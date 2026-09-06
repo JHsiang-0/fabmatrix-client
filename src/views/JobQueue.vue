@@ -263,7 +263,7 @@
       v-model:visible="createTaskDialogVisible"
       header="新建打印任务"
       width="560px"
-      :footer="false"
+      class="create-task-dialog"
       destroy-on-close
     >
       <t-alert
@@ -346,7 +346,13 @@
       </div>
       <template #footer>
         <div class="flex justify-end gap-3">
-          <t-button @click="createTaskDialogVisible = false">关闭</t-button>
+          <t-button
+            variant="outline"
+            :disabled="createTaskSubmitting"
+            @click="createTaskDialogVisible = false"
+          >
+            取消
+          </t-button>
           <t-button
             v-if="createTaskResults.some(result => result.status === 'FAILED' && result.retryable)"
             variant="outline"
@@ -363,7 +369,7 @@
             :disabled="taskFilesLoading || taskFiles.length === 0"
             @click="submitCreateTask"
           >
-            创建任务
+            确定
           </t-button>
         </div>
       </template>
@@ -899,5 +905,14 @@ onMounted(() => {
 
 .animate-spin {
   animation: rotate 1s linear infinite;
+}
+
+.create-task-dialog :deep(.t-dialog__body) {
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+}
+
+.create-task-dialog :deep(.t-dialog__footer) {
+  flex-shrink: 0;
 }
 </style>
