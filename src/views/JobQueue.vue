@@ -1,205 +1,232 @@
 <template>
-  <div class="app-page-shell app-page-background">
-    <PageHeader title="生产调度队列">
-      <template #actions>
+  <div class="app-page-shell app-page-background job-queue-page">
+    <div class="job-queue-page__header">
+      <div class="job-queue-page__title-group">
+        <h1 class="app-route-title">生产调度中心</h1>
+        <div class="job-queue-summary" aria-label="任务状态摘要">
+          <span class="job-queue-summary__item job-queue-summary__item--blue">待派发 {{ queuedCount }}</span>
+          <span class="job-queue-summary__item job-queue-summary__item--amber">调度中 {{ dispatchingCount }}</span>
+          <span class="job-queue-summary__item job-queue-summary__item--orange">已暂停 {{ pausedCount }}</span>
+        </div>
+      </div>
       <div class="app-page-toolbar__actions">
-        <t-button variant="outline" @click="openCreateTaskDialog" size="medium">
-          新建任务
-        </t-button>
-        <t-button :icon="renderIcon(Refresh)" :loading="loading" @click="fetchQueue" size="medium">
-          刷新
-        </t-button>
+        <t-button variant="outline" size="medium" @click="openCreateTaskDialog">新建任务</t-button>
+        <t-button :icon="renderIcon(Refresh)" :loading="loading" size="medium" @click="fetchQueue">刷新</t-button>
       </div>
-      </template>
-    </PageHeader>
+    </div>
 
-    <t-tabs v-model:value="activeTab" class="job-queue-tabs">
-      <t-tab-panel value="queue" label="待派发任务">
-        <section class="job-panel" aria-label="待派发任务">
-      <AsyncState
-        v-if="queueData.length === 0"
-        :loading="queueLoading"
-        :error="queueError"
-        :empty="!queueLoading && !queueError"
-        empty-description="当前没有排队中的任务，机器都在闲着呢！"
-        @retry="fetchQueue"
-      />
-      <t-alert v-if="queueError && queueData.length" theme="error" :close-btn="false" class="mb-3">
-        <template #default>{{ queueError.message || queueError }}</template>
-        <template #operation>
-          <t-button size="small" variant="outline" @click="fetchQueue">重试</t-button>
-        </template>
-      </t-alert>
-      <TdTable
-        v-if="queueData.length"
-        :data="queueData"
-        :loading="queueLoading"
-        :height="queueTableHeight"
-        style="width: 100%"
-        class="job-table"
-      >
-        <TdTableColumn prop="id" label="任务单号" width="100" align="center">
-          <template #default="scope">
-            <span class="font-mono font-semibold text-gray-700">#{{ scope.row.id }}</span>
-          </template>
-        </TdTableColumn>
+    <section class="job-queue-card">
+      <div class="job-queue-tabs-row">
+        <nav class="job-queue-tabs" aria-label="任务队列视图">
+          <button
+            v-for="tab in queueTabs"
+            :key="tab.value"
+            type="button"
+            class="job-queue-tab"
+            :class="{ 'job-queue-tab--active': activeTab === tab.value }"
+            @click="handleTabChange(tab.value)"
+          >
+            {{ tab.label }}
+            <span class="job-queue-tab__count">{{ tab.count }}</span>
+          </button>
+        </nav>
+        <div v-if="activeTab === 'queue'" class="job-queue-view-toggle" role="group" aria-label="视图切换">
+          <t-button variant="text" size="small" :class="{ 'job-queue-view-toggle--active': viewMode === 'list' }" aria-label="列表视图" @click="viewMode = 'list'">
+            <List />
+          </t-button>
+          <t-button variant="text" size="small" :class="{ 'job-queue-view-toggle--active': viewMode === 'grid' }" aria-label="网格视图" @click="viewMode = 'grid'">
+            <Grid />
+          </t-button>
+        </div>
+      </div>
 
-        <TdTableColumn prop="fileId" label="切片文件ID" width="100" align="center">
-          <template #default="scope">
-            <t-tag size="small" variant="light-outline">{{ scope.row.fileId }}</t-tag>
-          </template>
-        </TdTableColumn>
+      <div v-if="activeTab === 'queue'" class="job-queue-filters">
+        <div class="job-queue-filters__fields">
+          <t-input
+            v-model="filters.keyword"
+            class="job-queue-filters__search"
+            placeholder="通过任务单号/切片文件名检索..."
+            clearable
+            size="medium"
+            @input="handleSearch"
+            @keyup.enter="handleSearch"
+          >
+            <template #prefixIcon><Search /></template>
+          </t-input>
+          <t-select v-model="filters.machineModel" class="job-queue-filters__select" placeholder="按机型过滤" clearable size="medium" @change="handleSearch">
+            <t-option v-for="model in machineModels" :key="model" :label="model" :value="model" />
+          </t-select>
+          <t-select v-model="filters.nozzleSize" class="job-queue-filters__select" placeholder="喷嘴规格" clearable size="medium" @change="handleSearch">
+            <t-option label="0.2mm（高精度）" value="0.2" />
+            <t-option label="0.4mm（常规）" value="0.4" />
+            <t-option label="0.6mm（高速 / 耐磨）" value="0.6" />
+            <t-option label="0.8mm（粗打）" value="0.8" />
+          </t-select>
+          <t-select v-model="filters.materialType" class="job-queue-filters__select" placeholder="材质筛选" clearable size="medium" @change="handleSearch">
+            <t-option v-for="material in materialOptions" :key="material" :label="material" :value="material" />
+          </t-select>
+        </div>
+      </div>
 
-        <TdTableColumn label="耗材要求" width="120" align="center">
-          <template #default="scope">
-            <t-tag theme="warning" variant="light" size="small">
-              {{ scope.row.materialType || '-' }}
-            </t-tag>
-          </template>
-        </TdTableColumn>
-
-        <TdTableColumn label="喷嘴要求" width="100" align="center">
-          <template #default="scope">
-            <span class="font-medium text-gray-700">{{ formatOptionalUnit(scope.row.nozzleSize, 'mm') }}</span>
-          </template>
-        </TdTableColumn>
-
-        <TdTableColumn prop="priority" label="优先级" width="100" align="center">
-          <template #default="scope">
-            <t-select v-if="scope.row.status === 'QUEUED'" :value="scope.row.priority" size="small"
-              @change="value => handlePriority(scope.row, value)" style="width: 88px">
-              <t-option label="普通" :value="0" />
-              <t-option label="优先" :value="50" />
-              <t-option label="加急" :value="100" />
-            </t-select>
-            <t-tag v-else
-              :theme="getPriorityType(scope.row.priority)"
-              variant="dark"
-              size="small"
-              class="min-w-10 text-center"
-            >
-              {{ formatOptional(scope.row.priority) }}
-            </t-tag>
-          </template>
-        </TdTableColumn>
-
-        <TdTableColumn prop="status" label="状态" width="140" align="center">
-          <template #default="scope">
-            <StatusTag domain="job" :status="scope.row.status" />
-          </template>
-        </TdTableColumn>
-
-        <TdTableColumn label="创建时间" min-width="160" prop="createdAt" align="center">
-          <template #default="scope">
-            <div class="flex items-center justify-center gap-2 text-sm text-gray-600">
-              <span><clock /></span>
-              <span>{{ formatDateTime(scope.row.createdAt) }}</span>
-            </div>
-          </template>
-        </TdTableColumn>
-
-        <TdTableColumn label="调度操作" width="300" align="center" fixed="right">
-          <template #default="scope">
-            <t-space size="small">
-              <t-button size="small" variant="text" @click="openTaskDetail(scope.row)">详情</t-button>
-              <t-button
-                size="small"
-                theme="primary"
-                :disabled="scope.row.status !== 'QUEUED'"
-                @click="openAssignDialog(scope.row)"
-              >
-                <span><promotion /></span>
-                分配机器
-              </t-button>
-              <t-dropdown
-                trigger="click"
-                :options="getQueueActionOptions(scope.row)"
-                @click="item => handleQueueAction(scope.row, item)"
-              >
-                <t-button size="small" variant="text">更多</t-button>
-              </t-dropdown>
-            </t-space>
-          </template>
-        </TdTableColumn>
-      </TdTable>
-
-        </section>
-      </t-tab-panel>
-
-      <t-tab-panel value="active" label="活动任务">
-        <section class="job-panel" aria-label="活动任务">
-      <AsyncState
-        v-if="activePageData.length === 0"
-        :loading="activeLoading"
-        :error="activeError"
-        :empty="!activeLoading && !activeError"
-        empty-description="当前没有活动任务"
-        @retry="fetchActive"
-      />
-      <t-alert v-if="activeError && activePageData.length" theme="error" :close-btn="false" class="mb-3">
-        <template #default>{{ activeError.message || activeError }}</template>
-        <template #operation>
-          <t-button size="small" variant="outline" @click="fetchActive">重试</t-button>
-        </template>
-      </t-alert>
-      <TdTable
-        v-if="activePageData.length"
-        :data="activePageData"
-        :loading="activeLoading"
-        :height="activeTableHeight"
-        style="width: 100%"
-        class="job-table"
-      >
-        <TdTableColumn prop="id" label="任务单号" width="110" align="center">
-          <template #default="scope">
-            <span class="font-mono font-semibold text-gray-700">#{{ scope.row.id }}</span>
-          </template>
-        </TdTableColumn>
-        <TdTableColumn prop="fileId" label="切片文件ID" width="120" align="center" />
-        <TdTableColumn prop="printerId" label="打印机ID" width="120" align="center">
-          <template #default="scope">{{ scope.row.printerId || '未分配' }}</template>
-        </TdTableColumn>
-        <TdTableColumn prop="status" label="状态" width="140" align="center">
-          <template #default="scope">
-            <StatusTag domain="job" :status="scope.row.status" />
-          </template>
-        </TdTableColumn>
-        <TdTableColumn prop="progress" label="进度" width="150" align="center">
-          <template #default="scope">
-            <t-progress v-if="hasValue(scope.row.progress)" :percentage="scope.row.progress" :status="getProgressStatus(scope.row.status, scope.row.progress)" />
-            <span v-else>-</span>
-          </template>
-        </TdTableColumn>
-        <TdTableColumn prop="updatedAt" label="最近更新" min-width="160" align="center">
-          <template #default="scope">{{ formatDateTime(scope.row.updatedAt) }}</template>
-        </TdTableColumn>
-        <TdTableColumn label="操作" width="300" align="center" fixed="right">
-          <template #default="scope">
-            <t-space size="small">
-              <t-button size="small" variant="text" @click="openTaskDetail(scope.row)">详情</t-button>
-              <t-dropdown
-                trigger="click"
-                :options="getActiveActionOptions(scope.row)"
-                @click="item => handleActiveAction(scope.row, item)"
-              >
-                <t-button size="small" variant="text">更多</t-button>
-              </t-dropdown>
-            </t-space>
-          </template>
-        </TdTableColumn>
-      </TdTable>
-      <div v-if="activeTotal > activePageSize" class="flex justify-center mt-4">
-        <t-pagination
-          v-model:current="activePage"
-          :page-size="activePageSize"
-          :total="activeTotal"
-          :show-page-size="false"
-          @change="handleActivePageChange"
+      <div v-if="activeTab === 'queue'" class="job-queue-table-area">
+        <div v-if="queueLoading" class="job-queue-state">
+          <Refresh :size="40" class="is-loading" />
+          <p>加载中...</p>
+        </div>
+        <AsyncState
+          v-else-if="queueError && queueData.length === 0"
+          :loading="queueLoading"
+          :error="queueError"
+          :empty="false"
+          @retry="fetchQueue"
         />
+        <div v-else-if="queueError && queueData.length" class="job-queue-inline-error">
+          <t-alert theme="error" :close-btn="false">
+            <template #default>{{ queueError.message || queueError }}</template>
+            <template #operation><t-button size="small" variant="outline" @click="fetchQueue">重试</t-button></template>
+          </t-alert>
+        </div>
+        <div v-else-if="pagedQueueData.length === 0" class="job-queue-state">
+          <Coffee :size="56" />
+          <p>当前没有符合条件的待派发任务</p>
+        </div>
+        <div v-else-if="viewMode === 'list'" class="job-queue-list-view">
+          <TdTable
+            class="job-queue-table"
+            :data="pagedQueueData"
+            :loading="queueLoading"
+            style="width: 100%"
+            @selection-change="handleSelectionChange"
+            @row-click="openTaskDetail"
+          >
+            <TdTableColumn type="selection" width="44" align="center" />
+            <TdTableColumn label="任务单号 / 3D切片模型" min-width="250">
+              <template #default="scope">
+                <div class="job-name-cell">
+                  <div class="job-name-cell__icon"><Document :size="18" /></div>
+                  <div class="job-name-cell__content">
+                    <div class="job-name-cell__title">
+                      <span :title="getJobFileName(scope.row)">{{ getJobFileName(scope.row) }}</span>
+                      <t-tag size="small" :theme="getFileTagType(scope.row.materialType)">G-Code</t-tag>
+                    </div>
+                    <div class="job-name-cell__subtext">#{{ scope.row.id }} · {{ formatJobFileSize(scope.row) }}</div>
+                  </div>
+                </div>
+              </template>
+            </TdTableColumn>
+            <TdTableColumn label="适配机型 | 喷嘴 | 热床" min-width="180">
+              <template #default="scope">
+                <div class="job-compatibility">
+                  <strong>{{ getJobMachineModel(scope.row) }}</strong>
+                  <span>{{ formatJobNozzle(scope.row) }} · {{ formatJobBed(scope.row) }}</span>
+                </div>
+              </template>
+            </TdTableColumn>
+            <TdTableColumn label="持续工时" width="105" align="center">
+              <template #default="scope"><span class="job-mono">{{ formatJobDuration(scope.row) }}</span></template>
+            </TdTableColumn>
+            <TdTableColumn label="预估耗材 & 材质" width="145">
+              <template #default="scope">
+                <div class="job-material">
+                  <strong>{{ formatJobWeight(scope.row) }}</strong>
+                  <t-tag :theme="getFileTagType(scope.row.materialType)" size="small">{{ scope.row.materialType || '任意' }}</t-tag>
+                </div>
+              </template>
+            </TdTableColumn>
+            <TdTableColumn prop="priority" label="优先级" width="100" align="center">
+              <template #default="scope">
+                <t-input-number
+                  :value="Number(scope.row.priority ?? 0)"
+                  :min="0"
+                  :max="100"
+                  :step="1"
+                  :decimal-places="0"
+                  size="small"
+                  style="width: 82px"
+                  @change="value => handlePriority(scope.row, value)"
+                />
+              </template>
+            </TdTableColumn>
+            <TdTableColumn prop="createdAt" label="创建时间" width="145">
+              <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
+            </TdTableColumn>
+            <TdTableColumn prop="status" label="队列状态" width="115" align="center">
+              <template #default="scope"><t-tag :theme="getStatusType(scope.row.status)" variant="light" size="small">{{ getStatusLabel(scope.row.status) }}</t-tag></template>
+            </TdTableColumn>
+            <TdTableColumn label="调度操作" width="190" align="center" fixed="right">
+              <template #default="scope">
+                <div class="task-action-group">
+                  <t-button size="small" variant="text" @click.stop="openTaskDetail(scope.row)">详情</t-button>
+                  <t-button size="small" variant="outline" theme="primary" @click.stop="openAssignDialog(scope.row)">分配机位</t-button>
+                  <t-dropdown trigger="click" :options="getQueueActionOptions(scope.row)" @click="item => handleQueueAction(scope.row, item)">
+                    <t-button size="small" variant="outline" aria-label="更多调度操作" @click.stop>更多</t-button>
+                  </t-dropdown>
+                </div>
+              </template>
+            </TdTableColumn>
+          </TdTable>
+        </div>
+        <div v-else class="job-queue-grid-view">
+          <article v-for="job in pagedQueueData" :key="job.id" class="job-card" :class="{ 'job-card--selected': selectedJobIds.includes(job.id) }">
+            <div class="job-card__header">
+              <t-checkbox :checked="selectedJobIds.includes(job.id)" @click.stop="toggleJobSelection(job.id)" />
+              <t-tag :theme="getStatusType(job.status)" variant="light" size="small">{{ getStatusLabel(job.status) }}</t-tag>
+            </div>
+            <div class="job-card__title" :title="getJobFileName(job)">{{ getJobFileName(job) }}</div>
+            <div class="job-card__meta">#{{ job.id }} · {{ getJobMachineModel(job) }}</div>
+            <div class="job-card__stats"><span>{{ formatJobDuration(job) }}</span><span>{{ formatJobWeight(job) }}</span><t-tag :theme="getFileTagType(job.materialType)" size="small">{{ job.materialType || '任意' }}</t-tag></div>
+            <div class="job-card__actions">
+              <t-button size="small" variant="text" @click="openTaskDetail(job)">详情</t-button>
+              <t-button size="small" variant="outline" theme="primary" @click="openAssignDialog(job)">分配机位</t-button>
+              <t-dropdown trigger="click" :options="getQueueActionOptions(job)" @click="item => handleQueueAction(job, item)">
+                <t-button size="small" variant="outline" aria-label="更多调度操作">更多</t-button>
+              </t-dropdown>
+            </div>
+          </article>
+        </div>
       </div>
-        </section>
-      </t-tab-panel>
-    </t-tabs>
+
+      <div v-else class="job-queue-table-area job-queue-table-area--active">
+        <AsyncState
+          v-if="activePageData.length === 0"
+          :loading="activeLoading"
+          :error="activeError"
+          :empty="!activeLoading && !activeError"
+          empty-description="当前没有活动任务"
+          @retry="fetchActive"
+        />
+        <t-alert v-if="activeError && activePageData.length" theme="error" :close-btn="false" class="job-queue-inline-error">
+          <template #default>{{ activeError.message || activeError }}</template>
+          <template #operation><t-button size="small" variant="outline" @click="fetchActive">重试</t-button></template>
+        </t-alert>
+        <TdTable v-if="activePageData.length" :data="activePageData" :loading="activeLoading" class="job-queue-table" style="width: 100%" @row-click="openTaskDetail">
+          <TdTableColumn prop="id" label="任务单号" width="110" align="center"><template #default="scope"><span class="job-mono">#{{ scope.row.id }}</span></template></TdTableColumn>
+          <TdTableColumn prop="fileId" label="切片文件ID" width="120" align="center" />
+          <TdTableColumn prop="printerId" label="打印机ID" width="120" align="center"><template #default="scope">{{ scope.row.printerId || '未分配' }}</template></TdTableColumn>
+          <TdTableColumn prop="status" label="状态" width="140" align="center"><template #default="scope"><t-tag :theme="getStatusType(scope.row.status)" variant="light" size="small">{{ getStatusLabel(scope.row.status) }}</t-tag></template></TdTableColumn>
+          <TdTableColumn prop="progress" label="进度" width="150" align="center"><template #default="scope"><t-progress v-if="hasValue(scope.row.progress)" :percentage="scope.row.progress" :status="getProgressStatus(scope.row.status, scope.row.progress)" /><span v-else>-</span></template></TdTableColumn>
+          <TdTableColumn prop="updatedAt" label="最近更新" min-width="160" align="center"><template #default="scope">{{ formatDateTime(scope.row.updatedAt) }}</template></TdTableColumn>
+          <TdTableColumn label="操作" width="190" align="center" fixed="right"><template #default="scope"><div class="task-action-group"><t-button size="small" variant="text" @click.stop="openTaskDetail(scope.row)">详情</t-button><t-dropdown trigger="click" :options="getActiveActionOptions(scope.row)" @click="item => handleActiveAction(scope.row, item)"><t-button size="small" variant="outline" aria-label="更多操作" @click.stop>更多</t-button></t-dropdown></div></template></TdTableColumn>
+        </TdTable>
+      </div>
+
+      <footer v-if="activeTab === 'queue'" class="job-queue-footer">
+        <div class="job-queue-footer__batch">
+          <t-button variant="outline" size="small" :disabled="cancelableSelectedCount === 0" :icon="renderIcon(Delete)" @click="handleBatchCancel">批量移出</t-button>
+          <span>{{ selectedJobIds.length }} 已选择</span>
+          <span class="job-queue-footer__divider">|</span>
+          <span class="job-queue-footer__health">在线空闲打印机：<strong>{{ idlePrinterCount }} 台</strong></span>
+        </div>
+        <div class="job-queue-footer__pagination">
+          <span>共 {{ filteredQueueData.length }} 条调度工单</span>
+          <t-pagination v-model:current="pagination.pageNum" v-model:pageSize="pagination.pageSize" :total="filteredQueueData.length" :page-size-options="[20, 50, 100]" :total-content="false" @change="handlePageChange" />
+        </div>
+      </footer>
+      <footer v-else-if="activeTotal > activePageSize" class="job-queue-footer job-queue-footer--active">
+        <span>共 {{ activeTotal }} 条活动工单</span>
+        <t-pagination v-model:current="activePage" :page-size="activePageSize" :total="activeTotal" :show-page-size="false" :total-content="false" @change="handleActivePageChange" />
+      </footer>
+    </section>
 
     <!-- 指派打印机弹窗 -->
     <t-dialog v-model:visible="assignDialogVisible" header="指派打印机"
@@ -386,25 +413,27 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, reactive, ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import {
+  DeleteIcon as Delete,
+  FileIcon as Document,
+  GridViewIcon as Grid,
+  SearchIcon as Search,
+  ViewListIcon as List,
   RefreshIcon as Refresh,
-  TimeIcon as Clock,
-  SendIcon as Promotion,
+  FileIcon as Coffee,
   CheckIcon as Check
 } from 'tdesign-icons-vue-next'
 import { cancelJob, assignJobToPrinter, requeueJob, updateJobPriority, startJob, createPrintJob } from '@/api/job'
 import { confirmSafe, getPrinterList, pausePrinter, resumePrinter } from '@/api/printer'
 import { getFileTree } from '@/api/printFile'
 import { message, confirmMessage } from '@/utils/message'
-import { formatDateTime } from '@/utils/formatters'
+import { formatDateTime, formatDuration, formatFileSize } from '@/utils/formatters'
 import { renderIcon } from '@/utils/tdesign'
 import TdTable from '@/components/TdTable.vue'
 import TdTableColumn from '@/components/TdTableColumn.vue'
 import AsyncState from '@/components/AsyncState.vue'
-import PageHeader from '@/components/layout/PageHeader.vue'
-import StatusTag from '@/components/StatusTag.vue'
 import TaskDetailDrawer from '@/components/TaskDetailDrawer.vue'
 import { useJobStore } from '@/stores/jobStore'
 
@@ -413,6 +442,7 @@ defineOptions({ name: 'JobQueue' })
 const jobStore = useJobStore()
 const {
   queueJobs: queueData,
+  activeJobs,
   activePageJobs: activePageData,
   activeLoading,
   activePage,
@@ -425,14 +455,55 @@ const {
 } = storeToRefs(jobStore)
 const queueLoading = computed(() => jobStore.queueLoading)
 const loading = computed(() => jobStore.queueLoading || jobStore.activeLoading)
-const queueTableHeight = computed(() => queueData.value.length > 8
-  ? '100%'
-  : undefined)
-const activeTableHeight = computed(() => activePageData.value.length > 8
-  ? '100%'
-  : undefined)
 const detailErrorText = computed(() => detailError.value?.message || '')
 const fetchActive = () => jobStore.fetchActive()
+
+const activeTab = ref('queue')
+const viewMode = ref('list')
+const selectedJobIds = ref([])
+const idlePrinterCount = ref(0)
+const filters = reactive({
+  keyword: '',
+  machineModel: '',
+  nozzleSize: '',
+  materialType: ''
+})
+const pagination = reactive({
+  pageNum: 1,
+  pageSize: 20
+})
+const machineModels = ['拓竹 A1', '拓竹 X1-Carbon', '拓竹 P1S', '创想三维 K1 Max']
+const materialOptions = ['PLA', 'PLA-CF', 'ABS', 'ASA', 'PETG', 'TPU']
+
+const queuedCount = computed(() => queueData.value.length)
+const dispatchingCount = computed(() => activeJobs.value.filter(job => job.status !== 'PAUSED').length)
+const pausedCount = computed(() => activeJobs.value.filter(job => job.status === 'PAUSED').length)
+
+const filteredQueueData = computed(() => {
+  const keyword = filters.keyword.trim().toLowerCase()
+
+  return queueData.value.filter(job => {
+    if (keyword && ![job.id, job.fileId, job.fileName, getJobFileName(job)].some(value => String(value || '').toLowerCase().includes(keyword))) return false
+    if (filters.machineModel && getJobMachineModel(job) !== filters.machineModel) return false
+    if (filters.nozzleSize && String(job.nozzleSize ?? '') !== filters.nozzleSize) return false
+    if (filters.materialType && String(job.materialType || '').toUpperCase() !== filters.materialType.toUpperCase()) return false
+    return true
+  })
+})
+
+const pagedQueueData = computed(() => {
+  const start = (pagination.pageNum - 1) * pagination.pageSize
+  return filteredQueueData.value.slice(start, start + pagination.pageSize)
+})
+
+const queueTabs = computed(() => [
+  { value: 'queue', label: '待派发任务', count: queuedCount.value },
+  { value: 'active', label: '活动任务', count: activeTotal.value }
+])
+
+const cancelableSelectedCount = computed(() => selectedJobIds.value
+  .map(id => queueData.value.find(job => String(job.id) === String(id)))
+  .filter(job => job && canCancel(job.status)).length)
 
 // 派单弹窗状态
 const assignDialogVisible = ref(false)
@@ -452,7 +523,6 @@ const taskFiles = ref([])
 const taskPrinters = ref([])
 const taskFilesLoading = ref(false)
 const taskPrintersLoading = ref(false)
-const activeTab = ref('queue')
 const createTaskResults = ref([])
 const createTaskBatchKey = ref('')
 const actionLoadingKey = ref('')
@@ -504,9 +574,94 @@ const restoreTaskDetailContext = () => {
 
 const hasValue = value => value !== undefined && value !== null && value !== ''
 
-const formatOptional = value => hasValue(value) ? value : '-'
+const getJobFileName = job => job.fileName || `文件 #${job.fileId}`
 
-const formatOptionalUnit = (value, unit) => hasValue(value) ? `${value}${unit}` : '-'
+const getJobMachineModel = job => job.machineModel || job.printerModel || job.printerName || (job.printerId ? `设备 ${job.printerId}` : '未指定')
+
+const formatJobNozzle = job => {
+  const nozzleSize = Number(job.nozzleSize)
+  return Number.isFinite(nozzleSize) && nozzleSize > 0 ? `${nozzleSize.toFixed(1)}mm` : '喷嘴 --'
+}
+
+const formatJobBed = job => {
+  const bedTemp = Number(job.bedTemp)
+  return Number.isFinite(bedTemp) ? `热床 ${bedTemp}℃` : '热床 --'
+}
+
+const formatJobDuration = job => {
+  const duration = Number(job.estTime ?? job.estimatedSeconds ?? job.duration)
+  return Number.isFinite(duration) ? formatDuration(duration) : '--'
+}
+
+const formatJobWeight = job => {
+  const weight = Number(job.filamentWeight)
+  return Number.isFinite(weight) ? `${weight}g` : '--'
+}
+
+const formatJobFileSize = job => formatFileSize(job.fileSize)
+
+const getStatusType = status => {
+  const map = {
+    UPLOADING: 'warning',
+    QUEUED: 'primary',
+    ASSIGNED: 'warning',
+    READY: 'primary',
+    PRINTING: 'success',
+    PAUSED: 'warning',
+    COMPLETED: 'default',
+    FAILED: 'danger',
+    RECONCILING: 'warning'
+  }
+  return map[status] || 'default'
+}
+
+const getStatusLabel = status => {
+  const map = {
+    UPLOADING: '上传中',
+    QUEUED: '排队中',
+    ASSIGNED: '已分配待确认',
+    READY: '已上传待机',
+    PRINTING: '打印中',
+    PAUSED: '已暂停',
+    COMPLETED: '已完成',
+    FAILED: '失败',
+    CANCELLED: '已取消',
+    RECONCILING: '状态核对中'
+  }
+  return map[status] || status
+}
+
+const getFileTagType = materialType => {
+  const types = { PLA: 'success', 'PLA-CF': 'default', ABS: 'warning', ASA: 'warning', PETG: 'primary', TPU: 'default' }
+  return types[String(materialType || '').toUpperCase()] || 'default'
+}
+
+const handleSearch = () => {
+  pagination.pageNum = 1
+  selectedJobIds.value = []
+}
+
+const handleTabChange = tab => {
+  activeTab.value = tab
+  handleSearch()
+  if (tab === 'active') fetchActive()
+}
+
+const handlePageChange = ({ current, pageSize }) => {
+  pagination.pageNum = current
+  pagination.pageSize = pageSize
+  selectedJobIds.value = []
+}
+
+const handleSelectionChange = selection => {
+  selectedJobIds.value = selection.map(item => typeof item === 'object' ? item.id : item)
+}
+
+const toggleJobSelection = id => {
+  const index = selectedJobIds.value.findIndex(item => String(item) === String(id))
+  if (index >= 0) selectedJobIds.value.splice(index, 1)
+  else selectedJobIds.value.push(id)
+}
 
 const flattenTaskFiles = (nodes, result = []) => {
   nodes.forEach(node => {
@@ -632,14 +787,6 @@ const submitCreateTask = async (retryOnly = false) => {
 
 const retryFailedTaskCreations = () => submitCreateTask(true)
 
-// 获取优先级标签类型
-const getPriorityType = (priority) => {
-  if (priority >= 80) return 'danger'
-  if (priority >= 50) return 'warning'
-  if (priority >= 20) return 'primary'
-  return 'default'
-}
-
 const getProgressStatus = (status, progress) => {
   if (status === 'PAUSED') return 'warning'
   if (progress === 100) return 'success'
@@ -714,9 +861,39 @@ const handleActiveAction = async (job, item) => {
 const fetchQueue = async () => {
   try {
     await jobStore.refresh()
+    const printerResponse = await getPrinterList({ pageNum: 1, pageSize: 100 })
+    idlePrinterCount.value = (printerResponse.data?.records || [])
+      .filter(printer => printer.status === 'IDLE').length
+    selectedJobIds.value = []
+    pagination.pageNum = 1
     restoreTaskDetailContext()
   } catch {
     // 请求层已统一提示
+  }
+}
+
+const handleBatchCancel = async () => {
+  const selectedJobs = selectedJobIds.value
+    .map(id => queueData.value.find(job => String(job.id) === String(id)))
+    .filter(job => job && canCancel(job.status))
+
+  if (!selectedJobs.length) return
+
+  try {
+    await confirmMessage(
+      `确定要移出选中的 ${selectedJobs.length} 个任务吗？`,
+      '批量移出确认',
+      { confirmButtonText: '确定移出', cancelButtonText: '取消', type: 'warning' }
+    )
+    const results = await Promise.allSettled(selectedJobs.map(job => cancelJob(job.id)))
+    const successCount = results.filter(result => result.status === 'fulfilled').length
+    const failedCount = results.length - successCount
+    if (failedCount) message.warning(`已移出 ${successCount} 个任务，${failedCount} 个任务处理失败`)
+    else message.success(`已移出 ${successCount} 个任务`)
+    selectedJobIds.value = []
+    await fetchQueue()
+  } catch (error) {
+    if (error !== 'cancel') console.error('批量移出任务失败:', error)
   }
 }
 
@@ -858,61 +1035,389 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.job-queue-page {
+  --queue-primary: var(--app-primary);
+  --queue-border: var(--app-border);
+  --queue-text: var(--app-text-primary);
+  --queue-muted: var(--app-text-secondary);
+  min-width: 0;
+}
+
+.job-queue-page__header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-spacing-4);
+  min-height: 3rem;
+  margin-bottom: var(--app-spacing-3);
+}
+
+.job-queue-page__title-group {
+  display: flex;
+  align-items: baseline;
+  gap: var(--app-spacing-4);
+  min-width: 0;
+}
+
+.job-queue-page__title-group h1 {
+  margin: 0;
+  color: var(--queue-text);
+  white-space: nowrap;
+}
+
+.job-queue-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-spacing-2);
+  color: var(--queue-muted);
+  font-size: var(--td-font-size-body-small);
+  font-weight: 500;
+}
+
+.job-queue-summary__item {
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--app-radius-small);
+  white-space: nowrap;
+}
+
+.job-queue-summary__item--blue { color: var(--app-primary-active); background: var(--app-primary-light); }
+.job-queue-summary__item--amber,
+.job-queue-summary__item--orange { color: var(--app-warning-active); background: var(--app-warning-light); }
+
+.job-queue-card {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--app-surface);
+  border: 1px solid var(--queue-border);
+  border-radius: var(--app-radius);
+  box-shadow: var(--app-shadow);
+}
+
+.job-queue-tabs-row {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-spacing-4);
+  min-height: 3.25rem;
+  padding: 0.5rem var(--app-spacing-4) 0;
+  border-bottom: 1px solid var(--queue-border);
+}
+
 .job-queue-tabs {
   display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
+  align-items: stretch;
+  gap: var(--app-spacing-6);
   min-width: 0;
-  min-height: 0;
 }
 
-.job-queue-tabs :deep(.t-tabs__content),
-.job-queue-tabs :deep(.t-tab-panel) {
-  display: flex;
-  flex: 1 1 auto;
-  min-height: 0;
+.job-queue-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--app-spacing-2);
+  padding: 0.625rem 0.25rem 0.75rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--queue-muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--td-font-size-body-medium);
+  white-space: nowrap;
 }
 
-.job-queue-tabs :deep(.t-tabs__content) { flex-direction: column; }
-.job-queue-tabs :deep(.t-tab-panel) { flex-direction: column; }
+.job-queue-tab:hover,
+.job-queue-tab--active {
+  color: var(--queue-primary);
+}
 
-.job-panel {
+.job-queue-tab--active {
+  border-bottom-color: var(--queue-primary);
+  font-weight: 600;
+}
+
+.job-queue-tab__count {
+  min-width: 1.25rem;
+  padding: 0.1rem 0.375rem;
+  border-radius: 999px;
+  color: var(--app-text-secondary);
+  background: var(--app-surface-muted);
+  font-size: var(--td-font-size-body-small);
+  text-align: center;
+}
+
+.job-queue-tab--active .job-queue-tab__count {
+  color: var(--queue-primary);
+  background: var(--app-primary-light);
+}
+
+.job-queue-view-toggle {
   display: flex;
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-  padding: var(--app-spacing-5);
+  align-items: center;
+  padding: 0.125rem;
+  border: 1px solid var(--queue-border);
+  border-radius: var(--app-radius-small);
+  background: var(--app-surface-muted);
+}
+
+.job-queue-view-toggle :deep(.t-button) {
+  min-width: 2rem;
+  color: var(--app-text-placeholder);
+}
+
+.job-queue-view-toggle :deep(.job-queue-view-toggle--active) {
+  color: var(--queue-primary);
   background: var(--app-surface);
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-large);
 }
 
-.job-table {
+.job-queue-filters {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: var(--app-spacing-3) var(--app-spacing-4);
+  border-bottom: 1px solid var(--queue-border);
+}
+
+.job-queue-filters__fields {
+  display: flex;
   flex: 1 1 auto;
-  display: block;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-spacing-2);
+  min-width: 0;
+}
+
+.job-queue-filters__search { width: min(22rem, 100%); }
+.job-queue-filters__select { width: 10.5rem; }
+
+.job-queue-table-area {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
-@keyframes rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+.job-queue-list-view,
+.job-queue-table-area--active :deep(.td-table-adapter) {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
 }
 
-.animate-spin {
-  animation: rotate 1s linear infinite;
+.job-queue-table {
+  min-width: 0;
+  min-height: 100%;
 }
+
+.job-queue-table :deep(.t-table) { min-width: 1050px; }
+.job-queue-table :deep(.t-table th) {
+  color: var(--queue-muted);
+  background: var(--app-surface-muted);
+  font-weight: 500;
+}
+
+.job-queue-table :deep(.t-table td),
+.job-queue-table :deep(.t-table th) {
+  height: 4.25rem;
+  padding: 0.625rem 0.75rem;
+  border-color: var(--app-border);
+}
+
+.job-queue-table :deep(.t-table__content) {
+  overflow: auto;
+  scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
+  scrollbar-width: thin;
+}
+
+.job-queue-table :deep(.t-table__body tr:hover td) { background: var(--app-primary-light); }
+
+.job-queue-state {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: var(--app-spacing-3);
+  min-height: 14rem;
+  color: var(--app-text-placeholder);
+}
+
+.job-queue-state p { margin: 0; }
+.job-queue-inline-error { padding: var(--app-spacing-4); }
+
+.job-name-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--app-spacing-3);
+  min-width: 0;
+}
+
+.job-name-cell__icon {
+  display: flex;
+  flex: 0 0 2rem;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-small);
+  color: var(--app-primary);
+  background: var(--app-primary-light);
+}
+
+.job-name-cell__content { min-width: 0; }
+
+.job-name-cell__title {
+  display: flex;
+  align-items: center;
+  gap: var(--app-spacing-2);
+  min-width: 0;
+  color: var(--queue-text);
+  font-size: var(--td-font-size-body-medium);
+  font-weight: 600;
+}
+
+.job-name-cell__title > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-name-cell__title :deep(.t-tag) { flex-shrink: 0; }
+
+.job-name-cell__subtext {
+  margin-top: 0.25rem;
+  overflow: hidden;
+  color: var(--app-text-placeholder);
+  font-size: var(--td-font-size-body-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-compatibility,
+.job-material {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  line-height: 1.2;
+}
+
+.job-compatibility strong,
+.job-material strong { color: var(--queue-text); font-size: var(--td-font-size-body-small); }
+.job-compatibility span { color: var(--queue-muted); font-size: var(--td-font-size-body-small); }
+.job-mono { font-variant-numeric: tabular-nums; }
+
+.task-action-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--app-spacing-1);
+  white-space: nowrap;
+}
+
+.job-queue-grid-view {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  align-content: start;
+  gap: var(--app-spacing-3);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--app-spacing-4);
+  overflow: auto;
+}
+
+.job-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-spacing-3);
+  min-width: 0;
+  padding: var(--app-spacing-4);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: var(--app-surface);
+}
+
+.job-card--selected { border-color: var(--app-primary); background: var(--app-primary-light); }
+
+.job-card__header,
+.job-card__stats,
+.job-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-spacing-2);
+}
+
+.job-card__title {
+  overflow: hidden;
+  color: var(--queue-text);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-card__meta { color: var(--app-text-placeholder); font-size: var(--td-font-size-body-small); }
+.job-card__stats { justify-content: flex-start; color: var(--queue-muted); font-size: var(--td-font-size-body-small); }
+.job-card__actions { justify-content: flex-end; margin-top: auto; }
+
+.job-queue-footer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-spacing-4);
+  min-height: 3.5rem;
+  padding: 0.5rem var(--app-spacing-4);
+  border-top: 1px solid var(--queue-border);
+  background: var(--app-surface);
+}
+
+.job-queue-footer__batch,
+.job-queue-footer__pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--app-spacing-3);
+  min-width: 0;
+  color: var(--queue-muted);
+  font-size: var(--td-font-size-body-small);
+  white-space: nowrap;
+}
+
+.job-queue-footer__pagination { margin-left: auto; }
+.job-queue-footer__pagination :deep(.t-pagination) { flex-shrink: 0; }
+.job-queue-footer__divider { color: var(--app-border-strong); }
+.job-queue-footer__health strong { color: var(--app-success-active); }
 
 .create-task-dialog :deep(.t-dialog__body) {
   max-height: min(60vh, 520px);
   overflow-y: auto;
 }
 
-.create-task-dialog :deep(.t-dialog__footer) {
-  flex-shrink: 0;
+.create-task-dialog :deep(.t-dialog__footer) { flex-shrink: 0; }
+
+@media (max-width: 900px) {
+  .job-queue-page__title-group { align-items: flex-start; flex-direction: column; gap: var(--app-spacing-2); }
+  .job-queue-tabs-row { align-items: flex-start; flex-direction: column; padding-top: var(--app-spacing-3); }
+  .job-queue-view-toggle { align-self: flex-end; margin-top: calc(var(--app-spacing-3) * -1); }
+  .job-queue-footer { align-items: flex-start; flex-direction: column; }
+  .job-queue-footer__pagination { width: 100%; justify-content: space-between; margin-left: 0; }
+}
+
+@media (max-width: 640px) {
+  .job-queue-page__header { align-items: flex-start; flex-direction: column; }
+  .job-queue-page__header .app-page-toolbar__actions { width: 100%; justify-content: flex-end; }
+  .job-queue-filters__search,
+  .job-queue-filters__select { width: 100%; }
+  .job-queue-tabs { gap: var(--app-spacing-3); max-width: 100%; overflow-x: auto; }
 }
 </style>
