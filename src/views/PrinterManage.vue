@@ -1603,13 +1603,14 @@ const handleBatchAdd = async () => {
 
 .printer-grid-card {
   display: flex;
-  min-height: 15rem;
+  min-height: 18rem;
   flex-direction: column;
   gap: 1rem;
   padding: 1.125rem;
   background: var(--td-bg-color-container);
   border: 1px solid var(--td-border-level-1-color);
   border-radius: var(--td-radius-medium);
+  overflow: hidden;
   cursor: pointer;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -1656,7 +1657,7 @@ const handleBatchAdd = async () => {
 
 .printer-grid-card__progress {
   flex-wrap: wrap;
-  margin-top: auto;
+  margin-top: 0;
   row-gap: 0.5rem;
   color: var(--td-text-color-secondary);
   font-size: 0.8125rem;
@@ -1671,7 +1672,7 @@ const handleBatchAdd = async () => {
   justify-content: flex-end;
   gap: 0.5rem;
   min-height: 2rem;
-  margin-top: 0.125rem;
+  margin-top: auto;
   flex-wrap: wrap;
 }
 
