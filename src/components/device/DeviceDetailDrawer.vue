@@ -284,6 +284,7 @@
                     <t-skeleton v-else-if="historyLoading" :loading="true" theme="paragraph" />
                     <t-table
                         v-else-if="statusHistory.length > 0"
+                        class="printer-history-table"
                         :data="statusHistory"
                         :columns="historyColumns"
                         row-key="id"
@@ -330,21 +331,21 @@
                         打开 Mainsail 界面
                     </t-button>
 
-                    <!-- 操作按钮网格 - 移动端 2列，桌面 3列 -->
-                    <div class="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                        <t-button theme="warning" :disabled="actionLoading || !canPause" :loading="actionLoading" @click="handleAction('pause')" class="h-10">
+                    <!-- 操作按钮网格 - 移动端单列，桌面 3列 -->
+                    <div class="printer-detail-drawer__remote-actions">
+                        <t-button theme="warning" size="medium" :disabled="actionLoading || !canPause" :loading="actionLoading" @click="handleAction('pause')" class="printer-detail-drawer__remote-action">
                             <span>
                                 <VideoPause />
                             </span>
                             暂停
                         </t-button>
-                        <t-button theme="success" :disabled="actionLoading || !canResume" :loading="actionLoading" @click="handleAction('resume')">
+                        <t-button theme="success" size="medium" :disabled="actionLoading || !canResume" :loading="actionLoading" @click="handleAction('resume')" class="printer-detail-drawer__remote-action">
                             <span>
                                 <VideoPlay />
                             </span>
                             恢复
                         </t-button>
-                        <t-button theme="danger" :disabled="actionLoading || !canCancel" :loading="actionLoading" @click="handleAction('cancel')">
+                        <t-button theme="danger" size="medium" :disabled="actionLoading || !canCancel" :loading="actionLoading" @click="handleAction('cancel')" class="printer-detail-drawer__remote-action">
                             <span>
                                 <CircleClose />
                             </span>
@@ -429,8 +430,8 @@ const isLargeScreen = computed(() => windowWidth.value >= 1920)
 const drawerSize = computed(() => {
     if (isMobile.value) return '100%'      // 移动端：全屏
     if (isTablet.value) return '70%'       // 平板：70% 宽度
-    if (isLargeScreen.value) return '480px' // 大屏：固定 480px (30rem)
-    return '416px'                          // 桌面：固定 416px (26rem)
+    if (isLargeScreen.value) return '560px' // 大屏：固定 560px (35rem)
+    return '520px'                          // 桌面：固定 520px (32.5rem)
 })
 
 // 响应式描述列表列数
@@ -560,9 +561,9 @@ const drawerVisible = computed({
 
 const historyColumns = [
     { colKey: 'status', title: '状态', width: 100 },
-    { colKey: 'filename', title: '文件', ellipsis: true },
-    { colKey: 'progress', title: '进度', width: 70 },
-    { colKey: 'recordedAt', title: '记录时间', width: 150 }
+    { colKey: 'filename', title: '文件', width: 150, ellipsis: true },
+    { colKey: 'progress', title: '进度', width: 80 },
+    { colKey: 'recordedAt', title: '记录时间', width: 160 }
 ]
 
 const statisticCards = computed(() => {
@@ -797,6 +798,43 @@ async function handleStartPrint(action) {
     min-width: 0;
 }
 
+.printer-detail-drawer :deep(.printer-history-table) {
+    width: 100%;
+    min-width: 0;
+}
+
+.printer-detail-drawer :deep(.printer-history-table .t-table__content) {
+    overflow-x: hidden;
+}
+
+.printer-detail-drawer :deep(.printer-history-table table) {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+}
+
+.printer-detail-drawer :deep(.printer-history-table th),
+.printer-detail-drawer :deep(.printer-history-table td) {
+    white-space: nowrap;
+}
+
+.printer-detail-drawer :deep(.printer-history-table td:nth-child(2)) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.printer-detail-drawer__remote-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--app-spacing-2);
+}
+
+.printer-detail-drawer__remote-action {
+    width: 100%;
+    min-height: 2.5rem;
+    justify-content: center;
+}
+
 .printer-detail-drawer__header {
     display: flex;
     align-items: center;
@@ -820,6 +858,10 @@ async function handleStartPrint(action) {
 @media (max-width: 767px) {
     :deep(.t-drawer) {
         width: 100% !important;
+    }
+
+    .printer-detail-drawer__remote-actions {
+        grid-template-columns: 1fr;
     }
 
 }
