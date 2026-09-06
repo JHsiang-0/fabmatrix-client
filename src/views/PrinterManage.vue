@@ -1264,10 +1264,10 @@ const handleBatchAdd = async () => {
   align-items: center;
   min-width: 0;
   min-height: 2.5rem;
-  padding: 0.125rem;
+  padding: 0;
   background: var(--td-bg-color-container);
-  border: 1px solid var(--td-border-level-1-color);
-  border-radius: var(--td-radius-default);
+  border: 0;
+  border-radius: 0;
   box-shadow: none;
   overflow-x: auto;
   scrollbar-width: none;
@@ -1276,11 +1276,20 @@ const handleBatchAdd = async () => {
 .printer-management-tabs::-webkit-scrollbar { display: none; }
 
 .printer-management-tabs :deep(.t-radio-button) {
-  flex: 0 0 5.5rem;
-  width: 5.5rem;
+  flex: 0 0 6rem;
+  width: 6rem;
+  height: 2.125rem;
+  min-height: 2.125rem;
   justify-content: center;
   color: var(--td-text-color-secondary);
+  font-size: 0.875rem;
+  border: 0;
   box-shadow: none;
+}
+
+.printer-management-tabs :deep(.t-radio-button::before),
+.printer-management-tabs :deep(.t-radio-button.t-is-checked + .t-radio-button::before) {
+  display: none;
 }
 
 .printer-management-tabs :deep(.t-radio-button:hover) {
@@ -1290,6 +1299,7 @@ const handleBatchAdd = async () => {
 .printer-management-tabs :deep(.t-radio-button.t-is-checked) {
   color: var(--td-brand-color-6);
   background-color: var(--td-brand-color-1);
+  border: 0;
   box-shadow: none;
 }
 
