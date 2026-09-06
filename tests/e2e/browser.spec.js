@@ -19,6 +19,18 @@ const pages = [
   { label: '个人中心', path: '/profile', text: '个人资料' }
 ]
 
+const parentLabels = {
+  概览仪表盘: '工作台',
+  打印机管理: '打印机',
+  文件库: '文件',
+  任务队列: '任务',
+  打印历史: '任务',
+  批量派发: '批量派发',
+  用户管理: '管理中心',
+  操作日志: '管理中心',
+  个人中心: '个人中心'
+}
+
 const login = async page => {
   await page.goto('/login')
   await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible()
@@ -43,7 +55,14 @@ const openSidebarItem = async (page, width, label) => {
       await expect(sidebar).toHaveClass(/app-sidebar--mobile-open/)
     }
   }
-  const menuItem = sidebar.locator('.t-menu__item:visible').filter({ hasText: label }).first()
+  let menuItem = sidebar.locator('.t-submenu__item:visible').filter({ hasText: label }).first()
+  if (!(await menuItem.count())) {
+    const submenuTitle = sidebar.locator('.t-submenu > .t-menu__item:visible').filter({ hasText: parentLabels[label] }).first()
+    await expect(submenuTitle).toBeVisible()
+    await submenuTitle.click()
+    menuItem = sidebar.locator('.t-submenu__item:visible').filter({ hasText: label }).first()
+  }
+  await expect(menuItem).toBeVisible()
   await menuItem.evaluate(element => element.scrollIntoView({ block: 'center', inline: 'nearest' }))
   await page.waitForTimeout(300)
   const menuItemBox = await menuItem.boundingBox()

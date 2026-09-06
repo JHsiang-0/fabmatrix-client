@@ -10,8 +10,20 @@
   >
     <div class="app-sidebar__top-spacer" aria-hidden="true" />
 
-    <t-menu :value="activePath" :collapsed="props.collapsed && !props.isMobile" theme="light" class="app-menu app-scroll-region">
-      <t-menu-group v-for="group in visibleGroups" :key="group.key" :title="props.collapsed && !props.isMobile ? '' : group.label">
+    <t-menu
+      v-model:expanded="expandedGroupKeys"
+      :value="activePath"
+      :collapsed="props.collapsed && !props.isMobile"
+      :expand-mutex="true"
+      expand-type="normal"
+      theme="light"
+      class="app-menu app-scroll-region"
+    >
+      <t-submenu v-for="group in visibleGroups" :key="group.key" :value="group.key">
+        <template #icon>
+          <component :is="group.items[0].icon" size="18" />
+        </template>
+        <template #title>{{ group.label }}</template>
         <t-menu-item
           v-for="item in group.items"
           :key="item.key"
@@ -23,7 +35,7 @@
           </template>
           {{ item.title }}
         </t-menu-item>
-      </t-menu-group>
+      </t-submenu>
     </t-menu>
 
     <div v-if="!props.collapsed || props.isMobile" class="app-sidebar__footer">
@@ -34,7 +46,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { navigationGroups } from '@/config/navigation'
@@ -65,6 +77,14 @@ const visibleGroups = computed(() => navigationGroups.map(group => ({
   ...group,
   items: group.items.filter(item => !item.roles || userStore.hasRole(item.roles))
 })).filter(group => group.items.length > 0))
+const expandedGroupKeys = ref([])
+
+const syncExpandedGroup = () => {
+  const activeGroup = visibleGroups.value.find(group => group.items.some(item => item.to === route.path))
+  if (activeGroup) expandedGroupKeys.value = [activeGroup.key]
+}
+
+watch([() => route.path, visibleGroups], syncExpandedGroup, { immediate: true })
 
 const handleItemClick = item => {
   if (route.path !== item.to) {
@@ -112,15 +132,13 @@ const handleItemClick = item => {
   flex-shrink: 0;
 }
 
-:deep(.t-menu__group-title) {
-  padding: var(--app-spacing-3) var(--app-spacing-3) var(--app-spacing-1);
-  color: var(--app-text-placeholder);
-  font-size: 0.75rem;
+:deep(.t-menu__item) {
+  margin: 2px 0;
+  border-radius: var(--app-radius);
 }
 
-:deep(.t-menu__item) {
-  margin: var(--app-spacing-1) 0;
-  border-radius: var(--app-radius);
+:deep(.t-submenu__item) {
+  margin: 1px 0;
 }
 
 :deep(.t-menu__item.t-is-active) {
