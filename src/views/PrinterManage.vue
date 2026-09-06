@@ -53,19 +53,22 @@
 
     <section class="printer-management-toolbar-card" aria-label="打印机筛选和视图工具栏">
       <div class="printer-management-toolbar-card__top">
-        <nav class="printer-management-tabs" aria-label="打印机状态筛选">
-          <button
+        <t-radio-group
+          v-model="statusFilter"
+          class="printer-management-tabs"
+          variant="default-filled"
+          size="small"
+          aria-label="打印机状态筛选"
+          @change="applyStatusTab"
+        >
+          <t-radio-button
             v-for="tab in printerStatusTabs"
             :key="tab.value || 'all'"
-            type="button"
-            class="printer-management-tab"
-            :class="{ 'printer-management-tab--active': activeStatusFilterKey === tab.value }"
-            :aria-pressed="activeStatusFilterKey === tab.value"
-            @click="applyStatusTab(tab.value)"
+            :value="tab.value"
           >
-            <span>{{ tab.label }}</span>
-          </button>
-        </nav>
+            {{ tab.label }}
+          </t-radio-button>
+        </t-radio-group>
 
         <div class="printer-management-toolbar-card__controls">
           <t-input
@@ -1261,33 +1264,39 @@ const handleBatchAdd = async () => {
   align-items: center;
   min-width: 0;
   min-height: 2.5rem;
-  gap: 0.25rem;
+  padding: 0.125rem;
+  background: var(--td-bg-color-container);
+  border: 1px solid var(--td-border-level-1-color);
+  border-radius: var(--td-radius-default);
+  box-shadow: none;
   overflow-x: auto;
+  scrollbar-width: none;
 }
 
-.printer-management-tab {
-  display: inline-flex;
+.printer-management-tabs::-webkit-scrollbar { display: none; }
+
+.printer-management-tabs :deep(.t-radio-button) {
   flex: 0 0 5.5rem;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  height: 2.5rem;
   width: 5.5rem;
-  padding: 0 0.85rem;
+  justify-content: center;
   color: var(--td-text-color-secondary);
-  font-size: 0.8125rem;
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
+  box-shadow: none;
 }
 
-.printer-management-tab:hover,
-.printer-management-tab--active {
+.printer-management-tabs :deep(.t-radio-button:hover) {
   color: var(--td-brand-color-6);
 }
 
-.printer-management-tab--active { border-bottom-color: var(--td-brand-color-6); }
+.printer-management-tabs :deep(.t-radio-button.t-is-checked) {
+  color: var(--td-brand-color-6);
+  background-color: var(--td-brand-color-1);
+  box-shadow: none;
+}
+
+.printer-management-tabs :deep(.t-radio-group__bg-block) {
+  background-color: var(--td-brand-color-1);
+  box-shadow: none;
+}
 
 .printer-management-filter__search {
   flex: 0 1 16rem;
