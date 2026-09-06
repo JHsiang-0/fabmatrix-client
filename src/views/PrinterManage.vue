@@ -75,8 +75,8 @@
         class="printer-management-filter__search"
         clearable
         placeholder="按机器名称、IP 地址或编号搜索"
-        @enter="applyFilters"
-        @clear="applyFilters"
+        @enter="handleKeywordEnter"
+        @clear="handleKeywordClear"
       >
         <template #prefixIcon><Search /></template>
       </t-input>
@@ -561,7 +561,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -623,6 +623,8 @@ const queryParams = reactive({
 })
 
 const keyword = ref('')
+let lastAppliedKeyword = ''
+let searchDebounceTimer = null
 const statusFilter = ref('')
 const statusFilterConfig = Object.fromEntries(Object.entries(PRINTER_STATUS_MAP).map(([value, config]) => [value, {
     label: config.label,
@@ -1018,6 +1020,11 @@ const fetchData = async () => {
 }
 
 const applyFilters = () => {
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = null
+  }
+  lastAppliedKeyword = keyword.value.trim()
   queryParams.pageNum = 1
   const query = { ...route.query }
   if (statusFilter.value) query.status = statusFilter.value
@@ -1026,10 +1033,36 @@ const applyFilters = () => {
   if (statusFilter.value === activeStatusFilterKey.value) fetchData()
 }
 
+const scheduleKeywordSearch = () => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
+    searchDebounceTimer = null
+    applyFilters()
+  }, 400)
+}
+
+const handleKeywordEnter = () => {
+  applyFilters()
+}
+
+const handleKeywordClear = () => {
+  keyword.value = ''
+  applyFilters()
+}
+
 const clearStatusFilter = () => {
   statusFilter.value = ''
   applyFilters()
 }
+
+watch(keyword, value => {
+  if (value.trim() === lastAppliedKeyword) return
+  scheduleKeywordSearch()
+})
+
+onBeforeUnmount(() => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+})
 
 watch(() => route.query.status, value => {
   statusFilter.value = Array.isArray(value) ? value[0] || '' : value || ''
