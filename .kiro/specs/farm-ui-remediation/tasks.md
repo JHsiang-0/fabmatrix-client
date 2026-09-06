@@ -1083,7 +1083,7 @@ Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存
 
 提交：完成最终检查后创建独立本地提交 `style: 统一文件库 TDesign 卡片与筛选布局`，不执行 `git push`。
 
-### [ ] UI-004.8 文件子系统重写：Table/Grid 视图与右键菜单
+### [x] UI-004.8 文件子系统重写：Table/Grid 视图与右键菜单
 
 优先级：P0
 
@@ -1108,6 +1108,14 @@ Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存
 - 完成 `npm test`、`npm run test:e2e`、`npm run test:electron`、`npm run test:electron:dist`、`npm run lint`、`npm run build` 和桌面构建，并通过提交前 Git 检查。
 
 完成后提交：`refactor: 重写文件子系统视图与右键菜单`。
+
+完成记录：默认 Table 与可选 Grid 复用同一 `fileRows`，文件夹卡片只展示目录标识、名称和打开/删除，文件卡片仅展示正式安全元数据与打印/删除；Table 文件夹行不再填充文件专属指标。列表名称单元格和 Grid 卡片均接入 TDesign `Dropdown trigger="context-menu"`，右键仅提供打开、详情、打印、下载、删除和已选项批量删除，保留行点击、卡片点击和可见操作按钮；菜单动作兼容 TDesign 当前实际回调对象并沿用现有 API。
+
+测试：`npm test`（145/145）、`npm run test:e2e`（9/9，覆盖 `375×812`、`768×1024`、`1440×900`、`1920×855`）、`npm run test:electron`（3/3，包含右键打开文件详情）、`npm run test:electron:dist`（1/1，含 `npm run build:desktop`）、`npm run lint`、`npm run build` 全部通过。构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
+
+Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存后的 `git diff --cached --check`，仅暂存本子任务的 `src/views/FileLibrary.vue`、`tests/fileLibrary.test.js`、`tests/e2e/electron.spec.js` 和本任务记录。
+
+提交：完成最终检查后创建独立本地提交 `refactor: 重写文件子系统视图与右键菜单`，不执行 `git push`。
 
 ### 8.6 UI-004 执行顺序与统一约束
 

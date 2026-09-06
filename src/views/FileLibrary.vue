@@ -115,146 +115,153 @@
       <!-- 网格视图 -->
       <div v-if="viewMode === 'grid'" class="file-grid-view app-scroll-region">
         <!-- 文件夹 -->
-        <t-card
+        <div
           v-for="file in folderList"
           :key="file.id"
-          bordered
-          hover-shadow
-          class="file-card"
-          :class="{ 'file-card--selected': isBatchMode && selectedIds.includes(file.id) }"
-          @click="handleFileClick(file)"
+          class="file-card-context"
         >
-          <!-- 卡片选中状态 -->
-          <div v-if="isBatchMode" class="file-card__selection">
-            <t-checkbox :checked="selectedIds.includes(file.id)" disabled
-              @click.stop="toggleSelection(file.id)"
-              size="small" />
-          </div>
-
-          <!-- 文件夹图标 -->
-          <div class="file-card__media file-card__media--folder">
-            <IconFolder :size="64" />
-          </div>
-
-          <!-- 卡片内容 -->
-          <div class="file-card__body">
-            <h3 class="file-card__name"
-              :title="file.originalName">
-              {{ file.originalName }}
-            </h3>
-
-            <!-- 文件夹统计 -->
-            <div class="file-card__stats">
-              <div class="file-card__stat">
-                <span class="file-card__stat-label">类型</span>
-                <span class="file-card__stat-value">文件夹</span>
+          <t-dropdown :options="getContextMenuOptions(file)" trigger="context-menu"
+            @click="handleContextMenuClick($event, file)">
+            <t-card bordered hover-shadow class="file-card"
+              :class="{ 'file-card--selected': isBatchMode && selectedIds.includes(file.id) }"
+              @click="handleFileClick(file)">
+              <!-- 卡片选中状态 -->
+              <div v-if="isBatchMode" class="file-card__selection">
+                <t-checkbox :checked="selectedIds.includes(file.id)" disabled
+                  @click.stop="toggleSelection(file.id)"
+                  size="small" />
               </div>
-            </div>
 
-            <!-- 悬浮操作按钮 -->
-            <div class="file-card__actions">
-              <t-button theme="primary" size="small" :icon="renderIcon(FolderOpened)" @click.stop="navigateToFolder(file)"
-                class="file-card__action">
-                打开
-              </t-button>
-              <t-button theme="danger" size="small" :icon="renderIcon(Delete)" :loading="deletingIds.includes(file.id)"
-                :disabled="batchDeleting || deletingIds.length > 0" @click.stop="handleDelete(file.id)"
-                class="file-card__action">
-                删除
-              </t-button>
-            </div>
-          </div>
-        </t-card>
+              <!-- 文件夹图标 -->
+              <div class="file-card__media file-card__media--folder">
+                <IconFolder :size="64" />
+              </div>
+
+              <!-- 卡片内容 -->
+              <div class="file-card__body">
+                <h3 class="file-card__name"
+                  :title="file.originalName">
+                  {{ file.originalName }}
+                </h3>
+
+                <!-- 文件夹统计 -->
+                <div class="file-card__stats">
+                  <div class="file-card__stat">
+                    <span class="file-card__stat-label">类型</span>
+                    <span class="file-card__stat-value">文件夹</span>
+                  </div>
+                </div>
+
+                <!-- 悬浮操作按钮 -->
+                <div class="file-card__actions">
+                  <t-button theme="primary" size="small" :icon="renderIcon(FolderOpened)" @click.stop="navigateToFolder(file)"
+                    class="file-card__action">
+                    打开
+                  </t-button>
+                  <t-button theme="danger" size="small" :icon="renderIcon(Delete)" :loading="deletingIds.includes(file.id)"
+                    :disabled="batchDeleting || deletingIds.length > 0" @click.stop="handleDelete(file.id)"
+                    class="file-card__action">
+                    删除
+                  </t-button>
+                </div>
+              </div>
+            </t-card>
+          </t-dropdown>
+        </div>
 
         <!-- 文件 -->
-        <t-card
+        <div
           v-for="file in fileItemsList"
           :key="file.id"
-          bordered
-          hover-shadow
-          class="file-card"
-          :class="{ 'file-card--selected': isBatchMode && selectedIds.includes(file.id) }"
-          @click="handleFileClick(file)">
-          <!-- 卡片选中状态 -->
-          <div v-if="isBatchMode" class="file-card__selection">
-            <t-checkbox :checked="selectedIds.includes(file.id)" @click.stop="toggleSelection(file.id)"
-              size="small" />
-          </div>
+          class="file-card-context"
+        >
+          <t-dropdown :options="getContextMenuOptions(file)" trigger="context-menu"
+            @click="handleContextMenuClick($event, file)">
+            <t-card bordered hover-shadow class="file-card"
+              :class="{ 'file-card--selected': isBatchMode && selectedIds.includes(file.id) }"
+              @click="handleFileClick(file)">
+              <!-- 卡片选中状态 -->
+              <div v-if="isBatchMode" class="file-card__selection">
+                <t-checkbox :checked="selectedIds.includes(file.id)" @click.stop="toggleSelection(file.id)"
+                  size="small" />
+              </div>
 
-          <!-- 缩略图区域 -->
-          <div class="file-card__media">
-            <t-image v-if="file.thumbnailUrl" :src="file.thumbnailUrl" :alt="file.originalName" fit="cover"
-              class="file-card__thumbnail">
-              <template #error>
-                <div class="file-card__media-placeholder">
-                  <Picture :size="36" />
-                  <span>加载失败</span>
+              <!-- 缩略图区域 -->
+              <div class="file-card__media">
+                <t-image v-if="file.thumbnailUrl" :src="file.thumbnailUrl" :alt="file.originalName" fit="cover"
+                  class="file-card__thumbnail">
+                  <template #error>
+                    <div class="file-card__media-placeholder">
+                      <Picture :size="36" />
+                      <span>加载失败</span>
+                    </div>
+                  </template>
+                </t-image>
+                <div v-else class="file-card__media-placeholder">
+                  <Document :size="36" />
+                  <span>NO IMAGE</span>
                 </div>
-              </template>
-            </t-image>
-            <div v-else class="file-card__media-placeholder">
-              <Document :size="36" />
-              <span>NO IMAGE</span>
-            </div>
-            <!-- 材质标签 -->
-            <t-tag :theme="getMaterialTagType(file.materialType)" class="file-card__material-tag" size="small">
-              {{ file.materialType || '未指定' }}
-            </t-tag>
-          </div>
+                <!-- 材质标签 -->
+                <t-tag :theme="getMaterialTagType(file.materialType)" class="file-card__material-tag" size="small">
+                  {{ file.materialType || '未指定' }}
+                </t-tag>
+              </div>
 
-          <!-- 卡片内容 -->
-          <div class="file-card__body">
-            <h3 class="file-card__name"
-              :title="file.originalName">
-              {{ file.originalName }}
-            </h3>
+              <!-- 卡片内容 -->
+              <div class="file-card__body">
+                <h3 class="file-card__name"
+                  :title="file.originalName">
+                  {{ file.originalName }}
+                </h3>
 
-            <!-- 核心数据指标 -->
-            <div class="file-card__metrics">
-              <div>
-                <Clock :size="14" class="file-card__metric-icon" />
-                <span>{{ formatDuration(file.estTime) }}</span>
-              </div>
-              <div>
-                <ScaleToOriginal :size="14" class="file-card__metric-icon" />
-                <span>{{ formatMetric(file.filamentWeight, 'g') }}</span>
-              </div>
-              <div>
-                <FullScreen :size="14" class="file-card__metric-icon" />
-                <span>{{ formatMetric(file.filamentLength, 'm') }}</span>
-              </div>
-              <div>
-                <span>{{ formatFileSize(file.fileSize) }}</span>
-              </div>
-            </div>
+                <!-- 核心数据指标 -->
+                <div class="file-card__metrics">
+                  <div>
+                    <Clock :size="14" class="file-card__metric-icon" />
+                    <span>{{ formatDuration(file.estTime) }}</span>
+                  </div>
+                  <div>
+                    <ScaleToOriginal :size="14" class="file-card__metric-icon" />
+                    <span>{{ formatMetric(file.filamentWeight, 'g') }}</span>
+                  </div>
+                  <div>
+                    <FullScreen :size="14" class="file-card__metric-icon" />
+                    <span>{{ formatMetric(file.filamentLength, 'm') }}</span>
+                  </div>
+                  <div>
+                    <span>{{ formatFileSize(file.fileSize) }}</span>
+                  </div>
+                </div>
 
-            <!-- 统计信息 -->
-            <div class="file-card__stats">
-              <div>
-                <span class="file-card__stat-label">打印</span>
-                <span class="file-card__stat-value">{{ formatMetric(file.printCount, '次') }}</span>
-              </div>
-              <div class="file-card__success-rate">
-                <span class="file-card__stat-label">成功率</span>
-                <t-progress v-if="hasValue(file.successRate)" :percentage="file.successRate" :stroke-width="4" :label="false"
-                  :class="['file-card__success-rate-progress', getSuccessRateClass(file.successRate)]" />
-                <span class="file-card__stat-value">{{ formatMetric(file.successRate, '%') }}</span>
-              </div>
-            </div>
+                <!-- 统计信息 -->
+                <div class="file-card__stats">
+                  <div>
+                    <span class="file-card__stat-label">打印</span>
+                    <span class="file-card__stat-value">{{ formatMetric(file.printCount, '次') }}</span>
+                  </div>
+                  <div class="file-card__success-rate">
+                    <span class="file-card__stat-label">成功率</span>
+                    <t-progress v-if="hasValue(file.successRate)" :percentage="file.successRate" :stroke-width="4" :label="false"
+                      :class="['file-card__success-rate-progress', getSuccessRateClass(file.successRate)]" />
+                    <span class="file-card__stat-value">{{ formatMetric(file.successRate, '%') }}</span>
+                  </div>
+                </div>
 
-            <!-- 悬浮操作按钮 -->
-            <div class="file-card__actions">
-              <t-button theme="primary" size="small" :icon="renderIcon(Printer)" @click.stop="handlePrint(file)"
-                class="file-card__action">
-                打印
-              </t-button>
-              <t-button theme="danger" size="small" :icon="renderIcon(Delete)" @click.stop="handleDelete(file.id)"
-                class="file-card__action">
-                删除
-              </t-button>
-            </div>
-          </div>
-        </t-card>
+                <!-- 悬浮操作按钮 -->
+                <div class="file-card__actions">
+                  <t-button theme="primary" size="small" :icon="renderIcon(Printer)" @click.stop="handlePrint(file)"
+                    class="file-card__action">
+                    打印
+                  </t-button>
+                  <t-button theme="danger" size="small" :icon="renderIcon(Delete)" @click.stop="handleDelete(file.id)"
+                    class="file-card__action">
+                    删除
+                  </t-button>
+                </div>
+              </div>
+            </t-card>
+          </t-dropdown>
+        </div>
       </div>
 
       <!-- 列表视图 -->
@@ -265,52 +272,61 @@
 
           <TdTableColumn prop="originalName" label="文件名" min-width="200">
             <template #default="{ row }">
-              <div class="file-table__name-cell">
-                <div class="file-table__icon">
-                  <span v-if="row.folder" class="file-table__folder-icon">
-                    <IconFolder />
-                  </span>
-                  <t-image v-else-if="row.thumbnailUrl" :src="row.thumbnailUrl" fit="cover" class="file-table__thumbnail" />
-                  <span v-else class="file-table__file-icon">
-                    <Document />
-                  </span>
+              <t-dropdown :options="getContextMenuOptions(row)" trigger="context-menu"
+                @click="handleContextMenuClick($event, row)">
+                <div class="file-table__name-cell">
+                  <div class="file-table__icon">
+                    <span v-if="row.folder" class="file-table__folder-icon">
+                      <IconFolder />
+                    </span>
+                    <t-image v-else-if="row.thumbnailUrl" :src="row.thumbnailUrl" fit="cover" class="file-table__thumbnail" />
+                    <span v-else class="file-table__file-icon">
+                      <Document />
+                    </span>
+                  </div>
+                  <span class="file-table__name"
+                    :title="row.originalName">{{
+                      row.originalName
+                    }}</span>
+                  <t-tag v-if="row.folder" size="small" class="file-table__type-tag">
+                    文件夹
+                  </t-tag>
+                  <t-tag v-else :theme="getMaterialTagType(row.materialType)" size="small" class="file-table__type-tag">
+                    {{ row.materialType || '未指定' }}
+                  </t-tag>
                 </div>
-                <span class="file-table__name"
-                  :title="row.originalName">{{
-                    row.originalName
-                  }}</span>
-                <t-tag v-if="row.folder" size="small" class="file-table__type-tag">
-                  文件夹
-                </t-tag>
-                <t-tag v-else :theme="getMaterialTagType(row.materialType)" size="small" class="file-table__type-tag">
-                  {{ row.materialType || '未指定' }}
-                </t-tag>
-              </div>
+              </t-dropdown>
             </template>
           </TdTableColumn>
 
           <TdTableColumn prop="fileSize" label="文件大小" width="100" v-if="currentParentId">
-            <template #default="{ row }">{{ row.folder ? '-' : formatFileSize(row.fileSize) }}</template>
+            <template #default="{ row }">
+              <span v-if="!row.folder">{{ formatFileSize(row.fileSize) }}</span>
+            </template>
           </TdTableColumn>
 
           <TdTableColumn prop="estTime" label="预计耗时" width="85" v-if="currentParentId">
-            <template #default="{ row }">{{ row.folder ? '文件夹' : formatDuration(row.estTime) }}</template>
+            <template #default="{ row }">
+              <span v-if="!row.folder">{{ formatDuration(row.estTime) }}</span>
+            </template>
           </TdTableColumn>
 
           <TdTableColumn prop="filamentWeight" label="耗材重量" width="85" v-if="currentParentId">
-            <template #default="{ row }">{{
-              row.folder ? '-' : formatMetric(row.filamentWeight, 'g')
-              }}</template>
+            <template #default="{ row }">
+              <span v-if="!row.folder">{{ formatMetric(row.filamentWeight, 'g') }}</span>
+            </template>
           </TdTableColumn>
 
           <TdTableColumn prop="filamentLength" label="所需线长" width="85" v-if="currentParentId">
-            <template #default="{ row }">{{
-              row.folder ? '-' : formatMetric(row.filamentLength, 'm')
-              }}</template>
+            <template #default="{ row }">
+              <span v-if="!row.folder">{{ formatMetric(row.filamentLength, 'm') }}</span>
+            </template>
           </TdTableColumn>
 
           <TdTableColumn prop="printCount" label="打印次数" width="80" v-if="currentParentId">
-            <template #default="{ row }">{{ row.folder ? '-' : formatMetric(row.printCount, '次') }}</template>
+            <template #default="{ row }">
+              <span v-if="!row.folder">{{ formatMetric(row.printCount, '次') }}</span>
+            </template>
           </TdTableColumn>
 
           <TdTableColumn prop="successRate" label="成功率" width="100" v-if="currentParentId">
@@ -320,7 +336,7 @@
                   :class="getSuccessRateClass(row.successRate)" />
                 <span>{{ formatMetric(row.successRate, '%') }}</span>
               </div>
-              <span v-else>-</span>
+              <span v-else-if="!row.folder">-</span>
             </template>
           </TdTableColumn>
 
@@ -552,7 +568,8 @@ import {
   GridViewIcon as Grid,
   ViewListIcon as List,
   PrintIcon as Printer,
-  UploadIcon as Upload
+  UploadIcon as Upload,
+  DownloadIcon as Download
 } from 'tdesign-icons-vue-next'
 import {
   getFileList,
@@ -667,6 +684,33 @@ const fileRows = computed(() => fileList.value.map(file => ({
 const folderList = computed(() => fileRows.value.filter(file => file.viewType === 'folder'))
 
 const fileItemsList = computed(() => fileRows.value.filter(file => file.viewType === 'file'))
+
+const getContextMenuOptions = file => {
+  if (!file) return []
+
+  const options = file.folder
+    ? [
+        { content: '打开', value: 'open', prefixIcon: renderIcon(FolderOpened) },
+        { content: '删除', value: 'delete', theme: 'error', prefixIcon: renderIcon(Delete) }
+      ]
+    : [
+        { content: '查看详情', value: 'detail', prefixIcon: renderIcon(Document) },
+        { content: '打印', value: 'print', prefixIcon: renderIcon(Printer) },
+        { content: '下载', value: 'download', prefixIcon: renderIcon(Download) },
+        { content: '删除', value: 'delete', theme: 'error', prefixIcon: renderIcon(Delete) }
+      ]
+
+  if (isBatchMode.value && !file.folder && selectedIds.value.includes(file.id) && selectedIds.value.length > 1) {
+    options.push({
+      content: `批量删除 (${selectedIds.value.length})`,
+      value: 'batch-delete',
+      theme: 'error',
+      prefixIcon: renderIcon(Delete)
+    })
+  }
+
+  return options
+}
 
 const hasValue = value => value !== undefined && value !== null && value !== ''
 
@@ -1270,6 +1314,35 @@ const handleFileClick = (file) => {
   }
 }
 
+const handleContextMenuClick = (value, file) => {
+  if (!file) return
+
+  const action = typeof value === 'object' ? value.value : value
+
+  switch (action) {
+    case 'open':
+      if (file.folder) navigateToFolder(file)
+      break
+    case 'detail':
+      if (!file.folder) openFileDetail(file)
+      break
+    case 'print':
+      if (!file.folder) handlePrint(file)
+      break
+    case 'download':
+      if (!file.folder) handleFileDownload(file)
+      break
+    case 'delete':
+      handleDelete(file.id)
+      break
+    case 'batch-delete':
+      handleBatchDelete()
+      break
+    default:
+      break
+  }
+}
+
 /**
  * 处理表格行点击事件
  */
@@ -1488,18 +1561,23 @@ onMounted(() => {
   overflow-y: auto;
 }
 
+.file-card-context {
+  min-width: 0;
+  min-height: 0;
+}
+
+.file-card-context :deep(.t-card) {
+  height: 100%;
+}
+
 .file-card {
   position: relative;
-  display: flex;
   min-width: 0;
-  min-height: 280px;
-  flex-direction: column;
   overflow: hidden;
 }
 
 .file-card :deep(.t-card__body) {
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
   min-height: 0;
   padding: 0;
@@ -1517,7 +1595,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   position: relative;
-  height: 128px;
+  height: 112px;
   flex-shrink: 0;
   background: var(--td-bg-color-container-hover);
   overflow: hidden;
@@ -1559,14 +1637,14 @@ onMounted(() => {
 
 .file-card__body {
   display: flex;
-  min-height: 150px;
-  flex: 1;
+  min-height: 156px;
   flex-direction: column;
-  padding: var(--app-spacing-4);
+  gap: var(--app-spacing-2);
+  padding: var(--app-spacing-3);
 }
 
 .file-card__name {
-  margin: 0 0 var(--app-spacing-3);
+  margin: 0;
   overflow: hidden;
   color: var(--app-text-primary);
   font-size: 14px;
@@ -1581,12 +1659,14 @@ onMounted(() => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   min-width: 0;
-  margin-bottom: var(--app-spacing-3);
   color: var(--app-text-secondary);
   font-size: 12px;
 }
 
 .file-card__metrics > div {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1598,8 +1678,7 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: var(--app-spacing-3);
-  margin-bottom: var(--app-spacing-3);
-  padding: 10px;
+  padding: 8px;
   color: var(--app-text-secondary);
   background: var(--app-surface-muted);
   border-radius: var(--app-radius-small);
@@ -1663,7 +1742,14 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: var(--app-spacing-2);
+  width: 100%;
   min-width: 0;
+}
+
+.file-table__name-cell :deep(.t-dropdown__trigger) {
+  display: block;
+  min-width: 0;
+  width: 100%;
 }
 
 .file-table__icon {

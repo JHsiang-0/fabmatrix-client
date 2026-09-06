@@ -66,6 +66,17 @@ test('文件库默认使用可滚动 TDesign 列表并通过行或卡片打开�
   assert.doesNotMatch(source, /viewMode = ref\('grid'\)/)
 })
 
+test('文件库网格和列表均提供 TDesign 右键辅助菜单且只映射正式动作', () => {
+  assert.match(source, /trigger="context-menu"/)
+  assert.match(source, /const getContextMenuOptions = file =>/)
+  assert.match(source, /const handleContextMenuClick = \(value, file\) =>/)
+  assert.match(source, /value: 'detail'/)
+  assert.match(source, /value: 'download'/)
+  assert.match(source, /value: 'batch-delete'/)
+  assert.match(source, /DownloadIcon as Download/)
+  assert.doesNotMatch(source, /value: '(rename|move|copy|share)'/)
+})
+
 test('文件详情抽屉使用 TDesign 关闭同步并避免旧版卡片拼装', () => {
   assert.match(detailSource, /v-model:visible="drawerVisible"/)
   assert.match(detailSource, /aria-label="关闭文件详情"/)
