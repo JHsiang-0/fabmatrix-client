@@ -113,7 +113,10 @@ const handleItemClick = item => {
 }
 
 .app-menu {
+  box-sizing: border-box;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
   padding: var(--app-spacing-3) var(--app-spacing-2);
   border-right: 0;
   overflow-y: auto;
@@ -140,11 +143,15 @@ const handleItemClick = item => {
 }
 
 :deep(.t-menu__item) {
+  box-sizing: border-box;
+  max-width: 100%;
   margin: 2px 0;
   border-radius: var(--app-radius);
 }
 
 :deep(.t-submenu__item) {
+  box-sizing: border-box;
+  max-width: 100%;
   margin: 1px 0;
 }
 
