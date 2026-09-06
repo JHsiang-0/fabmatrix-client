@@ -19,6 +19,8 @@
       <div class="grid-overlay" />
       <div class="blur-circle blur-circle-1" />
       <div class="blur-circle blur-circle-2" />
+
+      <footer class="login-footer">© 2024 FabMatrix 生产管理平台</footer>
     </section>
 
     <section class="right-section">
@@ -131,18 +133,15 @@
           </button>
         </form>
 
-        <div class="login-secondary-actions">
-          <button v-if="setupMode" class="text-link setup-switch" type="button" @click="setupMode = false">
-            已有账号，返回登录
-          </button>
-          <t-button class="connection-link" variant="outline" theme="default" @click="goServerConnection">
-            配置服务器地址
-          </t-button>
-        </div>
+        <button v-if="setupMode" class="text-link setup-switch" type="button" @click="setupMode = false">
+          已有账号，返回登录
+        </button>
       </div>
-    </section>
 
-    <footer class="login-footer">© 2024 FabMatrix 生产管理平台</footer>
+      <t-button class="connection-link" variant="outline" theme="default" @click="goServerConnection">
+        配置服务器地址
+      </t-button>
+    </section>
   </main>
 </template>
 
@@ -375,6 +374,7 @@ onUnmounted(() => clearTimeout(feedbackTimer))
 }
 
 .right-section {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -525,16 +525,26 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   text-decoration: underline;
 }
 
-.login-secondary-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-top: 1rem;
+.setup-switch {
+  display: block;
+  width: fit-content;
+  margin: 1rem auto 0;
 }
 
-.setup-switch {
+.connection-link {
+  position: absolute;
+  right: clamp(1.5rem, 5vw, 4rem);
+  bottom: clamp(1rem, 3vh, 2rem);
+}
+
+.login-footer {
+  position: relative;
+  z-index: 2;
   margin: 0;
+  color: rgb(255 255 255 / 62%);
+  font-size: 0.75rem;
+  text-align: left;
+  pointer-events: none;
 }
 
 .error-message {
@@ -580,17 +590,6 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   opacity: 0.6;
 }
 
-.login-footer {
-  position: absolute;
-  right: 0;
-  bottom: 1rem;
-  left: 0;
-  color: rgb(255 255 255 / 62%);
-  font-size: 0.75rem;
-  text-align: center;
-  pointer-events: none;
-}
-
 @media (max-width: 1024px) {
   .login-page {
     grid-template-columns: 1fr;
@@ -603,10 +602,17 @@ onUnmounted(() => clearTimeout(feedbackTimer))
 
   .right-section {
     min-height: 100%;
+    padding-bottom: 5rem;
   }
 
   .login-footer {
-    color: #9ca3af;
+    display: none;
+  }
+
+  .connection-link {
+    position: static;
+    align-self: flex-end;
+    margin-top: 1rem;
   }
 }
 

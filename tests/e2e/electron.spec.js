@@ -47,6 +47,17 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     await expect(page.getByText('Mock 调试账号请使用系统中已有的用户名和密码', { exact: true })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '配置服务器地址', exact: true })).toBeVisible()
     await expect(page.locator('.login-page .logo-mark')).toHaveCount(0)
+    const rightSectionBox = await page.locator('.right-section').boundingBox()
+    const connectionButtonBox = await page.getByRole('button', { name: '配置服务器地址', exact: true }).boundingBox()
+    const leftSectionBox = await page.locator('.left-section').boundingBox()
+    const footerBox = await page.locator('.left-section .login-footer').boundingBox()
+    expect(rightSectionBox).not.toBeNull()
+    expect(connectionButtonBox).not.toBeNull()
+    expect(leftSectionBox).not.toBeNull()
+    expect(footerBox).not.toBeNull()
+    expect(connectionButtonBox.x + connectionButtonBox.width).toBeGreaterThanOrEqual(rightSectionBox.x + rightSectionBox.width - 96)
+    expect(connectionButtonBox.y + connectionButtonBox.height).toBeGreaterThanOrEqual(rightSectionBox.y + rightSectionBox.height - 96)
+    expect(footerBox.x + footerBox.width).toBeLessThanOrEqual(leftSectionBox.x + leftSectionBox.width + 1)
     const loginMetrics = await page.locator('.login-page').evaluate(element => ({
       clientHeight: element.clientHeight,
       scrollHeight: element.scrollHeight
