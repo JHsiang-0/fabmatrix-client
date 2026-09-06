@@ -51,7 +51,7 @@ test('文件详情仅展示安全元数据并区分缩略图不可用', () => {
   assert.match(detailSource, /file.thumbnailError/)
   assert.doesNotMatch(detailSource, /rustfsKey|safeName|fileUrl/)
   assert.doesNotMatch(detailSource, /上传用户ID/)
-  assert.match(source, /getThumbnailUrl\(file\.id\)/)
+  assert.match(source, /getThumbnailUrl\(fileId\)/)
 })
 
 test('文件库默认使用可滚动列表并保留网格切换和显式详情入口', () => {
@@ -74,4 +74,13 @@ test('文件详情抽屉使用 TDesign 关闭同步并避免旧版卡片拼装',
   assert.match(detailSource, /aria-label="关闭文件详情"/)
   assert.match(detailSource, /<t-descriptions/)
   assert.doesNotMatch(detailSource, /class="grid grid-cols|class="bg-white|class="space-y-/)
+  assert.match(detailSource, /@click="emit\('retry'\)"/)
+  assert.match(detailSource, /@click="emit\('retry-jobs'\)"/)
+  assert.match(source, /@retry="retryFileDetail"/)
+  assert.match(source, /@retry-jobs="retryFileJobs"/)
+  assert.match(source, /const loadFileDetail = async fileId =>/)
+  assert.match(source, /const loadFileJobs = async fileId =>/)
+  assert.match(source, /const retryFileDetail = \(\) =>/)
+  assert.match(source, /const retryFileJobs = \(\) =>/)
+  assert.match(source, /await refreshLibrary\(\)/)
 })

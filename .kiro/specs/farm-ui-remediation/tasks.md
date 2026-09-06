@@ -964,7 +964,7 @@ Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存
 
 提交：完成最终检查后创建独立本地提交 `refactor: 统一文件库表格与网格数据视图`，不执行 `git push`。
 
-### [ ] UI-004.4 上传、删除与文件详情工作流
+### [x] UI-004.4 上传、删除与文件详情工作流
 
 优先级：P1
 
@@ -986,6 +986,14 @@ Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存
 - 从文件详情到创建任务的流程在桌面和窄窗口可完成。
 
 完成后提交：`fix: 完善文件库上传删除与详情工作流`。
+
+完成记录：文件详情预览/缩略图和关联任务请求拆分为可重试的加载函数；详情 Drawer 的预览错误和关联任务错误均提供 TDesign 原位重试，保留安全字段、短期缩略图和正式下载入口。删除成功后等待当前目录同步，继续保留 422 文件夹冲突和批量逐项失败语义；未新增接口、字段、状态或业务数据。
+
+测试：`npm test`（144/144）、`npm run lint`、`npm run build` 通过。构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
+
+Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存后的 `git diff --cached --check`，仅暂存 `src/views/FileLibrary.vue`、`src/components/file/FileDetailDrawer.vue`、`tests/fileLibrary.test.js` 和本任务记录。
+
+提交：完成最终检查后创建独立本地提交 `fix: 完善文件库上传删除与详情工作流`，不执行 `git push`。
 
 ### [ ] UI-004.5 Electron、浏览器视觉与交互验收
 

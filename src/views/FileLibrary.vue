@@ -474,6 +474,8 @@
       @download="handleFileDownload"
       @closed="closeFileDetail"
       @print="handlePrintFromDetail"
+      @retry="retryFileDetail"
+      @retry-jobs="retryFileJobs"
     />
 
     <!-- 创建打印任务对话框 -->
@@ -1072,7 +1074,7 @@ const handleDelete = async (id) => {
       selectedIds.value.splice(index, 1)
     }
 
-    refreshLibrary()
+    await refreshLibrary()
   } catch (error) {
     if (error !== 'cancel') {
       console.error('删除失败:', error)
@@ -1245,25 +1247,15 @@ const getSuccessRateClass = (successRate) => {
   return 'success-rate-success'
 }
 
-/**
- * 打开文件详情
- */
-const openFileDetail = (file, event) => {
-  if (event) event.stopPropagation()
-  selectedFile.value = { ...file, thumbnailUrl: null, thumbnailError: false }
+const loadFileDetail = async fileId => {
   detailLoading.value = true
   detailError.value = ''
-  detailJobs.value = []
-  detailJobsLoading.value = true
-  detailJobsError.value = ''
-  sessionStorage.setItem(FILE_DETAIL_CONTEXT_KEY, String(file.id))
-  detailDrawerVisible.value = true
-
-  Promise.allSettled([
-    getFilePreview(file.id),
-    getThumbnailUrl(file.id)
-  ]).then(([previewResult, thumbnailResult]) => {
-    if (selectedFile.value && String(selectedFile.value.id) === String(file.id)) {
+  try {
+    const [previewResult, thumbnailResult] = await Promise.allSettled([
+      getFilePreview(fileId),
+      getThumbnailUrl(fileId)
+    ])
+    if (selectedFile.value && String(selectedFile.value.id) === String(fileId)) {
       if (previewResult.status === 'fulfilled') {
         selectedFile.value = {
           ...selectedFile.value,
@@ -1279,25 +1271,51 @@ const openFileDetail = (file, event) => {
         selectedFile.value.thumbnailError = true
       }
     }
-  }).finally(() => {
-    if (selectedFile.value && String(selectedFile.value.id) === String(file.id)) {
+  } finally {
+    if (selectedFile.value && String(selectedFile.value.id) === String(fileId)) {
       detailLoading.value = false
     }
-  })
+  }
+}
 
-  getFileJobs(file.id, { pageNum: 1, pageSize: 10 }).then(response => {
-    if (selectedFile.value && String(selectedFile.value.id) === String(file.id)) {
+const loadFileJobs = async fileId => {
+  detailJobsLoading.value = true
+  detailJobsError.value = ''
+  try {
+    const response = await getFileJobs(fileId, { pageNum: 1, pageSize: 10 })
+    if (selectedFile.value && String(selectedFile.value.id) === String(fileId)) {
       detailJobs.value = response.data?.records || []
     }
-  }).catch(() => {
-    if (selectedFile.value && String(selectedFile.value.id) === String(file.id)) {
+  } catch {
+    if (selectedFile.value && String(selectedFile.value.id) === String(fileId)) {
       detailJobsError.value = '关联任务加载失败，请稍后重试'
     }
-  }).finally(() => {
-    if (selectedFile.value && String(selectedFile.value.id) === String(file.id)) {
+  } finally {
+    if (selectedFile.value && String(selectedFile.value.id) === String(fileId)) {
       detailJobsLoading.value = false
     }
-  })
+  }
+}
+
+/**
+ * 打开文件详情
+ */
+const openFileDetail = (file, event) => {
+  if (event) event.stopPropagation()
+  selectedFile.value = { ...file, thumbnailUrl: null, thumbnailError: false }
+  detailJobs.value = []
+  sessionStorage.setItem(FILE_DETAIL_CONTEXT_KEY, String(file.id))
+  detailDrawerVisible.value = true
+  loadFileDetail(file.id)
+  loadFileJobs(file.id)
+}
+
+const retryFileDetail = () => {
+  if (selectedFile.value?.id) loadFileDetail(selectedFile.value.id)
+}
+
+const retryFileJobs = () => {
+  if (selectedFile.value?.id) loadFileJobs(selectedFile.value.id)
 }
 
 /**

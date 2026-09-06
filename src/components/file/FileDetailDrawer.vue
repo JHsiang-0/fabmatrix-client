@@ -24,7 +24,11 @@
       </div>
 
       <template v-else-if="file">
-        <t-alert v-if="error" theme="error" :title="error" :close-btn="false" />
+        <t-alert v-if="error" theme="error" :title="error" :close-btn="false">
+          <template #operation>
+            <t-button size="small" variant="outline" @click="emit('retry')">重试</t-button>
+          </template>
+        </t-alert>
         <t-alert
           v-if="file.thumbnailError"
           theme="warning"
@@ -91,7 +95,11 @@
             <h3 id="file-detail-jobs">关联打印任务</h3>
             <t-tag v-if="!jobsLoading" theme="default" variant="light" size="small">{{ jobs.length }} 条</t-tag>
           </div>
-          <t-alert v-if="jobsError" theme="error" :title="jobsError" :close-btn="false" />
+          <t-alert v-if="jobsError" theme="error" :title="jobsError" :close-btn="false">
+            <template #operation>
+              <t-button size="small" variant="outline" @click="emit('retry-jobs')">重试</t-button>
+            </template>
+          </t-alert>
           <t-skeleton v-else-if="jobsLoading" :loading="true" theme="paragraph" />
           <t-table v-else-if="jobs.length > 0" :data="jobs" :columns="jobColumns" row-key="id" size="small" bordered>
             <template #status="slotProps">
@@ -133,7 +141,7 @@ const props = defineProps({
   jobsError: { type: String, default: '' }
 })
 
-const emit = defineEmits(['update:modelValue', 'download', 'closed', 'print'])
+const emit = defineEmits(['update:modelValue', 'download', 'closed', 'print', 'retry', 'retry-jobs'])
 
 const drawerVisible = computed({
   get: () => props.modelValue,
