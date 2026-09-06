@@ -37,7 +37,7 @@
 
     <div v-if="!props.collapsed || props.isMobile" class="app-sidebar__footer">
       <span>FabMatrix</span>
-      <t-tag size="small" theme="default" variant="light" shape="round">v{{ appVersion }}</t-tag>
+      <t-tag class="app-sidebar__version" size="small" theme="default" variant="light" shape="round">v{{ appVersion }}</t-tag>
     </div>
   </t-aside>
 </template>
@@ -124,12 +124,19 @@ const handleItemClick = item => {
   display: flex;
   align-items: center;
   gap: var(--app-spacing-2);
-  padding: var(--app-spacing-4) var(--app-spacing-5);
+  padding: var(--app-spacing-2) var(--app-spacing-5);
   color: var(--app-text-placeholder);
   font-size: 0.75rem;
+  line-height: 24px;
   border-top: 1px solid var(--app-border);
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+.app-sidebar__footer > span,
+.app-sidebar__version {
+  font-size: 0.75rem;
+  line-height: 24px;
 }
 
 :deep(.t-menu__item) {

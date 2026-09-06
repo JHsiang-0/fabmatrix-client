@@ -19,7 +19,7 @@ test('FabMatrix theme maps application semantics to installed TDesign tokens', (
 })
 
 test('responsive shell keeps desktop dimensions in semantic tokens', () => {
-  assert.match(themeSource, /--app-sidebar-width:\s*232px/)
+  assert.match(themeSource, /--app-sidebar-width:\s*216px/)
   assert.match(themeSource, /--app-sidebar-collapsed-width:\s*64px/)
   assert.match(themeSource, /--app-sidebar-mobile-width:\s*280px/)
   assert.match(themeSource, /--app-content-padding:\s*var\(--app-spacing-6\)/)
