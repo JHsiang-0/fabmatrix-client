@@ -1595,18 +1595,18 @@ const handleBatchAdd = async () => {
 
 .printer-grid-view {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
-  gap: 0.75rem;
-  padding: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  gap: 1rem;
+  padding: 1rem;
   overflow: auto;
 }
 
 .printer-grid-card {
   display: flex;
-  min-height: 12rem;
+  min-height: 15rem;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 1rem;
+  gap: 1rem;
+  padding: 1.125rem;
   background: var(--td-bg-color-container);
   border: 1px solid var(--td-border-level-1-color);
   border-radius: var(--td-radius-medium);
@@ -1624,21 +1624,42 @@ const handleBatchAdd = async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 1rem;
+}
+
+.printer-grid-card__header {
+  align-items: flex-start;
+}
+
+.printer-grid-card__header .printer-table-primary {
+  min-width: 0;
+}
+
+.printer-grid-card__header .printer-management-status-pill {
+  flex: 0 0 auto;
 }
 
 .printer-grid-card__body {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.6rem;
   color: var(--td-text-color-secondary);
   font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.printer-grid-card__body > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .printer-grid-card__progress {
   flex-wrap: wrap;
   margin-top: auto;
+  row-gap: 0.5rem;
   color: var(--td-text-color-secondary);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
 }
 
 .printer-grid-card__progress :deep(.t-progress) {
@@ -1648,7 +1669,10 @@ const handleBatchAdd = async () => {
 .printer-grid-card__actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.25rem;
+  gap: 0.5rem;
+  min-height: 2rem;
+  margin-top: 0.125rem;
+  flex-wrap: wrap;
 }
 
 .printer-filter-bar { display: none; }
@@ -1675,6 +1699,12 @@ const handleBatchAdd = async () => {
 
   .printer-management-view-toggle {
     justify-content: flex-end;
+  }
+
+  .printer-grid-view {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+    padding: 0.75rem;
   }
 
   .printer-management-table-footer {
