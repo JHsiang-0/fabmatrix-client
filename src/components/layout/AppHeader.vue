@@ -8,21 +8,22 @@
         :title="collapsed ? '展开菜单' : '收起菜单'"
         @click="$emit('toggle-sidebar')"
       >
-        <MenuUnfoldIcon v-if="collapsed" size="20" />
-        <MenuFoldIcon v-else size="20" />
+        <ViewListIcon size="20" />
       </t-button>
 
     </div>
 
     <div class="app-header__right">
       <t-button
-        variant="text"
-        class="header-icon-button"
+        theme="primary"
+        shape="round"
+        class="app-header__dashboard-action"
         aria-label="实时设备看板"
         title="实时设备看板"
         @click="openFullscreenDashboard"
       >
-        <DesktopIcon size="19" />
+        <template #icon><DesktopIcon size="18" /></template>
+        实时设备看板
       </t-button>
       <t-button variant="text" class="header-icon-button" aria-label="消息通知" title="通知中心暂未开放" disabled>
         <MailIcon size="19" />
@@ -33,26 +34,28 @@
       <t-button variant="text" class="header-icon-button app-header__optional-action" aria-label="系统设置" title="系统设置暂未开放" disabled>
         <SettingIcon size="19" />
       </t-button>
-      <t-tag
-        size="small"
-        variant="light"
-        :theme="realtimeTheme"
-        :title="realtimeDescription"
-        aria-live="polite"
-        class="app-header__realtime-status"
-      >
-        {{ realtimeLabel }}
-      </t-tag>
-      <t-button
-        v-if="!isWsConnected || isRealtimeStale"
-        variant="text"
-        size="small"
-        class="app-header__reconnect"
-        aria-label="重新连接实时状态"
-        @click="reconnectRealtime"
-      >
-        重连
-      </t-button>
+      <div class="app-header__realtime-control" aria-label="实时设备连接状态">
+        <t-tag
+          size="small"
+          variant="light"
+          :theme="realtimeTheme"
+          :title="realtimeDescription"
+          aria-live="polite"
+          class="app-header__realtime-status"
+        >
+          {{ realtimeLabel }}
+        </t-tag>
+        <t-button
+          v-if="!isWsConnected || isRealtimeStale"
+          variant="text"
+          size="small"
+          class="app-header__reconnect"
+          aria-label="重新连接实时状态"
+          @click="reconnectRealtime"
+        >
+          重连
+        </t-button>
+      </div>
       <AppUserMenu />
     </div>
   </t-header>
@@ -66,9 +69,8 @@ import {
   DesktopIcon,
   HelpCircleIcon,
   MailIcon,
-  MenuFoldIcon,
-  MenuUnfoldIcon,
-  SettingIcon
+  SettingIcon,
+  ViewListIcon
 } from 'tdesign-icons-vue-next'
 import { enterAppFullscreen } from '@/utils/fullscreen'
 import { useRealtimeStore } from '@/stores/printer/realtimeStore'
@@ -146,13 +148,32 @@ const openFullscreenDashboard = async () => {
   gap: 0.5rem;
 }
 
+.app-header__dashboard-action {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.app-header__realtime-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  min-height: 32px;
+  padding: 2px 4px 2px 8px;
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
 .app-header__realtime-status {
   white-space: nowrap;
 }
 
 .app-header__reconnect {
-  padding: 0 4px;
+  min-height: 26px;
+  padding: 0 6px;
   color: var(--app-primary);
+  border-radius: 999px;
 }
 
 .header-icon-button {
@@ -183,7 +204,7 @@ const openFullscreenDashboard = async () => {
     display: none;
   }
 
-  .app-header__realtime-status {
+  .app-header__realtime-control {
     display: none;
   }
 }

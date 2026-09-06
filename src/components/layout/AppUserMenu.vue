@@ -11,11 +11,11 @@
     <template #dropdown>
       <t-dropdown-menu>
         <t-dropdown-item value="profile">
-          <template #prefix><UserIcon /></template>
+          <template #prefixIcon><UserIcon size="16" /></template>
           个人中心
         </t-dropdown-item>
-        <t-dropdown-item value="logout" divider>
-          <template #prefix><PoweroffIcon /></template>
+        <t-dropdown-item value="logout">
+          <template #prefixIcon><PoweroffIcon size="16" /></template>
           退出登录
         </t-dropdown-item>
       </t-dropdown-menu>
@@ -61,7 +61,8 @@ const handleCommand = item => {
 .user-menu-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 0.625rem;
+  justify-content: flex-start;
+  gap: 0.875rem;
   min-height: 40px;
   padding: 0 0.5rem;
   color: var(--app-text-primary);
@@ -76,10 +77,15 @@ const handleCommand = item => {
 }
 
 .user-menu-trigger__name {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
   max-width: 8rem;
   overflow: hidden;
   font-size: 0.875rem;
   font-weight: 500;
+  line-height: 1.25;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

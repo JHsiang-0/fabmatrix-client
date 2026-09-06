@@ -61,3 +61,12 @@ test('brand and profile entry are real FabMatrix routes', () => {
   assert.match(loginSource, /aria-label="配置服务器地址"[\s\S]*<SettingIcon size="20" \/>/)
   assert.match(loginSource, /class="characters-section"/)
 })
+
+test('应用头部使用明确的看板入口、组合式实时状态和带图标的用户菜单', () => {
+  assert.match(headerSource, /<ViewListIcon size="20" \/>/)
+  assert.match(headerSource, /theme="primary"[\s\S]*shape="round"[\s\S]*aria-label="实时设备看板"/)
+  assert.match(headerSource, /class="app-header__realtime-control"[^]*app-header__realtime-status[^]*app-header__reconnect/)
+  assert.match(userMenuSource, /#prefixIcon><UserIcon size="16" \/>/)
+  assert.match(userMenuSource, /#prefixIcon><PoweroffIcon size="16" \/>/)
+  assert.doesNotMatch(userMenuSource, /value="logout" divider/)
+})
