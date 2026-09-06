@@ -20,7 +20,7 @@ test('应用壳的交互控件使用 TDesign 并具备图标按钮标签', () =>
   assert.match(headerSource, /aria-label="消息通知"[\s\S]*disabled/)
   assert.match(headerSource, /aria-label="帮助中心"[\s\S]*disabled/)
   assert.match(headerSource, /aria-label="系统设置"[\s\S]*disabled/)
-  assert.match(sidebarSource, /<t-button[\s\S]*aria-label="FabMatrix"/)
+  assert.match(sidebarSource, /<t-menu[\s\S]*class="app-menu app-scroll-region"/)
   assert.match(userMenuSource, /<t-button[\s\S]*aria-label="打开用户菜单"/)
   assert.doesNotMatch(layoutSource + headerSource + sidebarSource + userMenuSource, /<button/)
 })

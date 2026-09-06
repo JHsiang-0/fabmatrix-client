@@ -8,17 +8,6 @@
     }"
     :width="props.isMobile ? 'var(--app-sidebar-mobile-width)' : (props.collapsed ? 'var(--app-sidebar-collapsed-width)' : 'var(--app-sidebar-width)')"
   >
-    <t-button
-      variant="text"
-      class="app-brand"
-      aria-label="FabMatrix"
-      :title="props.collapsed && !props.isMobile ? 'FabMatrix' : ''"
-      @click="goDashboard"
-    >
-      <img src="/icon.png" alt="" aria-hidden="true" class="app-brand__logo">
-      <span v-if="!props.collapsed || props.isMobile" class="app-brand__name">FabMatrix</span>
-    </t-button>
-
     <t-menu :value="activePath" :collapsed="props.collapsed && !props.isMobile" theme="light" class="app-menu app-scroll-region">
       <t-menu-group v-for="group in visibleGroups" :key="group.key" :title="props.collapsed && !props.isMobile ? '' : group.label">
         <t-menu-item
@@ -75,10 +64,6 @@ const visibleGroups = computed(() => navigationGroups.map(group => ({
   items: group.items.filter(item => !item.roles || userStore.hasRole(item.roles))
 })).filter(group => group.items.length > 0))
 
-const goDashboard = () => {
-  router.push('/dashboard')
-}
-
 const handleItemClick = item => {
   if (route.path !== item.to) {
     router.push(item.to)
@@ -97,42 +82,6 @@ const handleItemClick = item => {
   border-right: 1px solid var(--app-border);
   flex-shrink: 0;
   transition: width 0.2s ease, transform 0.2s ease;
-}
-
-.app-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--app-spacing-3);
-  width: 100%;
-  height: var(--app-header-height);
-  padding: 0 var(--app-spacing-5);
-  color: var(--app-text-primary);
-  text-align: left;
-  background: var(--app-surface);
-  border: 0;
-  border-bottom: 1px solid var(--app-border);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.app-brand__logo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  object-fit: contain;
-  flex-shrink: 0;
-}
-
-.app-brand__name {
-  overflow: hidden;
-  font-size: 1.05rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .app-menu {
