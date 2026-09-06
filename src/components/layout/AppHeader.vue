@@ -20,7 +20,7 @@
         aria-label="实时设备连接状态"
       >
         <t-tag
-          size="small"
+          size="medium"
           variant="dark"
           shape="round"
           :theme="realtimeTheme"
@@ -35,7 +35,7 @@
           :theme="realtimeTheme"
           variant="outline"
           shape="round"
-          size="small"
+          size="medium"
           class="app-header__reconnect"
           aria-label="重新连接实时状态"
           @click="reconnectRealtime"
@@ -166,8 +166,8 @@ const openFullscreenDashboard = async () => {
   display: inline-flex;
   align-items: center;
   gap: 0;
-  height: 24px;
-  min-height: 24px;
+  height: 32px;
+  min-height: 32px;
   padding: 0;
   background: transparent;
   border: 0;
@@ -176,7 +176,7 @@ const openFullscreenDashboard = async () => {
 }
 
 .app-header__realtime-status {
-  height: 24px;
+  height: 32px;
   border-radius: 999px;
   white-space: nowrap;
 }
@@ -187,8 +187,8 @@ const openFullscreenDashboard = async () => {
 }
 
 .app-header__reconnect {
-  height: 24px;
-  min-height: 24px;
+  height: 32px;
+  min-height: 32px;
   margin-left: -1px;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
