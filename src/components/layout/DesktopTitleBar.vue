@@ -6,7 +6,7 @@
   >
     <div class="desktop-titlebar__brand">
       <img src="/icon.png" alt="" aria-hidden="true" class="desktop-titlebar__logo">
-      <span class="desktop-titlebar__title">FabMatrix Desktop</span>
+      <span class="desktop-titlebar__title">嘉东三维工作台</span>
     </div>
 
     <div class="desktop-titlebar__actions" aria-label="窗口控制">

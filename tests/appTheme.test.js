@@ -49,6 +49,7 @@ test('brand and profile entry are real FabMatrix routes', () => {
   assert.match(userMenuSource, /router\.push\('\/profile'\)/)
   assert.doesNotMatch(userMenuSource, /后续版本开放/)
   assert.doesNotMatch(headerSource, /:count="3"/)
-  assert.match(loginSource, /<span>FabMatrix<\/span>/)
+  assert.doesNotMatch(loginSource, /class="logo-mark"|<span>FabMatrix<\/span>/)
+  assert.match(loginSource, /<t-button class="connection-link" variant="outline"/)
   assert.match(loginSource, /class="characters-section"/)
 })

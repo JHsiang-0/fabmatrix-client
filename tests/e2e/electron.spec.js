@@ -43,6 +43,15 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     })
 
     await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible()
+    await expect(page.getByRole('banner', { name: '应用标题栏' })).toContainText('嘉东三维工作台')
+    await expect(page.getByText('Mock 调试账号请使用系统中已有的用户名和密码', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '配置服务器地址', exact: true })).toBeVisible()
+    await expect(page.locator('.login-page .logo-mark')).toHaveCount(0)
+    const loginMetrics = await page.locator('.login-page').evaluate(element => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight
+    }))
+    expect(loginMetrics.scrollHeight).toBeLessThanOrEqual(loginMetrics.clientHeight + 1)
     await page.getByLabel('用户名', { exact: true }).fill('admin')
     await page.getByLabel('密码', { exact: true }).fill('Admin123')
     await page.getByRole('button', { name: '登录', exact: true }).click()

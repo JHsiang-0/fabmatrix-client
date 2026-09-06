@@ -1,13 +1,6 @@
 <template>
   <main class="login-page app-scroll-region">
     <section class="left-section" aria-label="系统介绍">
-      <div class="logo-section">
-        <a href="/" class="logo-link" @click.prevent>
-          <span class="logo-mark">3D</span>
-          <span>FabMatrix</span>
-        </a>
-      </div>
-
       <div class="characters-section">
         <AnimatedCharacters
           :is-typing="isTyping"
@@ -30,11 +23,6 @@
 
     <section class="right-section">
       <div class="form-wrapper">
-        <div class="mobile-logo">
-          <span class="logo-mark">3D</span>
-          <span>FabMatrix</span>
-      </div>
-
         <header class="form-header">
             <h2 class="form-title">{{ setupMode ? '初始化管理员' : '欢迎回来' }}</h2>
             <p class="form-subtitle">{{ setupMode ? '首次使用请创建本地管理员账户' : '请输入您的账户信息以继续操作' }}</p>
@@ -143,14 +131,14 @@
           </button>
         </form>
 
-        <button v-if="setupMode" class="text-link setup-switch" type="button" @click="setupMode = false">
-          已有账号，返回登录
-        </button>
-
-        <p class="login-tip">Mock 调试账号请使用系统中已有的用户名和密码</p>
-        <button class="text-link connection-link" type="button" @click="goServerConnection">
-          配置服务器地址
-        </button>
+        <div class="login-secondary-actions">
+          <button v-if="setupMode" class="text-link setup-switch" type="button" @click="setupMode = false">
+            已有账号，返回登录
+          </button>
+          <t-button class="connection-link" variant="outline" theme="default" @click="goServerConnection">
+            配置服务器地址
+          </t-button>
+        </div>
       </div>
     </section>
 
@@ -301,9 +289,9 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  min-height: 100vh;
-  min-height: 100dvh;
-  max-height: 100vh;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
   overflow: hidden;
   background: #fff;
 }
@@ -320,35 +308,10 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   background: linear-gradient(135deg, #111827, #3730a3 55%, #4f46e5);
 }
 
-.logo-section,
 .intro-content,
 .characters-section {
   position: relative;
   z-index: 2;
-}
-
-.logo-link,
-.mobile-logo {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  color: inherit;
-  font-size: 1.125rem;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.logo-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  color: #312e81;
-  font-size: 0.75rem;
-  font-weight: 800;
-  background: #fff;
-  border-radius: 0.625rem;
 }
 
 .characters-section {
@@ -425,18 +388,6 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   max-width: 26.25rem;
 }
 
-.mobile-logo {
-  display: none;
-  justify-content: center;
-  margin-bottom: 2.5rem;
-  color: #111827;
-}
-
-.mobile-logo .logo-mark {
-  color: #fff;
-  background: #312e81;
-}
-
 .form-header {
   margin-bottom: clamp(1.5rem, 4vh, 2.5rem);
   text-align: center;
@@ -449,8 +400,7 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   line-height: 1.25;
 }
 
-.form-subtitle,
-.login-tip {
+.form-subtitle {
   color: #6b7280;
   font-size: 0.875rem;
 }
@@ -571,14 +521,20 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   cursor: pointer;
 }
 
-.setup-switch {
-  display: block;
-  margin: 16px auto 0;
-  text-align: center;
-}
-
 .text-link:hover {
   text-decoration: underline;
+}
+
+.login-secondary-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.setup-switch {
+  margin: 0;
 }
 
 .error-message {
@@ -624,12 +580,6 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   opacity: 0.6;
 }
 
-.login-tip {
-  margin: 1.5rem 0 0;
-  text-align: center;
-  line-height: 1.5;
-}
-
 .login-footer {
   position: absolute;
   right: 0;
@@ -652,12 +602,7 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   }
 
   .right-section {
-    min-height: 100vh;
-    min-height: 100dvh;
-  }
-
-  .mobile-logo {
-    display: flex;
+    min-height: 100%;
   }
 
   .login-footer {
@@ -669,10 +614,6 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   .right-section {
     align-items: flex-start;
     padding: 2rem 1.25rem 4rem;
-  }
-
-  .mobile-logo {
-    margin-bottom: 2rem;
   }
 
   .form-options {
