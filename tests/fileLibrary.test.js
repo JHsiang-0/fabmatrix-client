@@ -56,6 +56,9 @@ test('文件详情仅展示安全元数据并区分缩略图不可用', () => {
 
 test('文件库默认使用可滚动列表并保留网格切换和显式详情入口', () => {
   assert.match(source, /const viewMode = ref\('list'\)/)
+  assert.match(source, /const fileRows = computed\(\(\) => fileList\.value\.map/)
+  assert.match(source, /<TdTable :data="fileRows" row-key="id"/)
+  assert.match(source, /openFileDetail\(file\)/)
   assert.match(source, /<QueryToolbar class="file-library-filter-row"/)
   assert.match(source, /height="100%"[\s\S]*@selection-change/)
   assert.match(source, /@click\.stop="openFileDetail\(row\)"/)

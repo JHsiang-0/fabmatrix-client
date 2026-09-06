@@ -153,7 +153,6 @@
           :key="file.id"
           class="file-card"
           :class="{ 'file-card--selected': isBatchMode && selectedIds.includes(file.id) }"
-          @dblclick="navigateToFolder(file)"
           @click="handleFileClick(file)"
         >
           <!-- 卡片选中状态 -->
@@ -274,6 +273,10 @@
 
             <!-- 悬浮操作按钮 -->
             <div class="file-card__actions">
+              <t-button variant="text" size="small" @click.stop="openFileDetail(file)"
+                class="file-card__action">
+                详情
+              </t-button>
               <t-button theme="primary" size="small" :icon="renderIcon(Printer)" @click.stop="handlePrint(file)"
                 class="file-card__action">
                 打印
@@ -289,7 +292,7 @@
 
       <!-- 列表视图 -->
       <div v-else class="file-table-view">
-        <TdTable :data="fileList" :loading="loading" height="100%" @selection-change="handleSelectionChange"
+        <TdTable :data="fileRows" row-key="id" :loading="loading" height="100%" @selection-change="handleSelectionChange"
           @row-click="handleTableRowClick" border stripe style="width: 100%">
           <TdTableColumn v-if="isBatchMode" type="selection" width="50" align="center" />
 
@@ -354,22 +357,22 @@
             </template>
           </TdTableColumn>
 
-          <TdTableColumn label="操作" width="200" fixed="right">
+          <TdTableColumn label="操作" width="220" fixed="right">
             <template #default="{ row }">
               <div class="file-table__actions">
-                <t-button v-if="row.folder" theme="primary" size="small" :icon="renderIcon(FolderOpened)" @click="navigateToFolder(row)">
+                <t-button v-if="row.folder" theme="primary" size="small" :icon="renderIcon(FolderOpened)" @click.stop="navigateToFolder(row)">
                   打开
                 </t-button>
                 <template v-else>
                   <t-button variant="text" size="small" @click.stop="openFileDetail(row)">
                     详情
                   </t-button>
-                  <t-button theme="primary" size="small" :icon="renderIcon(Printer)" @click="handlePrint(row)">
+                  <t-button theme="primary" size="small" :icon="renderIcon(Printer)" @click.stop="handlePrint(row)">
                     打印
                   </t-button>
                 </template>
                 <t-button theme="danger" size="small" :icon="renderIcon(Delete)" :loading="deletingIds.includes(row.id)"
-                  :disabled="batchDeleting || deletingIds.length > 0" @click="handleDelete(row.id)">
+                  :disabled="batchDeleting || deletingIds.length > 0" @click.stop="handleDelete(row.id)">
                   删除
                 </t-button>
               </div>
@@ -697,13 +700,14 @@ const pagination = reactive({
 })
 
 // 计算文件夹和文件列表
-const folderList = computed(() => {
-  return fileList.value.filter(file => file.folder)
-})
+const fileRows = computed(() => fileList.value.map(file => ({
+  ...file,
+  viewType: file.folder ? 'folder' : 'file'
+})))
 
-const fileItemsList = computed(() => {
-  return fileList.value.filter(file => !file.folder)
-})
+const folderList = computed(() => fileRows.value.filter(file => file.viewType === 'folder'))
+
+const fileItemsList = computed(() => fileRows.value.filter(file => file.viewType === 'file'))
 
 const hasValue = value => value !== undefined && value !== null && value !== ''
 

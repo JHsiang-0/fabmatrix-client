@@ -933,7 +933,7 @@ Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存
 
 提交：完成最终检查后创建独立本地提交 `style: 统一文件库工具栏与筛选交互`，不执行 `git push`。
 
-### [ ] UI-004.3 Table/Grid 数据视图统一
+### [x] UI-004.3 Table/Grid 数据视图统一
 
 优先级：P0
 
@@ -955,6 +955,14 @@ Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存
 - 不出现旧版自绘文件卡片导致的视觉体系分裂。
 
 完成后提交：`refactor: 统一文件库表格与网格数据视图`。
+
+完成记录：Table/Grid 现在共用由当前分页结果派生的 `fileRows` View Model，显式传递 `row-key="id"`；列表仍以 TDesign Table 适配层承载 `loading`、选择、固定操作列和内容区滚动，默认视图保持 Table。Grid 文件卡片补齐显式详情入口，Table/Grid 的文件夹打开、文件详情/打印、删除语义保持一致；操作按钮阻止行点击冒泡，避免一次操作触发重复动作。未新增接口、字段或业务数据。
+
+测试：`npm test`（144/144）、`npm run lint`、`npm run build` 通过。构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
+
+Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存后的 `git diff --cached --check`，仅暂存 `src/views/FileLibrary.vue`、`tests/fileLibrary.test.js` 和本任务记录。
+
+提交：完成最终检查后创建独立本地提交 `refactor: 统一文件库表格与网格数据视图`，不执行 `git push`。
 
 ### [ ] UI-004.4 上传、删除与文件详情工作流
 
