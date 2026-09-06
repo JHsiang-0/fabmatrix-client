@@ -211,13 +211,19 @@ onUnmounted(() => window.removeEventListener('beforeunload', handleBeforeUnload)
 </script>
 
 <style scoped>
+.profile-page {
+  min-height: 100%;
+  overflow: visible;
+}
+
 .profile-workspace {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--app-spacing-5);
-  width: min(100%, 1200px);
-  margin: 0 auto;
+  width: 100%;
   min-width: 0;
+  min-height: 0;
 }
 
 .profile-account-card {
@@ -270,15 +276,27 @@ onUnmounted(() => window.removeEventListener('beforeunload', handleBeforeUnload)
 
 .profile-grid {
   display: grid;
+  flex: 1 1 auto;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--app-spacing-5);
   width: 100%;
   min-width: 0;
+  min-height: 0;
+  align-items: stretch;
 }
 
 .profile-card {
-  align-self: start;
+  display: flex;
+  align-self: stretch;
+  height: 100%;
   min-width: 0;
+}
+
+.profile-card :deep(.t-card__body) {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .profile-form-alert {
@@ -294,7 +312,12 @@ onUnmounted(() => window.removeEventListener('beforeunload', handleBeforeUnload)
 
 @media (max-width: 900px) {
   .profile-grid {
+    flex: 0 0 auto;
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profile-card {
+    height: auto;
   }
 }
 </style>
