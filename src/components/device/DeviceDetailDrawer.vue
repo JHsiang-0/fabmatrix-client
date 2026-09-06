@@ -559,12 +559,23 @@ const drawerVisible = computed({
     set: value => handleVisibleChange(value)
 })
 
-const historyColumns = [
-    { colKey: 'status', title: '状态', width: 100 },
-    { colKey: 'filename', title: '文件', width: 150, ellipsis: true },
-    { colKey: 'progress', title: '进度', width: 80 },
-    { colKey: 'recordedAt', title: '记录时间', width: 160 }
-]
+const historyColumns = computed(() => {
+    if (isMobile.value) {
+        return [
+            { colKey: 'status', title: '状态', width: 82 },
+            { colKey: 'filename', title: '文件', width: 112, ellipsis: true },
+            { colKey: 'progress', title: '进度', width: 60 },
+            { colKey: 'recordedAt', title: '记录时间', width: 148 }
+        ]
+    }
+
+    return [
+        { colKey: 'status', title: '状态', width: 92 },
+        { colKey: 'filename', title: '文件', width: 136, ellipsis: true },
+        { colKey: 'progress', title: '进度', width: 72 },
+        { colKey: 'recordedAt', title: '记录时间', width: 152 }
+    ]
+})
 
 const statisticCards = computed(() => {
     const stats = props.statistics || {}
@@ -804,11 +815,14 @@ async function handleStartPrint(action) {
 }
 
 .printer-detail-drawer :deep(.printer-history-table .t-table__content) {
+    width: 100%;
+    max-width: 100%;
     overflow-x: hidden;
 }
 
 .printer-detail-drawer :deep(.printer-history-table table) {
     width: 100%;
+    max-width: 100%;
     min-width: 0;
     table-layout: fixed;
 }
@@ -821,6 +835,11 @@ async function handleStartPrint(action) {
 .printer-detail-drawer :deep(.printer-history-table td:nth-child(2)) {
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.printer-detail-drawer :deep(.printer-history-table td:nth-child(4)) {
+    font-size: 0.75rem;
+    white-space: nowrap;
 }
 
 .printer-detail-drawer__remote-actions {
