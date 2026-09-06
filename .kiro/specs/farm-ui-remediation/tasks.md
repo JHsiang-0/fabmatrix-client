@@ -310,9 +310,36 @@ git diff --check：通过。
 
 验证说明：`npm run lint` 和 `npm run build` 通过，`git diff --check` 通过。`npm test` 共 142 项，139 项通过、3 项失败；失败项为既有 `JobQueue.vue` 结构断言（旧 `job-panel`、局部滚动和 `StatusTag` 预期），与本任务修改范围无关。
 
+### [x] UI-001.13 批量派发资源选择区 TDesign 表格化
+
+范围：
+
+- `src/views/BatchDispatch.vue`
+- 批量派发第一步的步骤条、上传入口、文件选择表格和打印机选择表格
+
+目标：
+
+- 移除步骤条中与页面内容重复的辅助小字，压缩首屏垂直空间。
+- 将批量上传移动到文件选择区，以 TDesign Dialog 作为低频操作入口，保留多文件校验、上传进度、失败重试和资源刷新反馈。
+- 使用 TDesign Table 多选行替代文件和打印机 Checkbox 列表，展示稳定的文件名/ID/材料类型及打印机/IP/状态字段。
+- 保留既有资源加载、选择校验、预览、确认和错误处理契约，不新增或伪造后端字段。
+- 选择表格在资源较多和窄屏场景下可滚动，不产生页面级横向溢出。
+
+验收标准：
+
+- 第一步只展示简洁的五阶段步骤标题，文件和打印机选择均通过表格行选择完成。
+- “批量上传”按钮位于文件选择卡片标题区域，打开弹窗后仍可选择、上传、取消和重试文件。
+- 选择计数与 `selectedFileIds`、`selectedPrinterIds` 实时同步，下一步按钮和后续预览请求行为不变。
+- 文件、打印机为空时仍显示对应 TDesign Empty；资源加载时表格显示 Loading。
+- 完成 `npm test`、`npm run lint`、`npm run build` 和 `git diff --check`，并记录既有失败项（如有）。
+
+完成记录：批量派发第一步已移除步骤说明小字，批量上传改为文件选择卡片内的 TDesign Dialog；文件和打印机资源改用 TDesign Table 多选行，保留资源加载、空态、上传进度、失败重试、选择校验、预览和确认链路。表格使用局部滚动容器适配较多资源和窄屏，不修改 API 契约。
+
+验证说明：批量派发专项测试 `node --test tests/batchDispatch.test.js tests/batchDispatchPage.test.js` 9/9 通过；`npm run lint`、`npm run build` 和 `git diff --check` 通过。完整 `npm test` 共 142 项，139 项通过、3 项失败；失败项为既有 `JobQueue.vue` 结构断言，与本任务修改范围无关。浏览器 E2E 因当前工作区缺少 `@playwright/test` 未能启动，未修改依赖或锁文件。
+
 ## 2. 执行顺序
 
-UI-001.0 → UI-001.1 → UI-001.2 → UI-001.3 → UI-001.4 → UI-001.5 → UI-001.6 → UI-001.7 → UI-001.8 → UI-001.9 → UI-001.10 → UI-001.11
+UI-001.0 → UI-001.1 → UI-001.2 → UI-001.3 → UI-001.4 → UI-001.5 → UI-001.6 → UI-001.7 → UI-001.8 → UI-001.9 → UI-001.10 → UI-001.11 → UI-001.13
 
 UI-001.0、UI-001.1 和 UI-001.2 是页面整改前置条件。发现 API 或状态契约冲突时暂停对应子任务并记录，不得在 UI 层伪造解决方案。
 

@@ -10,16 +10,60 @@
     </PageHeader>
 
     <t-steps :current="currentStep" readonly class="mb-4">
-      <t-step-item title="选择资源" content="选择可见文件和打印机" />
-      <t-step-item title="配置策略" content="选择分配策略与动作" />
-      <t-step-item title="无副作用预览" content="确认冲突和执行范围" />
-      <t-step-item title="确认执行" content="按计划幂等执行" />
-      <t-step-item title="逐项结果" content="查看成功与恢复项" />
+      <t-step-item title="选择资源" />
+      <t-step-item title="配置策略" />
+      <t-step-item title="无副作用预览" />
+      <t-step-item title="确认执行" />
+      <t-step-item title="逐项结果" />
     </t-steps>
 
     <template v-if="currentStep === 0">
-      <section class="dispatch-panel" aria-labelledby="batch-upload-title">
-        <div class="dispatch-panel__heading"><h2 id="batch-upload-title">批量上传</h2></div>
+      <div class="selection-grid">
+        <section class="dispatch-panel selection-panel" :aria-label="`选择文件（${selectedFileIds.length}）`">
+          <div class="dispatch-panel__heading">
+            <h2>选择文件（{{ selectedFileIds.length }}）</h2>
+            <t-button size="small" variant="outline" @click="uploadDialogVisible = true">批量上传</t-button>
+          </div>
+          <div v-if="loadingResources || files.length" class="selection-table-wrap">
+            <t-table
+              class="selection-table"
+              :data="files"
+              :columns="fileSelectionColumns"
+              :selected-row-keys="selectedFileIds"
+              :loading="loadingResources"
+              row-key="id"
+              bordered
+              size="small"
+              @select-change="handleFileSelectionChange"
+            />
+          </div>
+          <t-empty v-if="!loadingResources && !files.length" description="暂无文件，请先批量上传或刷新。" />
+        </section>
+
+        <section class="dispatch-panel selection-panel" :aria-label="`选择打印机（${selectedPrinterIds.length}）`">
+          <div class="dispatch-panel__heading"><h2>选择打印机（{{ selectedPrinterIds.length }}）</h2></div>
+          <div v-if="loadingResources || printers.length" class="selection-table-wrap">
+            <t-table
+              class="selection-table"
+              :data="printers"
+              :columns="printerSelectionColumns"
+              :selected-row-keys="selectedPrinterIds"
+              :loading="loadingResources"
+              row-key="id"
+              bordered
+              size="small"
+              @select-change="handlePrinterSelectionChange"
+            >
+              <template #status="{ row }">
+                <t-tag theme="default" variant="light" size="small">{{ row.status || '-' }}</t-tag>
+              </template>
+            </t-table>
+          </div>
+          <t-empty v-if="!loadingResources && !printers.length" description="暂无打印机，请先添加设备。" />
+        </section>
+      </div>
+
+      <t-dialog v-model:visible="uploadDialogVisible" header="批量上传" width="600px" :footer="false">
         <p class="hint">支持多个 .gcode、.g、.3mf、.stl 文件；上传结果按文件分别返回。</p>
         <t-upload theme="file" multiple :auto-upload="false" accept=".gcode,.g,.3mf,.stl"
           :files="uploadFiles" @select-change="handleFileChange" />
@@ -39,31 +83,7 @@
             </t-button>
           </template>
         </t-alert>
-      </section>
-
-      <div class="selection-grid">
-        <section class="dispatch-panel" :aria-label="`选择文件（${selectedFileIds.length}）`">
-          <div class="dispatch-panel__heading"><h2>选择文件（{{ selectedFileIds.length }}）</h2></div>
-          <t-checkbox-group v-model="selectedFileIds" class="selection-group">
-            <t-checkbox v-for="file in files" :key="file.id" :value="file.id" class="selection-row">
-              <span>{{ file.originalName || `文件 #${file.id}` }}</span>
-              <small>{{ file.id }}</small>
-            </t-checkbox>
-          </t-checkbox-group>
-          <t-empty v-if="!files.length" description="暂无文件，请先批量上传或刷新。" />
-        </section>
-
-        <section class="dispatch-panel" :aria-label="`选择打印机（${selectedPrinterIds.length}）`">
-          <div class="dispatch-panel__heading"><h2>选择打印机（{{ selectedPrinterIds.length }}）</h2></div>
-          <t-checkbox-group v-model="selectedPrinterIds" class="selection-group">
-            <t-checkbox v-for="printer in printers" :key="printer.id" :value="printer.id" class="selection-row">
-              <span>{{ printer.name }}</span>
-              <small>{{ printer.ipAddress }} · {{ printer.status }}</small>
-            </t-checkbox>
-          </t-checkbox-group>
-          <t-empty v-if="!printers.length" description="暂无打印机，请先添加设备。" />
-        </section>
-      </div>
+      </t-dialog>
 
       <div class="step-actions">
         <t-button theme="primary" :disabled="!selectedFileIds.length || !selectedPrinterIds.length" @click="goToStrategy">
@@ -198,6 +218,7 @@ const selectedFileIds = ref([])
 const selectedPrinterIds = ref([])
 const uploadFiles = ref([])
 const uploadResult = ref(null)
+const uploadDialogVisible = ref(false)
 const lastBatchUploadFiles = ref([])
 const uploadController = ref(null)
 const previewData = ref(null)
@@ -257,6 +278,18 @@ const confirmColumns = [
   { colKey: 'retryable', title: '可重试', width: 100 },
   { colKey: 'source', title: '恢复来源' },
   { colKey: 'recovery', title: '恢复操作', width: 110 }
+]
+const fileSelectionColumns = [
+  { colKey: 'row-select', type: 'multiple', width: 48 },
+  { colKey: 'originalName', title: '文件名', ellipsis: true },
+  { colKey: 'id', title: '文件 ID', width: 120 },
+  { colKey: 'materialType', title: '材料类型', width: 120 }
+]
+const printerSelectionColumns = [
+  { colKey: 'row-select', type: 'multiple', width: 48 },
+  { colKey: 'name', title: '打印机', ellipsis: true },
+  { colKey: 'ipAddress', title: 'IP 地址', width: 140 },
+  { colKey: 'status', title: '状态', width: 100 }
 ]
 
 function flattenFiles(nodes, result = []) {
@@ -319,6 +352,14 @@ function goToSelection() {
   if (confirming.value) return
   invalidatePreview()
   activeStep.value = 0
+}
+
+function handleFileSelectionChange(selectedRowKeys) {
+  selectedFileIds.value = selectedRowKeys
+}
+
+function handlePrinterSelectionChange(selectedRowKeys) {
+  selectedPrinterIds.value = selectedRowKeys
 }
 
 function queryIds(value) {
@@ -516,14 +557,19 @@ onUnmounted(stopPreviewExpiryTimer)
 .dispatch-panel__heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--app-spacing-4); }
 .dispatch-panel__heading h2 { margin: 0; color: var(--app-text-primary); font-size: var(--td-font-size-title-medium); font-weight: 700; }
 .selection-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.selection-row, .preview-row { display: flex; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--app-border-subtle); }
-.selection-row span { flex: 1; }
+.selection-panel { display: flex; flex-direction: column; min-height: 0; }
+.selection-table-wrap { max-height: min(360px, 45vh); overflow: auto; border-radius: var(--app-radius); }
+.selection-table { width: 100%; }
+.selection-table :deep(.t-table__content) { overflow: visible; }
+.selection-table :deep(td), .selection-table :deep(th) { white-space: nowrap; }
+.preview-row { display: flex; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--app-border-subtle); }
 small { color: var(--app-text-placeholder); }
 .options-form { max-width: 560px; }
 .option-select { width: 280px; }
 .step-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 @media (max-width: 800px) {
   .selection-grid { grid-template-columns: 1fr; }
+  .selection-table-wrap { max-height: 320px; }
   .option-select { width: 100%; }
   .step-actions { justify-content: stretch; }
   .step-actions :deep(.t-button) { flex: 1 1 auto; }
