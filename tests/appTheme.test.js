@@ -45,6 +45,7 @@ test('navigation follows the T208-1 information architecture', () => {
 
 test('brand and profile entry are real FabMatrix routes', () => {
   assert.doesNotMatch(sidebarSource, /class="app-brand(?:__logo|__name)?"/)
+  assert.match(sidebarSource, /class="app-sidebar__top-spacer"/)
   assert.match(sidebarSource, /class="app-menu app-scroll-region"/)
   assert.match(userMenuSource, /router\.push\('\/profile'\)/)
   assert.doesNotMatch(userMenuSource, /后续版本开放/)

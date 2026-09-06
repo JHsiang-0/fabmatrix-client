@@ -8,6 +8,8 @@
     }"
     :width="props.isMobile ? 'var(--app-sidebar-mobile-width)' : (props.collapsed ? 'var(--app-sidebar-collapsed-width)' : 'var(--app-sidebar-width)')"
   >
+    <div class="app-sidebar__top-spacer" aria-hidden="true" />
+
     <t-menu :value="activePath" :collapsed="props.collapsed && !props.isMobile" theme="light" class="app-menu app-scroll-region">
       <t-menu-group v-for="group in visibleGroups" :key="group.key" :title="props.collapsed && !props.isMobile ? '' : group.label">
         <t-menu-item
@@ -82,6 +84,13 @@ const handleItemClick = item => {
   border-right: 1px solid var(--app-border);
   flex-shrink: 0;
   transition: width 0.2s ease, transform 0.2s ease;
+}
+
+.app-sidebar__top-spacer {
+  box-sizing: border-box;
+  flex: 0 0 var(--app-header-height);
+  height: var(--app-header-height);
+  border-bottom: 1px solid var(--app-border);
 }
 
 .app-menu {

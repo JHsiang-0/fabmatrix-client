@@ -72,6 +72,12 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     await expect(page).toHaveURL(/127\.0\.0\.1:5177\/#\/dashboard/)
     await expect(page.getByRole('heading', { name: '概览仪表盘' })).toBeVisible()
     await expect(page.locator('.app-sidebar .app-brand')).toHaveCount(0)
+    const sidebarSpacerBox = await page.locator('.app-sidebar__top-spacer').boundingBox()
+    const appHeaderBox = await page.locator('.app-header').boundingBox()
+    expect(sidebarSpacerBox).not.toBeNull()
+    expect(appHeaderBox).not.toBeNull()
+    expect(Math.abs(sidebarSpacerBox.y - appHeaderBox.y)).toBeLessThanOrEqual(1)
+    expect(Math.abs(sidebarSpacerBox.height - appHeaderBox.height)).toBeLessThanOrEqual(1)
 
     for (const size of [[800, 560], [1024, 640], [1200, 760]]) {
       await electronApp.evaluate(({ BrowserWindow }, nextSize) => {
