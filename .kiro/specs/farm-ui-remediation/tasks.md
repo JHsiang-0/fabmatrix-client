@@ -1027,9 +1027,38 @@ Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存
 
 提交：完成最终检查后创建独立本地提交 `test: 完成 UI-004 文件库视觉与交互验收`，不执行 `git push`。
 
+### [x] UI-004.6 单一主工作区文件导航
+
+优先级：P0
+
+目标：移除文件库左侧常驻目录树，避免目录导航与当前目录结果重复；以真实分页文件接口返回的文件夹行作为唯一文件夹导航入口，保留面包屑和根目录/上级目录跳转。
+
+工作内容：
+
+- 文件库只保留 Page Header、筛选与面包屑、当前目录 Table/Grid、分页组成的主工作区，不再挂载完整目录树或额外目录滚动容器。
+- 文件夹在正式 `/print-files/page` 结果中只展示一次，列表和网格视图均通过“打开”进入；不新增 API、字段或伪造业务数据。
+- 收敛文件库 CSS 和响应式布局，保证表格/网格继续承担局部滚动，页面不产生重复纵向滚动。
+- 更新静态契约测试与 Electron Playwright，验证 800×560、1024×640、1200×760 窗口下无侧栏残留、无页面级水平溢出，且根目录、文件夹打开、面包屑返回、详情和创建任务入口保持可用。
+
+验收：
+
+- 左侧目录树和其独立滚动条不存在；文件夹仅在主数据区展示一次。
+- 根目录、文件夹进入、面包屑返回和分页均基于当前正式接口结果同步更新。
+- 完成 `npm test`、浏览器/Electron 相关测试、`npm run lint`、`npm run build` 和桌面构建，并通过提交前 Git 检查。
+
+完成后提交：`refactor: 收口文件库单一主工作区导航`。
+
+完成记录：移除 FileLibrary 左侧常驻目录树、目录树独立加载态和滚动容器；文件夹只由正式 `/print-files/page` 分页结果承载，Table/Grid 均通过打开操作进入，面包屑统一管理根目录和上级目录状态。同步收敛文件库布局 CSS，Electron Playwright 增加无侧栏和无目录树回归断言；未新增接口、字段或业务数据。真实 RustFS/对象存储、生产 CORS、实体文件上传、物理打印机和 Windows DPI/主题仍需现场验收。
+
+测试：`npm test`（144/144）、`npm run test:e2e`（9/9）、`npm run test:electron`（3/3）、`npm run test:electron:dist`（1/1，含 `npm run build:desktop`）、`npm run lint`、`npm run build`、`npm run build:desktop` 全部通过。构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
+
+Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存后的 `git diff --cached --check`，仅暂存本子任务涉及的文件。
+
+提交：完成最终检查后创建独立本地提交 `refactor: 收口文件库单一主工作区导航`，不执行 `git push`。
+
 ### 8.6 UI-004 执行顺序与统一约束
 
-`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5`
+`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6`
 
 - UI-004 是独立文件库 UI/UX 重写任务，不属于 `farm-ui-v2`，不回写 UI-001、UI-002、UI-003 的历史状态。
 - 所有文件数据必须来自 API_HANDOFF、运行时 OpenAPI 和现有数据适配器；运行时泛型 schema 与正式文档冲突时记录并暂停相关猜测。

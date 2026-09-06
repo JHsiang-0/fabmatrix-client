@@ -124,22 +124,22 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
 
     await page.goto(`${E2E_DESKTOP_URL}/#/files`)
     await expect(page.getByRole('heading', { name: '文件库' })).toBeVisible()
-    await expect(page.locator('.file-library-layout')).toBeVisible()
+    await expect(page.locator('.file-library-main')).toBeVisible()
+    await expect(page.locator('.file-library-sidebar')).toHaveCount(0)
+    await expect(page.locator('.file-library-tree')).toHaveCount(0)
     await expect(page.locator('.file-table-view')).toBeVisible({ timeout: 10000 })
     await expect(page.getByRole('button', { name: '列表视图', exact: true })).toBeVisible()
     const fileWorkspaceMetrics = await page.evaluate(() => {
-      const tree = document.querySelector('.file-library-tree')
+      const main = document.querySelector('.file-library-main')
       const table = document.querySelector('.file-table-view .t-table__content')
       return {
-        treeHeight: tree?.clientHeight || 0,
-        treeOverflow: tree ? getComputedStyle(tree).overflowY : '',
+        mainHeight: main?.clientHeight || 0,
         tableHeight: table?.clientHeight || 0,
         tableOverflow: table ? getComputedStyle(table).overflowY : ''
       }
     })
-    expect(fileWorkspaceMetrics.treeHeight).toBeGreaterThan(0)
+    expect(fileWorkspaceMetrics.mainHeight).toBeGreaterThan(0)
     expect(fileWorkspaceMetrics.tableHeight).toBeGreaterThan(0)
-    expect(['auto', 'scroll']).toContain(fileWorkspaceMetrics.treeOverflow)
     expect(['auto', 'scroll']).toContain(fileWorkspaceMetrics.tableOverflow)
     await page.getByRole('button', { name: '新建文件夹', exact: true }).first().click()
     await expect(page.locator('.t-dialog__header-content').filter({ hasText: '新建文件夹' })).toBeVisible()

@@ -27,7 +27,7 @@
           :loading="batchDeleting" :disabled="batchDeleting || deletingIds.length > 0" @click="handleBatchDelete">
           批量删除 ({{ selectedIds.length }})
         </t-button>
-        <t-button :icon="renderIcon(Refresh)" :loading="loading || treeLoading" :disabled="batchDeleting || deletingIds.length > 0" @click="refreshLibrary" size="medium">
+        <t-button :icon="renderIcon(Refresh)" :loading="loading" :disabled="batchDeleting || deletingIds.length > 0" @click="refreshLibrary" size="medium">
           刷新
         </t-button>
       </t-space>
@@ -35,50 +35,13 @@
     </PageHeader>
 
     <DataRegion class="file-library-workspace" label="文件工作台">
-      <div class="file-library-layout">
-        <aside class="file-library-sidebar" aria-label="文件目录">
-          <div class="file-library-panel-heading">
-            <div>
-              <h2>目录</h2>
-              <p>按目录定位文件，内容在右侧工作区展示</p>
-            </div>
-            <t-button variant="text" size="small" :loading="treeLoading" @click="loadFileTree">
-              刷新
-            </t-button>
-          </div>
-          <div class="file-library-tree app-scroll-region">
-            <AsyncState
-              v-if="treeLoading || treeError"
-              :loading="treeLoading"
-              :error="treeError"
-              @retry="loadFileTree"
-            />
-            <t-empty v-else-if="fileTree.length === 0" description="暂无可见文件夹">
-              <template #operation>
-                <t-space>
-                  <t-button size="small" variant="outline" @click="openCreateFolderDialog">新建文件夹</t-button>
-                  <t-button size="small" theme="primary" @click="handleUpload">上传文件</t-button>
-                </t-space>
-              </template>
-            </t-empty>
-            <t-tree
-              v-else
-              :data="fileTree"
-              activable
-              hover
-              :expand-level="1"
-              @click="handleTreeClick"
-            />
-          </div>
-        </aside>
-
-        <section class="file-library-main" aria-labelledby="file-library-results-title">
+      <section class="file-library-main" aria-labelledby="file-library-results-title">
           <QueryToolbar class="file-library-filter-row" label="文件筛选条件">
             <div class="file-library-navigation">
               <span class="file-library-section-label">当前位置</span>
               <t-breadcrumb separator="/">
                 <t-breadcrumb-item :to="{ path: '' }" @click.prevent="navigateToRoot">
-                  <span><folder-opened /></span>
+                  <FolderOpened :size="16" />
                   <span>根目录</span>
                 </t-breadcrumb-item>
                 <t-breadcrumb-item
@@ -388,8 +351,7 @@
               @change="handlePageChange" />
           </div>
           </div>
-        </section>
-      </div>
+      </section>
     </DataRegion>
 
     <!-- 文件上传对话框 -->
@@ -601,7 +563,6 @@ import {
   getFilePreview,
   getThumbnailUrl,
   getFileJobs,
-  getFileTree,
   batchUploadFiles
 } from '@/api/printFile'
 import { createPrintJob } from '@/api/job'
@@ -628,9 +589,6 @@ defineOptions({ name: 'FileLibrary' })
 const loading = ref(false)
 const loadError = ref('')
 const fileList = ref([])
-const treeLoading = ref(false)
-const treeError = ref('')
-const fileTree = ref([])
 const selectedIds = ref([])
 const searchKeyword = ref('')
 const materialFilter = ref('')
@@ -715,26 +673,6 @@ const hasValue = value => value !== undefined && value !== null && value !== ''
 
 const formatMetric = (value, suffix = '') => hasValue(value) ? `${value}${suffix}` : '-'
 
-/**
- * 将完整 FileNodeVO 树裁剪为目录导航树。
- * 文件节点仍由当前目录的分页接口承载，不能在左侧目录中再次展示。
- */
-const normalizeTreeNode = node => {
-  if (!node || node.folder !== true) return null
-
-  return {
-    value: String(node.id),
-    label: node.name,
-    name: node.name,
-    folder: true,
-    id: node.id,
-    parentId: node.parentId ?? null,
-    children: Array.isArray(node.children)
-      ? node.children.map(normalizeTreeNode).filter(Boolean)
-      : []
-  }
-}
-
 const restoreFileDetailContext = () => {
   const fileId = sessionStorage.getItem(FILE_DETAIL_CONTEXT_KEY)
   if (!fileId || selectedFile.value) return
@@ -775,24 +713,7 @@ const fetchData = async () => {
   }
 }
 
-const loadFileTree = async () => {
-  treeLoading.value = true
-  treeError.value = ''
-  try {
-    const response = await getFileTree()
-    fileTree.value = (Array.isArray(response.data) ? response.data : [])
-      .map(normalizeTreeNode)
-      .filter(Boolean)
-  } catch (error) {
-    console.error('获取文件目录树失败:', error)
-    treeError.value = error?.message || '目录树加载失败，请重试'
-    message.error('获取文件目录树失败')
-  } finally {
-    treeLoading.value = false
-  }
-}
-
-const refreshLibrary = () => Promise.all([fetchData(), loadFileTree()])
+const refreshLibrary = () => fetchData()
 
 /**
  * 导航到根目录
@@ -823,21 +744,6 @@ const navigateToFolder = (folder) => {
 const navigateTo = (index) => {
   breadcrumbs.value = breadcrumbs.value.slice(0, index + 1)
   currentParentId.value = breadcrumbs.value[index]?.id || null
-  pagination.pageNum = 1
-  fetchData()
-}
-
-const handleTreeClick = ({ node }) => {
-  if (!node?.data?.folder) return
-
-  const path = typeof node.getPath === 'function' ? node.getPath() : []
-  breadcrumbs.value = path
-    .filter(pathNode => pathNode.data?.folder)
-    .map(pathNode => ({
-      id: pathNode.data.id,
-      name: pathNode.data.label || pathNode.data.name
-    }))
-  currentParentId.value = node.data.id
   pagination.pageNum = 1
   fetchData()
 }
@@ -1426,36 +1332,6 @@ onMounted(() => {
   flex: 0 0 auto;
 }
 
-.file-library-layout {
-  display: grid;
-  flex: 1 1 0%;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-}
-
-.file-library-sidebar {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  padding: var(--app-spacing-5);
-  background: var(--app-surface-muted);
-  border-right: 1px solid var(--app-border);
-}
-
-.file-library-panel-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--app-spacing-3);
-  flex: 0 0 auto;
-  padding-bottom: var(--app-spacing-4);
-}
-
-.file-library-panel-heading h2,
 .file-library-results-heading h2 {
   margin: 0;
   color: var(--app-text-primary);
@@ -1471,29 +1347,11 @@ onMounted(() => {
   line-height: 1.5;
 }
 
-.file-library-tree {
-  flex: 1 1 0%;
-  min-height: 0;
-  padding: var(--app-spacing-2);
-  background: var(--app-surface);
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
-  overflow-y: auto;
-}
-
-.file-library-tree :deep(.t-tree) {
-  min-width: 0;
-}
-
-.file-library-tree :deep(.t-tree__label) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .file-library-main {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   padding: var(--app-spacing-5);
@@ -1896,17 +1754,6 @@ onMounted(() => {
 }
 
 @media (max-width: 1024px) {
-  .file-library-layout {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(48px, 22%) minmax(0, 1fr);
-  }
-
-  .file-library-sidebar {
-    padding: var(--app-spacing-3);
-    border-right: 0;
-    border-bottom: 1px solid var(--app-border);
-  }
-
   .file-library-main {
     padding: var(--app-spacing-3);
   }
@@ -1974,21 +1821,6 @@ onMounted(() => {
 
   .file-library-toolbar__actions {
     justify-content: flex-start;
-  }
-
-  .file-library-layout {
-    display: flex;
-    height: auto;
-    min-height: 0;
-    flex-direction: column;
-  }
-
-  .file-library-sidebar {
-    flex: 0 0 190px;
-    max-height: 190px;
-    padding: var(--app-spacing-3);
-    border-right: 0;
-    border-bottom: 1px solid var(--app-border);
   }
 
   .file-library-main {
