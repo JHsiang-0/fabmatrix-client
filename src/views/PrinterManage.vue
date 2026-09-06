@@ -1276,10 +1276,12 @@ const handleBatchAdd = async () => {
 
 .printer-management-tab {
   display: inline-flex;
-  flex: 0 0 auto;
+  flex: 0 0 5.5rem;
   align-items: center;
+  justify-content: center;
   gap: 0.35rem;
   height: 3rem;
+  width: 5.5rem;
   padding: 0 0.85rem;
   color: var(--td-text-color-secondary);
   font-size: 0.8125rem;
