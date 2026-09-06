@@ -44,13 +44,36 @@
         </div>
 
         <div class="connection-ws-config">
-          <div class="connection-ws-toggle">
-            <t-switch v-model="form.customWsUrlEnabled" size="small" />
-            <span>自定义 WebSocket 地址</span>
-            <t-typography-text disabled>默认关闭，关闭时自动使用 /ws/farm-status</t-typography-text>
-          </div>
-          <t-form-item v-if="form.customWsUrlEnabled" class="connection-ws-input" label="WebSocket 地址" name="wsUrl">
-            <t-input v-model="form.wsUrl" placeholder="例如：ws://192.168.0.10:8080/ws/farm-status" clearable />
+          <t-form-item class="connection-ws-input" name="wsUrl">
+            <div class="connection-ws-heading">
+              <span class="connection-ws-label">
+                <t-switch
+                  v-model="form.customWsUrlEnabled"
+                  aria-label="启用自定义 WebSocket 地址"
+                  size="small"
+                />
+                <span>WebSocket 地址</span>
+              </span>
+            </div>
+            <div class="connection-ws-input-group">
+              <t-select
+                v-model="form.wsProtocol"
+                class="connection-ws-protocol"
+                :disabled="!form.customWsUrlEnabled"
+                aria-label="WebSocket 协议"
+              >
+                <t-option label="ws://" value="ws" />
+                <t-option label="wss://" value="wss" />
+              </t-select>
+              <t-input
+                v-model="form.wsAddress"
+                class="connection-ws-address"
+                :disabled="!form.customWsUrlEnabled"
+                placeholder="localhost:8080/ws/farm-status"
+                clearable
+                aria-label="WebSocket 主机、端口和路径"
+              />
+            </div>
           </t-form-item>
         </div>
 
@@ -95,11 +118,13 @@ defineOptions({ name: 'ServerConnectionView' })
 const router = useRouter()
 const initialConfig = getServerConfig()
 const initialEndpoint = parseServerEndpoint(initialConfig.apiBaseUrl)
+const initialWsEndpoint = parseWebSocketEndpoint(initialConfig.wsUrl)
 const form = reactive({
   protocol: initialEndpoint.protocol,
   host: initialEndpoint.host,
   port: initialEndpoint.port,
-  wsUrl: initialConfig.wsUrl,
+  wsProtocol: initialWsEndpoint.protocol,
+  wsAddress: initialWsEndpoint.address,
   customWsUrlEnabled: Boolean(initialConfig.wsUrl)
 })
 const testing = ref(false)
@@ -108,6 +133,15 @@ const errorMessage = ref('')
 const successMessage = ref('')
 
 const displayBaseUrl = computed(() => buildServerBaseUrl(form) || '尚未填写完整')
+
+function parseWebSocketEndpoint(wsUrl) {
+  const value = String(wsUrl || '').trim()
+  const match = value.match(/^(wss?):\/\/(.*)$/i)
+  return {
+    protocol: match?.[1]?.toLowerCase() || 'ws',
+    address: match?.[2] || ''
+  }
+}
 
 const getHealthUrl = baseUrl => `${baseUrl}/actuator/health`
 
@@ -122,18 +156,23 @@ const resolveBaseUrl = () => {
 }
 
 const resolveWebSocketUrl = () => {
-  const wsUrl = String(form.wsUrl || '').trim()
-  if (!wsUrl) return ''
+  const address = String(form.wsAddress || '').trim()
+  if (!address) return ''
+  if (/^wss?:\/\//i.test(address)) {
+    throw new Error('WebSocket 地址请不要重复输入 ws:// 或 wss:// 前缀')
+  }
+
+  const wsUrl = `${form.wsProtocol}://${address}`
 
   try {
     const parsed = new URL(wsUrl)
-    if (!['ws:', 'wss:'].includes(parsed.protocol) || parsed.username || parsed.password) {
+    if (!['ws:', 'wss:'].includes(parsed.protocol) || parsed.username || parsed.password || !parsed.hostname) {
       throw new Error('WebSocket 地址必须使用 ws:// 或 wss://，且不能包含账号密码')
     }
     return wsUrl
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith('WebSocket 地址必须')) throw error
-    throw new Error('请输入有效的 WebSocket 地址，例如 ws://192.168.0.10:8080/ws/farm-status', { cause: error })
+    if (error instanceof Error && error.message.startsWith('WebSocket 地址')) throw error
+    throw new Error('请输入有效的 WebSocket 主机、端口和路径', { cause: error })
   }
 }
 
@@ -184,7 +223,9 @@ const resetToEnvironment = () => {
   form.protocol = endpoint.protocol
   form.host = endpoint.host
   form.port = endpoint.port
-  form.wsUrl = config.wsUrl
+  const wsEndpoint = parseWebSocketEndpoint(config.wsUrl)
+  form.wsProtocol = wsEndpoint.protocol
+  form.wsAddress = wsEndpoint.address
   form.customWsUrlEnabled = Boolean(config.wsUrl)
   errorMessage.value = ''
   successMessage.value = '已载入当前启动配置，请测试后保存。'
@@ -298,34 +339,39 @@ const goLogin = () => router.push({ name: 'login' })
 }
 
 .connection-ws-config {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
   margin-top: 14px;
 }
 
-.connection-ws-toggle {
-  display: flex;
+.connection-ws-heading {
+  margin-bottom: 8px;
+}
+
+.connection-ws-label {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-width: 0;
-  padding-top: 8px;
-  color: var(--app-text-primary);
-  font-size: 13px;
-}
-
-.connection-ws-toggle .t-typography {
-  color: var(--app-text-secondary);
-}
-
-.connection-ws-input {
-  flex: 1 1 420px;
-  min-width: 280px;
-  margin: 0;
 }
 
 .connection-ws-input :deep(.t-form__controls) {
+  min-width: 0;
+}
+
+.connection-ws-input {
+  margin: 0;
+}
+
+.connection-ws-input-group {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.connection-ws-protocol {
+  flex: 0 0 96px;
+}
+
+.connection-ws-address {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -416,16 +462,6 @@ const goLogin = () => router.push({ name: 'login' })
     align-items: flex-start;
     flex-direction: column;
     gap: 4px;
-  }
-
-  .connection-ws-config {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .connection-ws-input {
-    min-width: 0;
   }
 
   .connection-notes ul {
