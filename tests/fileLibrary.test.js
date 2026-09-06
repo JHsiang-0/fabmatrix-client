@@ -34,6 +34,18 @@ test('文件中心不伪造材料和统计值，并覆盖上传删除结果态',
   assert.match(source, /error\?\.response\?\.status === 422/)
 })
 
+test('文件库工具栏使用统一 Space 并提供正式字段查询与重置', () => {
+  assert.match(source, /<t-space class="file-library-toolbar__actions"[\s\S]*break-line>/)
+  assert.doesNotMatch(source, /<div class="file-library-toolbar__actions">/)
+  assert.match(source, /v-model="searchKeyword"[\s\S]*@keyup\.enter="handleSearch"/)
+  assert.match(source, /v-model="materialFilter"[\s\S]*@keyup\.enter="handleSearch"/)
+  assert.match(source, /@click="resetSearch"/)
+  assert.match(source, /const resetSearch = \(\) =>/)
+  assert.match(source, /fileName: searchKeyword\.value \|\| undefined/)
+  assert.match(source, /materialType: materialFilter\.value \|\| undefined/)
+  assert.doesNotMatch(source, /keyword:/)
+})
+
 test('文件详情仅展示安全元数据并区分缩略图不可用', () => {
   assert.match(detailSource, /暂无缩略图/)
   assert.match(detailSource, /file.thumbnailError/)

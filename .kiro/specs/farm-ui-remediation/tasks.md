@@ -903,7 +903,7 @@ Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存
 
 提交：完成最终检查后创建独立本地提交 `refactor: 重组文件库目录导航信息架构`，不执行 `git push`。
 
-### [ ] UI-004.2 顶部工具栏与筛选操作统一
+### [x] UI-004.2 顶部工具栏与筛选操作统一
 
 优先级：P1
 
@@ -924,6 +924,14 @@ Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存
 - 查询 Loading、失败、清空和恢复状态均在工具栏或数据区有明确反馈。
 
 完成后提交：`style: 统一文件库工具栏与筛选交互`。
+
+完成记录：文件库 Page Header action 改为单一 TDesign `Space`，统一视图切换、新建文件夹、上传、批量删除和刷新按钮间距，并允许窄窗口换行；筛选区增加“查询”“重置”，查询仍只发送正式 `fileName`、`materialType`、`parentId` 和分页字段。切换离开批量模式、重置筛选和列表刷新时同步清理选中项；未新增接口、字段、材质枚举或业务数据。
+
+测试：`npm test`（144/144）、`npm run lint`、`npm run build` 通过。构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
+
+Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存后的 `git diff --cached --check`，仅暂存 `src/views/FileLibrary.vue`、`tests/fileLibrary.test.js` 和本任务记录。
+
+提交：完成最终检查后创建独立本地提交 `style: 统一文件库工具栏与筛选交互`，不执行 `git push`。
 
 ### [ ] UI-004.3 Table/Grid 数据视图统一
 

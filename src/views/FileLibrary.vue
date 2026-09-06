@@ -6,7 +6,7 @@
       description="管理可见的切片文件与目录，选择文件后可直接创建打印任务。"
     >
       <template #actions>
-      <div class="file-library-toolbar__actions">
+      <t-space class="file-library-toolbar__actions" size="small" align="center" break-line>
         <t-space class="file-view-toggle">
           <t-button variant="text" size="small" @click="viewMode = 'grid'"
             :class="{ 'file-view-toggle__active': viewMode === 'grid' }" aria-label="网格视图">
@@ -30,7 +30,7 @@
         <t-button :icon="renderIcon(Refresh)" :loading="loading || treeLoading" :disabled="batchDeleting || deletingIds.length > 0" @click="refreshLibrary" size="medium">
           刷新
         </t-button>
-      </div>
+      </t-space>
       </template>
     </PageHeader>
 
@@ -102,8 +102,16 @@
                 </template>
               </t-input>
               <t-input v-model="materialFilter" placeholder="材质筛选" clearable size="medium"
-                @change="handleSearch" @keyup.enter="handleSearch">
+                @keyup.enter="handleSearch">
               </t-input>
+              <t-space class="file-library-filter-actions" size="small">
+                <t-button theme="primary" size="medium" :loading="loading" @click="handleSearch">
+                  查询
+                </t-button>
+                <t-button variant="outline" size="medium" :disabled="loading" @click="resetSearch">
+                  重置
+                </t-button>
+              </t-space>
             </div>
           </QueryToolbar>
 
@@ -559,7 +567,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { message, confirmMessage } from '@/utils/message'
 import { renderIcon } from '@/utils/tdesign'
 import {
@@ -658,6 +666,10 @@ const detailJobsError = ref('')
 const FILE_DETAIL_CONTEXT_KEY = 'farm-ui:file-detail'
 // 批量操作模式
 const isBatchMode = ref(false)
+
+watch(isBatchMode, enabled => {
+  if (!enabled) selectedIds.value = []
+})
 
 // 文件夹导航状态
 const currentParentId = ref(null)
@@ -859,6 +871,14 @@ const handleCreateFolder = async () => {
  * 搜索处理
  */
 const handleSearch = () => {
+  pagination.pageNum = 1
+  fetchData()
+}
+
+const resetSearch = () => {
+  searchKeyword.value = ''
+  materialFilter.value = ''
+  selectedIds.value = []
   pagination.pageNum = 1
   fetchData()
 }
