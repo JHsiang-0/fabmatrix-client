@@ -138,8 +138,16 @@
         </button>
       </div>
 
-      <t-button class="connection-link" variant="outline" theme="default" @click="goServerConnection">
-        配置服务器地址
+      <t-button
+        class="connection-link"
+        variant="outline"
+        theme="default"
+        shape="circle"
+        aria-label="配置服务器地址"
+        title="配置服务器地址"
+        @click="goServerConnection"
+      >
+        <SettingIcon size="20" />
       </t-button>
     </section>
   </main>
@@ -149,6 +157,7 @@
 defineOptions({ name: 'LoginView' })
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { SettingIcon } from 'tdesign-icons-vue-next'
 import { message } from '@/utils/message'
 import { useUserStore } from '@/stores/user'
 import { getFirstAdminSetupStatus, setupFirstAdmin } from '@/api/user'
