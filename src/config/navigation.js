@@ -13,7 +13,7 @@ export const navigationGroups = [
     key: 'workspace',
     label: '工作台',
     items: [
-      { key: 'dashboard', title: '概览仪表盘', to: '/dashboard', icon: DashboardIcon }
+      { key: 'dashboard', title: '总览', to: '/dashboard', icon: DashboardIcon }
     ]
   },
   {

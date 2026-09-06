@@ -143,7 +143,7 @@ onUnmounted(() => {
   z-index: 1;
   width: 180px;
   height: 400px;
-  background: #6c3ff5;
+  background: var(--app-primary-active);
   animation: character-enter 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
@@ -152,7 +152,7 @@ onUnmounted(() => {
   z-index: 2;
   width: 120px;
   height: 310px;
-  background: #2d2d2d;
+  background: var(--app-text-primary);
   animation: character-enter 1s 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 }
 
@@ -207,7 +207,7 @@ onUnmounted(() => {
   display: block;
   width: 7px;
   height: 7px;
-  background: #2d2d2d;
+  background: var(--app-text-primary);
   border-radius: 50%;
 }
 
@@ -254,7 +254,7 @@ onUnmounted(() => {
 
 .yellow-mouth path {
   fill: none;
-  stroke: #2d2d2d;
+  stroke: var(--app-text-primary);
   stroke-width: 3;
   stroke-linecap: round;
 }

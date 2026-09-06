@@ -14,7 +14,7 @@
  *
  * @example
  * <IconNozzle />
- * <IconNozzle style="color: #ef4444; font-size: 16px;" />
+ * <IconNozzle style="color: var(--app-danger); font-size: 16px;" />
  */
 defineOptions({
     name: 'IconNozzle'

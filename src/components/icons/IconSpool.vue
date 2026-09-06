@@ -15,7 +15,7 @@
  *
  * @example
  * <IconSpool />
- * <IconSpool style="color: #10b981; font-size: 16px;" />
+ * <IconSpool style="color: var(--app-success); font-size: 16px;" />
  */
 defineOptions({
     name: 'IconSpool'

@@ -2,7 +2,7 @@
   <div class="dashboard-page">
     <header class="dashboard-heading">
       <div>
-        <h1 class="app-route-title">概览仪表盘</h1>
+        <h1 class="app-route-title">总览</h1>
         <p class="dashboard-heading__description">基于打印机 REST 快照与实时状态的生产概览</p>
       </div>
       <t-space class="dashboard-heading__actions">

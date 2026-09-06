@@ -317,7 +317,7 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   overflow: hidden;
   padding: clamp(1.5rem, 4vw, 3rem);
   color: #fff;
-  background: linear-gradient(135deg, #111827, #3730a3 55%, #4f46e5);
+  background: linear-gradient(135deg, var(--app-text-primary), var(--app-primary-active) 55%, var(--app-primary-active));
 }
 
 .logo-section,
@@ -344,7 +344,7 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   justify-content: center;
   width: 2.25rem;
   height: 2.25rem;
-  color: #312e81;
+  color: var(--app-primary-active);
   font-size: 0.75rem;
   font-weight: 800;
   background: #fff;
@@ -400,7 +400,7 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   right: 10%;
   width: 14rem;
   height: 14rem;
-  background: rgb(129 140 248 / 24%);
+  background: color-mix(in srgb, var(--app-primary-hover) 24%, transparent);
 }
 
 .blur-circle-2 {
@@ -408,7 +408,7 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   left: 15%;
   width: 18rem;
   height: 18rem;
-  background: rgb(192 132 252 / 18%);
+  background: color-mix(in srgb, var(--app-primary-light-hover) 18%, transparent);
 }
 
 .right-section {
@@ -429,12 +429,12 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   display: none;
   justify-content: center;
   margin-bottom: 2.5rem;
-  color: #111827;
+  color: var(--app-text-primary);
 }
 
 .mobile-logo .logo-mark {
   color: #fff;
-  background: #312e81;
+  background: var(--app-primary-active);
 }
 
 .form-header {
@@ -444,14 +444,14 @@ onUnmounted(() => clearTimeout(feedbackTimer))
 
 .form-title {
   margin: 0 0 0.5rem;
-  color: #111827;
+  color: var(--app-text-primary);
   font-size: clamp(1.5rem, 2.5vw, 1.875rem);
   line-height: 1.25;
 }
 
 .form-subtitle,
 .login-tip {
-  color: #6b7280;
+  color: var(--app-text-secondary);
   font-size: 0.875rem;
 }
 
@@ -472,7 +472,7 @@ onUnmounted(() => clearTimeout(feedbackTimer))
 }
 
 .form-label {
-  color: #374151;
+  color: var(--app-text-primary);
   font-size: 0.875rem;
   font-weight: 600;
 }
@@ -481,22 +481,22 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   width: 100%;
   height: 3rem;
   padding: 0 1rem;
-  color: #111827;
+  color: var(--app-text-primary);
   font: inherit;
   background: #fff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--app-border);
   border-radius: 0.5rem;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .form-input::placeholder {
-  color: #9ca3af;
+  color: var(--app-text-placeholder);
 }
 
 .form-input:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgb(99 102 241 / 15%);
+  border-color: var(--app-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-primary) 15%, transparent);
 }
 
 .password-wrapper {
@@ -517,7 +517,7 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   width: 1.75rem;
   height: 1.75rem;
   padding: 0;
-  color: #9ca3af;
+  color: var(--app-text-placeholder);
   background: transparent;
   border: 0;
   cursor: pointer;
@@ -525,7 +525,7 @@ onUnmounted(() => clearTimeout(feedbackTimer))
 }
 
 .password-toggle:hover {
-  color: #4f46e5;
+  color: var(--app-primary-active);
 }
 
 .password-toggle svg,
@@ -550,7 +550,7 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  color: #4b5563;
+  color: var(--app-text-secondary);
   font-size: 0.875rem;
   cursor: pointer;
 }
@@ -558,12 +558,12 @@ onUnmounted(() => clearTimeout(feedbackTimer))
 .checkbox {
   width: 1rem;
   height: 1rem;
-  accent-color: #4f46e5;
+  accent-color: var(--app-primary-active);
 }
 
 .text-link {
   padding: 0;
-  color: #4f46e5;
+  color: var(--app-primary-active);
   font: inherit;
   font-size: 0.875rem;
   background: none;
@@ -583,17 +583,17 @@ onUnmounted(() => clearTimeout(feedbackTimer))
 
 .error-message {
   margin: 0;
-  color: #dc2626;
+  color: var(--app-danger);
   font-size: 0.8125rem;
 }
 
 .error-alert {
   padding: 0.75rem;
-  color: #b91c1c;
+  color: var(--app-danger-active);
   font-size: 0.875rem;
   line-height: 1.5;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: var(--app-danger-light);
+  border: 1px solid var(--app-danger-light);
   border-radius: 0.5rem;
 }
 
@@ -607,7 +607,7 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   color: #fff;
   font: inherit;
   font-weight: 600;
-  background: #111827;
+  background: var(--app-text-primary);
   border: 0;
   border-radius: 0.5rem;
   cursor: pointer;
@@ -661,7 +661,7 @@ onUnmounted(() => clearTimeout(feedbackTimer))
   }
 
   .login-footer {
-    color: #9ca3af;
+    color: var(--app-text-placeholder);
   }
 }
 

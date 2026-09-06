@@ -220,8 +220,8 @@ function handleCellClick(device, rowIndex, colIndex) {
 <style scoped>
 /* 编辑模式网格背景 */
 .is-edit-mode :deep(.device-matrix) {
-    background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px),
-        linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
+    background-image: linear-gradient(to right, var(--app-border) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--app-border) 1px, transparent 1px);
     background-size: 20px 20px;
     background-position: center center;
 }

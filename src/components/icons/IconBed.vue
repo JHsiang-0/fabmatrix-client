@@ -3,7 +3,7 @@
         stroke-linejoin="round" class="icon-bed">
         <path d="M3 18h18v2H3z" />
         <path d="M6 14v-2c0-1.1.9-2 2-2h8c1.1 0 2 .9 2 2v2" />
-        <path d="M8 6v2M12 5v3M16 6v2" stroke-dasharray="2 2" stroke-width="1.5" stroke="#f56c6c" />
+        <path d="M8 6v2M12 5v3M16 6v2" stroke-dasharray="2 2" stroke-width="1.5" stroke="var(--app-danger)" />
     </svg>
 </template>
 
@@ -14,7 +14,7 @@
  *
  * @example
  * <IconBed />
- * <IconBed style="color: #f59e0b; font-size: 16px;" />
+ * <IconBed style="color: var(--app-warning); font-size: 16px;" />
  */
 defineOptions({
     name: 'IconBed'

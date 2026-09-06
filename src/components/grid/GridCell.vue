@@ -18,7 +18,7 @@
         :class="{ 'min-h-[60px] sm:min-h-[80px] lg:min-h-[100px]': true }"
     >
         <div class="hidden sm:block w-1 h-4/5 bg-repeat-y bg-[length:4px_8px] bg-gradient-to-b from-gray-400 via-gray-400 to-transparent opacity-40"
-             style="background-image: repeating-linear-gradient(to bottom, #9ca3af 0, #9ca3af 4px, transparent 4px, transparent 8px);"></div>
+             style="background-image: repeating-linear-gradient(to bottom, var(--app-text-placeholder) 0, var(--app-text-placeholder) 4px, transparent 4px, transparent 8px);"></div>
     </div>
 
     <!-- 空槽位 -->
