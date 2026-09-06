@@ -20,7 +20,7 @@ Electron 窗口不改变业务页面的信息架构。统一结构仍为：
 
 - `Content View` 是页面纵向滚动 owner。
 - `Table` 只有内容区横向/局部纵向滚动，分页位于滚动内容之外。
-- 文件树、Drawer Body 可以独立滚动，但每个区域只能有一个实际滚动容器。
+- 文件库结果区、Drawer Body 可以独立滚动，但每个区域只能有一个实际滚动容器；文件库不再设置常驻目录树滚动容器。
 - 800px 宽度下隐藏低优先级表格列或允许明确横向滚动，不压缩核心操作到不可点击。
 - Drawer Header/Footer 不随 Body 内容滚动；关闭后恢复触发按钮焦点。
 
@@ -32,7 +32,13 @@ Electron 窗口不改变业务页面的信息架构。统一结构仍为：
 
 ### 9.4 文件库数据工作台
 
-文件库采用左右工作台：左侧目录上下文，右侧 PageHeader/Toolbar/DataRegion。Table 与 Grid 共享：当前目录、搜索词、材质筛选、选中项、分页和刷新状态。文件夹行只展示打开/删除等正式操作；文件行展示详情、打印、删除等正式操作。空目录、无结果和上传失败都在数据区原位表达。
+文件库采用单一主工作区：PageHeader、TDesign Card 工作区、inline Form 筛选栏、面包屑、当前目录 Table/Grid、分页和文件详情 Drawer。取消常驻左侧目录树，文件夹只在当前目录正式结果中出现一次；Table 是默认视图，Grid 是共享同一分页结果的可选视图。
+
+当前目录和筛选状态由 `parentId`、`fileName`、`materialType`、分页和刷新状态组成，统一通过 `POST /print-files/page` 读取。根目录使用 `parentId=null`，文件夹打开后更新 `parentId` 和面包屑；不得把 `GET /print-files/tree` 与当前结果同时渲染为两份文件列表。`GET /print-files/folder/content` 仅在后续明确需要非分页直接子节点场景时使用，不能与分页结果混用造成状态分叉。
+
+文件夹仅展示名称、目录标识、打开和删除；文件展示安全元数据、详情、打印、下载和删除。详情通过行/卡片点击或操作菜单打开，不依赖额外的“详情”按钮。右键菜单使用 TDesign `Dropdown` 的 `trigger="context-menu"`，作为可见操作按钮之外的辅助入口：文件夹只提供打开/删除，文件提供详情/打印/下载/删除，多选只提供正式批量删除。后端未提供重命名、移动、复制、分享接口时，界面不得展示这些操作。
+
+空目录、无结果、列表加载、刷新失败、上传逐项失败和详情加载失败均在当前 Card 工作区或 Drawer Body 内原位表达；不以文件夹统计、文件大小汇总或其他未由接口返回的字段填充卡片空白。
 
 ### 9.5 任务与批量派发
 
@@ -100,7 +106,7 @@ App Layout → Sidebar → Main Layout → Header → Content → Breadcrumb（�
 
 - App Shell 负责布局高度。
 - 页面内容默认自然增长。
-- Table、目录树、Drawer Body 是允许局部滚动的区域。
+- 文件库 Table/Grid 结果区和 Drawer Body 是允许局部滚动的区域；不新增目录树滚动区域。
 - 每个局部区域只有一个滚动容器。
 - 分页位于表格滚动区域之外。
 
@@ -140,9 +146,11 @@ App Layout → Sidebar → Main Layout → Header → Content → Breadcrumb（�
 
 ### 5.3 文件库
 
-页面结构：Page Header、目录上下文和 Toolbar、左侧目录树、右侧文件 Table 或 Grid、文件详情 Drawer。
+页面结构：Page Header、TDesign Card 工作区、inline Form 筛选栏、面包屑、文件 Table 或 Grid、分页和文件详情 Drawer。页面不保留常驻左侧目录树，避免目录树和当前目录结果重复。
 
-默认以 Table 处理大量文件，Grid 作为用户选择。文件夹、文件、上传状态和批量操作要有不同的视觉层级。
+默认以 TDesign Table 处理大量文件，Grid 作为用户选择。Table 第一列统一承载文件夹/文件图标、名称和类型；文件夹显示目录专属操作，文件显示打印、下载、删除等正式操作，详情通过行或卡片点击进入 Drawer。Grid 使用紧凑 TDesign Card，文件夹不复用文件的耗时、耗材和成功率字段，不为缺失字段填充默认值。
+
+右键菜单采用 TDesign Dropdown `trigger="context-menu"`，必须与可见按钮保持同一权限和接口边界，不替代键盘和按钮操作。当前后端契约只支持目录创建、分页/直接子节点读取、上传、预览、缩略图、关联任务、下载、打印任务创建、单删和批量删除；重命名、移动、复制、分享等能力在后端接口出现前不进入 UI。
 
 ### 5.4 任务中心
 
