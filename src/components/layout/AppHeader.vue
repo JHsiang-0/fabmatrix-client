@@ -32,7 +32,7 @@
         </t-tag>
         <t-button
           v-if="!isWsConnected || isRealtimeStale"
-          theme="primary"
+          :theme="realtimeTheme"
           variant="outline"
           shape="round"
           size="small"
@@ -167,9 +167,9 @@ const openFullscreenDashboard = async () => {
   align-items: center;
   gap: 0;
   min-height: 32px;
-  padding: 2px;
-  background: var(--app-surface-muted);
-  border: 1px solid var(--app-border);
+  padding: 0;
+  background: transparent;
+  border: 0;
   border-radius: 999px;
   white-space: nowrap;
 }
