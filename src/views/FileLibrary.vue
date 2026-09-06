@@ -3,20 +3,9 @@
     <PageHeader
       class="file-library-page-toolbar"
       title="文件库"
-      description="管理可见的切片文件与目录，选择文件后可直接创建打印任务。"
     >
       <template #actions>
       <t-space class="file-library-toolbar__actions" size="small" align="center" break-line>
-        <t-space class="file-view-toggle">
-          <t-button variant="text" size="small" @click="viewMode = 'grid'"
-            :class="{ 'file-view-toggle__active': viewMode === 'grid' }" aria-label="网格视图">
-            <Grid />
-          </t-button>
-          <t-button variant="text" size="small" @click="viewMode = 'list'"
-            :class="{ 'file-view-toggle__active': viewMode === 'list' }" aria-label="列表视图">
-            <List />
-          </t-button>
-        </t-space>
         <t-button variant="outline" theme="default" size="medium" :icon="renderIcon(FolderOpened)" @click="openCreateFolderDialog">
           新建文件夹
         </t-button>
@@ -35,9 +24,9 @@
     </PageHeader>
 
     <t-card bordered class="file-library-workspace app-page-card" aria-label="文件工作台">
-      <section class="file-library-main" aria-labelledby="file-library-results-title">
+      <section class="file-library-main" aria-label="当前目录文件列表">
           <t-form layout="inline" class="file-library-filter-form" aria-label="文件筛选条件">
-            <t-form-item label="当前位置">
+            <t-form-item>
               <t-breadcrumb separator="/">
                 <t-breadcrumb-item :to="{ path: '' }" @click.prevent="navigateToRoot">
                   <FolderOpened :size="16" />
@@ -52,11 +41,23 @@
                 </t-breadcrumb-item>
               </t-breadcrumb>
             </t-form-item>
-            <t-form-item label="模式">
+            <t-form-item>
               <t-radio-group v-model="isBatchMode" variant="default-filled" size="small" aria-label="文件操作模式">
                 <t-radio-button :value="false">浏览</t-radio-button>
-                <t-radio-button :value="true">批量选择</t-radio-button>
+                <t-radio-button :value="true">选择</t-radio-button>
               </t-radio-group>
+            </t-form-item>
+            <t-form-item>
+              <t-space class="file-view-toggle">
+                <t-button variant="text" size="small" @click="viewMode = 'grid'"
+                  :class="{ 'file-view-toggle__active': viewMode === 'grid' }" aria-label="网格视图">
+                  <Grid />
+                </t-button>
+                <t-button variant="text" size="small" @click="viewMode = 'list'"
+                  :class="{ 'file-view-toggle__active': viewMode === 'list' }" aria-label="列表视图">
+                  <List />
+                </t-button>
+              </t-space>
             </t-form-item>
             <t-form-item>
               <t-input v-model="searchKeyword" placeholder="搜索文件名..." clearable size="medium"
@@ -65,10 +66,6 @@
                   <Search />
                 </template>
               </t-input>
-            </t-form-item>
-            <t-form-item>
-              <t-input v-model="materialFilter" placeholder="材质筛选" clearable size="medium"
-                @keyup.enter="handleSearch" />
             </t-form-item>
             <t-form-item>
               <t-space size="small">
@@ -83,14 +80,6 @@
           </t-form>
 
           <div class="file-library-results">
-            <div class="file-library-results-heading">
-              <div>
-                <h2 id="file-library-results-title">{{ currentParentId ? '目录内容' : '根目录文件' }}</h2>
-                <span>{{ fileList.length }} 项结果</span>
-              </div>
-              <t-tag v-if="isBatchMode" theme="primary" variant="light">批量选择模式</t-tag>
-            </div>
-
             <AsyncState
               v-if="loading || loadError"
               :loading="loading"
@@ -119,8 +108,9 @@
           v-for="file in folderList"
           :key="file.id"
           class="file-card-context"
+          @contextmenu="captureContextMenu"
         >
-          <t-dropdown :options="getContextMenuOptions(file)" trigger="context-menu"
+          <t-dropdown :options="getContextMenuOptions(file)" trigger="context-menu" :popup-props="contextMenuPopupProps"
             @click="handleContextMenuClick($event, file)">
             <t-card bordered hover-shadow class="file-card"
               :class="{ 'file-card--selected': isBatchMode && selectedIds.includes(file.id) }"
@@ -134,7 +124,7 @@
 
               <!-- 文件夹图标 -->
               <div class="file-card__media file-card__media--folder">
-                <IconFolder :size="64" />
+                <IconFolder :size="48" />
               </div>
 
               <!-- 卡片内容 -->
@@ -174,8 +164,9 @@
           v-for="file in fileItemsList"
           :key="file.id"
           class="file-card-context"
+          @contextmenu="captureContextMenu"
         >
-          <t-dropdown :options="getContextMenuOptions(file)" trigger="context-menu"
+          <t-dropdown :options="getContextMenuOptions(file)" trigger="context-menu" :popup-props="contextMenuPopupProps"
             @click="handleContextMenuClick($event, file)">
             <t-card bordered hover-shadow class="file-card"
               :class="{ 'file-card--selected': isBatchMode && selectedIds.includes(file.id) }"
@@ -267,14 +258,14 @@
       <!-- 列表视图 -->
       <div v-else class="file-table-view">
         <TdTable :data="fileRows" row-key="id" :loading="loading" height="100%" @selection-change="handleSelectionChange"
-          @row-click="handleTableRowClick" border stripe style="width: 100%">
+          @row-click="handleTableRowClick" border style="width: 100%">
           <TdTableColumn v-if="isBatchMode" type="selection" width="50" align="center" />
 
           <TdTableColumn prop="originalName" label="文件名" min-width="200">
             <template #default="{ row }">
-              <t-dropdown :options="getContextMenuOptions(row)" trigger="context-menu"
+              <t-dropdown :options="getContextMenuOptions(row)" trigger="context-menu" :popup-props="contextMenuPopupProps"
                 @click="handleContextMenuClick($event, row)">
-                <div class="file-table__name-cell">
+                <div class="file-table__name-cell" @contextmenu="captureContextMenu">
                   <div class="file-table__icon">
                     <span v-if="row.folder" class="file-table__folder-icon">
                       <IconFolder />
@@ -607,8 +598,6 @@ const loadError = ref('')
 const fileList = ref([])
 const selectedIds = ref([])
 const searchKeyword = ref('')
-const materialFilter = ref('')
-// 材质筛选使用后端 PrintFileQueryDTO 的 materialType 精确筛选。
 const viewMode = ref('list')
 const uploadDialogVisible = ref(false)
 const createFolderDialogVisible = ref(false)
@@ -685,6 +674,44 @@ const folderList = computed(() => fileRows.value.filter(file => file.viewType ==
 
 const fileItemsList = computed(() => fileRows.value.filter(file => file.viewType === 'file'))
 
+const contextMenuPosition = reactive({ left: 0, top: 0 })
+
+const captureContextMenu = event => {
+  contextMenuPosition.left = event.clientX
+  contextMenuPosition.top = event.clientY
+}
+
+const contextMenuPopupProps = {
+  onVisibleChange: (visible, context) => {
+    if (visible && context?.e) {
+      contextMenuPosition.left = context.e.clientX
+      contextMenuPosition.top = context.e.clientY
+    }
+  },
+  popperOptions: {
+    strategy: 'fixed',
+    modifiers: [
+      {
+        name: 'farm-context-menu-position',
+        enabled: true,
+        phase: 'beforeWrite',
+        fn: ({ state }) => {
+          const width = state.rects.popper.width || 0
+          const height = state.rects.popper.height || 0
+          const left = Math.min(contextMenuPosition.left, window.innerWidth - width - 8)
+          const top = Math.min(contextMenuPosition.top, window.innerHeight - height - 8)
+          state.styles.popper = {
+            ...state.styles.popper,
+            left: `${Math.max(8, left)}px`,
+            top: `${Math.max(8, top)}px`,
+            transform: 'none'
+          }
+        }
+      }
+    ]
+  }
+}
+
 const getContextMenuOptions = file => {
   if (!file) return []
 
@@ -737,7 +764,6 @@ const fetchData = async () => {
       pageNum: pagination.pageNum,
       pageSize: pagination.pageSize,
       fileName: searchKeyword.value || undefined,
-      materialType: materialFilter.value || undefined,
       parentId: currentParentId.value
     }
     const res = await getFileList(params)
@@ -832,7 +858,6 @@ const handleSearch = () => {
 
 const resetSearch = () => {
   searchKeyword.value = ''
-  materialFilter.value = ''
   selectedIds.value = []
   pagination.pageNum = 1
   fetchData()
@@ -1399,20 +1424,6 @@ onMounted(() => {
   flex: 0 0 auto;
 }
 
-.file-library-results-heading h2 {
-  margin: 0;
-  color: var(--app-text-primary);
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.file-library-results-heading span {
-  margin: 4px 0 0;
-  color: var(--app-text-secondary);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
 .file-library-main {
   display: flex;
   flex-direction: column;
@@ -1484,15 +1495,6 @@ onMounted(() => {
   min-height: 0;
 }
 
-.file-library-results-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--app-spacing-3);
-  flex: 0 0 auto;
-  margin-bottom: var(--app-spacing-3);
-}
-
 .file-library-list,
 .file-table-view {
   display: flex;
@@ -1525,6 +1527,15 @@ onMounted(() => {
   background-clip: padding-box;
 }
 
+.file-table-view :deep(.t-table__body tr > td) {
+  background: var(--td-bg-color-container);
+  transition: background-color 0.2s ease;
+}
+
+.file-table-view :deep(.t-table__body tr:hover > td) {
+  background: var(--td-bg-color-container-hover);
+}
+
 .file-table-view :deep(.td-table-adapter),
 .file-table-view :deep(.t-table) {
   min-height: 0;
@@ -1553,8 +1564,8 @@ onMounted(() => {
 
 .file-grid-view {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
-  gap: var(--app-spacing-4);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  gap: var(--app-spacing-3);
   align-content: start;
   min-height: 0;
   padding: 2px 2px var(--app-spacing-3);
@@ -1574,6 +1585,12 @@ onMounted(() => {
   position: relative;
   min-width: 0;
   overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.file-card:hover {
+  border-color: var(--td-brand-color-5);
+  box-shadow: var(--app-shadow);
 }
 
 .file-card :deep(.t-card__body) {
@@ -1585,8 +1602,8 @@ onMounted(() => {
 
 .file-card__selection {
   position: absolute;
-  top: 10px;
-  left: 10px;
+  top: 8px;
+  left: 8px;
   z-index: 2;
 }
 
@@ -1595,7 +1612,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   position: relative;
-  height: 112px;
+  height: 88px;
   flex-shrink: 0;
   background: var(--td-bg-color-container-hover);
   overflow: hidden;
@@ -1608,8 +1625,8 @@ onMounted(() => {
 
 .file-card__material-tag {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 8px;
+  right: 8px;
   z-index: 1;
 }
 
@@ -1637,17 +1654,17 @@ onMounted(() => {
 
 .file-card__body {
   display: flex;
-  min-height: 156px;
+  min-height: 124px;
   flex-direction: column;
-  gap: var(--app-spacing-2);
-  padding: var(--app-spacing-3);
+  gap: 6px;
+  padding: 10px;
 }
 
 .file-card__name {
   margin: 0;
   overflow: hidden;
   color: var(--app-text-primary);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.4;
   text-overflow: ellipsis;
@@ -1657,10 +1674,10 @@ onMounted(() => {
 .file-card__metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   color: var(--app-text-secondary);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .file-card__metrics > div {
@@ -1678,7 +1695,7 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: var(--app-spacing-3);
-  padding: 8px;
+  padding: 6px;
   color: var(--app-text-secondary);
   background: var(--app-surface-muted);
   border-radius: var(--app-radius-small);
@@ -1717,7 +1734,7 @@ onMounted(() => {
 
 .file-card__actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   margin-top: auto;
 }
 
@@ -1831,25 +1848,6 @@ onMounted(() => {
     gap: var(--app-spacing-2);
     margin-bottom: var(--app-spacing-2);
     padding-bottom: var(--app-spacing-2);
-  }
-
-  .file-library-results-heading {
-    align-items: baseline;
-    margin-bottom: var(--app-spacing-2);
-  }
-
-  .file-library-results-heading > div {
-    display: flex;
-    align-items: baseline;
-    gap: var(--app-spacing-2);
-    flex-wrap: nowrap;
-    white-space: nowrap;
-  }
-
-  .file-library-results-heading h2,
-  .file-library-results-heading span {
-    margin-top: 0;
-    white-space: nowrap;
   }
 
   .file-library-list {
