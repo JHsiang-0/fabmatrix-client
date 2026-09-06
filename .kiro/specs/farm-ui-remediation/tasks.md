@@ -288,6 +288,28 @@ git diff --check：通过。
 
 验证说明：`npm test` 共 142 项，139 项通过、3 项失败；失败项为既有任务队列结构断言，涉及 `JobQueue.vue` 的旧 `job-panel`、局部滚动和 `StatusTag` 预期，与本任务修改范围无关，未为通过测试而回退任务队列融合结果。
 
+### [x] UI-001.12 打印历史筛选栏 TDesign 重构
+
+范围：
+- `src/views/JobHistory.vue`
+- 打印历史页面顶部筛选区域
+
+目标：
+- 使用 TDesign Form/FormItem 统一筛选项的语义、标签和布局。
+- 保留任务状态、打印机 ID、时间范围、查询和重置功能，不修改 API 契约。
+- 大窗口保持紧凑横向布局，中小窗口自动换行，不产生页面级横向溢出。
+- 查询 Loading、错误、空数据和键盘回车提交行为保持可用。
+
+验收标准：
+- 筛选栏视觉层级、控件高度和间距统一，符合 TDesign 默认主题。
+- 查询和重置按钮位置明确，输入项在 375、768、1024、1440 宽度下均可访问。
+- 不影响表格、分页、详情抽屉和其他页面的现有功能。
+- 完成 `npm run lint`、`npm run build` 和 `git diff --check` 验证。
+
+完成记录：打印历史筛选区改用 TDesign Form/FormItem、Space、Select、Input 和 DateRangePicker，统一标签与控件布局；查询操作保留表单提交和回车行为，重置按钮使用 outline 变体；通过局部响应式样式实现横向紧凑布局和小屏单列布局，未修改 API、表格、分页或详情抽屉。
+
+验证说明：`npm run lint` 和 `npm run build` 通过，`git diff --check` 通过。`npm test` 共 142 项，139 项通过、3 项失败；失败项为既有 `JobQueue.vue` 结构断言（旧 `job-panel`、局部滚动和 `StatusTag` 预期），与本任务修改范围无关。
+
 ## 2. 执行顺序
 
 UI-001.0 → UI-001.1 → UI-001.2 → UI-001.3 → UI-001.4 → UI-001.5 → UI-001.6 → UI-001.7 → UI-001.8 → UI-001.9 → UI-001.10 → UI-001.11

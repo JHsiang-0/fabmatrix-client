@@ -12,54 +12,65 @@
 
     <t-card class="history-card app-page-card" aria-label="打印历史工作区">
       <div class="history-card__body">
-      <!-- 顶部检索区 -->
-      <QueryToolbar class="history-filter-toolbar" label="打印历史筛选条件">
-        <div class="flex flex-wrap items-center gap-4">
-          <div class="flex items-center gap-2">
-            <span class="text-sm text-gray-700 whitespace-nowrap">任务状态</span>
-            <t-select v-model="queryForm.status" placeholder="请选择状态" clearable style="width: 160px">
-              <t-option label="排队中" value="QUEUED" />
-              <t-option label="上传中" value="UPLOADING" />
-              <t-option label="已分配待确认" value="ASSIGNED" />
-              <t-option label="已上传待机" value="READY" />
-              <t-option label="打印中" value="PRINTING" />
-              <t-option label="已暂停" value="PAUSED" />
-              <t-option label="已完成" value="COMPLETED" />
-              <t-option label="失败" value="FAILED" />
-              <t-option label="状态核对中" value="RECONCILING" />
-              <t-option label="已取消" value="CANCELLED" />
-            </t-select>
-          </div>
+        <!-- 顶部筛选区 -->
+        <QueryToolbar class="history-filter-toolbar" label="打印历史筛选条件">
+          <t-form
+            class="history-filter-form"
+            :data="queryForm"
+            layout="inline"
+            label-align="right"
+            @submit="handleQuery"
+          >
+            <t-form-item label="任务状态" name="status">
+              <t-select v-model="queryForm.status" placeholder="请选择状态" clearable class="history-filter-status">
+                <t-option label="排队中" value="QUEUED" />
+                <t-option label="上传中" value="UPLOADING" />
+                <t-option label="已分配待确认" value="ASSIGNED" />
+                <t-option label="已上传待机" value="READY" />
+                <t-option label="打印中" value="PRINTING" />
+                <t-option label="已暂停" value="PAUSED" />
+                <t-option label="已完成" value="COMPLETED" />
+                <t-option label="失败" value="FAILED" />
+                <t-option label="状态核对中" value="RECONCILING" />
+                <t-option label="已取消" value="CANCELLED" />
+              </t-select>
+            </t-form-item>
 
-          <div class="flex items-center gap-2">
-            <span class="text-sm text-gray-700 whitespace-nowrap">打印机 ID</span>
-            <t-input v-model="queryForm.printerId" placeholder="请输入设备 ID" clearable style="width: 140px" />
-          </div>
+            <t-form-item label="打印机 ID" name="printerId">
+              <t-input
+                v-model="queryForm.printerId"
+                placeholder="请输入设备 ID"
+                clearable
+                class="history-filter-printer"
+                @enter="handleQuery"
+              />
+            </t-form-item>
 
-          <div class="flex items-center gap-2">
-            <span class="text-sm text-gray-700 whitespace-nowrap">时间范围</span>
-            <t-date-range-picker
-              v-model="queryForm.dateRange"
-              separator="至"
-              :placeholder="['开始日期', '结束日期']"
-              value-type="YYYY-MM-DD HH:mm:ss"
-              style="width: 280px"
-              :default-time="['00:00:00', '23:59:59']"
-            />
-          </div>
+            <t-form-item label="时间范围" name="dateRange">
+              <t-date-range-picker
+                v-model="queryForm.dateRange"
+                separator="至"
+                :placeholder="['开始日期', '结束日期']"
+                value-type="YYYY-MM-DD HH:mm:ss"
+                class="history-filter-date"
+                :default-time="['00:00:00', '23:59:59']"
+              />
+            </t-form-item>
 
-          <div class="flex items-center gap-2 ml-auto">
-            <t-button theme="primary" @click="handleQuery" :loading="loading">
-              <span><search /></span>
-              查询
-            </t-button>
-            <t-button @click="handleReset">
-              <span><refresh /></span>
-              重置
-            </t-button>
-          </div>
-        </div>
-      </QueryToolbar>
+            <t-form-item label="操作" class="history-filter-actions">
+              <t-space size="small">
+                <t-button theme="primary" type="submit" :loading="loading">
+                  <template #icon><search /></template>
+                  查询
+                </t-button>
+                <t-button variant="outline" @click="handleReset">
+                  <template #icon><refresh /></template>
+                  重置
+                </t-button>
+              </t-space>
+            </t-form-item>
+          </t-form>
+        </QueryToolbar>
 
       <!-- 数据内容区：只允许这里滚动，避免表格内容推动底部分页。 -->
       <div class="history-content">
@@ -183,7 +194,6 @@
           </TdTable>
         </div>
       </div>
-
       </div>
 
       <!-- 底部分页区 -->
@@ -461,6 +471,40 @@ fetchData()
   margin-bottom: var(--app-spacing-4);
 }
 
+.history-filter-toolbar :deep(.app-query-toolbar__fields) {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.history-filter-form {
+  width: 100%;
+  min-width: 0;
+}
+
+.history-filter-form :deep(.t-form__item) {
+  min-width: 0;
+}
+
+.history-filter-form :deep(.t-form__item:last-child) {
+  margin-right: 0;
+}
+
+.history-filter-status {
+  width: 160px;
+}
+
+.history-filter-printer {
+  width: 140px;
+}
+
+.history-filter-date {
+  width: 280px;
+}
+
+.history-filter-actions {
+  margin-left: auto !important;
+}
+
 .history-content {
   display: flex;
   flex: 1 1 auto;
@@ -549,6 +593,48 @@ fetchData()
     align-self: flex-end;
     max-width: 100%;
     margin-left: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .history-filter-actions {
+    margin-left: 0 !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .history-filter-toolbar {
+    padding: var(--app-spacing-3);
+  }
+
+  .history-filter-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--app-spacing-3);
+  }
+
+  .history-filter-form :deep(.t-form__item) {
+    display: flex;
+    margin: 0;
+  }
+
+  .history-filter-form :deep(.t-form__label) {
+    flex: 0 0 5rem;
+  }
+
+  .history-filter-form :deep(.t-form__controls) {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .history-filter-status,
+  .history-filter-printer,
+  .history-filter-date {
+    width: 100%;
+  }
+
+  .history-filter-actions {
+    justify-content: flex-end;
   }
 }
 </style>
