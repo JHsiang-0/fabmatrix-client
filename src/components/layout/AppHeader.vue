@@ -14,7 +14,11 @@
     </div>
 
     <div class="app-header__right">
-      <div class="app-header__realtime-control" aria-label="实时设备连接状态">
+      <div
+        class="app-header__realtime-control"
+        :class="{ 'app-header__realtime-control--with-action': !isWsConnected || isRealtimeStale }"
+        aria-label="实时设备连接状态"
+      >
         <t-tag
           size="small"
           variant="dark"
@@ -161,21 +165,30 @@ const openFullscreenDashboard = async () => {
 .app-header__realtime-control {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: 0;
   min-height: 32px;
-  padding: 0;
-  background: transparent;
-  border: 0;
+  padding: 2px;
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-border);
   border-radius: 999px;
   white-space: nowrap;
 }
 
 .app-header__realtime-status {
+  border-radius: 999px;
   white-space: nowrap;
+}
+
+.app-header__realtime-control--with-action .app-header__realtime-status {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .app-header__reconnect {
   min-height: 28px;
+  margin-left: -1px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 
 .header-icon-button {
