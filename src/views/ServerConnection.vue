@@ -343,6 +343,9 @@ const goLogin = () => router.push({ name: 'login' })
 }
 
 .connection-ws-heading {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
   margin-bottom: 8px;
 }
 
@@ -354,6 +357,11 @@ const goLogin = () => router.push({ name: 'login' })
 
 .connection-ws-input :deep(.t-form__controls) {
   min-width: 0;
+}
+
+.connection-ws-input :deep(.t-form__controls-content) {
+  display: block;
+  width: 100%;
 }
 
 .connection-ws-input {
