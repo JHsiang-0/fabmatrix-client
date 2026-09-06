@@ -995,7 +995,7 @@ Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存
 
 提交：完成最终检查后创建独立本地提交 `fix: 完善文件库上传删除与详情工作流`，不执行 `git push`。
 
-### [ ] UI-004.5 Electron、浏览器视觉与交互验收
+### [x] UI-004.5 Electron、浏览器视觉与交互验收
 
 优先级：P0
 
@@ -1016,6 +1016,16 @@ Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存
 - 完成全量测试、相关浏览器/Electron 测试、lint、build，并通过提交前 Git 检查。
 
 完成后提交：`test: 完成 UI-004 文件库视觉与交互验收`。
+
+完成记录：浏览器 Playwright 9/9 通过，覆盖 `375×812`、`768×1024`、`1440×900`、`1920×855`，验证文件库列表/Grid、目录/筛选/详情/弹窗入口和局部滚动；Electron Playwright 3/3 通过，覆盖实际 BrowserWindow 内容尺寸 `800×560`、`1024×640`、`1200×760`，验证文件库目录打开、根目录返回、详情 Drawer、创建任务和上传/新建文件夹入口；`test:electron:dist` 及桌面构建通过。现有稳定截图生成于 Playwright test-results 目录，不提交截图产物。
+
+测试：`npm test`（144/144）、`npm run test:e2e`（9/9）、`npm run test:electron`（3/3）、`npm run test:electron:dist`（1/1，含 `npm run build:desktop`）、`npm run lint`、`npm run build`、`npm run build:desktop` 全部通过。构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
+
+视觉和交互结论：文件树不再显示文件节点，主列表成为文件唯一结果承载区；顶部操作无粘连；默认 Table、可选 Grid、详情 Drawer、上传入口、目录和分页均可达，页面级横向溢出未出现。真实 RustFS/对象存储、生产 CORS、实体文件上传、物理打印机、Windows DPI/主题和安装包签名仍需现场验收。
+
+Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存后的 `git diff --cached --check`，仅暂存本任务记录。
+
+提交：完成最终检查后创建独立本地提交 `test: 完成 UI-004 文件库视觉与交互验收`，不执行 `git push`。
 
 ### 8.6 UI-004 执行顺序与统一约束
 
