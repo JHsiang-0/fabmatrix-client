@@ -35,16 +35,16 @@
       </template>
       <template #actions>
       <div class="app-page-toolbar__actions printer-page-actions">
-        <t-button size="small" variant="outline" :icon="renderIcon(Refresh)" :loading="loading" @click="fetchData">
+        <t-button size="medium" variant="outline" :icon="renderIcon(Refresh)" :loading="loading" @click="fetchData">
           刷新
         </t-button>
-        <t-button size="small" variant="outline" :icon="renderIcon(FolderAdd)" @click="openUnallocatedDialog">
+        <t-button size="medium" variant="outline" :icon="renderIcon(FolderAdd)" @click="openUnallocatedDialog">
           未分配设备
         </t-button>
-        <t-button v-if="isAdmin" size="small" variant="outline" :icon="renderIcon(Aim)" @click="openScanDialog">
+        <t-button v-if="isAdmin" size="medium" variant="outline" :icon="renderIcon(Aim)" @click="openScanDialog">
           扫描局域网设备
         </t-button>
-        <t-button v-if="isAdmin" size="small" theme="primary" :icon="renderIcon(Plus)" @click="handleAdd">
+        <t-button v-if="isAdmin" size="medium" theme="primary" :icon="renderIcon(Plus)" @click="handleAdd">
           新增打印机
         </t-button>
       </div>
@@ -1212,7 +1212,12 @@ const handleBatchAdd = async () => {
 }
 
 .printer-page-actions {
-  gap: 0.5rem;
+  gap: 0.75rem;
+}
+
+.printer-manage-page :deep(.app-page-header__title) {
+  font-size: 1.375rem;
+  line-height: 1.4;
 }
 
 .printer-management-tabs-panel,
