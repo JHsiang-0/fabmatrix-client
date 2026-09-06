@@ -116,7 +116,7 @@ const handleItemClick = item => {
   box-sizing: border-box;
   min-height: 0;
   min-width: 0;
-  width: 100%;
+  width: 100% !important;
   padding: var(--app-spacing-3) var(--app-spacing-2);
   border-right: 0;
   overflow-y: auto;

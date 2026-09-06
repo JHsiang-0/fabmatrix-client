@@ -48,7 +48,7 @@ test('brand and profile entry are real FabMatrix routes', () => {
   assert.match(sidebarSource, /class="app-sidebar__top-spacer"/)
   assert.match(sidebarSource, /class="app-menu app-scroll-region"/)
   assert.match(sidebarSource, /<t-menu[\s\S]*v-model:expanded="expandedGroupKeys"/)
-  assert.match(sidebarSource, /\.app-menu \{[\s\S]*box-sizing: border-box;[\s\S]*min-width: 0;[\s\S]*width: 100%;/)
+  assert.match(sidebarSource, /\.app-menu \{[\s\S]*box-sizing: border-box;[\s\S]*min-width: 0;[\s\S]*width: 100% !important;/)
   assert.match(sidebarSource, /:deep\(\.t-menu__item\) \{[\s\S]*max-width: 100%;/)
   assert.match(sidebarSource, /:deep\(\.t-menu__item\) \{[\s\S]*margin-top: 2px;[\s\S]*margin-bottom: 2px;/)
   assert.doesNotMatch(sidebarSource, /:deep\(\.t-menu__item\) \{[\s\S]*margin: 2px 0;/)
