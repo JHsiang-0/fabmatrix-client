@@ -64,9 +64,13 @@ test('brand and profile entry are real FabMatrix routes', () => {
 
 test('应用头部使用明确的看板入口、组合式实时状态和带图标的用户菜单', () => {
   assert.match(headerSource, /<ViewListIcon size="20" \/>/)
-  assert.match(headerSource, /theme="primary"[\s\S]*shape="round"[\s\S]*aria-label="实时设备看板"/)
+  assert.match(headerSource, /class="app-header__realtime-control"[^]*variant="dark"[^]*class="app-header__realtime-status"/)
+  assert.match(headerSource, /theme="primary"[^]*variant="outline"[^]*aria-label="重新连接实时状态"/)
+  assert.match(headerSource, /theme="default"[^]*variant="base"[^]*aria-label="设备看板"/)
   assert.match(headerSource, /class="app-header__realtime-control"[^]*app-header__realtime-status[^]*app-header__reconnect/)
+  assert.match(headerSource, /app-header__realtime-control[^]*aria-label="设备看板"/)
   assert.match(userMenuSource, /#prefixIcon><UserIcon size="16" \/>/)
   assert.match(userMenuSource, /#prefixIcon><PoweroffIcon size="16" \/>/)
+  assert.match(userMenuSource, /class="user-menu-trigger__identity"/)
   assert.doesNotMatch(userMenuSource, /value="logout" divider/)
 })

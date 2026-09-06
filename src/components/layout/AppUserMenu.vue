@@ -1,11 +1,15 @@
 <template>
   <t-dropdown trigger="click" @click="handleCommand">
     <t-button variant="text" class="user-menu-trigger" aria-label="打开用户菜单">
-      <t-avatar size="32" :image="userStore.userInfo.avatar || undefined">
-        {{ userStore.userInfo.username?.charAt(0).toUpperCase() || 'U' }}
-      </t-avatar>
-      <span class="user-menu-trigger__name">{{ userStore.userInfo.username || '管理员' }}</span>
-      <ChevronDownIcon size="16" class="user-menu-trigger__arrow" />
+      <span class="user-menu-trigger__content">
+        <span class="user-menu-trigger__identity">
+          <t-avatar size="32" :image="userStore.userInfo.avatar || undefined">
+            {{ userStore.userInfo.username?.charAt(0).toUpperCase() || 'U' }}
+          </t-avatar>
+          <span class="user-menu-trigger__name">{{ userStore.userInfo.username || '管理员' }}</span>
+        </span>
+        <ChevronDownIcon size="16" class="user-menu-trigger__arrow" />
+      </span>
     </t-button>
 
     <template #dropdown>
@@ -62,7 +66,6 @@ const handleCommand = item => {
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.875rem;
   min-height: 40px;
   padding: 0 0.5rem;
   color: var(--app-text-primary);
@@ -76,9 +79,21 @@ const handleCommand = item => {
   background: var(--app-surface-muted);
 }
 
-.user-menu-trigger__name {
+.user-menu-trigger__content,
+.user-menu-trigger__identity {
   display: inline-flex;
   align-items: center;
+}
+
+.user-menu-trigger__content {
+  gap: 0.625rem;
+}
+
+.user-menu-trigger__identity {
+  gap: 0.875rem;
+}
+
+.user-menu-trigger__name {
   flex: 0 0 auto;
   max-width: 8rem;
   overflow: hidden;
@@ -91,6 +106,7 @@ const handleCommand = item => {
 }
 
 .user-menu-trigger__arrow {
+  flex-shrink: 0;
   color: var(--app-text-secondary);
   transition: transform 0.2s ease;
 }

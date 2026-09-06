@@ -14,16 +14,42 @@
     </div>
 
     <div class="app-header__right">
+      <div class="app-header__realtime-control" aria-label="实时设备连接状态">
+        <t-tag
+          size="small"
+          variant="dark"
+          shape="round"
+          :theme="realtimeTheme"
+          :title="realtimeDescription"
+          aria-live="polite"
+          class="app-header__realtime-status"
+        >
+          {{ realtimeLabel }}
+        </t-tag>
+        <t-button
+          v-if="!isWsConnected || isRealtimeStale"
+          theme="primary"
+          variant="outline"
+          shape="round"
+          size="small"
+          class="app-header__reconnect"
+          aria-label="重新连接实时状态"
+          @click="reconnectRealtime"
+        >
+          重连
+        </t-button>
+      </div>
       <t-button
-        theme="primary"
+        theme="default"
+        variant="base"
         shape="round"
         class="app-header__dashboard-action"
-        aria-label="实时设备看板"
-        title="实时设备看板"
+        aria-label="设备看板"
+        title="设备看板"
         @click="openFullscreenDashboard"
       >
         <template #icon><DesktopIcon size="18" /></template>
-        实时设备看板
+        设备看板
       </t-button>
       <t-button variant="text" class="header-icon-button" aria-label="消息通知" title="通知中心暂未开放" disabled>
         <MailIcon size="19" />
@@ -34,28 +60,6 @@
       <t-button variant="text" class="header-icon-button app-header__optional-action" aria-label="系统设置" title="系统设置暂未开放" disabled>
         <SettingIcon size="19" />
       </t-button>
-      <div class="app-header__realtime-control" aria-label="实时设备连接状态">
-        <t-tag
-          size="small"
-          variant="light"
-          :theme="realtimeTheme"
-          :title="realtimeDescription"
-          aria-live="polite"
-          class="app-header__realtime-status"
-        >
-          {{ realtimeLabel }}
-        </t-tag>
-        <t-button
-          v-if="!isWsConnected || isRealtimeStale"
-          variant="text"
-          size="small"
-          class="app-header__reconnect"
-          aria-label="重新连接实时状态"
-          @click="reconnectRealtime"
-        >
-          重连
-        </t-button>
-      </div>
       <AppUserMenu />
     </div>
   </t-header>
@@ -98,8 +102,9 @@ const realtimeLabel = computed(() => {
   return wsConnectionState.value === 'CONNECTING' ? '实时连接中' : '实时未连接'
 })
 const realtimeTheme = computed(() => {
-  if (isRecovering.value || isRealtimeStale.value) return 'warning'
-  return isWsConnected.value ? 'success' : 'default'
+  if (isRealtimeStale.value || isRecovering.value || wsConnectionState.value === 'CONNECTING') return 'warning'
+  if (isWsConnected.value) return 'success'
+  return 'danger'
 })
 const realtimeDescription = computed(() => (
   isRealtimeStale.value
@@ -156,11 +161,11 @@ const openFullscreenDashboard = async () => {
 .app-header__realtime-control {
   display: inline-flex;
   align-items: center;
-  gap: 0.125rem;
+  gap: 0.375rem;
   min-height: 32px;
-  padding: 2px 4px 2px 8px;
-  background: var(--app-surface-muted);
-  border: 1px solid var(--app-border);
+  padding: 0;
+  background: transparent;
+  border: 0;
   border-radius: 999px;
   white-space: nowrap;
 }
@@ -170,10 +175,7 @@ const openFullscreenDashboard = async () => {
 }
 
 .app-header__reconnect {
-  min-height: 26px;
-  padding: 0 6px;
-  color: var(--app-primary);
-  border-radius: 999px;
+  min-height: 28px;
 }
 
 .header-icon-button {

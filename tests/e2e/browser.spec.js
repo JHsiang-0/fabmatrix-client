@@ -113,7 +113,7 @@ for (const viewport of viewports) {
         if (await closeNavButton.isVisible()) await closeNavButton.click()
       }
       if (viewport.width > 768) {
-        await page.getByRole('button', { name: '实时设备看板', exact: true }).click()
+        await page.getByRole('button', { name: '设备看板', exact: true }).click()
         await expect(page).toHaveURL(/\/dashboard\/fullscreen$/)
         await expect(page.getByRole('heading', { name: 'FabMatrix 3D 打印控制系统' })).toBeVisible()
         await expect(page.getByRole('button', { name: '退出全屏', exact: true })).toBeVisible()
