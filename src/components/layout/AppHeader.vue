@@ -55,15 +55,27 @@
         <template #icon><DesktopIcon size="18" /></template>
         设备看板
       </t-button>
-      <t-button variant="text" class="header-icon-button" aria-label="消息通知" title="通知中心暂未开放" disabled>
-        <MailIcon size="19" />
-      </t-button>
-      <t-button variant="text" class="header-icon-button app-header__optional-action" aria-label="帮助中心" title="帮助中心暂未开放" disabled>
-        <HelpCircleIcon size="19" />
-      </t-button>
-      <t-button variant="text" class="header-icon-button app-header__optional-action" aria-label="系统设置" title="系统设置暂未开放" disabled>
-        <SettingIcon size="19" />
-      </t-button>
+      <t-tooltip content="通知中心暂未开放">
+        <span class="app-header__tooltip-trigger" tabindex="0">
+          <t-button variant="text" class="header-icon-button" aria-label="消息通知" disabled>
+            <MailIcon size="19" />
+          </t-button>
+        </span>
+      </t-tooltip>
+      <t-tooltip content="帮助中心暂未开放">
+        <span class="app-header__tooltip-trigger app-header__optional-action" tabindex="0">
+          <t-button variant="text" class="header-icon-button" aria-label="帮助中心" disabled>
+            <HelpCircleIcon size="19" />
+          </t-button>
+        </span>
+      </t-tooltip>
+      <t-tooltip content="系统设置暂未开放">
+        <span class="app-header__tooltip-trigger app-header__optional-action" tabindex="0">
+          <t-button variant="text" class="header-icon-button" aria-label="系统设置" disabled>
+            <SettingIcon size="19" />
+          </t-button>
+        </span>
+      </t-tooltip>
       <AppUserMenu />
     </div>
   </t-header>
@@ -160,6 +172,17 @@ const openFullscreenDashboard = async () => {
 .app-header__dashboard-action {
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+.app-header__tooltip-trigger {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  outline: none;
+}
+
+.app-header__tooltip-trigger:focus-visible {
+  box-shadow: 0 0 0 2px var(--app-primary-light);
 }
 
 .app-header__realtime-control {
