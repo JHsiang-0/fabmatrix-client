@@ -275,13 +275,13 @@
               <t-progress :percentage="getProgress(printerItem)" :label="false" :stroke-width="5" :status="getProgressStatus(printerItem)" />
             </div>
             <div class="printer-grid-card__actions" @click.stop>
-              <t-button size="small" variant="text" @click="handleRowClick(printerItem)">详情</t-button>
-              <t-button v-if="shouldShowSafeButton(printerItem)" size="small" theme="warning" @click="handleConfirmSafe(printerItem)">确认清理</t-button>
-              <t-button v-else-if="shouldShowStartButton(printerItem)" size="small" theme="primary" @click="handleStartJob(printerItem)">启动打印</t-button>
-              <t-button v-else-if="isAdmin" size="small" variant="text" theme="primary" :icon="renderIcon(Edit)" @click="handleEdit(printerItem)">编辑</t-button>
+              <t-button size="small" theme="default" variant="base" @click="handleRowClick(printerItem)">详情</t-button>
+              <t-button v-if="shouldShowSafeButton(printerItem)" size="small" theme="warning" variant="base" @click="handleConfirmSafe(printerItem)">确认清理</t-button>
+              <t-button v-else-if="shouldShowStartButton(printerItem)" size="small" theme="primary" variant="base" @click="handleStartJob(printerItem)">启动打印</t-button>
+              <t-button v-else-if="isAdmin" size="small" theme="primary" variant="base" :icon="renderIcon(Edit)" @click="handleEdit(printerItem)">编辑</t-button>
               <t-popconfirm v-if="isAdmin" :content="getDeleteMessage(printerItem)" theme="danger" @confirm="handleDelete(printerItem.id)">
                 <template #default>
-                  <t-button size="small" variant="text" theme="danger" :icon="renderIcon(Delete)" :loading="deletingIds.includes(printerItem.id)" @click.stop>删除</t-button>
+                  <t-button size="small" theme="danger" variant="base" :icon="renderIcon(Delete)" :loading="deletingIds.includes(printerItem.id)" @click.stop>删除</t-button>
                 </template>
               </t-popconfirm>
             </div>
