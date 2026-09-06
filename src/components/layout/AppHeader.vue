@@ -166,7 +166,8 @@ const openFullscreenDashboard = async () => {
   display: inline-flex;
   align-items: center;
   gap: 0;
-  min-height: 32px;
+  height: 24px;
+  min-height: 24px;
   padding: 0;
   background: transparent;
   border: 0;
@@ -175,6 +176,7 @@ const openFullscreenDashboard = async () => {
 }
 
 .app-header__realtime-status {
+  height: 24px;
   border-radius: 999px;
   white-space: nowrap;
 }
@@ -185,7 +187,8 @@ const openFullscreenDashboard = async () => {
 }
 
 .app-header__reconnect {
-  min-height: 28px;
+  height: 24px;
+  min-height: 24px;
   margin-left: -1px;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
