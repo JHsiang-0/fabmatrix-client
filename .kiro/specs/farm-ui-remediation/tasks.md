@@ -872,7 +872,7 @@ Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存
 
 提交：`af8418a` 之后创建独立本地提交 `docs: 建立 UI-004 文件库重写基线`；不执行 `git push`。
 
-### [ ] UI-004.1 目录导航与页面信息架构
+### [x] UI-004.1 目录导航与页面信息架构
 
 优先级：P0
 
@@ -894,6 +894,14 @@ Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存
 - 页面不出现无来源的水平溢出或重复滚动容器。
 
 完成后提交：`refactor: 重组文件库目录导航信息架构`。
+
+完成记录：完整 `FileNodeVO` 树在进入 TDesign Tree 前只保留 `folder=true` 的目录节点，并递归清理文件节点；文件详情不再由目录树触发，主分页列表保留显式“详情”入口。目录树、面包屑、当前目录 `parentId` 和分页仍共享现有正式状态，目录切换继续回到第一页；未新增接口、字段或业务数据。
+
+测试：`npm test`（143/143）、`npm run lint`、`npm run build` 通过。构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
+
+Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存后的 `git diff --cached --check`，仅暂存 `src/views/FileLibrary.vue`、`tests/fileLibrary.test.js` 和本任务记录。
+
+提交：完成最终检查后创建独立本地提交 `refactor: 重组文件库目录导航信息架构`，不执行 `git push`。
 
 ### [ ] UI-004.2 顶部工具栏与筛选操作统一
 

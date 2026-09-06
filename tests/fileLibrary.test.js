@@ -17,6 +17,10 @@ test('文件中心使用真实文件树契约并提供统一目录导航', () =>
   assert.match(source, /class="file-library-sidebar"/)
   assert.match(source, /<DataRegion class="file-library-workspace"/)
   assert.doesNotMatch(source, /class="file-library-content-card"/)
+  assert.match(source, /if \(!node \|\| node\.folder !== true\) return null/)
+  assert.match(source, /\.map\(normalizeTreeNode\)\.filter\(Boolean\)/)
+  assert.match(source, /if \(!node\?\.data\?\.folder\) return/)
+  assert.doesNotMatch(source, /treeNodeToFile/)
 })
 
 test('文件中心不伪造材料和统计值，并覆盖上传删除结果态', () => {

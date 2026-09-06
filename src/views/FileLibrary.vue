@@ -40,7 +40,7 @@
           <div class="file-library-panel-heading">
             <div>
               <h2>目录</h2>
-              <p>当前账号可见的文件与文件夹</p>
+              <p>按目录定位文件，内容在右侧工作区展示</p>
             </div>
             <t-button variant="text" size="small" :loading="treeLoading" @click="loadFileTree">
               刷新
@@ -53,7 +53,7 @@
               :error="treeError"
               @retry="loadFileTree"
             />
-            <t-empty v-else-if="fileTree.length === 0" description="暂无可见文件或文件夹">
+            <t-empty v-else-if="fileTree.length === 0" description="暂无可见文件夹">
               <template #operation>
                 <t-space>
                   <t-button size="small" variant="outline" @click="openCreateFolderDialog">新建文件夹</t-button>
@@ -697,28 +697,25 @@ const hasValue = value => value !== undefined && value !== null && value !== ''
 
 const formatMetric = (value, suffix = '') => hasValue(value) ? `${value}${suffix}` : '-'
 
-const normalizeTreeNode = node => ({
-  value: String(node.id),
-  label: node.name,
-  name: node.name,
-  folder: node.folder === true,
-  id: node.id,
-  parentId: node.parentId ?? null,
-  fileSize: node.fileSize,
-  materialType: node.materialType,
-  createdAt: node.createdAt,
-  children: Array.isArray(node.children) ? node.children.map(normalizeTreeNode) : []
-})
+/**
+ * 将完整 FileNodeVO 树裁剪为目录导航树。
+ * 文件节点仍由当前目录的分页接口承载，不能在左侧目录中再次展示。
+ */
+const normalizeTreeNode = node => {
+  if (!node || node.folder !== true) return null
 
-const treeNodeToFile = node => ({
-  id: node.id,
-  parentId: node.parentId ?? null,
-  folder: node.folder === true,
-  originalName: node.name,
-  fileSize: node.fileSize,
-  materialType: node.materialType,
-  createdAt: node.createdAt
-})
+  return {
+    value: String(node.id),
+    label: node.name,
+    name: node.name,
+    folder: true,
+    id: node.id,
+    parentId: node.parentId ?? null,
+    children: Array.isArray(node.children)
+      ? node.children.map(normalizeTreeNode).filter(Boolean)
+      : []
+  }
+}
 
 const restoreFileDetailContext = () => {
   const fileId = sessionStorage.getItem(FILE_DETAIL_CONTEXT_KEY)
@@ -765,7 +762,9 @@ const loadFileTree = async () => {
   treeError.value = ''
   try {
     const response = await getFileTree()
-    fileTree.value = (Array.isArray(response.data) ? response.data : []).map(normalizeTreeNode)
+    fileTree.value = (Array.isArray(response.data) ? response.data : [])
+      .map(normalizeTreeNode)
+      .filter(Boolean)
   } catch (error) {
     console.error('获取文件目录树失败:', error)
     treeError.value = error?.message || '目录树加载失败，请重试'
@@ -811,21 +810,18 @@ const navigateTo = (index) => {
 }
 
 const handleTreeClick = ({ node }) => {
-  if (!node?.data) return
-  if (node.data.folder) {
-    const path = typeof node.getPath === 'function' ? node.getPath() : []
-    breadcrumbs.value = path
-      .filter(pathNode => pathNode.data?.folder)
-      .map(pathNode => ({
-        id: pathNode.data.id,
-        name: pathNode.data.label || pathNode.data.name
-      }))
-    currentParentId.value = node.data.id
-    pagination.pageNum = 1
-    fetchData()
-    return
-  }
-  openFileDetail(treeNodeToFile(node.data))
+  if (!node?.data?.folder) return
+
+  const path = typeof node.getPath === 'function' ? node.getPath() : []
+  breadcrumbs.value = path
+    .filter(pathNode => pathNode.data?.folder)
+    .map(pathNode => ({
+      id: pathNode.data.id,
+      name: pathNode.data.label || pathNode.data.name
+    }))
+  currentParentId.value = node.data.id
+  pagination.pageNum = 1
+  fetchData()
 }
 
 /**
