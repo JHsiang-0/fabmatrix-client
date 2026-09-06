@@ -51,76 +51,61 @@
       </template>
     </PageHeader>
 
-    <section class="printer-management-tabs-panel" aria-label="打印机状态筛选">
-      <nav class="printer-management-tabs">
-        <button
-          v-for="tab in printerStatusTabs"
-          :key="tab.value || 'all'"
-          type="button"
-          class="printer-management-tab"
-          :class="{ 'printer-management-tab--active': activeStatusFilterKey === tab.value }"
-          :aria-pressed="activeStatusFilterKey === tab.value"
-          @click="applyStatusTab(tab.value)"
-        >
-          <span v-if="tab.value === 'ERROR'" class="printer-management-tab__dot" />
-          <span>{{ tab.label }}</span>
-          <span v-if="tab.count !== null" class="printer-management-tab__count">{{ tab.count }}</span>
-        </button>
-      </nav>
-    </section>
+    <section class="printer-management-toolbar-card" aria-label="打印机筛选和视图工具栏">
+      <div class="printer-management-toolbar-card__top">
+        <nav class="printer-management-tabs" aria-label="打印机状态筛选">
+          <button
+            v-for="tab in printerStatusTabs"
+            :key="tab.value || 'all'"
+            type="button"
+            class="printer-management-tab"
+            :class="{ 'printer-management-tab--active': activeStatusFilterKey === tab.value }"
+            :aria-pressed="activeStatusFilterKey === tab.value"
+            @click="applyStatusTab(tab.value)"
+          >
+            <span>{{ tab.label }}</span>
+          </button>
+        </nav>
 
-    <section class="printer-management-filter-panel" aria-label="打印机筛选条件">
-      <t-input
-        v-model="keyword"
-        class="printer-management-filter__search"
-        clearable
-        placeholder="按机器名称、IP 地址或编号搜索"
-        @enter="handleKeywordEnter"
-        @clear="handleKeywordClear"
-      >
-        <template #prefixIcon><Search /></template>
-      </t-input>
-      <div class="printer-management-filter__controls">
-        <label class="printer-management-filter__item">
-          <span>运行状态：</span>
-          <t-select v-model="statusFilter" class="printer-management-filter__select" clearable placeholder="全部状态" @change="applyFilters">
-            <t-option label="全部状态" value="" />
-            <t-option v-for="option in statusOptions" :key="option.value" :label="option.label" :value="option.value" />
-          </t-select>
-        </label>
+        <div class="printer-management-view-toggle" role="group" aria-label="设备列表视图切换">
+          <span>视图：</span>
+          <div class="printer-management-view-toggle__buttons">
+            <t-button
+              size="small"
+              variant="text"
+              :class="{ 'printer-management-view-toggle__active': viewMode === 'list' }"
+              aria-label="列表视图"
+              @click="viewMode = 'list'"
+            >
+              <ViewList :size="16" />
+            </t-button>
+            <t-button
+              size="small"
+              variant="text"
+              :class="{ 'printer-management-view-toggle__active': viewMode === 'grid' }"
+              aria-label="网格视图"
+              @click="viewMode = 'grid'"
+            >
+              <GridView :size="16" />
+            </t-button>
+          </div>
+        </div>
+      </div>
+
+      <div class="printer-management-toolbar-card__bottom">
+        <t-input
+          v-model="keyword"
+          class="printer-management-filter__search"
+          clearable
+          placeholder="按机器名称、IP 地址或编号搜索"
+          @enter="handleKeywordEnter"
+          @clear="handleKeywordClear"
+        >
+          <template #prefixIcon><Search /></template>
+        </t-input>
         <t-button size="small" variant="outline" :icon="renderIcon(Refresh)" @click="resetFilters">
           重置
         </t-button>
-      </div>
-    </section>
-
-    <section class="printer-management-batchbar" aria-label="打印机列表工具栏">
-      <div class="printer-management-batchbar__left">
-        <span>共 <strong>{{ total }}</strong> 台设备</span>
-        <span class="printer-management-batchbar__hint">实时状态会在列表中自动更新</span>
-      </div>
-      <div class="printer-management-view-toggle" role="group" aria-label="设备列表视图切换">
-        <span>视图：</span>
-        <div class="printer-management-view-toggle__buttons">
-          <t-button
-            size="small"
-            variant="text"
-            :class="{ 'printer-management-view-toggle__active': viewMode === 'list' }"
-            aria-label="列表视图"
-            @click="viewMode = 'list'"
-          >
-            <ViewList :size="16" />
-          </t-button>
-          <t-button
-            size="small"
-            variant="text"
-            :class="{ 'printer-management-view-toggle__active': viewMode === 'grid' }"
-            aria-label="网格视图"
-            @click="viewMode = 'grid'"
-          >
-            <GridView :size="16" />
-          </t-button>
-        </div>
       </div>
     </section>
 
@@ -638,8 +623,8 @@ const statusOptions = Object.values(PRINTER_STATUS).map(value => ({
 
 const viewMode = ref('list')
 const printerStatusTabs = computed(() => [
-  { value: '', label: '全部', count: total.value },
-  ...statusOptions.map(option => ({ ...option, count: null }))
+  { value: '', label: '全部' },
+  ...statusOptions
 ])
 
 const activeStatusFilterKey = computed(() => {
@@ -1254,22 +1239,36 @@ const handleBatchAdd = async () => {
   line-height: 1.4;
 }
 
-.printer-management-tabs-panel,
-.printer-management-filter-panel,
-.printer-management-batchbar {
+.printer-management-toolbar-card {
   flex: 0 0 auto;
+  padding: 0.75rem;
   background: var(--td-bg-color-container);
   border: 1px solid var(--td-border-level-1-color);
   border-radius: var(--app-radius);
 }
 
-.printer-management-tabs-panel {
-  padding: 0 0.75rem;
+.printer-management-toolbar-card__top,
+.printer-management-toolbar-card__bottom {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.printer-management-toolbar-card__top {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.printer-management-toolbar-card__bottom {
+  gap: 0.75rem;
+  margin-top: 0.75rem;
 }
 
 .printer-management-tabs {
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
+  min-width: 0;
   min-height: 3rem;
   gap: 0.25rem;
   overflow-x: auto;
@@ -1297,87 +1296,20 @@ const handleBatchAdd = async () => {
 
 .printer-management-tab--active { border-bottom-color: var(--td-brand-color-6); }
 
-.printer-management-tab__count {
-  min-width: 1.25rem;
-  padding: 0.1rem 0.35rem;
-  color: var(--td-brand-color-6);
-  font-size: 0.75rem;
-  line-height: 1.2;
-  text-align: center;
-  background: var(--td-brand-color-1);
-  border-radius: 999px;
-}
-
-.printer-management-tab__dot {
-  width: 0.4rem;
-  height: 0.4rem;
-  background: var(--td-error-color-6);
-  border-radius: 50%;
-}
-
-.printer-management-filter-panel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.75rem;
-}
-
 .printer-management-filter__search {
+  flex: 1 1 auto;
   width: min(25rem, 100%);
+  min-width: 0;
 }
 
-.printer-management-filter__controls {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.printer-management-filter__item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--td-text-color-secondary);
-  font-size: 0.8125rem;
-  white-space: nowrap;
-}
-
-.printer-management-filter__select {
-  width: 9.5rem;
-}
-
-.printer-management-batchbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 2.75rem;
-  padding: 0.5rem 0.75rem;
-  color: var(--td-text-color-secondary);
-  font-size: 0.8125rem;
-}
-
-.printer-management-batchbar__left,
 .printer-management-view-toggle,
 .printer-management-view-toggle__buttons {
   display: flex;
   align-items: center;
 }
 
-.printer-management-batchbar__left {
-  gap: 1rem;
-}
-
-.printer-management-batchbar strong {
-  color: var(--td-text-color-primary);
-  font-weight: 600;
-}
-
-.printer-management-batchbar__hint {
-  color: var(--td-text-color-placeholder);
-  font-size: 0.75rem;
-}
-
 .printer-management-view-toggle {
+  flex: 0 0 auto;
   gap: 0.5rem;
 }
 
@@ -1714,21 +1646,21 @@ const handleBatchAdd = async () => {
 }
 
 @media (max-width: 768px) {
-  .printer-management-filter-panel,
-  .printer-management-batchbar {
+  .printer-management-toolbar-card__top {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .printer-management-filter__search,
-  .printer-management-filter__select {
+  .printer-management-toolbar-card__bottom {
+    align-items: stretch;
+  }
+
+  .printer-management-filter__search {
     width: 100%;
   }
 
-  .printer-management-filter__controls,
-  .printer-management-batchbar__left,
   .printer-management-view-toggle {
-    justify-content: space-between;
+    justify-content: flex-end;
   }
 
   .printer-management-table-footer {
