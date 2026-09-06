@@ -128,7 +128,7 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     await expect(page.locator('.file-library-sidebar')).toHaveCount(0)
     await expect(page.locator('.file-library-tree')).toHaveCount(0)
     await expect(page.locator('.file-table-view')).toBeVisible({ timeout: 10000 })
-    await expect(page.getByRole('button', { name: '列表视图', exact: true })).toBeVisible()
+    await expect(page.getByRole('radio', { name: '列表视图', exact: true }).locator('..')).toBeVisible()
     const fileWorkspaceMetrics = await page.evaluate(() => {
       const main = document.querySelector('.file-library-main')
       const table = document.querySelector('.file-table-view .t-table__content')

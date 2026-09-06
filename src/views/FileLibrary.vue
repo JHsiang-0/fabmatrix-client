@@ -26,7 +26,7 @@
     <t-card bordered class="file-library-workspace app-page-card" aria-label="文件工作台">
       <section class="file-library-main" aria-label="当前目录文件列表">
           <t-form layout="inline" class="file-library-filter-form" aria-label="文件筛选条件">
-            <t-form-item>
+            <t-form-item class="file-library-filter-form__path">
               <t-breadcrumb separator="/">
                 <t-breadcrumb-item :to="{ path: '' }" @click.prevent="navigateToRoot">
                   <FolderOpened :size="16" />
@@ -42,33 +42,29 @@
               </t-breadcrumb>
             </t-form-item>
             <t-form-item>
-              <t-radio-group v-model="isBatchMode" variant="default-filled" size="small" aria-label="文件操作模式">
-                <t-radio-button :value="false">浏览</t-radio-button>
-                <t-radio-button :value="true">选择</t-radio-button>
-              </t-radio-group>
-            </t-form-item>
-            <t-form-item>
-              <t-space class="file-view-toggle">
-                <t-button variant="text" size="small" @click="viewMode = 'grid'"
-                  :class="{ 'file-view-toggle__active': viewMode === 'grid' }" aria-label="网格视图">
-                  <Grid />
-                </t-button>
-                <t-button variant="text" size="small" @click="viewMode = 'list'"
-                  :class="{ 'file-view-toggle__active': viewMode === 'list' }" aria-label="列表视图">
-                  <List />
-                </t-button>
+              <t-space class="file-library-mode-controls" size="small">
+                <t-radio-group v-model="isBatchMode" variant="default-filled" size="medium" aria-label="文件操作模式">
+                  <t-radio-button :value="false">浏览</t-radio-button>
+                  <t-radio-button :value="true">选择</t-radio-button>
+                </t-radio-group>
+                <t-radio-group class="file-library-view-mode" v-model="viewMode" variant="default-filled" size="medium" aria-label="文件视图">
+                  <t-radio-button value="grid" aria-label="网格视图" @click="viewMode = 'grid'">
+                    <Grid />
+                  </t-radio-button>
+                  <t-radio-button value="list" aria-label="列表视图" @click="viewMode = 'list'">
+                    <List />
+                  </t-radio-button>
+                </t-radio-group>
               </t-space>
             </t-form-item>
-            <t-form-item>
-              <t-input v-model="searchKeyword" placeholder="搜索文件名..." clearable size="medium"
-                @keyup.enter="handleSearch">
-                <template #prefixIcon>
-                  <Search />
-                </template>
-              </t-input>
-            </t-form-item>
-            <t-form-item>
-              <t-space size="small">
+            <t-form-item class="file-library-filter-form__search">
+              <t-space class="file-library-search-actions" size="small">
+                <t-input class="file-library-search-input" v-model="searchKeyword" placeholder="搜索文件名..." clearable size="medium"
+                  @keyup.enter="handleSearch">
+                  <template #prefixIcon>
+                    <Search />
+                  </template>
+                </t-input>
                 <t-button theme="primary" size="medium" :loading="loading" @click="handleSearch">
                   查询
                 </t-button>
@@ -1460,22 +1456,70 @@ onMounted(() => {
   white-space: nowrap;
 }
 
+.file-library-filter-form__path {
+  margin-left: 0 !important;
+}
+
+.file-library-filter-form__path :deep(.t-form__label),
+.file-library-filter-form__path :deep(.t-form__controls) {
+  margin-left: 0;
+}
+
 .file-library-filter-form :deep(.t-breadcrumb) {
   max-width: min(240px, 20vw);
   overflow: hidden;
   white-space: nowrap;
 }
 
-.file-library-filter-form :deep(.t-input) {
-  width: 180px;
-}
-
-.file-library-filter-form :deep(.t-form__item:last-child) {
+.file-library-filter-form__search {
   margin-left: auto;
 }
 
 .file-library-filter-form :deep(.t-radio-group) {
   white-space: nowrap;
+}
+
+.file-library-mode-controls {
+  flex: 0 0 auto;
+}
+
+.file-library-mode-controls :deep(.t-radio-button) {
+  min-width: 32px;
+  height: 32px;
+  padding-right: 10px;
+  padding-left: 10px;
+  line-height: 30px;
+}
+
+.file-library-mode-controls :deep(.file-library-view-mode .t-radio-button) {
+  width: 32px;
+  padding-right: 0;
+  padding-left: 0;
+  text-align: center;
+}
+
+.file-library-search-actions {
+  align-items: center;
+}
+
+.file-library-search-input {
+  width: 220px;
+}
+
+.file-library-search-input :deep(.t-input) {
+  border-color: transparent;
+  background: var(--app-surface-muted);
+  box-shadow: none;
+}
+
+.file-library-search-input :deep(.t-input:hover) {
+  border-color: transparent;
+  background: var(--td-bg-color-container-hover);
+}
+
+.file-library-search-input :deep(.t-input:focus-within) {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--td-brand-color-2);
 }
 
 .file-library-filter-form :deep(.t-breadcrumb__item) {
@@ -1540,26 +1584,6 @@ onMounted(() => {
 .file-table-view :deep(.t-table) {
   min-height: 0;
   height: 100%;
-}
-
-.file-view-toggle {
-  display: inline-flex;
-  flex: 0 0 auto;
-  padding: 3px;
-  background: var(--app-surface-muted);
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
-}
-
-.file-view-toggle :deep(.t-button) {
-  min-width: 32px;
-  color: var(--app-text-secondary);
-}
-
-.file-view-toggle :deep(.file-view-toggle__active) {
-  color: var(--app-primary);
-  background: var(--app-surface);
-  box-shadow: var(--app-shadow);
 }
 
 .file-grid-view {
@@ -1834,9 +1858,9 @@ onMounted(() => {
     flex-wrap: wrap;
   }
 
-  .file-library-filter-form :deep(.t-form__item:last-child) { margin-left: 0; }
+  .file-library-filter-form__search { margin-left: 0; }
 
-  .file-library-filter-form :deep(.t-input) { width: min(240px, 100%); }
+  .file-library-search-input { width: min(240px, 100%); }
 }
 
 @media (max-width: 1024px) {

@@ -1143,9 +1143,39 @@ Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存
 
 提交：完成最终检查后创建独立本地提交 `style: 优化文件库密度与右键定位`，不执行 `git push`。
 
+### [x] UI-004.10 文件库控制栏分段控件与搜索布局
+
+优先级：P1
+
+目标：统一文件库顶部控制栏的 TDesign 交互语言，消除左侧空白、视图切换控件样式不一致和搜索操作间距过大的问题。
+
+范围：`src/views/FileLibrary.vue`、文件库静态测试、文件库浏览器/Electron 语义回归测试和本任务记录；不得新增后端接口、字段或伪造业务数据。
+
+工作内容：
+
+- 将“浏览/选择”和网格/列表切换统一为 TDesign `default-filled` 分段单选组，并使用一致的中等尺寸；图标视图切换保留可访问名称。
+- 明确控制栏路径、模式和搜索操作的布局边界，移除首项空白，搜索框与查询/重置按钮组成相邻操作组。
+- 搜索框使用 TDesign 输入组件的灰色容器背景和无边框样式，保留键盘回车、清空和焦点反馈。
+- 更新文件库静态契约测试，确保不改变真实文件查询字段和现有视图/分页/右键功能。
+
+验收：
+
+- 桌面端控制栏左侧从文件夹路径开始，两个选择器高度、边框和选中态一致。
+- 搜索框紧邻查询按钮左侧，使用灰底无边框样式；重置按钮保持同组且不产生异常空白。
+- 窄窗口按既有响应式规则换行，不产生页面级水平溢出。
+- 完成 `npm test`、`npm run test:e2e`、`npm run test:electron`、`npm run test:electron:dist`、`npm run lint`、`npm run build` 和提交前 Git 检查。
+
+完成记录：控制栏路径项取消表单预留空白，浏览/选择与网格/列表统一为 TDesign `default-filled` 分段单选组；搜索、查询和重置合并为相邻操作组，搜索框改为灰色容器背景、无边框并保留焦点反馈。同步更新浏览器/Electron Playwright 对 TDesign radio 语义和可见 label 的断言，未修改文件查询接口、字段和业务数据来源。
+
+测试：`npm test`（145/145）、`npm run test:e2e`（9/9，覆盖 375px、768px、1440px、1920px）、`npm run test:electron`（3/3）、`npm run test:electron:dist`（1/1，含 `npm run build:desktop`）、`npm run lint`、`npm run build` 全部通过。构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
+
+Git 检查：提交前执行 `git status --short`、`git diff --check`，仅暂存本子任务涉及的 `src/views/FileLibrary.vue`、文件库静态测试、浏览器/Electron 回归测试和本任务记录。
+
+提交：完成最终检查后创建独立本地提交 `style: 统一文件库控制栏与搜索布局`，不执行 `git push`。
+
 ### 8.6 UI-004 执行顺序与统一约束
 
-`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6 → UI-004.7 → UI-004.8 → UI-004.9`
+`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6 → UI-004.7 → UI-004.8 → UI-004.9 → UI-004.10`
 
 - UI-004 是独立文件库 UI/UX 重写任务，不属于 `farm-ui-v2`，不回写 UI-001、UI-002、UI-003 的历史状态。
 - 所有文件数据必须来自 API_HANDOFF、运行时 OpenAPI 和现有数据适配器；运行时泛型 schema 与正式文档冲突时记录并暂停相关猜测。
