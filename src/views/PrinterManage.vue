@@ -67,45 +67,42 @@
           </button>
         </nav>
 
-        <div class="printer-management-view-toggle" role="group" aria-label="设备列表视图切换">
-          <span>视图：</span>
-          <div class="printer-management-view-toggle__buttons">
-            <t-button
-              size="small"
-              variant="text"
-              :class="{ 'printer-management-view-toggle__active': viewMode === 'list' }"
-              aria-label="列表视图"
-              @click="viewMode = 'list'"
-            >
-              <ViewList :size="16" />
-            </t-button>
-            <t-button
-              size="small"
-              variant="text"
-              :class="{ 'printer-management-view-toggle__active': viewMode === 'grid' }"
-              aria-label="网格视图"
-              @click="viewMode = 'grid'"
-            >
-              <GridView :size="16" />
-            </t-button>
+        <div class="printer-management-toolbar-card__controls">
+          <t-input
+            v-model="keyword"
+            class="printer-management-filter__search"
+            clearable
+            placeholder="按机器名称、IP 地址或编号搜索"
+            @enter="handleKeywordEnter"
+            @clear="handleKeywordClear"
+          >
+            <template #prefixIcon><Search /></template>
+          </t-input>
+
+          <div class="printer-management-view-toggle" role="group" aria-label="设备列表视图切换">
+            <span>视图：</span>
+            <div class="printer-management-view-toggle__buttons">
+              <t-button
+                size="small"
+                variant="text"
+                :class="{ 'printer-management-view-toggle__active': viewMode === 'list' }"
+                aria-label="列表视图"
+                @click="viewMode = 'list'"
+              >
+                <ViewList :size="16" />
+              </t-button>
+              <t-button
+                size="small"
+                variant="text"
+                :class="{ 'printer-management-view-toggle__active': viewMode === 'grid' }"
+                aria-label="网格视图"
+                @click="viewMode = 'grid'"
+              >
+                <GridView :size="16" />
+              </t-button>
+            </div>
           </div>
         </div>
-      </div>
-
-      <div class="printer-management-toolbar-card__bottom">
-        <t-input
-          v-model="keyword"
-          class="printer-management-filter__search"
-          clearable
-          placeholder="按机器名称、IP 地址或编号搜索"
-          @enter="handleKeywordEnter"
-          @clear="handleKeywordClear"
-        >
-          <template #prefixIcon><Search /></template>
-        </t-input>
-        <t-button size="small" variant="outline" :icon="renderIcon(Refresh)" @click="resetFilters">
-          重置
-        </t-button>
       </div>
     </section>
 
@@ -635,12 +632,6 @@ const activeStatusFilter = computed(() => statusFilterConfig[activeStatusFilterK
 
 const applyStatusTab = value => {
   statusFilter.value = value
-  applyFilters()
-}
-
-const resetFilters = () => {
-  keyword.value = ''
-  statusFilter.value = ''
   applyFilters()
 }
 
@@ -1241,14 +1232,14 @@ const handleBatchAdd = async () => {
 
 .printer-management-toolbar-card {
   flex: 0 0 auto;
-  padding: 0.75rem;
+  padding: 0.5rem 0.75rem;
   background: var(--td-bg-color-container);
   border: 1px solid var(--td-border-level-1-color);
   border-radius: var(--app-radius);
 }
 
 .printer-management-toolbar-card__top,
-.printer-management-toolbar-card__bottom {
+.printer-management-toolbar-card__controls {
   display: flex;
   align-items: center;
   min-width: 0;
@@ -1259,9 +1250,9 @@ const handleBatchAdd = async () => {
   gap: 1rem;
 }
 
-.printer-management-toolbar-card__bottom {
+.printer-management-toolbar-card__controls {
+  flex: 0 0 auto;
   gap: 0.75rem;
-  margin-top: 0.75rem;
 }
 
 .printer-management-tabs {
@@ -1269,7 +1260,7 @@ const handleBatchAdd = async () => {
   display: flex;
   align-items: center;
   min-width: 0;
-  min-height: 3rem;
+  min-height: 2.5rem;
   gap: 0.25rem;
   overflow-x: auto;
 }
@@ -1280,7 +1271,7 @@ const handleBatchAdd = async () => {
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  height: 3rem;
+  height: 2.5rem;
   width: 5.5rem;
   padding: 0 0.85rem;
   color: var(--td-text-color-secondary);
@@ -1299,8 +1290,8 @@ const handleBatchAdd = async () => {
 .printer-management-tab--active { border-bottom-color: var(--td-brand-color-6); }
 
 .printer-management-filter__search {
-  flex: 1 1 auto;
-  width: min(25rem, 100%);
+  flex: 0 1 16rem;
+  width: 16rem;
   min-width: 0;
 }
 
@@ -1653,12 +1644,14 @@ const handleBatchAdd = async () => {
     flex-direction: column;
   }
 
-  .printer-management-toolbar-card__bottom {
-    align-items: stretch;
+  .printer-management-toolbar-card__controls {
+    align-items: center;
+    justify-content: space-between;
   }
 
   .printer-management-filter__search {
     width: 100%;
+    flex: 1 1 auto;
   }
 
   .printer-management-view-toggle {
