@@ -1,47 +1,71 @@
 <template>
   <div class="profile-page app-page-shell app-page-background">
     <PageHeader title="个人中心" description="管理个人资料与登录安全设置" />
-    <div class="profile-grid">
-      <t-card title="个人资料" class="profile-card">
-        <t-loading v-if="profileLoading && !profileLoaded" class="profile-loading" />
-        <t-alert v-else-if="profileError" theme="error" :close-btn="false">
-          {{ profileError }}
-          <template #operation><t-button size="small" variant="outline" @click="loadProfile">重试</t-button></template>
-        </t-alert>
-        <t-form v-else :data="profileForm" :rules="profileRules" label-align="top" @submit="saveProfile">
-          <t-alert v-if="profileSaveError" theme="error" :close-btn="false" class="mb-4">{{ profileSaveError }}</t-alert>
-          <t-form-item label="用户名">
-            <t-input :value="userStore.userInfo.username" disabled />
-          </t-form-item>
-          <t-form-item name="email" label="邮箱">
-            <t-input v-model="profileForm.email" placeholder="请输入邮箱（可选）" clearable />
-          </t-form-item>
-          <t-form-item name="phone" label="手机号">
-            <t-input v-model="profileForm.phone" placeholder="请输入手机号（可选）" clearable />
-          </t-form-item>
-          <t-space>
-            <t-button theme="primary" type="submit" :loading="profileLoading" :disabled="!profileDirty">保存资料</t-button>
-            <t-button variant="outline" :disabled="!profileDirty || profileLoading" @click="cancelProfileChanges">取消修改</t-button>
-          </t-space>
-        </t-form>
+    <div class="profile-workspace">
+      <t-card class="profile-account-card">
+        <div class="profile-account-card__header">
+          <div class="profile-account-card__identity">
+            <t-avatar size="64px" shape="circle">
+              {{ (userStore.userInfo.username || 'U').slice(0, 1).toUpperCase() }}
+            </t-avatar>
+            <div>
+              <p class="profile-account-card__eyebrow">当前账户</p>
+              <h2 class="profile-account-card__title">{{ userStore.userInfo.username || '未登录用户' }}</h2>
+              <t-tag theme="primary" variant="light-outline">
+                {{ userStore.userInfo.role || '未设置角色' }}
+              </t-tag>
+            </div>
+          </div>
+          <t-tag theme="success" variant="light-outline">已登录</t-tag>
+        </div>
+        <t-descriptions class="profile-account-card__details" :column="2" size="small">
+          <t-descriptions-item label="用户 ID">{{ userId || '—' }}</t-descriptions-item>
+          <t-descriptions-item label="账户角色">{{ userStore.userInfo.role || '—' }}</t-descriptions-item>
+        </t-descriptions>
       </t-card>
 
-      <t-card title="修改密码" class="profile-card">
-        <t-alert v-if="passwordError" theme="error" :close-btn="false" class="mb-4">{{ passwordError }}</t-alert>
-        <t-form :data="passwordForm" :rules="passwordRules" label-align="top" @submit="savePassword">
-          <t-form-item name="oldPassword" label="当前密码">
-            <t-input v-model="passwordForm.oldPassword" type="password" autocomplete="current-password" />
-          </t-form-item>
-          <t-form-item name="newPassword" label="新密码">
-            <t-input v-model="passwordForm.newPassword" type="password" autocomplete="new-password" />
-          </t-form-item>
-          <t-form-item name="confirmPassword" label="确认新密码">
-            <t-input v-model="passwordForm.confirmPassword" type="password" autocomplete="new-password" />
-          </t-form-item>
-          <p class="mb-4 text-xs text-[var(--app-text-secondary)]">密码长度 6-20 位，必须包含大写字母、小写字母和数字。</p>
-          <t-button theme="primary" type="submit" :loading="passwordLoading">修改密码</t-button>
-        </t-form>
-      </t-card>
+      <div class="profile-grid">
+        <t-card title="个人资料" class="profile-card">
+          <t-loading v-if="profileLoading && !profileLoaded" class="profile-loading" />
+          <t-alert v-else-if="profileError" theme="error" :close-btn="false">
+            {{ profileError }}
+            <template #operation><t-button size="small" variant="outline" @click="loadProfile">重试</t-button></template>
+          </t-alert>
+          <t-form v-else :data="profileForm" :rules="profileRules" label-align="top" @submit="saveProfile">
+            <t-alert v-if="profileSaveError" theme="error" :close-btn="false" class="profile-form-alert">{{ profileSaveError }}</t-alert>
+            <t-form-item label="用户名">
+              <t-input :value="userStore.userInfo.username" disabled />
+            </t-form-item>
+            <t-form-item name="email" label="邮箱">
+              <t-input v-model="profileForm.email" placeholder="请输入邮箱（可选）" clearable />
+            </t-form-item>
+            <t-form-item name="phone" label="手机号">
+              <t-input v-model="profileForm.phone" placeholder="请输入手机号（可选）" clearable />
+            </t-form-item>
+            <t-space>
+              <t-button theme="primary" type="submit" :loading="profileLoading" :disabled="!profileDirty">保存资料</t-button>
+              <t-button variant="outline" :disabled="!profileDirty || profileLoading" @click="cancelProfileChanges">取消修改</t-button>
+            </t-space>
+          </t-form>
+        </t-card>
+
+        <t-card title="账户安全" class="profile-card">
+          <t-alert v-if="passwordError" theme="error" :close-btn="false" class="profile-form-alert">{{ passwordError }}</t-alert>
+          <t-form :data="passwordForm" :rules="passwordRules" label-align="top" @submit="savePassword">
+            <t-form-item name="oldPassword" label="当前密码">
+              <t-input v-model="passwordForm.oldPassword" type="password" autocomplete="current-password" />
+            </t-form-item>
+            <t-form-item name="newPassword" label="新密码">
+              <t-input v-model="passwordForm.newPassword" type="password" autocomplete="new-password" />
+            </t-form-item>
+            <t-form-item name="confirmPassword" label="确认新密码">
+              <t-input v-model="passwordForm.confirmPassword" type="password" autocomplete="new-password" />
+            </t-form-item>
+            <p class="profile-password-hint">密码长度 6-20 位，必须包含大写字母、小写字母和数字。</p>
+            <t-button theme="primary" type="submit" :loading="passwordLoading">修改密码</t-button>
+          </t-form>
+        </t-card>
+      </div>
     </div>
   </div>
 </template>
@@ -187,16 +211,85 @@ onUnmounted(() => window.removeEventListener('beforeunload', handleBeforeUnload)
 </script>
 
 <style scoped>
+.profile-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-spacing-5);
+  width: min(100%, 1200px);
+  margin: 0 auto;
+  min-width: 0;
+}
+
+.profile-account-card {
+  border-color: var(--td-brand-color-2);
+  background: var(--td-brand-color-1);
+}
+
+.profile-account-card :deep(.t-card__body) {
+  padding: var(--app-spacing-5) var(--app-spacing-6);
+}
+
+.profile-account-card__header,
+.profile-account-card__identity {
+  display: flex;
+  align-items: center;
+}
+
+.profile-account-card__header {
+  justify-content: space-between;
+  gap: var(--app-spacing-4);
+}
+
+.profile-account-card__identity {
+  gap: var(--app-spacing-4);
+  min-width: 0;
+}
+
+.profile-account-card__eyebrow,
+.profile-account-card__title {
+  margin: 0;
+}
+
+.profile-account-card__eyebrow {
+  color: var(--app-text-secondary);
+  font-size: 12px;
+}
+
+.profile-account-card__title {
+  margin: 2px 0 6px;
+  color: var(--app-text-primary);
+  font-size: 20px;
+  line-height: 1.3;
+}
+
+.profile-account-card__details {
+  margin-top: var(--app-spacing-5);
+  padding-top: var(--app-spacing-4);
+  border-top: 1px solid var(--td-brand-color-2);
+}
+
 .profile-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--app-spacing-6);
-  width: min(100%, 1080px);
-  margin: 0 auto;
+  gap: var(--app-spacing-5);
+  width: 100%;
+  min-width: 0;
 }
 
 .profile-card {
   align-self: start;
+  min-width: 0;
+}
+
+.profile-form-alert {
+  margin-bottom: var(--app-spacing-4);
+}
+
+.profile-password-hint {
+  margin: calc(var(--app-spacing-2) * -1) 0 var(--app-spacing-4);
+  color: var(--app-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 @media (max-width: 900px) {
