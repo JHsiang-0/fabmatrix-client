@@ -35,13 +35,13 @@
       </template>
       <template #actions>
       <div class="app-page-toolbar__actions printer-page-actions">
-        <t-button size="medium" variant="outline" :icon="renderIcon(Refresh)" :loading="loading" @click="fetchData">
+        <t-button size="medium" theme="default" variant="outline" :icon="renderIcon(Refresh)" :loading="loading" @click="fetchData">
           刷新
         </t-button>
-        <t-button size="medium" variant="outline" :icon="renderIcon(FolderAdd)" @click="openUnallocatedDialog">
+        <t-button size="medium" theme="warning" variant="outline" :icon="renderIcon(FolderAdd)" @click="openUnallocatedDialog">
           未分配设备
         </t-button>
-        <t-button v-if="isAdmin" size="medium" variant="outline" :icon="renderIcon(Aim)" @click="openScanDialog">
+        <t-button v-if="isAdmin" size="medium" theme="success" variant="outline" :icon="renderIcon(Aim)" @click="openScanDialog">
           扫描局域网设备
         </t-button>
         <t-button v-if="isAdmin" size="medium" theme="primary" :icon="renderIcon(Plus)" @click="handleAdd">
