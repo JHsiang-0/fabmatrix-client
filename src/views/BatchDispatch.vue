@@ -1,11 +1,14 @@
 <template>
   <div class="batch-dispatch-page app-page-background">
-    <PageHeader title="批量手动派发" description="先选择文件和打印机生成预览，确认后才会创建任务或启动打印。">
+    <PageHeader title="批量手动派发">
       <template #actions>
         <t-tag theme="default" variant="outline" title="v3 自动派单尚未开放，不会发送自动派单请求">
           v3 自动派单：规划中
         </t-tag>
         <t-button variant="outline" :loading="loadingResources" @click="loadResources">刷新资源</t-button>
+        <t-button theme="primary" :disabled="!selectedFileIds.length || !selectedPrinterIds.length" @click="goToStrategy">
+          下一步：配置策略
+        </t-button>
       </template>
     </PageHeader>
 
@@ -85,11 +88,6 @@
         </t-alert>
       </t-dialog>
 
-      <div class="step-actions">
-        <t-button theme="primary" :disabled="!selectedFileIds.length || !selectedPrinterIds.length" @click="goToStrategy">
-          下一步：配置策略
-        </t-button>
-      </div>
     </template>
 
     <section v-else-if="currentStep === 1" class="dispatch-panel step-panel" aria-labelledby="dispatch-strategy-title">
@@ -551,14 +549,14 @@ onUnmounted(stopPreviewExpiryTimer)
 </script>
 
 <style scoped>
-.batch-dispatch-page { display: flex; flex-direction: column; min-height: 100%; overflow: visible; color: var(--app-text-primary); gap: var(--app-spacing-4); }
+.batch-dispatch-page { display: flex; height: 100%; flex-direction: column; min-height: 100%; overflow: visible; color: var(--app-text-primary); gap: var(--app-spacing-4); }
 .hint { color: var(--app-text-secondary); margin: 6px 0 12px; }
 .dispatch-panel { min-width: 0; padding: var(--app-spacing-5); background: var(--app-surface); border: 1px solid var(--app-border); border-radius: var(--app-radius-large); }
 .dispatch-panel__heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--app-spacing-4); }
 .dispatch-panel__heading h2 { margin: 0; color: var(--app-text-primary); font-size: var(--td-font-size-title-medium); font-weight: 700; }
-.selection-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.selection-grid { display: grid; flex: 1 1 auto; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; min-height: 0; }
 .selection-panel { display: flex; flex-direction: column; min-height: 0; }
-.selection-table-wrap { max-height: min(360px, 45vh); overflow: auto; border-radius: var(--app-radius); }
+.selection-table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; border-radius: var(--app-radius); }
 .selection-table { width: 100%; }
 .selection-table :deep(.t-table__content) { overflow: visible; }
 .selection-table :deep(td), .selection-table :deep(th) { white-space: nowrap; }
@@ -569,7 +567,6 @@ small { color: var(--app-text-placeholder); }
 .step-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 @media (max-width: 800px) {
   .selection-grid { grid-template-columns: 1fr; }
-  .selection-table-wrap { max-height: 320px; }
   .option-select { width: 100%; }
   .step-actions { justify-content: stretch; }
   .step-actions :deep(.t-button) { flex: 1 1 auto; }
