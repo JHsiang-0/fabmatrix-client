@@ -312,6 +312,7 @@
             v-model:pageSize="queryParams.pageSize"
             :total="total"
             :show-page-size="false"
+            :total-content="false"
             @change="fetchData"
           />
         </div>
@@ -1395,7 +1396,20 @@ const handleBatchAdd = async () => {
   overflow: hidden;
 }
 
+.printer-management-table :deep(.t-table),
 .printer-management-table :deep(.t-table__content) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.printer-management-table :deep(.t-table__content) {
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+.printer-management-table :deep(.t-table__content > table) {
+  width: 100%;
   min-width: 1100px;
 }
 
@@ -1577,19 +1591,29 @@ const handleBatchAdd = async () => {
 }
 
 .printer-management-table-footer {
-  display: flex;
+  display: grid;
   align-items: center;
-  justify-content: space-between;
+  grid-template-columns: minmax(0, 1fr) max-content;
   gap: 1rem;
+  min-width: 0;
+  overflow: visible;
 }
 
 .printer-management-table-summary {
+  flex: 0 0 auto;
   color: var(--td-text-color-secondary);
   font-size: 0.8125rem;
+  white-space: nowrap;
 }
 
 .printer-management-table-summary strong {
   color: var(--td-text-color-primary);
+}
+
+.printer-management-table-footer :deep(.t-pagination) {
+  width: max-content;
+  min-width: max-content;
+  justify-self: end;
 }
 
 .printer-grid-view {
@@ -1675,8 +1699,8 @@ const handleBatchAdd = async () => {
   }
 
   .printer-management-table-footer {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
   }
 }
 </style>
