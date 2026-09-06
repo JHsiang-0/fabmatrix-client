@@ -145,14 +145,16 @@ const handleItemClick = item => {
 :deep(.t-menu__item) {
   box-sizing: border-box;
   max-width: 100%;
-  margin: 2px 0;
+  margin-top: 2px;
+  margin-bottom: 2px;
   border-radius: var(--app-radius);
 }
 
 :deep(.t-submenu__item) {
   box-sizing: border-box;
   max-width: 100%;
-  margin: 1px 0;
+  margin-top: 1px;
+  margin-bottom: 1px;
 }
 
 :deep(.t-menu__item.t-is-active) {
