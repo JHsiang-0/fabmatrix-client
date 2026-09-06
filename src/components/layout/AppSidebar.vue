@@ -37,7 +37,7 @@
 
     <div v-if="!props.collapsed || props.isMobile" class="app-sidebar__footer">
       <span>FabMatrix</span>
-      <span>生产管理平台</span>
+      <t-tag size="small" theme="default" variant="light" shape="round">v{{ appVersion }}</t-tag>
     </div>
   </t-aside>
 </template>
@@ -45,6 +45,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import packageJson from '../../../package.json'
 import { useUserStore } from '@/stores/user'
 import { navigationGroups } from '@/config/navigation'
 
@@ -68,6 +69,7 @@ const props = defineProps({
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const appVersion = packageJson.version
 
 const activePath = computed(() => route.path)
 const visibleGroups = computed(() => navigationGroups.map(group => ({
@@ -120,13 +122,14 @@ const handleItemClick = item => {
 
 .app-sidebar__footer {
   display: flex;
-  flex-direction: column;
-  gap: var(--app-spacing-1);
+  align-items: center;
+  gap: var(--app-spacing-2);
   padding: var(--app-spacing-4) var(--app-spacing-5);
   color: var(--app-text-placeholder);
   font-size: 0.75rem;
   border-top: 1px solid var(--app-border);
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 :deep(.t-menu__item) {
