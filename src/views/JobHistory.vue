@@ -195,6 +195,7 @@
           v-model:pageSize="pagination.pageSize"
           :total="pagination.total"
           :show-page-size="false"
+          :total-content="false"
           @change="handlePaginationChange"
         />
         </div>
@@ -508,7 +509,9 @@ fetchData()
   align-items: center;
   justify-content: space-between;
   gap: var(--app-spacing-4);
+  width: 100%;
   min-width: 0;
+  overflow: visible;
   color: var(--app-text-secondary);
   font-size: var(--td-font-size-body-small);
   white-space: nowrap;
@@ -516,6 +519,8 @@ fetchData()
 
 .history-pagination-footer :deep(.t-pagination) {
   flex-shrink: 0;
+  min-width: 0;
+  overflow: visible;
 }
 
 @media (max-width: 640px) {
