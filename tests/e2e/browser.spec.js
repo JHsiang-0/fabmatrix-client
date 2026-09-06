@@ -145,8 +145,10 @@ test('服务器连接页在桌面和移动视口保持可用且拆分地址操�
       await expect(page.getByRole('heading', { name: '连接生产服务器' })).toBeVisible()
       const hostInput = page.locator('.connection-endpoint-grid__host input')
       const portInput = page.locator('.connection-endpoint-grid input[placeholder="8080"]')
+      const wsInput = page.locator('.connection-endpoint-grid__ws input')
       await expect(hostInput).toBeVisible()
       await expect(portInput).toBeVisible()
+      await expect(wsInput).toBeVisible()
       await expect(page.getByRole('button', { name: '测试', exact: true })).toBeVisible()
       await expect(page.getByRole('button', { name: '保存并连接', exact: true })).toBeVisible()
       await expect(page.getByText('测试并保存', { exact: true })).toHaveCount(0)
@@ -157,9 +159,10 @@ test('服务器连接页在桌面和移动视口保持可用且拆分地址操�
         await page.getByRole('button', { name: '测试', exact: true }).click()
         await expect(page.getByText('请输入有效的服务器 IP 或主机名，不要包含协议、路径或查询参数')).toBeVisible()
         await hostInput.fill('127.0.0.1')
+        await wsInput.fill('ws://127.0.0.1:8080/ws/farm-status')
         await page.getByRole('button', { name: '保存并连接', exact: true }).click()
         await expect(page).toHaveURL(/\/login$/)
-        await expect.poll(() => page.evaluate(() => window.localStorage.getItem('fabmatrix.server.connection'))).toContain('127.0.0.1')
+        await expect.poll(() => page.evaluate(() => window.localStorage.getItem('fabmatrix.server.connection'))).toContain('ws://127.0.0.1:8080/ws/farm-status')
       }
     } finally {
       await context.close()

@@ -2,8 +2,8 @@
   <main class="connection-page app-scroll-region">
     <section class="connection-card" aria-labelledby="connection-title">
       <div class="connection-brand">
-        <span class="connection-brand__mark">3D</span>
-        <span>FabMatrix</span>
+        <span class="connection-brand__name">FabMatrix</span>
+        <t-typography-text disabled>嘉东三维管理平台</t-typography-text>
       </div>
 
       <header class="connection-header">
@@ -12,7 +12,6 @@
           <h1 id="connection-title">连接生产服务器</h1>
           <p>先配置 FabMatrix 服务地址，再登录或完成首次管理员初始化。</p>
         </div>
-        <t-tag theme="primary" variant="light">安全连接配置</t-tag>
       </header>
 
       <t-alert v-if="errorMessage" theme="error" :close-btn="false" class="connection-alert">
@@ -36,10 +35,22 @@
           <t-form-item label="端口" name="port">
             <t-input v-model="form.port" inputmode="numeric" placeholder="8080" clearable />
           </t-form-item>
+          <t-form-item class="connection-endpoint-grid__ws" label="WebSocket 地址" name="wsUrl">
+            <t-input v-model="form.wsUrl" placeholder="留空自动使用 /ws/farm-status" clearable />
+            <template #help>
+              <t-typography-text disabled>仅在 WebSocket 与 HTTP 服务地址不同时填写，支持 ws:// 或 wss://。</t-typography-text>
+            </template>
+          </t-form-item>
         </div>
-        <div class="connection-endpoint-preview">
-          <span>连接地址</span>
-          <code>{{ displayBaseUrl }}</code>
+        <div class="connection-endpoint-preview" aria-label="连接地址预览">
+          <div>
+            <span>HTTP API</span>
+            <code>{{ displayBaseUrl }}</code>
+          </div>
+          <div>
+            <span>WebSocket</span>
+            <code>{{ displayWsUrl }}</code>
+          </div>
         </div>
 
         <div class="connection-actions">
@@ -67,7 +78,9 @@
 
       <div class="connection-footer">
         <span>当前配置：{{ displayBaseUrl }}</span>
-        <t-button variant="text" size="small" @click="goLogin">返回登录</t-button>
+        <t-button variant="outline" theme="default" size="small" :disabled="testing || saving" @click="goLogin">
+          返回登录
+        </t-button>
       </div>
     </section>
   </main>
@@ -86,7 +99,8 @@ const initialEndpoint = parseServerEndpoint(initialConfig.apiBaseUrl)
 const form = reactive({
   protocol: initialEndpoint.protocol,
   host: initialEndpoint.host,
-  port: initialEndpoint.port
+  port: initialEndpoint.port,
+  wsUrl: initialConfig.wsUrl
 })
 const testing = ref(false)
 const saving = ref(false)
@@ -94,6 +108,7 @@ const errorMessage = ref('')
 const successMessage = ref('')
 
 const displayBaseUrl = computed(() => buildServerBaseUrl(form) || '尚未填写完整')
+const displayWsUrl = computed(() => String(form.wsUrl || '').trim() || '自动使用 /ws/farm-status')
 
 const getHealthUrl = baseUrl => `${baseUrl}/actuator/health`
 
@@ -107,8 +122,25 @@ const resolveBaseUrl = () => {
   return baseUrl
 }
 
+const resolveWebSocketUrl = () => {
+  const wsUrl = String(form.wsUrl || '').trim()
+  if (!wsUrl) return ''
+
+  try {
+    const parsed = new URL(wsUrl)
+    if (!['ws:', 'wss:'].includes(parsed.protocol) || parsed.username || parsed.password) {
+      throw new Error('WebSocket 地址必须使用 ws:// 或 wss://，且不能包含账号密码')
+    }
+    return wsUrl
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('WebSocket 地址必须')) throw error
+    throw new Error('请输入有效的 WebSocket 地址，例如 ws://192.168.0.10:8080/ws/farm-status', { cause: error })
+  }
+}
+
 const requestHealth = async () => {
   const baseUrl = resolveBaseUrl()
+  resolveWebSocketUrl()
   const response = await fetch(getHealthUrl(baseUrl), {
     method: 'GET',
     headers: { Accept: 'application/json' }
@@ -138,7 +170,7 @@ const saveAndConnect = async () => {
 
   try {
     const apiBaseUrl = await requestHealth()
-    saveServerConfig({ apiBaseUrl })
+    saveServerConfig({ apiBaseUrl, wsUrl: resolveWebSocketUrl() })
     await router.push({ name: 'login' })
   } catch (error) {
     errorMessage.value = error?.message || '无法连接服务器，配置未保存。'
@@ -153,6 +185,7 @@ const resetToEnvironment = () => {
   form.protocol = endpoint.protocol
   form.host = endpoint.host
   form.port = endpoint.port
+  form.wsUrl = config.wsUrl
   errorMessage.value = ''
   successMessage.value = '已载入当前启动配置，请测试后保存。'
 }
@@ -174,34 +207,27 @@ const goLogin = () => router.push({ name: 'login' })
 }
 
 .connection-card {
-  width: min(100%, 620px);
+  width: min(100%, 760px);
   padding: 32px;
-  background: var(--app-surface);
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-large);
-  box-shadow: var(--app-shadow-raised);
   margin: auto;
 }
 
 .connection-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin-bottom: 28px;
   color: var(--app-text-primary);
-  font-size: 20px;
+  align-items: flex-start;
+}
+
+.connection-brand__name {
+  font-size: 24px;
   font-weight: 700;
 }
 
-.connection-brand__mark {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  color: var(--app-text-on-brand);
-  font-size: 12px;
-  background: var(--app-primary);
-  border-radius: 10px;
+.connection-brand :deep(.t-typography) {
+  font-size: 13px;
 }
 
 .connection-header {
@@ -243,17 +269,35 @@ const goLogin = () => router.push({ name: 'login' })
   gap: 12px;
 }
 
+.connection-endpoint-grid__ws {
+  grid-column: 1 / -1;
+}
+
 .connection-endpoint-preview {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
   margin-top: -4px;
   padding: 10px 12px;
   color: var(--app-text-secondary);
   background: var(--app-surface-muted);
   border-radius: var(--app-radius);
   font-size: 13px;
+}
+
+.connection-endpoint-preview > div {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.connection-endpoint-preview span {
+  flex: 0 0 auto;
 }
 
 .connection-endpoint-preview code {
@@ -310,7 +354,7 @@ const goLogin = () => router.push({ name: 'login' })
 
   .connection-card {
     width: 100%;
-    padding: 24px 20px;
+    padding: 24px 0;
   }
 
   .connection-header {
