@@ -1,14 +1,16 @@
 <template>
   <main class="connection-page app-scroll-region">
     <section class="connection-card" aria-labelledby="connection-title">
-      <div class="connection-brand">
-        <span class="connection-brand__name">FabMatrix</span>
-        <t-typography-text disabled>嘉东三维管理平台</t-typography-text>
+      <div class="connection-brand-bar">
+        <div class="connection-brand">
+          <span class="connection-brand__name">FabMatrix</span>
+          <t-typography-text disabled>嘉东三维管理平台</t-typography-text>
+        </div>
+        <p class="connection-eyebrow">LOCAL EDITION</p>
       </div>
 
       <header class="connection-header">
         <div>
-          <p class="connection-eyebrow">LOCAL EDITION</p>
           <h1 id="connection-title">连接生产服务器</h1>
           <p>先配置 FabMatrix 服务地址，再登录或完成首次管理员初始化。</p>
         </div>
@@ -35,34 +37,38 @@
           <t-form-item label="端口" name="port">
             <t-input v-model="form.port" inputmode="numeric" placeholder="8080" clearable />
           </t-form-item>
-          <t-form-item class="connection-endpoint-grid__ws" label="WebSocket 地址" name="wsUrl">
-            <t-input v-model="form.wsUrl" placeholder="留空自动使用 /ws/farm-status" clearable />
-            <template #help>
-              <t-typography-text disabled>仅在 WebSocket 与 HTTP 服务地址不同时填写，支持 ws:// 或 wss://。</t-typography-text>
-            </template>
-          </t-form-item>
         </div>
-        <div class="connection-endpoint-preview" aria-label="连接地址预览">
-          <div>
-            <span>HTTP API</span>
-            <code>{{ displayBaseUrl }}</code>
+        <div class="connection-current-config">
+          <span>当前配置</span>
+          <code>{{ displayBaseUrl }}</code>
+        </div>
+
+        <div class="connection-ws-config">
+          <div class="connection-ws-toggle">
+            <t-switch v-model="form.customWsUrlEnabled" size="small" />
+            <span>自定义 WebSocket 地址</span>
+            <t-typography-text disabled>默认关闭，关闭时自动使用 /ws/farm-status</t-typography-text>
           </div>
-          <div>
-            <span>WebSocket</span>
-            <code>{{ displayWsUrl }}</code>
-          </div>
+          <t-form-item v-if="form.customWsUrlEnabled" class="connection-ws-input" label="WebSocket 地址" name="wsUrl">
+            <t-input v-model="form.wsUrl" placeholder="例如：ws://192.168.0.10:8080/ws/farm-status" clearable />
+          </t-form-item>
         </div>
 
         <div class="connection-actions">
-          <t-button variant="outline" :loading="testing" :disabled="testing" @click="testConnection">
-            测试
+          <t-button variant="outline" theme="default" :disabled="testing || saving" @click="goLogin">
+            返回登录
           </t-button>
-          <t-button theme="primary" :loading="saving" :disabled="testing || saving" @click="saveAndConnect">
-            保存并连接
-          </t-button>
-          <t-button variant="text" :disabled="testing || saving" @click="resetToEnvironment">
-            使用启动配置
-          </t-button>
+          <div class="connection-actions__right">
+            <t-button variant="outline" theme="default" :disabled="testing || saving" @click="resetToEnvironment">
+              使用启动配置
+            </t-button>
+            <t-button variant="outline" theme="default" :loading="testing" :disabled="testing || saving" @click="testConnection">
+              测试
+            </t-button>
+            <t-button theme="primary" :loading="saving" :disabled="testing || saving" @click="saveAndConnect">
+              保存并连接
+            </t-button>
+          </div>
         </div>
       </t-form>
 
@@ -72,15 +78,8 @@
           <li>地址只保存在当前浏览器或 Electron 用户配置中，不包含账号、密码和 Token。</li>
           <li>自动搜索局域网服务器需要后端提供发现协议；当前 API 的扫描功能仅用于发现打印机。</li>
           <li>测试会访问后端公开的健康检查接口，不会执行业务写操作。</li>
-          <li>WebSocket 会按后端约定自动使用同一主机和端口的 <code>/ws/farm-status</code>。</li>
+          <li>开启自定义 WebSocket 地址后，仅在实时服务与 HTTP 服务地址不同时填写。</li>
         </ul>
-      </div>
-
-      <div class="connection-footer">
-        <span>当前配置：{{ displayBaseUrl }}</span>
-        <t-button variant="outline" theme="default" size="small" :disabled="testing || saving" @click="goLogin">
-          返回登录
-        </t-button>
       </div>
     </section>
   </main>
@@ -100,7 +99,8 @@ const form = reactive({
   protocol: initialEndpoint.protocol,
   host: initialEndpoint.host,
   port: initialEndpoint.port,
-  wsUrl: initialConfig.wsUrl
+  wsUrl: initialConfig.wsUrl,
+  customWsUrlEnabled: Boolean(initialConfig.wsUrl)
 })
 const testing = ref(false)
 const saving = ref(false)
@@ -108,7 +108,6 @@ const errorMessage = ref('')
 const successMessage = ref('')
 
 const displayBaseUrl = computed(() => buildServerBaseUrl(form) || '尚未填写完整')
-const displayWsUrl = computed(() => String(form.wsUrl || '').trim() || '自动使用 /ws/farm-status')
 
 const getHealthUrl = baseUrl => `${baseUrl}/actuator/health`
 
@@ -140,7 +139,7 @@ const resolveWebSocketUrl = () => {
 
 const requestHealth = async () => {
   const baseUrl = resolveBaseUrl()
-  resolveWebSocketUrl()
+  if (form.customWsUrlEnabled) resolveWebSocketUrl()
   const response = await fetch(getHealthUrl(baseUrl), {
     method: 'GET',
     headers: { Accept: 'application/json' }
@@ -170,7 +169,7 @@ const saveAndConnect = async () => {
 
   try {
     const apiBaseUrl = await requestHealth()
-    saveServerConfig({ apiBaseUrl, wsUrl: resolveWebSocketUrl() })
+    saveServerConfig({ apiBaseUrl, wsUrl: form.customWsUrlEnabled ? resolveWebSocketUrl() : '' })
     await router.push({ name: 'login' })
   } catch (error) {
     errorMessage.value = error?.message || '无法连接服务器，配置未保存。'
@@ -186,6 +185,7 @@ const resetToEnvironment = () => {
   form.host = endpoint.host
   form.port = endpoint.port
   form.wsUrl = config.wsUrl
+  form.customWsUrlEnabled = Boolean(config.wsUrl)
   errorMessage.value = ''
   successMessage.value = '已载入当前启动配置，请测试后保存。'
 }
@@ -201,24 +201,30 @@ const goLogin = () => router.push({ name: 'login' })
   width: 100%;
   height: 100%;
   min-height: 100%;
-  padding: 32px 20px;
+  padding: 24px 32px;
   background: var(--app-page-background);
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .connection-card {
   width: min(100%, 760px);
-  padding: 32px;
+  padding: 0;
   margin: auto;
+}
+
+.connection-brand-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
 }
 
 .connection-brand {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 28px;
+  align-items: baseline;
+  gap: 10px;
   color: var(--app-text-primary);
-  align-items: flex-start;
 }
 
 .connection-brand__name {
@@ -235,7 +241,7 @@ const goLogin = () => router.push({ name: 'login' })
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 }
 
 .connection-eyebrow {
@@ -269,17 +275,12 @@ const goLogin = () => router.push({ name: 'login' })
   gap: 12px;
 }
 
-.connection-endpoint-grid__ws {
-  grid-column: 1 / -1;
-}
-
-.connection-endpoint-preview {
+.connection-current-config {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: -4px;
+  gap: 12px;
+  margin-top: -2px;
   padding: 10px 12px;
   color: var(--app-text-secondary);
   background: var(--app-surface-muted);
@@ -287,20 +288,7 @@ const goLogin = () => router.push({ name: 'login' })
   font-size: 13px;
 }
 
-.connection-endpoint-preview > div {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
-}
-
-.connection-endpoint-preview span {
-  flex: 0 0 auto;
-}
-
-.connection-endpoint-preview code {
+.connection-current-config code {
   min-width: 0;
   overflow: hidden;
   color: var(--app-text-primary);
@@ -309,21 +297,60 @@ const goLogin = () => router.push({ name: 'login' })
   white-space: nowrap;
 }
 
+.connection-ws-config {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.connection-ws-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 8px;
+  color: var(--app-text-primary);
+  font-size: 13px;
+}
+
+.connection-ws-toggle .t-typography {
+  color: var(--app-text-secondary);
+}
+
+.connection-ws-input {
+  flex: 1 1 420px;
+  min-width: 280px;
+  margin: 0;
+}
+
+.connection-ws-input :deep(.t-form__controls) {
+  min-width: 0;
+}
+
 .connection-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 24px;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.connection-actions__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .connection-notes {
-  margin-top: 28px;
-  padding: 16px;
+  margin-top: 18px;
+  padding: 12px 14px;
   color: var(--app-text-secondary);
   background: var(--app-surface-muted);
   border-radius: var(--app-radius);
   font-size: 13px;
-  line-height: 1.7;
+  line-height: 1.5;
 }
 
 .connection-notes__title {
@@ -333,28 +360,28 @@ const goLogin = () => router.push({ name: 'login' })
 }
 
 .connection-notes ul {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 24px;
   margin: 0;
   padding-left: 18px;
 }
 
-.connection-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 20px;
-  color: var(--app-text-secondary);
-  font-size: 12px;
-}
-
 @media (max-width: 640px) {
   .connection-page {
-    padding: 16px 12px;
+    padding: 16px 12px 24px;
+    overflow-y: auto;
   }
 
   .connection-card {
     width: 100%;
-    padding: 24px 0;
+  }
+
+  .connection-brand-bar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
   }
 
   .connection-header {
@@ -362,10 +389,17 @@ const goLogin = () => router.push({ name: 'login' })
   }
 
   .connection-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .connection-actions__right {
+    align-items: stretch;
     flex-direction: column;
   }
 
-  .connection-actions .t-button {
+  .connection-actions .t-button,
+  .connection-actions__right .t-button {
     width: 100%;
   }
 
@@ -378,9 +412,24 @@ const goLogin = () => router.push({ name: 'login' })
     grid-row: 1;
   }
 
-  .connection-footer {
+  .connection-current-config {
     align-items: flex-start;
     flex-direction: column;
+    gap: 4px;
+  }
+
+  .connection-ws-config {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .connection-ws-input {
+    min-width: 0;
+  }
+
+  .connection-notes ul {
+    display: block;
   }
 }
 </style>
