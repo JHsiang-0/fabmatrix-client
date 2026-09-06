@@ -190,14 +190,14 @@
       <template #footer>
         <div class="history-pagination-footer">
           <span>共 {{ pagination.total }} 条数据</span>
-        <t-pagination
-          v-model:current="pagination.pageNum"
-          v-model:pageSize="pagination.pageSize"
-          :total="pagination.total"
-          :show-page-size="false"
-          :total-content="false"
-          @change="handlePaginationChange"
-        />
+          <t-pagination
+            v-model:current="pagination.pageNum"
+            v-model:pageSize="pagination.pageSize"
+            :total="pagination.total"
+            :show-page-size="false"
+            :total-content="false"
+            @change="handlePaginationChange"
+          />
         </div>
       </template>
     </t-card>
@@ -441,6 +441,10 @@ fetchData()
 
 .history-card :deep(.t-card__footer) {
   flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  overflow: visible;
   padding: var(--app-spacing-3) var(--app-spacing-5);
 }
 
@@ -507,10 +511,12 @@ fetchData()
 .history-pagination-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   gap: var(--app-spacing-4);
   width: 100%;
   min-width: 0;
+  box-sizing: border-box;
   overflow: visible;
   color: var(--app-text-secondary);
   font-size: var(--td-font-size-body-small);
@@ -518,9 +524,15 @@ fetchData()
 }
 
 .history-pagination-footer :deep(.t-pagination) {
-  flex-shrink: 0;
-  min-width: 0;
+  flex: 0 0 auto;
+  width: auto !important;
+  max-width: 100%;
+  margin-left: auto;
   overflow: visible;
+}
+
+.history-pagination-footer :deep(.t-pagination__total) {
+  display: none !important;
 }
 
 @media (max-width: 640px) {
@@ -535,6 +547,8 @@ fetchData()
 
   .history-pagination-footer :deep(.t-pagination) {
     align-self: flex-end;
+    max-width: 100%;
+    margin-left: 0;
   }
 }
 </style>
