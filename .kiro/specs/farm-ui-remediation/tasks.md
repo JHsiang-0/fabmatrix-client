@@ -842,7 +842,7 @@ git diff --check：通过；暂存后另行执行 `git diff --cached --check`。
 - 不执行 `git push`；不提交环境配置、Token、密码、预签名 URL 或其他敏感信息。
 - 每项记录真实 API/OpenAPI 来源、Loading/Empty/Error、状态同步、Electron 窗口尺寸、浏览器视口和未验证的真实环境限制。
 
-### [ ] UI-004.0 文件库运行基线与契约冻结
+### [x] UI-004.0 文件库运行基线与契约冻结
 
 优先级：P0
 
@@ -863,6 +863,14 @@ git diff --check：通过；暂存后另行执行 `git diff --cached --check`。
 - 基线记录不修改代码，不伪造登录或后端数据。
 
 完成后提交：`docs: 建立 UI-004 文件库重写基线`。
+
+完成记录：已建立 [`UI-004-BASELINE.md`](./UI-004-BASELINE.md)，冻结当前源码提交、前端代理与 Electron 端口/尺寸、后端健康检查和运行时 OpenAPI 文件接口。已核对 `API_HANDOFF.md` 的完整文件树、`parentId` 分页、新建文件夹、单/批量上传、预览、缩略图、关联任务、下载、单删和批量删除约束；记录了运行时泛型 `Result` 结构不足、当前完整文件树与分页主列表重复、工具栏 action 缺少统一 `Space`、Grid/兼容表格双渲染器分叉，以及浏览器过期登录态导致的现场截图限制。本阶段未修改业务代码、未新增接口/字段/业务数据。
+
+测试：`npm test`、`npm run lint`、`npm run build` 通过。
+
+Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存后的 `git diff --cached --check`，仅暂存本子任务的基线文档和任务记录。
+
+提交：`af8418a` 之后创建独立本地提交 `docs: 建立 UI-004 文件库重写基线`；不执行 `git push`。
 
 ### [ ] UI-004.1 目录导航与页面信息架构
 
