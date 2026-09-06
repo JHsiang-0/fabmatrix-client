@@ -10,7 +10,8 @@
       </template>
     </PageHeader>
 
-    <section class="history-workspace" aria-label="打印历史工作区">
+    <t-card class="history-card app-page-card" aria-label="打印历史工作区">
+      <div class="history-card__body">
       <!-- 顶部检索区 -->
       <QueryToolbar class="history-filter-toolbar" label="打印历史筛选条件">
         <div class="flex flex-wrap items-center gap-4">
@@ -60,29 +61,32 @@
         </div>
       </QueryToolbar>
 
-      <!-- 数据表格区 -->
-      <AsyncState
-        v-if="loading || (loadError && tableData.length === 0)"
-        :loading="loading"
-        :error="loadError"
-        @retry="fetchData"
-      />
-      <t-empty v-else-if="tableData.length === 0" description="暂无打印历史记录" />
-      <t-alert v-if="loadError && tableData.length" theme="error" :close-btn="false" class="mb-3">
-        <template #default>{{ loadError }}</template>
-        <template #operation>
-          <t-button size="small" variant="outline" @click="fetchData">重试</t-button>
-        </template>
-      </t-alert>
-      <TdTable
-        v-if="tableData.length"
-        :data="tableData"
-        @row-click="openTaskDetail"
-        :loading="loading"
-        :height="historyTableHeight"
-        style="width: 100%"
-        class="history-table"
-      >
+      <!-- 数据内容区：只允许这里滚动，避免表格内容推动底部分页。 -->
+      <div class="history-content">
+        <div v-if="loading || (loadError && tableData.length === 0)" class="history-state">
+          <AsyncState
+            :loading="loading"
+            :error="loadError"
+            @retry="fetchData"
+          />
+        </div>
+        <div v-else-if="tableData.length === 0" class="history-state">
+          <t-empty description="暂无打印历史记录" />
+        </div>
+        <t-alert v-if="loadError && tableData.length" theme="error" :close-btn="false" class="history-inline-error">
+          <template #default>{{ loadError }}</template>
+          <template #operation>
+            <t-button size="small" variant="outline" @click="fetchData">重试</t-button>
+          </template>
+        </t-alert>
+        <div v-if="tableData.length" class="history-table-wrapper">
+          <TdTable
+            :data="tableData"
+            @row-click="openTaskDetail"
+            :loading="loading"
+            style="width: 100%"
+            class="history-table"
+          >
         <TdTableColumn prop="id" label="任务ID" width="100" align="center">
           <template #default="scope">
             <span class="font-mono font-semibold text-gray-700">#{{ scope.row.id }}</span>
@@ -176,10 +180,16 @@
             </t-popconfirm>
           </template>
         </TdTableColumn>
-      </TdTable>
+          </TdTable>
+        </div>
+      </div>
+
+      </div>
 
       <!-- 底部分页区 -->
-      <div class="mt-4 flex justify-center px-4">
+      <template #footer>
+        <div class="history-pagination-footer">
+          <span>共 {{ pagination.total }} 条数据</span>
         <t-pagination
           v-model:current="pagination.pageNum"
           v-model:pageSize="pagination.pageSize"
@@ -187,8 +197,9 @@
           :show-page-size="false"
           @change="handlePaginationChange"
         />
-      </div>
-    </section>
+        </div>
+      </template>
+    </t-card>
     <TaskDetailDrawer
       v-model="detailDrawerVisible"
       :task="selectedJob"
@@ -229,9 +240,6 @@ const jobStore = useJobStore()
 const detailLoading = computed(() => jobStore.detailLoading)
 const detailErrorText = computed(() => jobStore.detailError?.message || '')
 const tableData = ref([])
-const historyTableHeight = computed(() => tableData.value.length > 8
-  ? '100%'
-  : undefined)
 const detailDrawerVisible = ref(false)
 const selectedJob = ref(null)
 const JOB_HISTORY_DETAIL_CONTEXT_KEY = 'farm-ui:job-history-detail'
@@ -416,28 +424,112 @@ fetchData()
 </script>
 
 <style scoped>
-.history-workspace {
+.history-card {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.history-card :deep(.t-card__body) {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.history-card :deep(.t-card__footer) {
+  flex: 0 0 auto;
+  padding: var(--app-spacing-3) var(--app-spacing-5);
+}
+
+.history-card__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.history-filter-toolbar {
+  flex: 0 0 auto;
+  margin-bottom: var(--app-spacing-4);
+}
+
+.history-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.history-state {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 14rem;
+}
+
+.history-inline-error {
+  flex: 0 0 auto;
+  margin-bottom: var(--app-spacing-3);
+}
+
+.history-table-wrapper {
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
-  flex-direction: column;
-  overflow: hidden;
-  padding: var(--app-spacing-5);
-  background: var(--app-surface);
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-large);
-}
-
-.history-filter-toolbar {
-  margin-bottom: var(--app-spacing-5);
+  overflow: auto;
 }
 
 .history-table {
-  flex: 1 1 auto;
   display: block;
+  flex: 1 1 auto;
   min-width: 0;
-  min-height: 0;
-  overflow: hidden;
+  min-height: 100%;
+}
+
+.history-table :deep(.t-table) {
+  min-width: 1120px;
+}
+
+.history-table :deep(.t-table__content) {
+  overflow: auto;
+  scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
+  scrollbar-width: thin;
+}
+
+.history-pagination-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-spacing-4);
+  min-width: 0;
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+  white-space: nowrap;
+}
+
+.history-pagination-footer :deep(.t-pagination) {
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .history-card :deep(.t-card__footer) {
+    padding: var(--app-spacing-3);
+  }
+
+  .history-pagination-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .history-pagination-footer :deep(.t-pagination) {
+    align-self: flex-end;
+  }
 }
 </style>
