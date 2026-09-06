@@ -35,6 +35,7 @@
               :selected-row-keys="selectedFileIds"
               :loading="loadingResources"
               row-key="id"
+              select-on-row-click
               bordered
               size="small"
               @select-change="handleFileSelectionChange"
@@ -53,12 +54,13 @@
               :selected-row-keys="selectedPrinterIds"
               :loading="loadingResources"
               row-key="id"
+              select-on-row-click
               bordered
               size="small"
               @select-change="handlePrinterSelectionChange"
             >
               <template #status="{ row }">
-                <t-tag theme="default" variant="light" size="small">{{ row.status || '-' }}</t-tag>
+                <StatusTag domain="printer" :status="row.status" variant="light-outline" />
               </template>
             </t-table>
           </div>
@@ -206,6 +208,7 @@ import { createBatchPreviewRequest, normalizeBatchConfirmResult } from '@/utils/
 import { isBatchUploadSuccess, normalizeBatchUploadResult, validateBatchUploadSelection } from '@/utils/batchUpload'
 import { useJobStore } from '@/stores/jobStore'
 import PageHeader from '@/components/layout/PageHeader.vue'
+import StatusTag from '@/components/StatusTag.vue'
 
 const route = useRoute()
 const router = useRouter()

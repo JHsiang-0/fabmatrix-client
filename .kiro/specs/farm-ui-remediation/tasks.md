@@ -361,9 +361,32 @@ git diff --check：通过。
 
 验证说明：批量派发专项测试 `node --test tests/batchDispatch.test.js tests/batchDispatchPage.test.js` 9/9 通过；`npm run lint`、`npm run build` 和 `git diff --check` 通过。浏览器 E2E 当前因工作区缺少 `@playwright/test` 未能启动，未修改依赖或锁文件。
 
+### [x] UI-001.15 批量派发表格交互与状态标签统一
+
+范围：
+
+- `src/views/BatchDispatch.vue`
+- 批量派发首步文件和打印机资源表格
+
+目标：
+
+- 参考 TDesign Table 多选示例，启用点击行选中并保持受控选中状态。
+- 打印机状态复用项目公共 `StatusTag`，使用带图标的 `light-outline` 主题表达状态。
+- 保留现有资源字段、选择计数、局部滚动、Loading/Empty 和后续派发流程。
+
+验收标准：
+
+- 文件和打印机表格均支持点击行选中/取消，表头多选和 `selected-row-keys` 仍可用。
+- 打印机状态显示项目统一的标签文案、图标和主题色，不引入审批示例字段或业务状态。
+- 完成批量派发专项测试、`npm run lint`、`npm run build` 和 `git diff --check`。
+
+完成记录：批量派发首步文件和打印机表格启用 TDesign 点击行选中，继续通过 `selected-row-keys` 受控同步；打印机状态复用公共 `StatusTag`，改为带图标的 `light-outline` 标签，未改变资源字段和派发流程。
+
+验证说明：批量派发专项测试 `node --test tests/batchDispatch.test.js tests/batchDispatchPage.test.js` 9/9 通过；`npm run lint`、`npm run build` 和 `git diff --check` 通过。构建仅保留既有动态导入和大 chunk 提示。
+
 ## 2. 执行顺序
 
-UI-001.0 → UI-001.1 → UI-001.2 → UI-001.3 → UI-001.4 → UI-001.5 → UI-001.6 → UI-001.7 → UI-001.8 → UI-001.9 → UI-001.10 → UI-001.11 → UI-001.13 → UI-001.14
+UI-001.0 → UI-001.1 → UI-001.2 → UI-001.3 → UI-001.4 → UI-001.5 → UI-001.6 → UI-001.7 → UI-001.8 → UI-001.9 → UI-001.10 → UI-001.11 → UI-001.13 → UI-001.14 → UI-001.15
 
 UI-001.0、UI-001.1 和 UI-001.2 是页面整改前置条件。发现 API 或状态契约冲突时暂停对应子任务并记录，不得在 UI 层伪造解决方案。
 
