@@ -153,7 +153,7 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     await expect(page.locator('#file-library-results-title')).toHaveText('目录内容')
     await page.getByText('根目录', { exact: true }).click()
     await expect(page.locator('#file-library-results-title')).toHaveText('根目录文件')
-    await page.getByRole('button', { name: '详情', exact: true }).first().click()
+    await page.getByText('gearbox.gcode', { exact: true }).click()
     await expect(page.getByRole('button', { name: '关闭文件详情', exact: true })).toBeVisible()
     await expect(page.getByText('切片摘要', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: '关闭文件详情', exact: true }).click()

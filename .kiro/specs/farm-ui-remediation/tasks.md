@@ -1056,9 +1056,36 @@ Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存
 
 提交：完成最终检查后创建独立本地提交 `refactor: 收口文件库单一主工作区导航`，不执行 `git push`。
 
+### [x] UI-004.7 文件库 TDesign 卡片、筛选和操作对齐
+
+优先级：P1
+
+目标：进一步收敛文件库到 TDesign 默认视觉语言，降低筛选区域高度，统一文件夹和文件的操作层级。
+
+工作内容：
+
+- 将文件筛选区改为 TDesign inline Form 单行布局，桌面宽度下保持当前位置、模式、搜索、材质和查询操作同一行。
+- 文件库工作区和网格条目使用 TDesign Card，移除重复的外层自定义卡片边框、阴影和圆角实现。
+- 移除文件“详情”操作按钮，详情仍通过列表行或网格卡片点击打开；文件夹与文件操作列保持同等数量和位置，避免按钮错位。
+- 更新文件库静态契约测试和 Electron 真实点击回归，不新增接口、字段或业务数据。
+
+验收：
+
+- 桌面端筛选区为单行；窄窗口允许按 TDesign Form 规则换行，不产生页面级水平溢出。
+- 文件夹和文件操作按钮对齐，详情 Drawer、文件夹打开、打印、删除、上传和分页入口保持可用。
+- 完成 `npm test`、浏览器/Electron 相关测试、`npm run lint`、`npm run build` 和桌面构建，并通过提交前 Git 检查。
+
+完成记录：文件库外层和网格条目改用 TDesign Card，筛选区改为 inline Form；列表和网格均移除单独的“详情”按钮，详情入口统一为行/卡片点击，文件操作列保持“打开/打印 + 删除”的同构布局。未新增接口、字段或业务数据；真实 RustFS/对象存储、生产 CORS、实体文件上传、物理打印机和 Windows DPI/主题仍需现场验收。
+
+测试：`npm test`（144/144）、`npm run test:e2e`（9/9）、`npm run test:electron`（3/3）、`npm run test:electron:dist`（1/1，含 `npm run build:desktop`）、`npm run lint`、`npm run build`、`npm run build:desktop` 全部通过。构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
+
+Git 检查：提交前执行 `git status --short`、`git diff --check` 和暂存后的 `git diff --cached --check`，仅暂存本子任务涉及的文件。
+
+提交：完成最终检查后创建独立本地提交 `style: 统一文件库 TDesign 卡片与筛选布局`，不执行 `git push`。
+
 ### 8.6 UI-004 执行顺序与统一约束
 
-`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6`
+`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6 → UI-004.7`
 
 - UI-004 是独立文件库 UI/UX 重写任务，不属于 `farm-ui-v2`，不回写 UI-001、UI-002、UI-003 的历史状态。
 - 所有文件数据必须来自 API_HANDOFF、运行时 OpenAPI 和现有数据适配器；运行时泛型 schema 与正式文档冲突时记录并暂停相关猜测。

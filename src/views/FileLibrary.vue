@@ -34,11 +34,10 @@
       </template>
     </PageHeader>
 
-    <DataRegion class="file-library-workspace" label="文件工作台">
+    <t-card bordered class="file-library-workspace app-page-card" aria-label="文件工作台">
       <section class="file-library-main" aria-labelledby="file-library-results-title">
-          <QueryToolbar class="file-library-filter-row" label="文件筛选条件">
-            <div class="file-library-navigation">
-              <span class="file-library-section-label">当前位置</span>
+          <t-form layout="inline" class="file-library-filter-form" aria-label="文件筛选条件">
+            <t-form-item label="当前位置">
               <t-breadcrumb separator="/">
                 <t-breadcrumb-item :to="{ path: '' }" @click.prevent="navigateToRoot">
                   <FolderOpened :size="16" />
@@ -52,22 +51,27 @@
                   {{ breadcrumb.name }}
                 </t-breadcrumb-item>
               </t-breadcrumb>
-            </div>
-            <div class="file-library-toolbar__filters">
+            </t-form-item>
+            <t-form-item label="模式">
               <t-radio-group v-model="isBatchMode" variant="default-filled" size="small" aria-label="文件操作模式">
-                <t-radio-button :value="false">浏览详情</t-radio-button>
+                <t-radio-button :value="false">浏览</t-radio-button>
                 <t-radio-button :value="true">批量选择</t-radio-button>
               </t-radio-group>
+            </t-form-item>
+            <t-form-item>
               <t-input v-model="searchKeyword" placeholder="搜索文件名..." clearable size="medium"
                 @keyup.enter="handleSearch">
                 <template #prefixIcon>
                   <Search />
                 </template>
               </t-input>
+            </t-form-item>
+            <t-form-item>
               <t-input v-model="materialFilter" placeholder="材质筛选" clearable size="medium"
-                @keyup.enter="handleSearch">
-              </t-input>
-              <t-space class="file-library-filter-actions" size="small">
+                @keyup.enter="handleSearch" />
+            </t-form-item>
+            <t-form-item>
+              <t-space size="small">
                 <t-button theme="primary" size="medium" :loading="loading" @click="handleSearch">
                   查询
                 </t-button>
@@ -75,8 +79,8 @@
                   重置
                 </t-button>
               </t-space>
-            </div>
-          </QueryToolbar>
+            </t-form-item>
+          </t-form>
 
           <div class="file-library-results">
             <div class="file-library-results-heading">
@@ -111,9 +115,11 @@
       <!-- 网格视图 -->
       <div v-if="viewMode === 'grid'" class="file-grid-view app-scroll-region">
         <!-- 文件夹 -->
-        <div
+        <t-card
           v-for="file in folderList"
           :key="file.id"
+          bordered
+          hover-shadow
           class="file-card"
           :class="{ 'file-card--selected': isBatchMode && selectedIds.includes(file.id) }"
           @click="handleFileClick(file)"
@@ -158,12 +164,14 @@
               </t-button>
             </div>
           </div>
-        </div>
+        </t-card>
 
         <!-- 文件 -->
-        <div
+        <t-card
           v-for="file in fileItemsList"
           :key="file.id"
+          bordered
+          hover-shadow
           class="file-card"
           :class="{ 'file-card--selected': isBatchMode && selectedIds.includes(file.id) }"
           @click="handleFileClick(file)">
@@ -236,10 +244,6 @@
 
             <!-- 悬浮操作按钮 -->
             <div class="file-card__actions">
-              <t-button variant="text" size="small" @click.stop="openFileDetail(file)"
-                class="file-card__action">
-                详情
-              </t-button>
               <t-button theme="primary" size="small" :icon="renderIcon(Printer)" @click.stop="handlePrint(file)"
                 class="file-card__action">
                 打印
@@ -250,7 +254,7 @@
               </t-button>
             </div>
           </div>
-        </div>
+        </t-card>
       </div>
 
       <!-- 列表视图 -->
@@ -327,9 +331,6 @@
                   打开
                 </t-button>
                 <template v-else>
-                  <t-button variant="text" size="small" @click.stop="openFileDetail(row)">
-                    详情
-                  </t-button>
                   <t-button theme="primary" size="small" :icon="renderIcon(Printer)" @click.stop="handlePrint(row)">
                     打印
                   </t-button>
@@ -352,7 +353,7 @@
           </div>
           </div>
       </section>
-    </DataRegion>
+    </t-card>
 
     <!-- 文件上传对话框 -->
     <t-dialog v-model:visible="uploadDialogVisible" header="批量上传切片文件" width="600px" :footer="false">
@@ -570,8 +571,6 @@ import { getPrinterList } from '@/api/printer'
 import { formatDuration, formatFileSize } from '@/utils/formatters'
 import FileDetailDrawer from '@/components/file/FileDetailDrawer.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
-import QueryToolbar from '@/components/layout/QueryToolbar.vue'
-import DataRegion from '@/components/layout/DataRegion.vue'
 import IconFolder from '@/components/icons/IconFolder.vue'
 import AsyncState from '@/components/AsyncState.vue'
 import TdTable from '@/components/TdTable.vue'
@@ -1304,18 +1303,13 @@ onMounted(() => {
 }
 
 .file-library-workspace {
-  display: flex;
   width: 100%;
   min-width: 0;
   min-height: 0;
-  flex: 1 1 auto;
   overflow: hidden;
-  background: var(--app-surface);
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-large);
 }
 
-.file-library-workspace :deep(.app-data-region__body) {
+.file-library-workspace :deep(.t-card__body) {
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -1339,7 +1333,6 @@ onMounted(() => {
   font-weight: 700;
 }
 
-.file-library-panel-heading p,
 .file-library-results-heading span {
   margin: 4px 0 0;
   color: var(--app-text-secondary);
@@ -1354,56 +1347,60 @@ onMounted(() => {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
-  padding: var(--app-spacing-5);
-  background: var(--app-surface);
+  padding: 0;
   overflow: hidden;
 }
 
-.file-library-filter-row {
+.file-library-filter-form {
+  display: flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: var(--app-spacing-4);
+  flex-wrap: nowrap;
+  gap: var(--app-spacing-2) var(--app-spacing-4);
   margin-bottom: var(--app-spacing-4);
   padding: 0 0 var(--app-spacing-4);
-  background: transparent;
-  border: 0;
   border-bottom: 1px solid var(--app-border);
 }
 
-.file-library-navigation {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 4px;
+.file-library-filter-form :deep(.t-form__item) {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+
+.file-library-filter-form :deep(.t-form__controls) {
   min-width: 0;
 }
 
-.file-library-section-label {
-  color: var(--app-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
+.file-library-filter-form :deep(.t-form__label) {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
-.file-library-navigation :deep(.t-breadcrumb) {
-  min-width: 0;
+.file-library-filter-form :deep(.t-breadcrumb) {
+  max-width: min(240px, 20vw);
   overflow: hidden;
   white-space: nowrap;
 }
 
-.file-library-toolbar__filters {
-  display: flex;
-  flex: 0 1 auto;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--app-spacing-3);
+.file-library-filter-form :deep(.t-input) {
+  width: 180px;
 }
 
-.file-library-toolbar__filters .t-input:first-of-type {
-  width: min(240px, 24vw);
+.file-library-filter-form :deep(.t-form__item:last-child) {
+  margin-left: auto;
 }
 
-.file-library-toolbar__filters .t-input:last-of-type {
-  width: 132px;
+.file-library-filter-form :deep(.t-radio-group) {
+  white-space: nowrap;
+}
+
+.file-library-filter-form :deep(.t-breadcrumb__item) {
+  white-space: nowrap;
+}
+
+.file-library-filter-form :deep(.t-breadcrumb__item:last-child) {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .file-library-results {
@@ -1497,11 +1494,15 @@ onMounted(() => {
   min-width: 0;
   min-height: 280px;
   flex-direction: column;
-  background: var(--app-surface);
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
-  box-shadow: var(--app-shadow);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+}
+
+.file-card :deep(.t-card__body) {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
 }
 
 .file-card__selection {
@@ -1511,12 +1512,6 @@ onMounted(() => {
   z-index: 2;
 }
 
-.file-card:hover,
-.file-card--selected {
-  border-color: var(--app-primary);
-  box-shadow: var(--app-shadow-raised);
-}
-
 .file-card__media {
   display: flex;
   align-items: center;
@@ -1524,8 +1519,7 @@ onMounted(() => {
   position: relative;
   height: 128px;
   flex-shrink: 0;
-  background: var(--app-surface-muted);
-  border-bottom: 1px solid var(--app-border);
+  background: var(--td-bg-color-container-hover);
   overflow: hidden;
 }
 
@@ -1543,7 +1537,7 @@ onMounted(() => {
 
 .file-card__media--folder {
   color: var(--app-primary);
-  background: var(--app-primary-light);
+  background: var(--td-brand-color-1);
 }
 
 .file-card__media-placeholder {
@@ -1732,25 +1726,14 @@ onMounted(() => {
 }
 
 @media (max-width: 900px) {
-  .file-library-filter-row {
-    align-items: stretch;
-    flex-direction: column;
+  .file-library-filter-form {
+    align-items: flex-start;
+    flex-wrap: wrap;
   }
 
-  .file-library-navigation,
-  .file-library-toolbar__filters {
-    width: 100%;
-  }
+  .file-library-filter-form :deep(.t-form__item:last-child) { margin-left: 0; }
 
-  .file-library-toolbar__filters {
-    justify-content: flex-start;
-  }
-
-  .file-library-toolbar__filters .t-input:first-of-type,
-  .file-library-toolbar__filters .t-input:last-of-type {
-    flex: 1 1 180px;
-    width: auto;
-  }
+  .file-library-filter-form :deep(.t-input) { width: min(240px, 100%); }
 }
 
 @media (max-width: 1024px) {
@@ -1758,35 +1741,10 @@ onMounted(() => {
     padding: var(--app-spacing-3);
   }
 
-  .file-library-filter-row {
-    display: flex;
-    align-items: stretch;
-    flex-direction: column;
+  .file-library-filter-form {
     gap: var(--app-spacing-2);
     margin-bottom: var(--app-spacing-2);
     padding-bottom: var(--app-spacing-2);
-  }
-
-  .file-library-navigation,
-  .file-library-toolbar__filters {
-    width: 100%;
-  }
-
-  .file-library-navigation {
-    min-width: 0;
-  }
-
-  .file-library-toolbar__filters {
-    flex-wrap: nowrap;
-    gap: var(--app-spacing-2);
-  }
-
-  .file-library-toolbar__filters .t-input:first-of-type {
-    width: 120px;
-  }
-
-  .file-library-toolbar__filters .t-input:last-of-type {
-    width: 80px;
   }
 
   .file-library-results-heading {
@@ -1825,7 +1783,6 @@ onMounted(() => {
 
   .file-library-main {
     min-height: 420px;
-    padding: var(--app-spacing-3);
   }
 
   .file-library-pagination {
