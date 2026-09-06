@@ -489,18 +489,18 @@ fetchData()
 .history-table {
   display: block;
   flex: 1 1 auto;
+  height: auto !important;
   min-width: 0;
-  min-height: 100%;
+  min-height: 0;
 }
 
 .history-table :deep(.t-table) {
+  height: auto !important;
   min-width: 1120px;
 }
 
 .history-table :deep(.t-table__content) {
-  overflow: auto;
-  scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
-  scrollbar-width: thin;
+  overflow: visible !important;
 }
 
 .history-pagination-footer {
