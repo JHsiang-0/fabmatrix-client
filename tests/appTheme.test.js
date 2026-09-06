@@ -49,6 +49,8 @@ test('brand and profile entry are real FabMatrix routes', () => {
   assert.match(sidebarSource, /class="app-menu app-scroll-region"/)
   assert.match(sidebarSource, /<t-menu[\s\S]*v-model:expanded="expandedGroupKeys"/)
   assert.match(sidebarSource, /<t-submenu v-for="group in visibleGroups"/)
+  assert.match(sidebarSource, /:is="group.icon"/)
+  assert.doesNotMatch(sidebarSource, /:is="item.icon"/)
   assert.match(sidebarSource, /expand-type="normal"/)
   assert.match(userMenuSource, /router\.push\('\/profile'\)/)
   assert.doesNotMatch(userMenuSource, /后续版本开放/)

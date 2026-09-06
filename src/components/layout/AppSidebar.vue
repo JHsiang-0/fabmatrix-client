@@ -21,7 +21,7 @@
     >
       <t-submenu v-for="group in visibleGroups" :key="group.key" :value="group.key">
         <template #icon>
-          <component :is="group.items[0].icon" size="18" />
+          <component :is="group.icon" size="18" />
         </template>
         <template #title>{{ group.label }}</template>
         <t-menu-item
@@ -30,9 +30,6 @@
           :value="item.to"
           @click="handleItemClick(item)"
         >
-          <template #icon>
-            <component :is="item.icon" size="18" />
-          </template>
           {{ item.title }}
         </t-menu-item>
       </t-submenu>
