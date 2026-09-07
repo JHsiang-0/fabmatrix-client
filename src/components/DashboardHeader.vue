@@ -1,15 +1,31 @@
 <template>
   <header v-cloak class="dashboard-header" aria-label="实时设备看板导航">
     <div class="dashboard-header__brand">
-      <span class="dashboard-header__brand-icon" aria-hidden="true">
-        <PrintIcon size="18" />
-      </span>
+      <img class="dashboard-header__brand-logo" src="/icon.png" alt="" aria-hidden="true" />
       <div class="dashboard-header__brand-title-row">
         <h1>{{ labels.title }}</h1>
-        <t-tag theme="primary" variant="light-outline" size="small">
-          <template #icon><Location size="12" /></template>
-          {{ workshopName }}
-        </t-tag>
+        <t-dropdown
+          v-if="workshopOptions.length"
+          :options="workshopOptions"
+          trigger="click"
+          @click="handleWorkshopChange"
+        >
+          <t-button
+            class="dashboard-header__workshop-switch"
+            theme="primary"
+            variant="outline"
+            size="small"
+            aria-label="切换区域"
+          >
+            <template #icon><Location size="14" /></template>
+            <span class="dashboard-header__workshop-name">{{ workshopName }}</span>
+            <ChevronDownIcon size="14" />
+          </t-button>
+        </t-dropdown>
+        <t-button v-else class="dashboard-header__workshop-switch" theme="primary" variant="outline" size="small" disabled>
+          <template #icon><Location size="14" /></template>
+          <span class="dashboard-header__workshop-name">{{ workshopName }}</span>
+        </t-button>
       </div>
     </div>
 
@@ -54,14 +70,14 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { LocationIcon as Location, PrintIcon, RefreshIcon as Refresh, TimeIcon } from 'tdesign-icons-vue-next'
+import { ChevronDownIcon, LocationIcon as Location, RefreshIcon as Refresh, TimeIcon } from 'tdesign-icons-vue-next'
 import { PRINTER_STATE } from '@/utils/constants'
 import { renderIcon } from '@/utils/tdesign'
 
 defineOptions({ name: 'DashboardHeader' })
 
 const labels = {
-  title: 'FabMatrix 3D 打印控制系统',
+  title: '嘉东__联动3D打印实时控制系统',
   total: '设备总数',
   printing: '打印中',
   standby: '待机',
@@ -84,13 +100,17 @@ const props = defineProps({
     type: String,
     default: '3F-一号车间'
   },
+  workshopOptions: {
+    type: Array,
+    default: () => []
+  },
   lastUpdateTime: {
     type: String,
     default: ''
   }
 })
 
-const emit = defineEmits(['refresh'])
+const emit = defineEmits(['refresh', 'workshop-change'])
 const isRefreshing = ref(false)
 
 const totalCount = computed(() => Object.values(props.statusCounts).reduce((sum, count) => sum + (count || 0), 0))
@@ -116,6 +136,13 @@ function handleRefresh() {
   window.setTimeout(() => {
     isRefreshing.value = false
   }, 1500)
+}
+
+function handleWorkshopChange(item) {
+  const nextWorkshop = typeof item === 'string' ? item : item?.value ?? item?.content
+  if (!nextWorkshop || nextWorkshop === props.workshopName) return
+
+  emit('workshop-change', nextWorkshop)
 }
 </script>
 
@@ -144,21 +171,45 @@ function handleRefresh() {
   gap: var(--app-spacing-2);
 }
 
-.dashboard-header__brand-icon {
-  display: inline-flex;
+.dashboard-header__brand-logo {
+  display: block;
   flex: 0 0 32px;
-  align-items: center;
-  justify-content: center;
   width: 32px;
   height: 32px;
-  color: var(--td-text-color-anti);
-  background: var(--td-brand-color-7);
-  border-radius: var(--app-radius);
+  object-fit: contain;
 }
 
 .dashboard-header__brand-title-row {
+  flex: 1 1 auto;
   min-width: 0;
   gap: var(--app-spacing-2);
+}
+
+.dashboard-header__brand-title-row h1 {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.dashboard-header__workshop-switch {
+  flex: 0 0 auto;
+  max-width: 180px;
+}
+
+.dashboard-header__workshop-switch :deep(.t-button__text) {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+}
+
+.dashboard-header__workshop-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-header__workshop-switch :deep(svg) {
+  flex: 0 0 auto;
 }
 
 .dashboard-header h1 {

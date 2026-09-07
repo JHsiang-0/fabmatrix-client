@@ -3,7 +3,8 @@
     <!-- 顶部标题和统计 -->
     <div class="dashboard-top-shell">
       <dashboard-header :status-counts="store.statusCounts" :workshop-name="workshopName"
-        :last-update-time="lastUpdateTime" @refresh="handleRefresh">
+        :workshop-options="workshopOptions" :last-update-time="lastUpdateTime" @refresh="handleRefresh"
+        @workshop-change="handleWorkshopChange">
       <!-- 布局编辑入口：管理员在这里完成解锁、调整和保存 -->
       <template #actions>
         <t-button v-if="canManageLayout" :theme="isEditMode ? 'primary' : 'default'"
@@ -171,9 +172,21 @@ const activeDevice = ref(null)
 
 /** 车间信息 */
 const workshopName = ref('3F-一号车间')
+const workshopOptions = [
+  { content: '3F-一号车间', value: '3F-一号车间' },
+  { content: '3F-二号车间', value: '3F-二号车间' },
+  { content: '3F-三号车间', value: '3F-三号车间' }
+]
 
 /** 最后更新时间 */
 const lastUpdateTime = ref('')
+
+function handleWorkshopChange(nextWorkshop) {
+  if (!workshopOptions.some(option => option.value === nextWorkshop)) return
+
+  workshopName.value = nextWorkshop
+  message.success(`已切换至${nextWorkshop}`)
+}
 
 const realtimeNotice = computed(() => props.realtimeNoticeOverride || (
   store.isRecovering

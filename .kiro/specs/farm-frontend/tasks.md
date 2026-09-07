@@ -1,5 +1,36 @@
 # 前端 Kiro 任务清单
 
+## Kiro Task UI-001.36：优化全屏看板品牌头部与区域切换
+
+状态：已完成（专项验证通过；全量测试存在 3 项既有静态断言失败）
+范围：
+- `src/components/DashboardHeader.vue`
+- `src/components/FarmDashboard.vue`
+- `tests/fullscreenDashboardHeader.test.js`
+- `.kiro/specs/farm-frontend/tasks.md`
+
+目标：
+- 使用公共资源 `public/icon.png` 作为全屏看板品牌图标。
+- 将品牌标题调整为“嘉东__联动3D打印实时控制系统”。
+- 将当前车间名称改为 TDesign 下拉按钮，支持切换预置区域并提供操作反馈。
+- 保持现有状态统计、刷新、布局设置、全屏操作和实时数据逻辑不变。
+- 确保标题较长或窗口缩小时品牌区、区域按钮和状态区仍可用，不出现头部横向溢出。
+
+完成记录：
+- 看板头部已使用 `/icon.png`，标题已调整为“嘉东__联动3D打印实时控制系统”。
+- 车间名称已改为 TDesign 下拉按钮，支持预置区域切换、父级状态更新和成功提示；未伪造后端区域过滤。
+- 已同步更新全屏看板端到端测试中的标题断言。
+- 专项 Node 测试 18/18 通过，`npm run lint`、`npm run build`、`git diff --check` 通过。
+- 全量 `npm test` 为 163/166 通过，失败项来自既有任务中心/UI 规范静态断言，不涉及本任务文件。
+
+验收标准：
+- 看板头部显示 `icon.png` 和指定中文标题。
+- 点击区域按钮可打开区域选项，切换后按钮显示新区域并给出成功反馈；当前数据仍明确保持全局看板口径，未伪造后端区域过滤。
+- 头部原有状态统计、刷新和操作插槽行为不回归。
+- Node 静态契约测试、`npm run lint`、`npm run build` 和 `git diff --check` 通过。
+
+提交建议：`feat: 优化全屏看板品牌头部与区域切换`
+
 ## Kiro Task UI-001.35：重构全屏看板顶部统计卡片
 
 状态：已完成
