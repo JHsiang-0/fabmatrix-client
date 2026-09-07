@@ -1,6 +1,12 @@
 <template>
   <div class="fullscreen-dashboard" :class="{ 'is-compact': viewportWidth < 768 }">
-    <FarmDashboard />
+    <FarmDashboard :realtime-notice-override="realtimeNotice">
+      <template #fullscreen-action>
+        <t-button size="small" variant="text" @click.stop="leaveFullscreenDashboard">
+          退出全屏
+        </t-button>
+      </template>
+    </FarmDashboard>
 
     <div v-if="!fullscreenSupported" class="fullscreen-dashboard__support-notice">
       <t-alert theme="warning" title="当前浏览器不支持原生全屏，仍可使用监控看板" :close-btn="false" />
@@ -33,24 +39,6 @@
       </t-card>
     </div>
 
-    <div v-if="realtimeNotice" class="fullscreen-dashboard__realtime-notice">
-      <t-alert theme="warning" :title="realtimeNotice" :close-btn="false">
-        <template #operation>
-          <t-button size="small" variant="outline" :loading="reconnecting" @click="reconnectRealtime">重新连接</t-button>
-        </template>
-      </t-alert>
-    </div>
-
-    <div class="fullscreen-dashboard__actions">
-      <t-button
-        type="button"
-        size="small"
-        variant="outline"
-        @click.stop="leaveFullscreenDashboard"
-      >
-        退出全屏
-      </t-button>
-    </div>
   </div>
 </template>
 
@@ -168,16 +156,7 @@ onUnmounted(() => {
   background: var(--app-page-background);
 }
 
-.fullscreen-dashboard__actions {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 100;
-  pointer-events: auto;
-}
-
-.fullscreen-dashboard__support-notice,
-.fullscreen-dashboard__realtime-notice {
+.fullscreen-dashboard__support-notice {
   position: fixed;
   top: var(--app-spacing-4);
   left: 50%;
@@ -187,7 +166,6 @@ onUnmounted(() => {
 }
 
 .fullscreen-dashboard__support-notice { top: var(--app-spacing-4); }
-.fullscreen-dashboard__realtime-notice { top: 4.25rem; }
 
 .fullscreen-dashboard__state {
   position: fixed;
@@ -204,8 +182,6 @@ onUnmounted(() => {
 .fullscreen-dashboard__state--error .t-card { width: min(680px, 100%); }
 
 @media (max-width: 767px) {
-  .fullscreen-dashboard__actions { top: var(--app-spacing-3); right: var(--app-spacing-3); }
   .fullscreen-dashboard__support-notice { top: 3.75rem; }
-  .fullscreen-dashboard__realtime-notice { top: 7.5rem; }
 }
 </style>

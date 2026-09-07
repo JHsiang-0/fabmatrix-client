@@ -1,7 +1,7 @@
 <template>
-  <div v-cloak class="h-full bg-gray-100 flex flex-col overflow-hidden">
+  <div v-cloak class="farm-dashboard h-full bg-gray-100 flex flex-col overflow-hidden">
     <!-- 顶部标题和统计 -->
-    <div class="p-4 pb-0">
+    <div class="dashboard-top-shell">
       <dashboard-header :status-counts="store.statusCounts" :workshop-name="workshopName"
         :last-update-time="lastUpdateTime" @refresh="handleRefresh">
       <!-- 布局锁定/编辑模式切换按钮 -->
@@ -12,16 +12,17 @@
         <t-button v-else-if="canManageLayout" theme="primary" :icon="renderIcon(Unlock)" @click="saveLayout">
           保存布局
         </t-button>
+        <slot name="fullscreen-action"></slot>
       </template>
       </dashboard-header>
-      <t-alert
-        v-if="store.wsConnectionState !== 'OPEN' || store.isRealtimeStale || store.isRecovering"
-        class="mt-2"
-        theme="warning"
-        :title="store.isRecovering ? '正在恢复实时状态' : (store.isRealtimeStale ? '实时状态可能已陈旧' : '实时连接未建立，当前看板数据可能不是最新')"
-        :close-btn="false"
-      />
-      <div v-if="store.alerts.length" class="mt-2 space-y-2" aria-live="polite">
+      <div v-if="realtimeNotice || store.alerts.length" class="dashboard-alert-stack" aria-live="polite">
+        <t-alert v-if="realtimeNotice" theme="warning" :title="realtimeNotice" :close-btn="false">
+          <template #operation>
+            <t-button size="small" variant="outline" :loading="reconnecting" @click="reconnectRealtime">
+              重新连接
+            </t-button>
+          </template>
+        </t-alert>
         <t-alert
           v-for="alert in store.alerts"
           :key="alert.id"
@@ -86,6 +87,13 @@ import DeviceDetailDrawer from './device/DeviceDetailDrawer.vue'
 
 defineOptions({ name: 'FarmDashboard' })
 
+const props = defineProps({
+  realtimeNoticeOverride: {
+    type: String,
+    default: ''
+  }
+})
+
 // ============================================
 // Store
 // ============================================
@@ -98,6 +106,7 @@ const activeJobs = computed(() => jobStore.activeJobs)
 const historyJobs = ref([])
 const historyLoading = ref(false)
 const historyError = ref('')
+const reconnecting = ref(false)
 
 // ============================================
 // Reactive State
@@ -129,6 +138,16 @@ const workshopName = ref('3F-一号车间')
 
 /** 最后更新时间 */
 const lastUpdateTime = ref('')
+
+const realtimeNotice = computed(() => props.realtimeNoticeOverride || (
+  store.isRecovering
+    ? '正在恢复实时状态，当前显示最近一次可用快照'
+    : store.isRealtimeStale
+      ? '实时状态可能已陈旧，当前看板正在重新收敛'
+      : store.wsConnectionState !== 'OPEN'
+        ? '实时连接未建立，当前看板展示 REST 快照数据'
+        : ''
+))
 
 /**
  * 更新最后更新时间
@@ -561,6 +580,15 @@ async function handleRefresh() {
   }
 }
 
+function reconnectRealtime() {
+  if (reconnecting.value || store.wsConnectionState === 'OPEN') return
+  reconnecting.value = true
+  store.connectWs()
+  window.setTimeout(() => {
+    reconnecting.value = false
+  }, 800)
+}
+
 // ============================================
 // Lifecycle Hooks
 // ============================================
@@ -629,5 +657,29 @@ onUnmounted(() => {
 .dashboard-workshop-scroll {
   min-height: 0;
   overflow: auto;
+}
+
+.dashboard-top-shell {
+  flex: 0 0 auto;
+}
+
+.dashboard-alert-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 var(--app-spacing-4);
+  background: var(--app-page-background);
+}
+
+.dashboard-alert-stack :deep(.t-alert) {
+  min-height: 32px;
+  padding: 4px 8px;
+  border-radius: 0;
+}
+
+.dashboard-alert-stack :deep(.t-alert__title) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

@@ -1,191 +1,64 @@
 <template>
-  <!--
-    仪表盘头部组件 - 完全响应式重构版
-    设计原则：
-    1. 移动端（< 768px）：垂直堆叠布局，减少信息量
-    2. 平板（768px - 1279px）：水平布局，适度紧凑
-    3. 桌面（>= 1280px）：完整水平布局，所有功能可见
-  -->
-  <div v-cloak class="flex flex-col lg:flex-row justify-between items-stretch lg:items-center p-fluid-md bg-white rounded-lg shadow-sm gap-fluid-md">
-
-    <!-- 左侧：标题和车间信息 -->
-    <div class="flex items-center shrink-0">
-      <div class="flex items-center gap-3">
-        <!-- 图标：移动端缩小 -->
-        <office-building :size="isMobile ? '24' : '28'" class="text-primary" />
-
-        <div class="flex flex-col gap-0.5">
-          <!-- 标题：响应式字体 -->
-          <h2 class="text-fluid-lg font-bold text-gray-900 leading-tight">{{ labels.title }}</h2>
-
-          <!-- 车间信息：移动端隐藏详细地址 -->
-          <span class="inline-flex items-center gap-1 text-fluid-xs text-gray-500 font-medium">
-            <location size="12" class="text-red-500" />
-            {{ workshopName }}
-          </span>
-        </div>
+  <header v-cloak class="dashboard-header" aria-label="实时设备看板导航">
+    <div class="dashboard-header__brand">
+      <span class="dashboard-header__brand-icon" aria-hidden="true">
+        <PrintIcon size="18" />
+      </span>
+      <div class="dashboard-header__brand-title-row">
+        <h1>{{ labels.title }}</h1>
+        <t-tag theme="primary" variant="light-outline" size="small">
+          <template #icon><Location size="12" /></template>
+          {{ workshopName }}
+        </t-tag>
       </div>
     </div>
 
-    <!-- 中间：状态统计条 - 响应式布局 -->
-    <div class="flex flex-col items-center gap-2 flex-1 lg:max-w-[800px]">
-      <!-- 状态标签行：平板和桌面端使用 flex，移动端使用 wrap -->
-      <div class="flex flex-wrap items-center gap-1 justify-center lg:justify-center">
-
-        <!-- 设备总数 - 始终显示 -->
-        <StatBadge
-          :count="totalCount"
-          :label="labels.total"
-          bgClass="bg-gradient-to-r from-gray-100 to-gray-200"
-          iconBgClass="bg-gray-600"
-        />
-
-        <div class="w-px h-5 bg-gray-100 mx-1 shrink-0"></div>
-
-        <!-- 打印中 - 高亮显示 -->
-        <StatBadge
-          :count="statusCounts.PRINTING"
-          :label="labels.printing"
-          bgClass="bg-gradient-to-r from-blue-50 to-blue-100"
-          iconBgClass="bg-blue-600"
-           :iconComponent="IconNozzle"
-          :highlight="statusCounts.PRINTING > 0"
-          highlightRing="ring-blue-300"
-        />
-
-        <!-- 待机 -->
-        <StatBadge
-          :count="statusCounts.STANDBY"
-          :label="labels.standby"
-          bgClass="bg-gradient-to-r from-blue-50 to-blue-100"
-          iconBgClass="bg-blue-500"
-          iconType="circle-check"
-        />
-
-        <!-- 已完成 -->
-        <StatBadge
-          :count="statusCounts.COMPLETED"
-          :label="labels.completed"
-          bgClass="bg-gradient-to-r from-green-50 to-green-100"
-          iconBgClass="bg-green-600"
-          iconType="circle-check-filled"
-        />
-
-        <!-- 已暂停 -->
-        <StatBadge
-          :count="statusCounts.PAUSED"
-          :label="labels.paused"
-          bgClass="bg-gradient-to-r from-yellow-50 to-yellow-100"
-          iconBgClass="bg-yellow-600"
-          iconType="video-pause"
-          :highlight="statusCounts.PAUSED > 0"
-          highlightRing="ring-yellow-300"
-        />
-
-        <!-- 致命错误 - 严重警告 -->
-        <StatBadge
-          :count="fatalCount"
-          :label="labels.fatal"
-          bgClass="bg-gradient-to-r from-red-50 to-red-100"
-          iconBgClass="bg-red-600"
-          iconType="circle-close"
-          :highlight="fatalCount > 0"
-          highlightRing="ring-red-300"
-        />
-
-        <!-- 打印中断 -->
-        <StatBadge
-          :count="statusCounts.PRINT_ERROR"
-          :label="labels.printError"
-          bgClass="bg-gradient-to-r from-orange-50 to-orange-100"
-          iconBgClass="bg-orange-600"
-          iconType="warning"
-          :highlight="statusCounts.PRINT_ERROR > 0"
-          highlightRing="ring-orange-300"
-        />
-      </div>
-
-      <!-- 进度概览 - 仅在有设备时显示 -->
-      <div class="flex items-center gap-3 w-full max-w-[400px]" v-if="totalCount > 0">
-        <div class="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden flex">
-          <div class="h-full bg-blue-600 transition-all" :style="{ width: printingPercent + '%' }"></div>
-          <div class="h-full bg-green-600 transition-all" :style="{ width: completedPercent + '%' }"></div>
-          <div class="h-full bg-blue-500 transition-all" :style="{ width: standbyPercent + '%' }"></div>
-          <div class="h-full bg-red-600 transition-all" :style="{ width: errorPercent + '%' }"></div>
-        </div>
-        <span class="text-fluid-xs text-gray-500 font-medium whitespace-nowrap">{{ printingCount }} 台正在打印</span>
-      </div>
+    <div class="dashboard-header__stats" aria-label="设备状态统计">
+      <t-tag theme="default" variant="dark" class="dashboard-header__total">
+        <span>{{ labels.total }}</span>
+        <strong>{{ totalCount }}</strong>
+      </t-tag>
+      <t-tag
+        v-for="item in statusItems"
+        :key="item.key"
+        :theme="item.theme"
+        variant="light-outline"
+        size="small"
+        class="dashboard-header__status"
+      >
+        <span class="dashboard-header__status-dot" :class="`dashboard-header__status-dot--${item.theme}`"></span>
+        <span>{{ item.label }}</span>
+        <strong>{{ item.count }}</strong>
+      </t-tag>
     </div>
 
-    <!-- 右侧：操作按钮 - 响应式布局 -->
-    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 lg:gap-3 shrink-0">
-      <!-- 外部传入的操作按钮（解锁/保存布局） -->
+    <div class="dashboard-header__actions">
+      <span v-if="lastUpdateTime" class="dashboard-header__updated">
+        <TimeIcon size="13" />
+        {{ labels.updatedAt }} <strong>{{ lastUpdateTime }}</strong>
+      </span>
       <slot name="actions"></slot>
-
-      <!-- 刷新按钮 - 移动端全宽 -->
       <t-button
+        theme="primary"
+        size="small"
         :icon="renderIcon(Refresh)"
-        size="medium"
-        :class="{ 'w-full sm:w-auto': isMobile }"
         :loading="isRefreshing"
         @click="handleRefresh"
       >
-        <span class="hidden sm:inline">{{ isRefreshing ? labels.refreshing : labels.refresh }}</span>
-        <span class="sm:hidden">{{ isRefreshing ? '刷新中...' : '刷新' }}</span>
+        {{ isRefreshing ? labels.refreshing : labels.refresh }}
       </t-button>
-
-      <!-- 最后更新时间 - 移动端隐藏，平板显示 -->
-      <span
-        class="hidden sm:flex items-center justify-center gap-1 text-fluid-xs text-gray-400 font-normal"
-        v-if="lastUpdateTime"
-      >
-        <clock size="12" />
-        {{ labels.updatedAt }} {{ lastUpdateTime }}
-      </span>
+      <slot name="fullscreen-action"></slot>
     </div>
-  </div>
+  </header>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import {
-  BuildingIcon as OfficeBuilding,
-  LocationIcon as Location,
-  RefreshIcon as Refresh,
-  TimeIcon as Clock
-} from 'tdesign-icons-vue-next'
-import IconNozzle from './icons/IconNozzle.vue'
+import { computed, ref } from 'vue'
+import { LocationIcon as Location, PrintIcon, RefreshIcon as Refresh, TimeIcon } from 'tdesign-icons-vue-next'
 import { PRINTER_STATE } from '@/utils/constants'
 import { renderIcon } from '@/utils/tdesign'
-import StatBadge from './StatBadge.vue'
 
 defineOptions({ name: 'DashboardHeader' })
-
-// ============================================
-// 响应式断点检测
-// ============================================
-
-const windowWidth = ref(window.innerWidth)
-const isMobile = computed(() => windowWidth.value < 768)
-// 监听窗口大小变化
-let resizeHandler = null
-
-onMounted(() => {
-  resizeHandler = () => {
-    windowWidth.value = window.innerWidth
-  }
-  window.addEventListener('resize', resizeHandler)
-})
-
-onUnmounted(() => {
-  if (resizeHandler) {
-    window.removeEventListener('resize', resizeHandler)
-  }
-})
-
-// ============================================
-// Data - 中文标签配置
-// ============================================
 
 const labels = {
   title: 'FabMatrix 3D 打印控制系统',
@@ -198,38 +71,19 @@ const labels = {
   printError: '打印中断',
   refresh: '刷新',
   refreshing: '刷新中...',
-  updatedAt: '更新于',
-  unknown: '离线/未知'
+  updatedAt: '更新于'
 }
 
-// ============================================
-// Props
-// ============================================
-
 const props = defineProps({
-  /** 状态计数对象 - 10个标准状态（包含 UNKNOWN） */
   statusCounts: {
     type: Object,
     required: true,
-    default: () => ({
-      [PRINTER_STATE.UNKNOWN]: 0,
-      [PRINTER_STATE.PRINTING]: 0,
-      [PRINTER_STATE.STANDBY]: 0,
-      [PRINTER_STATE.COMPLETED]: 0,
-      [PRINTER_STATE.PAUSED]: 0,
-      [PRINTER_STATE.FAULT]: 0,
-      [PRINTER_STATE.SYS_ERROR]: 0,
-      [PRINTER_STATE.PRINT_ERROR]: 0,
-      [PRINTER_STATE.STARTING]: 0,
-      [PRINTER_STATE.CANCELLED]: 0
-    })
+    default: () => ({})
   },
-  /** 车间名称 */
   workshopName: {
     type: String,
     default: '3F-一号车间'
   },
-  /** 最后更新时间 */
   lastUpdateTime: {
     type: String,
     default: ''
@@ -237,196 +91,178 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['refresh'])
-
-// ============================================
-// Reactive State
-// ============================================
-
 const isRefreshing = ref(false)
 
-// ============================================
-// Computed
-// ============================================
+const totalCount = computed(() => Object.values(props.statusCounts).reduce((sum, count) => sum + (count || 0), 0))
+const printingCount = computed(() => props.statusCounts[PRINTER_STATE.PRINTING] || 0)
+const fatalCount = computed(() => (
+  (props.statusCounts[PRINTER_STATE.FAULT] || 0) +
+  (props.statusCounts[PRINTER_STATE.SYS_ERROR] || 0)
+))
+const statusItems = computed(() => [
+  { key: PRINTER_STATE.PRINTING, label: labels.printing, count: printingCount.value, theme: 'primary' },
+  { key: PRINTER_STATE.STANDBY, label: labels.standby, count: props.statusCounts[PRINTER_STATE.STANDBY] || 0, theme: 'success' },
+  { key: PRINTER_STATE.COMPLETED, label: labels.completed, count: props.statusCounts[PRINTER_STATE.COMPLETED] || 0, theme: 'default' },
+  { key: PRINTER_STATE.PAUSED, label: labels.paused, count: props.statusCounts[PRINTER_STATE.PAUSED] || 0, theme: 'warning' },
+  { key: 'fatal', label: labels.fatal, count: fatalCount.value, theme: 'danger' },
+  { key: PRINTER_STATE.PRINT_ERROR, label: labels.printError, count: props.statusCounts[PRINTER_STATE.PRINT_ERROR] || 0, theme: 'warning' }
+])
 
-/**
- * 设备总数
- */
-const totalCount = computed(() => {
-  return Object.values(props.statusCounts).reduce((sum, count) => sum + (count || 0), 0)
-})
-
-/**
- * 打印中数量
- */
-const printingCount = computed(() => {
-  return props.statusCounts[PRINTER_STATE.PRINTING] || 0
-})
-
-/**
- * 致命错误总数（设备故障 + 系统错误）
- */
-const fatalCount = computed(() => {
-  return (props.statusCounts[PRINTER_STATE.FAULT] || 0) +
-    (props.statusCounts[PRINTER_STATE.SYS_ERROR] || 0)
-})
-
-/**
- * 各状态百分比
- */
-const printingPercent = computed(() => {
-  return totalCount.value > 0 ? Math.round((printingCount.value / totalCount.value) * 100) : 0
-})
-
-const completedPercent = computed(() => {
-  const count = props.statusCounts[PRINTER_STATE.COMPLETED] || 0
-  return totalCount.value > 0 ? Math.round((count / totalCount.value) * 100) : 0
-})
-
-const standbyPercent = computed(() => {
-  const count = props.statusCounts[PRINTER_STATE.STANDBY] || 0
-  return totalCount.value > 0 ? Math.round((count / totalCount.value) * 100) : 0
-})
-
-const errorPercent = computed(() => {
-  const count = fatalCount.value + (props.statusCounts[PRINTER_STATE.PRINT_ERROR] || 0)
-  return totalCount.value > 0 ? Math.round((count / totalCount.value) * 100) : 0
-})
-
-// ============================================
-// Methods
-// ============================================
-
-/**
- * 处理刷新按钮点击
- */
 function handleRefresh() {
   if (isRefreshing.value) return
 
   isRefreshing.value = true
   emit('refresh')
-
-  // 1.5秒后恢复按钮状态
-  setTimeout(() => {
+  window.setTimeout(() => {
     isRefreshing.value = false
   }, 1500)
 }
 </script>
 
 <style scoped>
-/* ============================================
-   动画关键帧
-   ============================================ */
-@keyframes pulse-primary {
-  0%, 100% {
-    box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.5);
-  }
-  50% {
-    box-shadow: 0 0 0 4px rgba(219, 234, 254, 0.5);
-  }
+.dashboard-header {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto minmax(240px, 1fr);
+  gap: var(--app-spacing-3);
+  align-items: center;
+  min-height: 50px;
+  padding: 0 var(--app-spacing-4);
+  background: var(--app-surface);
+  border-bottom: 1px solid var(--app-border);
 }
 
-@keyframes pulse-danger {
-  0%, 100% {
-    box-shadow: 0 0 0 2px rgba(254, 202, 202, 0.5);
-  }
-  50% {
-    box-shadow: 0 0 0 4px rgba(254, 226, 226, 0.5);
-  }
+.dashboard-header__brand,
+.dashboard-header__brand-title-row,
+.dashboard-header__actions,
+.dashboard-header__updated {
+  display: flex;
+  align-items: center;
 }
 
-.animate-spin {
-  animation: rotate 1s linear infinite;
+.dashboard-header__brand {
+  min-width: 0;
+  gap: var(--app-spacing-2);
 }
 
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.dashboard-header__brand-icon {
+  display: inline-flex;
+  flex: 0 0 32px;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--td-text-color-anti);
+  background: var(--td-brand-color-7);
+  border-radius: var(--app-radius);
 }
 
-/* ============================================
-   响应式适配
-   ============================================ */
+.dashboard-header__brand-title-row {
+  min-width: 0;
+  gap: var(--app-spacing-2);
+}
 
-/* 超大屏幕优化（2.5K+）：限制最大宽度，保持内容居中 */
-@media (min-width: 1920px) {
+.dashboard-header h1 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--app-text-primary);
+  font-size: var(--td-font-size-body-medium);
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-header__stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px;
+  overflow-x: auto;
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  scrollbar-width: none;
+}
+
+.dashboard-header__stats::-webkit-scrollbar { display: none; }
+
+.dashboard-header__total,
+.dashboard-header__status {
+  flex: 0 0 auto;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.dashboard-header__total strong,
+.dashboard-header__status strong {
+  font-family: var(--app-font-family-mono);
+  font-weight: 700;
+}
+
+.dashboard-header__status-dot {
+  width: 7px;
+  height: 7px;
+  background: var(--td-text-color-placeholder);
+  border-radius: 50%;
+}
+
+.dashboard-header__status-dot--primary { background: var(--td-brand-color-6); }
+.dashboard-header__status-dot--success { background: var(--td-success-color-6); }
+.dashboard-header__status-dot--warning { background: var(--td-warning-color-6); }
+.dashboard-header__status-dot--danger { background: var(--td-error-color-6); }
+
+.dashboard-header__actions {
+  justify-content: flex-end;
+  gap: var(--app-spacing-2);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.dashboard-header__updated {
+  gap: 4px;
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-caption);
+}
+
+.dashboard-header__updated strong {
+  color: var(--app-text-primary);
+  font-family: var(--app-font-family-mono);
+  font-weight: 500;
+}
+
+@media (max-width: 1280px) {
   .dashboard-header {
-    max-width: 1800px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-}
-
-/* 桌面端（1280px - 1919px）：标准布局 */
-@media (max-width: 1919px) and (min-width: 1280px) {
-  .dashboard-header {
-    flex-wrap: nowrap;
-  }
-}
-
-/* 平板端（768px - 1279px）：适度紧凑 */
-@media (max-width: 1279px) and (min-width: 768px) {
-  .dashboard-header {
-    flex-wrap: wrap;
+    grid-template-columns: minmax(220px, 1fr) minmax(0, 1.7fr);
   }
 
-  .header-center {
-    order: 3;
-    width: 100%;
-    max-width: none;
-  }
-
-  .stats-bar {
+  .dashboard-header__stats {
+    grid-column: 1 / -1;
+    grid-row: 2;
     justify-content: flex-start;
-    flex-wrap: wrap;
   }
 }
 
-/* 移动端（< 768px）：垂直堆叠 */
 @media (max-width: 767px) {
   .dashboard-header {
+    display: flex;
     flex-direction: column;
     align-items: stretch;
-    padding: 0.75rem;
+    gap: var(--app-spacing-2);
+    padding: var(--app-spacing-3);
   }
 
-  .header-left,
-  .header-right {
-    justify-content: center;
+  .dashboard-header__brand-title-row,
+  .dashboard-header__actions {
+    justify-content: space-between;
   }
 
-  .header-center {
-    order: 0;
+  .dashboard-header__actions {
+    flex-wrap: wrap;
   }
 
-  .stats-bar {
-    justify-content: center;
-    gap: 0.5rem;
-  }
-
-  /* 移动端：隐藏部分统计标签，仅保留数字 */
-  .stat-label {
-    display: none;
-  }
-
-  .action-group {
-    width: 100%;
-    justify-content: center;
-  }
-}
-
-/* 小屏手机（< 375px）：极致紧凑 */
-@media (max-width: 374px) {
-  .dashboard-header {
-    padding: 0.5rem;
-  }
-
-  /* 只显示最关键的状态 */
-  .stat-item:not(.stat-critical) {
-    display: none;
+  .dashboard-header__updated {
+    flex: 1 1 100%;
   }
 }
 </style>
