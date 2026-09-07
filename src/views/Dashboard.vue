@@ -114,7 +114,18 @@
               </div>
             </div>
           </template>
-          <div v-if="totalPrinters" class="status-overview">
+          <t-alert
+            v-if="printerLoadError && !totalPrinters"
+            class="status-state status-state--error"
+            theme="error"
+            :close-btn="false"
+          >
+            <template #default>{{ printerLoadError }}</template>
+            <template #operation>
+              <t-button size="small" variant="outline" :loading="loading" @click="fetchOverview">重新加载</t-button>
+            </template>
+          </t-alert>
+          <div v-else-if="totalPrinters" class="status-overview">
             <div class="status-donut" :style="donutStyle">
               <div class="status-donut__content">
                 <strong>{{ totalPrinters }}</strong>
@@ -131,7 +142,7 @@
               </div>
             </div>
           </div>
-          <t-empty v-else :description="loadError ? '设备状态暂不可用' : '设备运行正常'" />
+          <t-empty v-else class="status-state status-state--empty" description="暂无设备数据" />
         </t-card>
       </section>
 
@@ -248,6 +259,7 @@ const { statusMap, wsConnectionState, isWsConnected, isRealtimeStale, isRecoveri
 
 const loading = ref(false)
 const loadError = ref('')
+const printerLoadError = ref('')
 const hasLoadedOnce = ref(false)
 const printers = ref([])
 const recentJobs = ref([])
@@ -394,6 +406,7 @@ function markUpdated() {
 async function fetchOverview() {
   loading.value = true
   loadError.value = ''
+  printerLoadError.value = ''
   const rangeEnd = new Date()
   const rangeStart = new Date(rangeEnd)
   rangeStart.setDate(rangeStart.getDate() - 6)
@@ -410,6 +423,7 @@ async function fetchOverview() {
 
   const [printerResult, , recentResult, failedResult, completedResult, failedTrendResult, cancelledResult] = results
   if (printerResult.status === 'fulfilled') printers.value = printerResult.value.data?.records || []
+  else printerLoadError.value = '设备状态暂不可用，请检查后端服务或数据库结构'
   if (recentResult.status === 'fulfilled') recentJobs.value = recentResult.value.data?.records || []
   if (failedResult.status === 'fulfilled') {
     const data = failedResult.value.data || {}
@@ -689,6 +703,10 @@ onUnmounted(() => {
   margin-bottom: var(--app-spacing-4);
 }
 
+.dashboard-grid {
+  align-items: start;
+}
+
 .bottom-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-bottom: 0;
@@ -764,6 +782,20 @@ onUnmounted(() => {
   padding: 0 var(--app-spacing-2);
   color: var(--app-text-placeholder);
   font-size: 0.6875rem;
+}
+
+.status-state {
+  min-height: 156px;
+}
+
+.status-state--error {
+  display: flex;
+  align-items: center;
+}
+
+.status-state--empty {
+  padding-top: var(--app-spacing-6);
+  padding-bottom: var(--app-spacing-6);
 }
 
 .status-overview {

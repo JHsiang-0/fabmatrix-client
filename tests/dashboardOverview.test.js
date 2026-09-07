@@ -19,8 +19,17 @@ test('工作台只使用真实设备和任务契约并覆盖核心统计', () =>
   assert.match(dashboardSource, /status-donut/)
   assert.match(dashboardSource, /bottom-grid/)
   assert.match(dashboardSource, /activeJobs\.length/)
-  assert.match(dashboardSource, /设备运行正常/)
+  assert.match(dashboardSource, /暂无设备数据/)
   assert.doesNotMatch(dashboardSource, /Math\.random\(/)
+})
+
+test('设备状态卡片区分接口错误与暂无设备空态', () => {
+  assert.match(dashboardSource, /printerLoadError/)
+  assert.match(dashboardSource, /status-state--error/)
+  assert.match(dashboardSource, /重新加载/)
+  assert.match(dashboardSource, /status-state--empty/)
+  assert.match(dashboardSource, /设备状态暂不可用，请检查后端服务或数据库结构/)
+  assert.match(dashboardSource, /\.dashboard-grid\s*\{[\s\S]*align-items: start/)
 })
 
 test('美化总览复用 Electron 的状态归一化和任务状态标签', () => {
