@@ -1,5 +1,46 @@
 # 前端 Kiro 任务清单
 
+## Kiro Task UI-001.39：增加打印机管理表格悬停反馈
+
+状态：已完成（专项测试 8/8；lint/build 通过）
+
+范围：
+
+- `src/views/PrinterManage.vue`
+- `tests/printerHover.test.js`
+- `.kiro/specs/farm-frontend/tasks.md`
+
+目标：
+
+- 为打印机管理列表视图增加清晰、稳定的行悬停反馈。
+- 使用 TDesign Table 官方 `hover` 能力，并复用项目语义颜色。
+- 保持行点击、详情、编辑、删除和状态展示逻辑不变。
+- 让卡片视图与列表视图保持一致的悬停和键盘焦点视觉反馈。
+
+实施方案：
+
+- 为内部 `TdTable` 传入 `hover`，由兼容层透传到 TDesign Table。
+- 悬停行使用容器 hover 背景色，首列增加品牌色内侧强调线，并添加短暂过渡。
+- 卡片 hover 增加同源背景色，focus-visible 增加品牌色轮廓，避免仅依赖鼠标操作。
+- 增加静态回归测试，锁定模板属性和语义化样式。
+
+验收标准：
+
+- 鼠标移入列表任意数据行时，整行出现浅色高亮，首列显示强调线。
+- 表格行不会因 hover 发生位移，行内操作按钮仍可正常点击。
+- 卡片视图保留圆角、边框和阴影，并使用一致的 hover 背景。
+- 相关专项测试、lint、build 和 `git diff --check` 通过。
+
+完成记录：
+
+- 已为列表模式的 `TdTable` 开启 TDesign 行悬停能力。
+- 已增加浅色背景、首列品牌色强调线和短暂过渡，避免 hover 导致表格布局抖动。
+- 已增强卡片模式 hover，并补充按钮语义、键盘焦点和 Enter/Space 操作。
+- `node --test tests/printerHover.test.js tests/printerCenter.test.js` 通过（8/8）。
+- `npm run lint`、`npm run build` 和 `git diff --check` 通过。
+
+提交建议：`feat: 增加打印机管理表格悬停反馈`
+
 ## Kiro Task UI-001.38：修复打印机管理未分配设备抽屉数据与关闭交互
 
 状态：已完成（专项测试 6/6；lint/build 通过；全量测试保留 3 项既有失败）

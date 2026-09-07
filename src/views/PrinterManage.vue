@@ -133,6 +133,7 @@
             :loading="loading"
             height="100%"
             class="printer-management-table printer-table"
+            hover
             @row-click="handleRowClick"
             row-class-name="printer-management-table__row"
           >
@@ -249,7 +250,17 @@
         </template>
 
         <div v-else class="printer-grid-view">
-          <article v-for="printerItem in displayTableData" :key="printerItem.id" class="printer-grid-card" @click="handleRowClick(printerItem)">
+          <article
+            v-for="printerItem in displayTableData"
+            :key="printerItem.id"
+            class="printer-grid-card"
+            role="button"
+            tabindex="0"
+            :aria-label="`查看${printerItem.name || `打印机 #${printerItem.id}`}`"
+            @click="handleRowClick(printerItem)"
+            @keydown.enter.prevent="handleRowClick(printerItem)"
+            @keydown.space.prevent="handleRowClick(printerItem)"
+          >
             <div class="printer-grid-card__header">
               <div class="printer-table-primary">
                 <span class="printer-management-name">
@@ -1426,6 +1437,18 @@ const handleBatchAdd = async () => {
   cursor: pointer;
 }
 
+.printer-management-table :deep(.t-table__body tr) {
+  transition: background-color 0.18s ease;
+}
+
+.printer-management-table :deep(.t-table__body tr:hover > td) {
+  background: var(--td-bg-color-container-hover);
+}
+
+.printer-management-table :deep(.t-table__body tr:hover > td:first-child) {
+  box-shadow: inset 3px 0 var(--td-brand-color-6);
+}
+
 .printer-management-primary,
 .printer-management-name,
 .printer-management-task,
@@ -1630,8 +1653,14 @@ const handleBatchAdd = async () => {
 }
 
 .printer-grid-card:hover {
+  background: var(--td-bg-color-container-hover);
   border-color: var(--td-brand-color-4);
   box-shadow: var(--td-shadow-1);
+}
+
+.printer-grid-card:focus-visible {
+  outline: 2px solid var(--td-brand-color-6);
+  outline-offset: 2px;
 }
 
 .printer-grid-card__header,
