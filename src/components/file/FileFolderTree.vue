@@ -1,31 +1,18 @@
 <template>
   <aside class="file-folder-tree" aria-label="文件夹导航">
     <div class="file-folder-tree__header">
-      <div>
-        <h2 class="file-folder-tree__title">文件夹列表</h2>
-        <p class="file-folder-tree__description">按目录查看文件</p>
-      </div>
+      <h2 class="file-folder-tree__title">文件夹列表</h2>
       <t-space size="small">
         <t-button
           theme="primary"
           variant="outline"
           shape="square"
-          size="medium"
+          size="small"
           aria-label="新建文件夹"
           title="新建文件夹"
           @click="emit('create')"
         >
           <AddIcon />
-        </t-button>
-        <t-button
-          variant="text"
-          shape="square"
-          size="small"
-          :loading="loading"
-          aria-label="刷新文件夹列表"
-          @click="refresh"
-        >
-          <RefreshIcon />
         </t-button>
       </t-space>
     </div>
@@ -72,7 +59,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { AddIcon, SearchIcon, RefreshIcon } from 'tdesign-icons-vue-next'
+import { AddIcon, SearchIcon } from 'tdesign-icons-vue-next'
 import { getFileTree } from '@/api/printFile'
 
 defineOptions({ name: 'FileFolderTree' })
@@ -252,18 +239,18 @@ defineExpose({ refresh })
   line-height: var(--td-line-height-title-medium);
 }
 
-.file-folder-tree__description {
-  margin: 4px 0 0;
-  color: var(--app-text-secondary);
-  font-size: var(--td-font-size-body-small);
-  line-height: var(--td-line-height-body-small);
-}
-
 .file-folder-tree__search {
   flex: 0 0 auto;
   margin-bottom: var(--app-spacing-3);
   background: var(--app-surface-muted);
   border-radius: var(--app-radius-small);
+  box-shadow: var(--app-shadow);
+}
+
+.file-folder-tree__search :deep(.t-input) {
+  border-color: transparent;
+  background: var(--app-surface-muted);
+  box-shadow: var(--app-shadow);
 }
 
 .file-folder-tree__error {

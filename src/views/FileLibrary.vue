@@ -21,23 +21,20 @@
                 <div class="file-library-filter-form" aria-label="文件筛选条件">
                 <t-space class="file-library-toolbar-actions" size="small" align="center" break-line>
                   <t-button theme="primary" size="medium" :icon="renderIcon(Upload)" @click="handleUpload">
-                    上传 G-Code 文件
+                    上传
                   </t-button>
                   <t-button v-if="selectedIds.length > 0" theme="danger" size="medium" :icon="renderIcon(Delete)"
                     :loading="batchDeleting" :disabled="batchDeleting || deletingIds.length > 0" @click="handleBatchDelete">
                     批量删除 ({{ selectedIds.length }})
                   </t-button>
-                  <t-button :icon="renderIcon(Refresh)" :loading="loading" :disabled="batchDeleting || deletingIds.length > 0" @click="refreshLibrary" size="medium">
-                    刷新
-                  </t-button>
                 </t-space>
                 <t-space class="file-library-search-actions" size="small" align="center" break-line>
                   <t-radio-group class="file-library-view-mode" v-model="viewMode" variant="default-filled" size="medium" aria-label="文件视图">
                     <t-radio-button value="grid" aria-label="网格视图">
-                      <Grid />
+                      <Grid :size="16" />
                     </t-radio-button>
                     <t-radio-button value="list" aria-label="列表视图">
-                      <List />
+                      <List :size="16" />
                     </t-radio-button>
                   </t-radio-group>
                   <t-input class="file-library-search-input" v-model="searchKeyword" placeholder="搜索文件名..." clearable size="medium"
@@ -48,9 +45,6 @@
                   </t-input>
                   <t-button theme="primary" size="medium" :loading="loading" @click="handleSearch">
                     查询
-                  </t-button>
-                  <t-button variant="outline" size="medium" :disabled="loading" @click="resetSearch">
-                    重置
                   </t-button>
                 </t-space>
                 </div>
@@ -67,7 +61,7 @@
             <template #operation>
               <t-space>
                 <t-button size="small" variant="outline" @click="openCreateFolderDialog">新建文件夹</t-button>
-                <t-button size="small" theme="primary" @click="handleUpload">上传 G-Code 文件</t-button>
+                <t-button size="small" theme="primary" @click="handleUpload">上传</t-button>
               </t-space>
             </template>
           </t-empty>
@@ -519,7 +513,6 @@ import { message, confirmMessage } from '@/utils/message'
 import { renderIcon } from '@/utils/tdesign'
 import {
   SearchIcon as Search,
-  RefreshIcon as Refresh,
   DeleteIcon as Delete,
   CloudUploadIcon as UploadFilled,
   ImageIcon as Picture,
@@ -806,16 +799,6 @@ watch(searchKeyword, () => {
     fetchData()
   }, 300)
 })
-
-const resetSearch = () => {
-  selectedIds.value = []
-  pagination.pageNum = 1
-  if (searchKeyword.value) {
-    searchKeyword.value = ''
-  } else {
-    fetchData()
-  }
-}
 
 /**
  * 页码变化

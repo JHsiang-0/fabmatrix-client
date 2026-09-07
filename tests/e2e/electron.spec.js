@@ -172,7 +172,7 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     await expect(page.locator('.t-dialog__header-content').filter({ hasText: '新建文件夹' })).toBeVisible()
     await page.getByRole('button', { name: '取消', exact: true }).last().click()
     await expect(page.locator('.t-dialog__header-content').filter({ hasText: '新建文件夹' })).not.toBeVisible()
-    await page.getByRole('button', { name: '上传 G-Code 文件', exact: true }).first().click()
+    await page.getByRole('button', { name: '上传', exact: true }).first().click()
     await expect(page.locator('.t-dialog__header-content').filter({ hasText: '批量上传切片文件' })).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(page.locator('.t-dialog__header-content').filter({ hasText: '批量上传切片文件' })).not.toBeVisible()

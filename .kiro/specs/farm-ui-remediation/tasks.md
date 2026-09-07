@@ -1429,4 +1429,36 @@ Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅�
 
 验证：`npm test`（155/155）、`npm run test:e2e`（9/9）、`npm run test:electron`（3/3）、`npm run lint`、`npm run build`、`npm run build:desktop` 全部通过；额外验证网格实际多列铺开；构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
 
-Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅提交本子任务涉及的 6 个文件；提交哈希：`5991b16`。未执行 `git push`。
+Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅提交本子任务涉及的 6 个文件；提交哈希：`b338ab8`。未执行 `git push`。
+
+### [x] UI-004.18 文件库入口精简与控件细节修复
+
+优先级：P2
+
+目标：继续精简文件库操作入口，修复视图切换器图标裁切，并统一文件树搜索与新增按钮的 TDesign 细节。
+
+范围：`src/views/FileLibrary.vue`、`src/components/file/FileFolderTree.vue`、`tests/fileLibrary.test.js`、`tests/e2e/electron.spec.js` 和本任务记录；不修改后端接口、文件数据适配器或 `src/stores/printerStore.js.backup`。
+
+工作内容：
+
+- 移除文件树标题区刷新按钮，保留组件内部刷新方法供新建文件夹成功后同步目录树和错误态重试使用。
+- 移除右侧工具栏刷新和重置按钮，保留查询按钮、回车查询及文件名输入的实时搜索。
+- 将工具栏“上传 G-Code 文件”简化为“上传”，并同步空目录操作入口。
+- 移除文件树“按目录查看文件”辅助文案。
+- 为文件树搜索框补充灰色背景、透明边框和 TDesign 阴影；新增文件夹按钮缩小为 small。
+- 为网格/列表图标显式设置统一尺寸，保证在 medium 切换器内水平垂直居中。
+
+验收：
+
+- 文件树和右侧工具栏不再展示无效或重复的刷新按钮；目录创建后的程序化刷新和错误重试仍可用。
+- 右侧不再展示重置按钮，输入文件名继续防抖实时搜索，查询和回车兼容保留。
+- 上传按钮显示为“上传”。
+- 文件树搜索具有灰色阴影输入样式，新增文件夹 `+` 按钮为 small 尺寸。
+- 网格/列表图标不被按钮内部裁切，且两个图标尺寸一致、居中显示。
+- 完成 `npm test`、`npm run test:e2e`、`npm run test:electron`、`npm run lint`、`npm run build` 和 `npm run build:desktop`。
+
+完成记录：移除文件树和右侧工具栏的无效刷新入口，移除重置按钮并保留实时搜索及查询操作；上传按钮简化为“上传”；删除文件树辅助文案；文件树搜索使用灰色阴影输入样式；新增文件夹按钮调整为 small；视图图标固定 16px 并保持 medium 切换器布局。
+
+验证：`npm test`（155/155）、`npm run test:e2e`（9/9）、`npm run test:electron`（3/3）、`npm run lint`、`npm run build`、`npm run build:desktop` 全部通过；构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
+
+Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅提交本子任务涉及的 5 个文件；提交信息：`refactor: 完成 UI-004.18 文件库入口精简与控件细节修复`。未执行 `git push`。
