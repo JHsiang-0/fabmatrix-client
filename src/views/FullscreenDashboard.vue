@@ -2,7 +2,7 @@
   <div class="fullscreen-dashboard" :class="{ 'is-compact': viewportWidth < 768 }">
     <FarmDashboard :realtime-notice-override="realtimeNotice">
       <template #fullscreen-action>
-        <t-button theme="primary" variant="base" size="small" @click.stop="leaveFullscreenDashboard">
+        <t-button class="dashboard-action-button" theme="danger" variant="base" size="small" @click.stop="leaveFullscreenDashboard">
           退出全屏
         </t-button>
       </template>

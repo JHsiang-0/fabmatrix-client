@@ -1,17 +1,19 @@
 <template>
   <div v-cloak class="farm-dashboard h-full bg-gray-100 flex flex-col overflow-hidden">
-    <!-- 顶部标题和统计 -->
+    <!-- 顶部品牌和操作 -->
     <div class="dashboard-top-shell">
-      <dashboard-header :status-counts="store.statusCounts" :workshop-name="workshopName"
+      <dashboard-header :workshop-name="workshopName"
         :workshop-options="workshopOptions" :last-update-time="lastUpdateTime" @refresh="handleRefresh"
         @workshop-change="handleWorkshopChange">
       <!-- 布局编辑入口：管理员在这里完成解锁、调整和保存 -->
       <template #actions>
-        <t-button v-if="canManageLayout" :theme="isEditMode ? 'primary' : 'default'"
+        <t-button v-if="canManageLayout" class="dashboard-action-button"
+          :theme="isEditMode ? 'primary' : 'default'" :variant="isEditMode ? 'base' : 'outline'" size="small"
           :icon="renderIcon(isEditMode ? Unlock : Lock)" :loading="layoutSaving" @click="toggleLayoutEditing">
           {{ isEditMode ? '完成布局' : '布局设置' }}
         </t-button>
-        <t-button v-if="canManageLayout && isEditMode" variant="outline" @click="cancelLayoutEditing">
+        <t-button v-if="canManageLayout && isEditMode" class="dashboard-action-button" theme="warning"
+          variant="outline" size="small" @click="cancelLayoutEditing">
           取消编辑
         </t-button>
         <slot name="fullscreen-action"></slot>
@@ -73,11 +75,14 @@
       <!-- 厂房网格布局 - 与DashboardHeader保持相同最大宽度 -->
       <div class="w-full max-w-[1920px] mx-auto bg-gray-100 border border-gray-200 rounded-xl shadow-sm p-4">
         <!-- 使用 GridMap 组件 -->
-        <grid-map :device-matrix="store.deviceMatrix" :real-time-status="store.realTimeStatus"
+        <grid-map v-if="hasWorkshopData" :device-matrix="store.deviceMatrix" :real-time-status="store.realTimeStatus"
           :grid-config="store.gridConfig" :is-edit-mode="isEditMode" :dragged-device="draggedDevice"
           :drag-over-cell="dragOverCell" @dragstart="handleDragStart" @dragend="handleDragEnd"
           @dragenter="handleDragEnter" @dragleave="handleDragLeave" @drop="handleDrop" @cell-click="handleCellClick"
           @dimension-change="handleDimensionChange" @aisle-context="handleAisleContext" />
+        <div v-else class="dashboard-workshop-empty">
+          <t-empty description="该区域暂未开发" />
+        </div>
       </div>
     </div>
 
@@ -171,21 +176,32 @@ const drawerVisible = ref(false)
 const activeDevice = ref(null)
 
 /** 车间信息 */
-const workshopName = ref('3F-一号车间')
 const workshopOptions = [
-  { content: '3F-一号车间', value: '3F-一号车间' },
-  { content: '3F-二号车间', value: '3F-二号车间' },
-  { content: '3F-三号车间', value: '3F-三号车间' }
+  { content: '3F-一号车间', value: 'workshop-3f-1', available: true },
+  { content: '3F-二号车间', value: 'workshop-3f-2', available: false },
+  { content: '3F-三号车间', value: 'workshop-3f-3', available: false }
 ]
+const selectedWorkshopId = ref(workshopOptions[0].value)
+const workshopName = ref(workshopOptions[0].content)
+const selectedWorkshop = computed(() => workshopOptions.find(option => option.value === selectedWorkshopId.value))
+const hasWorkshopData = computed(() => selectedWorkshop.value?.available === true)
 
 /** 最后更新时间 */
 const lastUpdateTime = ref('')
 
 function handleWorkshopChange(nextWorkshop) {
-  if (!workshopOptions.some(option => option.value === nextWorkshop)) return
+  const nextOption = workshopOptions.find(option => option.value === nextWorkshop)
+  if (!nextOption || selectedWorkshopId.value === nextOption.value) return
 
-  workshopName.value = nextWorkshop
-  message.success(`已切换至${nextWorkshop}`)
+  if (isEditMode.value) cancelLayoutEditing()
+
+  selectedWorkshopId.value = nextOption.value
+  workshopName.value = nextOption.content
+  if (nextOption.available) {
+    message.success(`已切换至${nextOption.content}`)
+  } else {
+    message.info(`${nextOption.content}暂未开发`)
+  }
 }
 
 const realtimeNotice = computed(() => props.realtimeNoticeOverride || (
@@ -982,6 +998,15 @@ onUnmounted(() => {
 .dashboard-workshop-scroll {
   min-height: 0;
   overflow: auto;
+}
+
+.dashboard-workshop-empty {
+  display: flex;
+  min-height: clamp(240px, 42vh, 520px);
+  align-items: center;
+  justify-content: center;
+  background: var(--app-surface);
+  border-radius: var(--app-radius);
 }
 
 .dashboard-top-shell {

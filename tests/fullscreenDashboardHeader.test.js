@@ -18,10 +18,18 @@ test('看板头部区域按钮支持 TDesign 下拉切换并向父级派发事�
   assert.match(headerSource, /emit\('workshop-change', nextWorkshop\)/)
 })
 
+test('看板头部移除重复状态统计并将区域按钮放在更新时间之后', () => {
+  assert.doesNotMatch(headerSource, /dashboard-header__stats/)
+  assert.match(headerSource, /dashboard-header__updated[\s\S]*dashboard-header__workshop-switch/)
+  assert.match(headerSource, /class="dashboard-header__action-button"[\s\S]*theme="default"[\s\S]*variant="outline"/)
+})
+
 test('看板提供预置区域并在切换后更新当前区域和用户反馈', () => {
   assert.match(farmDashboardSource, /:workshop-options="workshopOptions"/)
   assert.match(farmDashboardSource, /@workshop-change="handleWorkshopChange"/)
-  assert.match(farmDashboardSource, /3F-二号车间/)
-  assert.match(farmDashboardSource, /workshopName\.value = nextWorkshop/)
-  assert.match(farmDashboardSource, /message\.success\(`已切换至\$\{nextWorkshop\}`\)/)
+  assert.match(farmDashboardSource, /value: 'workshop-3f-2', available: false/)
+  assert.match(farmDashboardSource, /v-if="hasWorkshopData"/)
+  assert.match(farmDashboardSource, /description="该区域暂未开发"/)
+  assert.match(farmDashboardSource, /selectedWorkshopId\.value = nextOption\.value/)
+  assert.match(farmDashboardSource, /message\.info\(`\$\{nextOption\.content\}暂未开发`\)/)
 })

@@ -1,5 +1,38 @@
 # 前端 Kiro 任务清单
 
+## Kiro Task UI-001.37：优化看板区域切换状态与头部操作区
+
+状态：已完成（专项验证通过；全量测试保留 3 项既有失败）
+范围：
+- `src/components/DashboardHeader.vue`
+- `src/components/FarmDashboard.vue`
+- `src/views/FullscreenDashboard.vue`
+- `tests/dashboardOverview.test.js`
+- `tests/fullscreenDashboardHeader.test.js`
+- `.kiro/specs/farm-frontend/tasks.md`
+
+目标：
+- 删除头部重复的设备状态统计标签，保留下方看板中的状态统计数据。
+- 将区域切换按钮移动到更新时间之后，并统一头部操作按钮尺寸、间距和 TDesign 语义颜色。
+- 为暂无区域数据的区域提供“该区域暂未开发”空状态，不继续展示上一个区域的网格数据。
+- 使用区域 ID 和可用状态管理切换，保留未来接入后端区域查询的扩展点。
+
+完成记录：
+- 已删除头部重复状态统计，区域按钮已移动到更新时间之后。
+- 已统一刷新、区域切换、布局设置、取消编辑和退出全屏按钮的尺寸，并使用 TDesign 语义颜色。
+- 切换到未开发区域时显示“该区域暂未开发”，切回一号车间时恢复设备网格。
+- 专项 Node 测试 16/16、`npm run lint`、`npm run build`、`git diff --check` 通过。
+- 全量 `npm test` 仍有 3 项既有任务中心/UI 规范静态断言失败，与本任务无关。
+
+验收标准：
+- 头部不再渲染截图中的设备状态统计区域。
+- 区域按钮位于更新时间之后，刷新、布局设置、取消编辑、退出全屏按钮尺寸统一，颜色表达操作语义。
+- 切换到未开发区域后隐藏旧网格并显示“该区域暂未开发”；切回已开发区域后恢复网格。
+- 现有设备状态、实时连接、刷新、布局编辑和全屏退出逻辑不回归。
+- 专项 Node 测试、`npm run lint`、`npm run build` 和 `git diff --check` 通过。
+
+提交建议：`feat: 优化看板区域切换与头部操作区`
+
 ## Kiro Task UI-001.36：优化全屏看板品牌头部与区域切换
 
 状态：已完成（专项验证通过；全量测试存在 3 项既有静态断言失败）

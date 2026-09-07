@@ -4,48 +4,7 @@
       <img class="dashboard-header__brand-logo" src="/icon.png" alt="" aria-hidden="true" />
       <div class="dashboard-header__brand-title-row">
         <h1>{{ labels.title }}</h1>
-        <t-dropdown
-          v-if="workshopOptions.length"
-          :options="workshopOptions"
-          trigger="click"
-          @click="handleWorkshopChange"
-        >
-          <t-button
-            class="dashboard-header__workshop-switch"
-            theme="primary"
-            variant="outline"
-            size="small"
-            aria-label="切换区域"
-          >
-            <template #icon><Location size="14" /></template>
-            <span class="dashboard-header__workshop-name">{{ workshopName }}</span>
-            <ChevronDownIcon size="14" />
-          </t-button>
-        </t-dropdown>
-        <t-button v-else class="dashboard-header__workshop-switch" theme="primary" variant="outline" size="small" disabled>
-          <template #icon><Location size="14" /></template>
-          <span class="dashboard-header__workshop-name">{{ workshopName }}</span>
-        </t-button>
       </div>
-    </div>
-
-    <div class="dashboard-header__stats" aria-label="设备状态统计">
-      <t-tag theme="default" variant="dark" class="dashboard-header__total">
-        <span>{{ labels.total }}</span>
-        <strong>{{ totalCount }}</strong>
-      </t-tag>
-      <t-tag
-        v-for="item in statusItems"
-        :key="item.key"
-        :theme="item.theme"
-        variant="light-outline"
-        size="small"
-        class="dashboard-header__status"
-      >
-        <span class="dashboard-header__status-dot" :class="`dashboard-header__status-dot--${item.theme}`"></span>
-        <span>{{ item.label }}</span>
-        <strong>{{ item.count }}</strong>
-      </t-tag>
     </div>
 
     <div class="dashboard-header__actions">
@@ -53,9 +12,40 @@
         <TimeIcon size="13" />
         {{ labels.updatedAt }} <strong>{{ lastUpdateTime }}</strong>
       </span>
+      <t-dropdown
+        v-if="workshopOptions.length"
+        :options="workshopOptions"
+        trigger="click"
+        @click="handleWorkshopChange"
+      >
+        <t-button
+          class="dashboard-header__workshop-switch dashboard-header__action-button"
+          theme="primary"
+          variant="outline"
+          size="small"
+          aria-label="切换区域"
+        >
+          <template #icon><Location size="14" /></template>
+          <span class="dashboard-header__workshop-name">{{ workshopName }}</span>
+          <ChevronDownIcon size="14" />
+        </t-button>
+      </t-dropdown>
+      <t-button
+        v-else
+        class="dashboard-header__workshop-switch dashboard-header__action-button"
+        theme="primary"
+        variant="outline"
+        size="small"
+        disabled
+      >
+        <template #icon><Location size="14" /></template>
+        <span class="dashboard-header__workshop-name">{{ workshopName }}</span>
+      </t-button>
       <slot name="actions"></slot>
       <t-button
-        theme="primary"
+        class="dashboard-header__action-button"
+        theme="default"
+        variant="outline"
         size="small"
         :icon="renderIcon(Refresh)"
         :loading="isRefreshing"
@@ -69,33 +59,20 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { ChevronDownIcon, LocationIcon as Location, RefreshIcon as Refresh, TimeIcon } from 'tdesign-icons-vue-next'
-import { PRINTER_STATE } from '@/utils/constants'
 import { renderIcon } from '@/utils/tdesign'
 
 defineOptions({ name: 'DashboardHeader' })
 
 const labels = {
   title: '嘉东__联动3D打印实时控制系统',
-  total: '设备总数',
-  printing: '打印中',
-  standby: '待机',
-  completed: '已完成',
-  paused: '已暂停',
-  fatal: '致命错误',
-  printError: '打印中断',
   refresh: '刷新',
   refreshing: '刷新中...',
   updatedAt: '更新于'
 }
 
 const props = defineProps({
-  statusCounts: {
-    type: Object,
-    required: true,
-    default: () => ({})
-  },
   workshopName: {
     type: String,
     default: '3F-一号车间'
@@ -112,21 +89,6 @@ const props = defineProps({
 
 const emit = defineEmits(['refresh', 'workshop-change'])
 const isRefreshing = ref(false)
-
-const totalCount = computed(() => Object.values(props.statusCounts).reduce((sum, count) => sum + (count || 0), 0))
-const printingCount = computed(() => props.statusCounts[PRINTER_STATE.PRINTING] || 0)
-const fatalCount = computed(() => (
-  (props.statusCounts[PRINTER_STATE.FAULT] || 0) +
-  (props.statusCounts[PRINTER_STATE.SYS_ERROR] || 0)
-))
-const statusItems = computed(() => [
-  { key: PRINTER_STATE.PRINTING, label: labels.printing, count: printingCount.value, theme: 'primary' },
-  { key: PRINTER_STATE.STANDBY, label: labels.standby, count: props.statusCounts[PRINTER_STATE.STANDBY] || 0, theme: 'success' },
-  { key: PRINTER_STATE.COMPLETED, label: labels.completed, count: props.statusCounts[PRINTER_STATE.COMPLETED] || 0, theme: 'default' },
-  { key: PRINTER_STATE.PAUSED, label: labels.paused, count: props.statusCounts[PRINTER_STATE.PAUSED] || 0, theme: 'warning' },
-  { key: 'fatal', label: labels.fatal, count: fatalCount.value, theme: 'danger' },
-  { key: PRINTER_STATE.PRINT_ERROR, label: labels.printError, count: props.statusCounts[PRINTER_STATE.PRINT_ERROR] || 0, theme: 'warning' }
-])
 
 function handleRefresh() {
   if (isRefreshing.value) return
@@ -148,8 +110,7 @@ function handleWorkshopChange(item) {
 
 <style scoped>
 .dashboard-header {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto minmax(240px, 1fr);
+  display: flex;
   gap: var(--app-spacing-3);
   align-items: center;
   min-height: 50px;
@@ -167,6 +128,7 @@ function handleWorkshopChange(item) {
 }
 
 .dashboard-header__brand {
+  flex: 1 1 auto;
   min-width: 0;
   gap: var(--app-spacing-2);
 }
@@ -191,8 +153,7 @@ function handleWorkshopChange(item) {
 }
 
 .dashboard-header__workshop-switch {
-  flex: 0 0 auto;
-  max-width: 180px;
+  min-width: 120px;
 }
 
 .dashboard-header__workshop-switch :deep(.t-button__text) {
@@ -223,51 +184,26 @@ function handleWorkshopChange(item) {
   white-space: nowrap;
 }
 
-.dashboard-header__stats {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  padding: 4px;
-  overflow-x: auto;
-  background: var(--app-surface-muted);
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
-  scrollbar-width: none;
-}
-
-.dashboard-header__stats::-webkit-scrollbar { display: none; }
-
-.dashboard-header__total,
-.dashboard-header__status {
-  flex: 0 0 auto;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.dashboard-header__total strong,
-.dashboard-header__status strong {
-  font-family: var(--app-font-family-mono);
-  font-weight: 700;
-}
-
-.dashboard-header__status-dot {
-  width: 7px;
-  height: 7px;
-  background: var(--td-text-color-placeholder);
-  border-radius: 50%;
-}
-
-.dashboard-header__status-dot--primary { background: var(--td-brand-color-6); }
-.dashboard-header__status-dot--success { background: var(--td-success-color-6); }
-.dashboard-header__status-dot--warning { background: var(--td-warning-color-6); }
-.dashboard-header__status-dot--danger { background: var(--td-error-color-6); }
-
 .dashboard-header__actions {
+  flex: 0 1 auto;
+  margin-left: auto;
   justify-content: flex-end;
   gap: var(--app-spacing-2);
   min-width: 0;
+  flex-wrap: wrap;
   white-space: nowrap;
+}
+
+.dashboard-header__action-button {
+  min-width: 80px;
+  height: 32px;
+  border-radius: var(--app-radius);
+}
+
+.dashboard-header__actions :deep(.dashboard-action-button) {
+  min-width: 80px;
+  height: 32px;
+  border-radius: var(--app-radius);
 }
 
 .dashboard-header__updated {
@@ -282,18 +218,6 @@ function handleWorkshopChange(item) {
   font-weight: 500;
 }
 
-@media (max-width: 1280px) {
-  .dashboard-header {
-    grid-template-columns: minmax(220px, 1fr) minmax(0, 1.7fr);
-  }
-
-  .dashboard-header__stats {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-content: flex-start;
-  }
-}
-
 @media (max-width: 767px) {
   .dashboard-header {
     display: flex;
@@ -303,13 +227,8 @@ function handleWorkshopChange(item) {
     padding: var(--app-spacing-3);
   }
 
-  .dashboard-header__brand-title-row,
-  .dashboard-header__actions {
+  .dashboard-header__brand-title-row {
     justify-content: space-between;
-  }
-
-  .dashboard-header__actions {
-    flex-wrap: wrap;
   }
 
   .dashboard-header__updated {
