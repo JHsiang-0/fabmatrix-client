@@ -287,6 +287,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', handleBeforeUnload)
 
 .profile-card {
   display: flex;
+  flex-direction: column;
   align-self: stretch;
   height: 100%;
   min-width: 0;
@@ -299,12 +300,16 @@ onUnmounted(() => window.removeEventListener('beforeunload', handleBeforeUnload)
   min-height: 0;
 }
 
+.profile-card :deep(.t-form) {
+  width: min(100%, 560px);
+}
+
 .profile-form-alert {
   margin-bottom: var(--app-spacing-4);
 }
 
 .profile-password-hint {
-  margin: calc(var(--app-spacing-2) * -1) 0 var(--app-spacing-4);
+  margin: 0 0 var(--app-spacing-4);
   color: var(--app-text-secondary);
   font-size: 12px;
   line-height: 1.5;
