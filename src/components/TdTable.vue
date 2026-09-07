@@ -24,7 +24,13 @@ provide('farm-table-register-column', column => {
 
 const columns = computed(() => registeredColumns.value.map((column, index) => {
   if (column.type === 'selection') {
-    return { colKey: 'row-select', type: 'multiple', width: column.width || 48, fixed: column.fixed }
+    return {
+      colKey: 'row-select',
+      type: 'multiple',
+      width: column.width || 48,
+      fixed: column.fixed,
+      checkProps: column.checkProps
+    }
   }
 
   return {

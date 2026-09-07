@@ -154,9 +154,9 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     const treeFolder = page.locator('.file-folder-tree .t-tree__label').filter({ hasText: firstFolderName }).first()
     await expect(treeFolder).toBeVisible()
     await treeFolder.click()
-    await expect(page.locator('.file-library-filter-form .t-breadcrumb').getByText(firstFolderName, { exact: true })).toBeVisible()
+    await expect(page.locator('.file-library-filter-form .t-breadcrumb')).toHaveCount(0)
     await page.locator('.file-folder-tree .t-tree__label').filter({ hasText: '我的文件夹' }).click()
-    await expect(page.locator('.file-library-filter-form .t-breadcrumb').getByText('根目录', { exact: true })).toBeVisible()
+    await expect(page.locator('.file-library-filter-form .t-breadcrumb')).toHaveCount(0)
     const gearboxFile = page.getByText('gearbox.gcode', { exact: true })
     const gearboxBox = await gearboxFile.boundingBox()
     const contextClick = { x: 24, y: 16 }

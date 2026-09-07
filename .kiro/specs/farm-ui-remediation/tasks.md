@@ -1276,9 +1276,39 @@ git diff --check：通过。
 
 提交：完成最终检查后创建独立本地提交 refactor: 重构文件夹树与当前目录联动，不执行 git push。
 
+### [x] UI-004.13 文件库单一树导航与常驻选择工具栏
+
+优先级：P0
+
+目标：移除右侧重复的页面导航和浏览/选择模式切换，使文件库由左侧真实文件夹树统一导航；将文件操作、视图切换和搜索收敛到右侧列表上方同一工具栏，并让选择列始终可见。
+
+范围：`src/views/FileLibrary.vue`、`src/components/TdTable.vue`、`src/components/TdTableColumn.vue`、`tests/fileLibrary.test.js`、`tests/e2e/electron.spec.js` 和本任务记录；不得修改后端接口、字段、数据适配器或 `src/stores/printerStore.js.backup`。
+
+工作内容：
+
+- 移除右侧面包屑、右侧文件夹打开动作和“浏览/选择”模式状态；右侧目录结果中的文件夹保留正式分页返回，但只能通过左侧树进入。
+- 列表视图永久显示 TDesign Table 的多选列；网格视图永久显示选择框，文件夹不参与文件批量操作，批量删除入口根据实际选择显示。
+- 将“新建文件夹”“上传 G-Code 文件”“刷新”与搜索框、查询、重置放入同一行工具栏；删除 PageHeader 中重复的顶部操作入口。
+- 保留 TDesign `RadioGroup` 的 `default-filled` 视图切换，仅使用组件默认尺寸与选中态，不再为列表/网格切换器绘制自定义按钮样式。
+- 保留搜索框灰底无边框、键盘回车查询、加载/空目录/错误重试、分页、右键菜单、详情和真实 `parentId` 查询链路。
+
+验收：
+
+- 文件库右侧不存在面包屑和浏览/选择模式切换；切换目录只能通过左侧 `FileFolderTree` 更新 `parentId` 并重新查询。
+- 列表首列始终显示选择框，网格选择框不因模式切换布局跳动，批量操作仅使用已选文件。
+- 三个文件操作按钮与搜索框处于同一工具栏行，窄窗口按 TDesign Space 规则换行，不产生重复顶部按钮或异常横向溢出。
+- 视图切换使用 TDesign `RadioGroup` 默认分段样式，无 `.file-library-mode-controls` 或自定义 `.t-radio-button` 尺寸覆盖。
+- 完成 `npm test`、浏览器/Electron Playwright、`npm run lint`、`npm run build`、`npm run build:desktop`，并执行提交前 Git 检查。
+
+完成记录：文件库改为左侧文件夹树唯一导航，移除右侧面包屑、文件夹打开入口和浏览/选择模式；列表选择列与网格选择框常驻，文件夹不参与文件批量操作。新建文件夹、上传、刷新与 TDesign 默认视图分段、灰底无边框搜索框、查询/重置合并到结果区同一工具栏，PageHeader 不再重复承载操作按钮。未修改后端接口、字段和真实数据查询链路。
+
+测试：`npm test`（155/155）、`PW_BROWSER_PORT=5186 npm run test:e2e`（9/9）、`npm run test:electron`（3/3）、`npm run test:electron:dist`（1/1，含 `npm run build:desktop`）、`npm run lint`、`npm run build` 全部通过。构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
+
+Git 检查与提交：提交前执行 `git status --short`、`git diff --check`，仅暂存本子任务涉及的文件；完成后再次检查工作区并提交本地变更，不执行 `git push`。
+
 ### 8.6 UI-004 执行顺序与统一约束
 
-`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6 → UI-004.7 → UI-004.8 → UI-004.9 → UI-004.10 → UI-004.11 → UI-004.12`
+`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6 → UI-004.7 → UI-004.8 → UI-004.9 → UI-004.10 → UI-004.11 → UI-004.12 → UI-004.13`
 
 - UI-004 是独立文件库 UI/UX 重写任务，不属于 `farm-ui-v2`，不回写 UI-001、UI-002、UI-003 的历史状态。
 - 所有文件数据必须来自 API_HANDOFF、运行时 OpenAPI 和现有数据适配器；运行时泛型 schema 与正式文档冲突时记录并暂停相关猜测。

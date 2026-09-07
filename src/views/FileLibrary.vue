@@ -1,27 +1,8 @@
 <template>
   <div class="app-page-shell app-page-background file-library-page">
     <PageHeader
-      class="file-library-page-toolbar"
       title="文件库"
-    >
-      <template #actions>
-      <t-space class="file-library-toolbar__actions" size="small" align="center" break-line>
-        <t-button variant="outline" theme="default" size="medium" :icon="renderIcon(FolderOpened)" @click="openCreateFolderDialog">
-          新建文件夹
-        </t-button>
-        <t-button theme="primary" size="medium" :icon="renderIcon(Upload)" @click="handleUpload">
-          上传 G-Code 文件
-        </t-button>
-        <t-button v-if="isBatchMode && selectedIds.length > 0" theme="danger" size="medium" :icon="renderIcon(Delete)"
-          :loading="batchDeleting" :disabled="batchDeleting || deletingIds.length > 0" @click="handleBatchDelete">
-          批量删除 ({{ selectedIds.length }})
-        </t-button>
-        <t-button :icon="renderIcon(Refresh)" :loading="loading" :disabled="batchDeleting || deletingIds.length > 0" @click="refreshLibrary" size="medium">
-          刷新
-        </t-button>
-      </t-space>
-      </template>
-    </PageHeader>
+    />
 
     <t-card bordered class="file-library-workspace app-page-card" aria-label="文件工作台">
       <t-layout class="file-library-layout">
@@ -33,57 +14,47 @@
             @create="openCreateFolderDialog"
           />
         </t-aside>
-        <t-content class="file-library-content">
-          <section class="file-library-main" aria-label="当前目录文件列表">
-          <t-form layout="inline" class="file-library-filter-form" aria-label="文件筛选条件">
-            <t-form-item class="file-library-filter-form__path">
-              <t-breadcrumb separator="/">
-                <t-breadcrumb-item :to="{ path: '' }" @click.prevent="navigateToRoot">
-                  <FolderOpened :size="16" />
-                  <span>根目录</span>
-                </t-breadcrumb-item>
-                <t-breadcrumb-item
-                  v-for="(breadcrumb, index) in breadcrumbs"
-                  :key="breadcrumb.id"
-                  @click.prevent="navigateTo(index)"
-                >
-                  {{ breadcrumb.name }}
-                </t-breadcrumb-item>
-              </t-breadcrumb>
-            </t-form-item>
-            <t-form-item>
-              <t-space class="file-library-mode-controls" size="small">
-                <t-radio-group v-model="isBatchMode" variant="default-filled" size="medium" aria-label="文件操作模式">
-                  <t-radio-button :value="false">浏览</t-radio-button>
-                  <t-radio-button :value="true">选择</t-radio-button>
-                </t-radio-group>
-                <t-radio-group class="file-library-view-mode" v-model="viewMode" variant="default-filled" size="medium" aria-label="文件视图">
-                  <t-radio-button value="grid" aria-label="网格视图" @click="viewMode = 'grid'">
-                    <Grid />
-                  </t-radio-button>
-                  <t-radio-button value="list" aria-label="列表视图" @click="viewMode = 'list'">
-                    <List />
-                  </t-radio-button>
-                </t-radio-group>
-              </t-space>
-            </t-form-item>
-            <t-form-item class="file-library-filter-form__search">
-              <t-space class="file-library-search-actions" size="small">
-                <t-input class="file-library-search-input" v-model="searchKeyword" placeholder="搜索文件名..." clearable size="medium"
-                  @keyup.enter="handleSearch">
-                  <template #prefixIcon>
-                    <Search />
-                  </template>
-                </t-input>
-                <t-button theme="primary" size="medium" :loading="loading" @click="handleSearch">
-                  查询
-                </t-button>
-                <t-button variant="outline" size="medium" :disabled="loading" @click="resetSearch">
-                  重置
-                </t-button>
-              </t-space>
-            </t-form-item>
-          </t-form>
+          <t-content class="file-library-content">
+            <section class="file-library-main" aria-label="当前目录文件列表">
+              <div class="file-library-filter-form" aria-label="文件筛选条件">
+                <t-space class="file-library-toolbar-actions" size="small" align="center" break-line>
+                  <t-button variant="outline" theme="default" size="medium" :icon="renderIcon(FolderOpened)" @click="openCreateFolderDialog">
+                    新建文件夹
+                  </t-button>
+                  <t-button theme="primary" size="medium" :icon="renderIcon(Upload)" @click="handleUpload">
+                    上传 G-Code 文件
+                  </t-button>
+                  <t-button v-if="selectedIds.length > 0" theme="danger" size="medium" :icon="renderIcon(Delete)"
+                    :loading="batchDeleting" :disabled="batchDeleting || deletingIds.length > 0" @click="handleBatchDelete">
+                    批量删除 ({{ selectedIds.length }})
+                  </t-button>
+                  <t-button :icon="renderIcon(Refresh)" :loading="loading" :disabled="batchDeleting || deletingIds.length > 0" @click="refreshLibrary" size="medium">
+                    刷新
+                  </t-button>
+                </t-space>
+                <t-space class="file-library-search-actions" size="small" align="center" break-line>
+                  <t-radio-group class="file-library-view-mode" v-model="viewMode" variant="default-filled" size="small" aria-label="文件视图">
+                    <t-radio-button value="grid" aria-label="网格视图">
+                      <Grid />
+                    </t-radio-button>
+                    <t-radio-button value="list" aria-label="列表视图">
+                      <List />
+                    </t-radio-button>
+                  </t-radio-group>
+                  <t-input class="file-library-search-input" v-model="searchKeyword" placeholder="搜索文件名..." clearable size="medium"
+                    @keyup.enter="handleSearch">
+                    <template #prefixIcon>
+                      <Search />
+                    </template>
+                  </t-input>
+                  <t-button theme="primary" size="medium" :loading="loading" @click="handleSearch">
+                    查询
+                  </t-button>
+                  <t-button variant="outline" size="medium" :disabled="loading" @click="resetSearch">
+                    重置
+                  </t-button>
+                </t-space>
+              </div>
 
           <div class="file-library-results">
             <AsyncState
@@ -119,13 +90,12 @@
           <t-dropdown :options="getContextMenuOptions(file)" trigger="context-menu" :popup-props="contextMenuPopupProps"
             @click="handleContextMenuClick($event, file)">
             <t-card bordered hover-shadow class="file-card"
-              :class="{ 'file-card--selected': isBatchMode && selectedIds.includes(file.id) }"
+              :class="{ 'file-card--selected': selectedIds.includes(file.id) }"
               @click="handleFileClick(file)">
-              <!-- 卡片选中状态 -->
-              <div v-if="isBatchMode" class="file-card__selection">
-                <t-checkbox :checked="selectedIds.includes(file.id)" disabled
-                  @click.stop="toggleSelection(file.id)"
-                  size="small" />
+              <!-- 左侧常驻选择状态；文件夹由左侧目录树导航，不参与文件批量操作。 -->
+              <div class="file-card__selection">
+                <t-checkbox :checked="selectedIds.includes(file.id)" :disabled="file.folder"
+                  @click.stop="toggleSelection(file.id)" size="small" />
               </div>
 
               <!-- 文件夹图标 -->
@@ -150,10 +120,6 @@
 
                 <!-- 悬浮操作按钮 -->
                 <div class="file-card__actions">
-                  <t-button theme="primary" size="small" :icon="renderIcon(FolderOpened)" @click.stop="navigateToFolder(file)"
-                    class="file-card__action">
-                    打开
-                  </t-button>
                   <t-button theme="danger" size="small" :icon="renderIcon(Delete)" :loading="deletingIds.includes(file.id)"
                     :disabled="batchDeleting || deletingIds.length > 0" @click.stop="handleDelete(file.id)"
                     class="file-card__action">
@@ -175,10 +141,10 @@
           <t-dropdown :options="getContextMenuOptions(file)" trigger="context-menu" :popup-props="contextMenuPopupProps"
             @click="handleContextMenuClick($event, file)">
             <t-card bordered hover-shadow class="file-card"
-              :class="{ 'file-card--selected': isBatchMode && selectedIds.includes(file.id) }"
+              :class="{ 'file-card--selected': selectedIds.includes(file.id) }"
               @click="handleFileClick(file)">
-              <!-- 卡片选中状态 -->
-              <div v-if="isBatchMode" class="file-card__selection">
+              <!-- 文件选择框始终可见，避免浏览/选择模式切换造成布局跳动。 -->
+              <div class="file-card__selection">
                 <t-checkbox :checked="selectedIds.includes(file.id)" @click.stop="toggleSelection(file.id)"
                   size="small" />
               </div>
@@ -265,7 +231,7 @@
       <div v-else class="file-table-view">
         <TdTable :data="fileRows" row-key="id" :loading="loading" height="100%" @selection-change="handleSelectionChange"
           @row-click="handleTableRowClick" border style="width: 100%">
-          <TdTableColumn v-if="isBatchMode" type="selection" width="50" align="center" />
+          <TdTableColumn type="selection" width="50" align="center" :check-props="getRowCheckProps" />
 
           <TdTableColumn prop="originalName" label="文件名" min-width="200">
             <template #default="{ row }">
@@ -340,10 +306,7 @@
           <TdTableColumn label="操作" width="220" fixed="right">
             <template #default="{ row }">
               <div class="file-table__actions">
-                <t-button v-if="row.folder" theme="primary" size="small" :icon="renderIcon(FolderOpened)" @click.stop="navigateToFolder(row)">
-                  打开
-                </t-button>
-                <template v-else>
+                <template v-if="!row.folder">
                   <t-button theme="primary" size="small" :icon="renderIcon(Printer)" @click.stop="handlePrint(row)">
                     打印
                   </t-button>
@@ -550,7 +513,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { message, confirmMessage } from '@/utils/message'
 import { renderIcon } from '@/utils/tdesign'
 import {
@@ -641,16 +604,8 @@ const detailJobs = ref([])
 const detailJobsLoading = ref(false)
 const detailJobsError = ref('')
 const FILE_DETAIL_CONTEXT_KEY = 'farm-ui:file-detail'
-// 批量操作模式
-const isBatchMode = ref(false)
-
-watch(isBatchMode, enabled => {
-  if (!enabled) selectedIds.value = []
-})
-
 // 文件夹导航状态
 const currentParentId = ref(null)
-const breadcrumbs = ref([])
 const folderTreeRef = ref(null)
 
 // 新建文件夹表单
@@ -683,6 +638,8 @@ const fileRows = computed(() => fileList.value.map(file => ({
 const folderList = computed(() => fileRows.value.filter(file => file.viewType === 'folder'))
 
 const fileItemsList = computed(() => fileRows.value.filter(file => file.viewType === 'file'))
+
+const getRowCheckProps = ({ row }) => ({ disabled: Boolean(row.folder) })
 
 const contextMenuPosition = reactive({ left: 0, top: 0 })
 
@@ -727,7 +684,6 @@ const getContextMenuOptions = file => {
 
   const options = file.folder
     ? [
-        { content: '打开', value: 'open', prefixIcon: renderIcon(FolderOpened) },
         { content: '删除', value: 'delete', theme: 'error', prefixIcon: renderIcon(Delete) }
       ]
     : [
@@ -737,7 +693,7 @@ const getContextMenuOptions = file => {
         { content: '删除', value: 'delete', theme: 'error', prefixIcon: renderIcon(Delete) }
       ]
 
-  if (isBatchMode.value && !file.folder && selectedIds.value.includes(file.id) && selectedIds.value.length > 1) {
+  if (!file.folder && selectedIds.value.includes(file.id) && selectedIds.value.length > 1) {
     options.push({
       content: `批量删除 (${selectedIds.value.length})`,
       value: 'batch-delete',
@@ -794,51 +750,8 @@ const fetchData = async () => {
 
 const refreshLibrary = () => fetchData()
 
-/**
- * 导航到根目录
- */
-const navigateToRoot = () => {
-  currentParentId.value = null
-  breadcrumbs.value = []
-  pagination.pageNum = 1
-  fetchData()
-}
-
 const handleFolderSelect = selection => {
   currentParentId.value = selection?.id ?? null
-  breadcrumbs.value = Array.isArray(selection?.path)
-    ? selection.path.map(folder => ({ ...folder }))
-    : []
-  pagination.pageNum = 1
-  fetchData()
-}
-
-/**
- * 导航到指定文件夹
- */
-const navigateToFolder = (folder) => {
-  const folderId = folder?.id
-  if (folderId === undefined || folderId === null) return
-
-  const breadcrumb = {
-    id: String(folderId),
-    name: folder.originalName || folder.name || `文件夹 ${folderId}`
-  }
-  const currentIndex = breadcrumbs.value.findIndex(item => String(item.id) === String(folderId))
-  handleFolderSelect({
-    id: folderId,
-    path: currentIndex >= 0
-      ? breadcrumbs.value.slice(0, currentIndex + 1)
-      : [...breadcrumbs.value, breadcrumb]
-  })
-}
-
-/**
- * 导航到面包屑指定位置
- */
-const navigateTo = (index) => {
-  breadcrumbs.value = breadcrumbs.value.slice(0, index + 1)
-  currentParentId.value = breadcrumbs.value[index]?.id || null
   pagination.pageNum = 1
   fetchData()
 }
@@ -1352,18 +1265,8 @@ const handleFileDownload = async (file) => {
  * 处理文件点击事件
  */
 const handleFileClick = (file) => {
-  if (isBatchMode.value) {
-    if (file.folder) return
-    // 批量操作模式：执行选择操作
-    toggleSelection(file.id)
-  } else {
-    // 详情查看模式：如果是文件夹则打开，否则显示详情
-    if (file.folder) {
-      navigateToFolder(file)
-    } else {
-      openFileDetail(file)
-    }
-  }
+  // 文件夹统一由左侧目录树导航，右侧结果区只打开文件详情。
+  if (!file.folder) openFileDetail(file)
 }
 
 const handleContextMenuClick = (value, file) => {
@@ -1372,9 +1275,6 @@ const handleContextMenuClick = (value, file) => {
   const action = typeof value === 'object' ? value.value : value
 
   switch (action) {
-    case 'open':
-      if (file.folder) navigateToFolder(file)
-      break
     case 'detail':
       if (!file.folder) openFileDetail(file)
       break
@@ -1399,16 +1299,8 @@ const handleContextMenuClick = (value, file) => {
  * 处理表格行点击事件
  */
 const handleTableRowClick = (row) => {
-  if (isBatchMode.value) {
-    // 批量操作模式：表格有内置的选择功能，不额外处理
-  } else {
-    // 详情查看模式：如果是文件夹则打开，否则显示详情
-    if (row.folder) {
-      navigateToFolder(row)
-    } else {
-      openFileDetail(row)
-    }
-  }
+  // 文件夹只在左侧树中导航；表格行点击仅用于打开文件详情。
+  if (!row.folder) openFileDetail(row)
 }
 
 // ============ 生命周期 ============
@@ -1421,10 +1313,6 @@ onMounted(() => {
 /* The file workspace has one canonical visual system and one result scroll region. */
 .file-library-page {
   gap: var(--app-spacing-4);
-}
-
-.file-library-page-toolbar {
-  align-items: flex-start;
 }
 
 .file-library-workspace {
@@ -1491,73 +1379,27 @@ onMounted(() => {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: nowrap;
-  gap: var(--app-spacing-2) var(--app-spacing-4);
+  gap: var(--app-spacing-4);
   margin-bottom: var(--app-spacing-4);
   padding: 0 0 var(--app-spacing-4);
   border-bottom: 1px solid var(--app-border);
 }
 
-.file-library-filter-form :deep(.t-form__item) {
-  flex: 0 0 auto;
+.file-library-toolbar-actions,
+.file-library-search-actions {
   min-width: 0;
-  margin-bottom: 0;
-  margin-right: 0;
+  flex-wrap: wrap;
 }
 
-.file-library-filter-form :deep(.t-form__controls) {
-  min-width: 0;
-}
-
-.file-library-filter-form :deep(.t-form__label) {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-.file-library-filter-form__path {
-  margin-left: 0 !important;
-}
-
-.file-library-filter-form__path :deep(.t-form__label),
-.file-library-filter-form__path :deep(.t-form__controls) {
-  margin-left: 0;
-}
-
-.file-library-filter-form :deep(.t-breadcrumb) {
-  max-width: min(240px, 20vw);
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.file-library-filter-form__search {
-  margin-left: auto;
-}
-
-.file-library-filter-form :deep(.t-radio-group) {
-  white-space: nowrap;
-}
-
-.file-library-mode-controls {
-  flex: 0 0 auto;
-}
-
-.file-library-mode-controls :deep(.t-radio-button) {
-  min-width: 32px;
-  height: 32px;
-  padding-right: 10px;
-  padding-left: 10px;
-  line-height: 30px;
-}
-
-.file-library-mode-controls :deep(.file-library-view-mode .t-radio-button) {
-  width: 32px;
-  padding-right: 0;
-  padding-left: 0;
-  text-align: center;
+.file-library-toolbar-actions {
+  flex: 1 1 auto;
 }
 
 .file-library-search-actions {
-  align-items: center;
+  flex: 0 0 auto;
+  justify-content: flex-end;
 }
 
 .file-library-search-input {
@@ -1580,13 +1422,20 @@ onMounted(() => {
   box-shadow: 0 0 0 2px var(--td-brand-color-2);
 }
 
-.file-library-filter-form :deep(.t-breadcrumb__item) {
-  white-space: nowrap;
+.file-library-filter-form :deep(.t-space-item) {
+  min-width: 0;
 }
 
-.file-library-filter-form :deep(.t-breadcrumb__item:last-child) {
-  overflow: hidden;
-  text-overflow: ellipsis;
+.file-library-filter-form :deep(.t-button) {
+  flex: 0 0 auto;
+}
+
+.file-library-filter-form :deep(.t-input__wrap) {
+  min-width: 0;
+}
+
+.file-library-filter-form :deep(.t-input) {
+  min-width: 0;
 }
 
 .file-library-results {
@@ -1916,7 +1765,9 @@ onMounted(() => {
     flex-wrap: wrap;
   }
 
-  .file-library-filter-form__search { margin-left: 0; }
+  .file-library-search-actions {
+    justify-content: flex-start;
+  }
 
   .file-library-search-input { width: min(240px, 100%); }
 }
@@ -1952,14 +1803,6 @@ onMounted(() => {
   .file-library-content {
     flex: 1 1 auto;
     min-height: 420px;
-  }
-
-  .file-library-page-toolbar {
-    align-items: stretch;
-  }
-
-  .file-library-toolbar__actions {
-    justify-content: flex-start;
   }
 
   .file-library-main {

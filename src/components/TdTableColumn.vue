@@ -9,6 +9,7 @@ const props = defineProps({
   align: { type: String, default: undefined },
   fixed: { type: [String, Boolean], default: undefined },
   type: { type: String, default: undefined },
+  checkProps: { type: [Object, Function], default: undefined },
   showOverflowTooltip: { type: Boolean, default: false }
 })
 
