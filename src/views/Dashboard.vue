@@ -507,7 +507,12 @@ onUnmounted(() => {
 
 <style scoped>
 .dashboard-page {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  width: 100%;
   min-width: 0;
+  min-height: 100%;
   padding-bottom: var(--app-spacing-6);
 }
 

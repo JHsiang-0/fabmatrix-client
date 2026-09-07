@@ -32,6 +32,12 @@ test('设备状态卡片区分接口错误与暂无设备空态', () => {
   assert.match(dashboardSource, /\.dashboard-grid\s*\{[\s\S]*align-items: start/)
 })
 
+test('总览页面填充父级可用内容区域', () => {
+  assert.match(dashboardSource, /\.dashboard-page\s*\{[\s\S]*display: flex/)
+  assert.match(dashboardSource, /\.dashboard-page\s*\{[\s\S]*flex: 1 1 auto/)
+  assert.match(dashboardSource, /\.dashboard-page\s*\{[\s\S]*min-height: 100%/)
+})
+
 test('美化总览复用 Electron 的状态归一化和任务状态标签', () => {
   assert.match(dashboardSource, /normalizePrinterStatus/)
   assert.match(dashboardSource, /statusOverviewSegments/)
