@@ -57,6 +57,13 @@ test('看板信息卡片不使用固定高度裁剪内容', () => {
   assert.match(detailsPanelSource, /flex: 1 1 auto/)
 })
 
+test('近七日趋势时间范围保持紧凑单行显示', () => {
+  assert.match(detailsPanelSource, /\.dashboard-trend-range[\s\S]*font-size: 11px/)
+  assert.match(detailsPanelSource, /\.dashboard-trend-range[\s\S]*line-height: 16px/)
+  assert.match(detailsPanelSource, /\.dashboard-trend-range[\s\S]*white-space: nowrap/)
+  assert.match(detailsPanelSource, /\.dashboard-trend-range[\s\S]*text-overflow: ellipsis/)
+})
+
 test('实时告警中的重连按钮与提示文字保持同排右对齐', () => {
   assert.match(farmDashboardSource, /class="dashboard-realtime-alert"/)
   assert.match(farmDashboardSource, /<template #default>\s*<span class="dashboard-alert__message">\{\{ realtimeNotice \}\}/)

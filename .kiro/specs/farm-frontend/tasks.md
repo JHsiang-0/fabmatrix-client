@@ -1,5 +1,32 @@
 # 前端 Kiro 任务清单
 
+## Kiro Task UI-001.23：近 7 日趋势时间范围适配
+
+状态：已完成
+
+范围：
+
+- `src/components/DashboardDetailsPanel.vue`
+- `tests/dashboardOverview.test.js`
+
+目标：
+
+- 缩小近 7 日趋势卡片时间范围文字的字号和行高。
+- 保持日期范围单行显示，避免标题区溢出或挤压趋势图。
+- 保留 TDesign Card 结构和趋势数据逻辑不变。
+
+验收标准：
+
+- `09-01 ~ 09-07` 在卡片标题区完整显示且不换行。
+- 时间范围文字不会覆盖标题、副标题或超出卡片边界。
+- 专项测试、`npm run lint`、`npm run build` 和 `git diff --check` 全部通过。
+
+提交建议：fix: 优化趋势卡片时间范围显示
+
+完成记录：将近 7 日趋势卡片的时间范围改为 11px 字号和 16px 行高，限制最大宽度并保持单行省略，避免日期文字溢出或挤压标题区。
+
+验证说明：看板专项测试 10/10 通过；`npm run lint` 通过；`npm run build` 通过；`git diff --check` 通过。构建仅保留项目原有动态导入和大 chunk 提示。
+
 ## Kiro Task UI-001.22：告警条重连按钮右对齐
 
 状态：已完成

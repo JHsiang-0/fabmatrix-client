@@ -191,6 +191,10 @@ const barHeight = count => Math.max(6, Math.round((count / maxTrendCount.value) 
   min-width: 0;
 }
 
+.dashboard-detail-card--trend .dashboard-detail-card__heading {
+  min-width: 0;
+}
+
 .dashboard-detail-card__heading h3 {
   color: var(--app-text-primary);
   font-size: var(--td-font-size-body-small);
@@ -198,11 +202,21 @@ const barHeight = count => Math.max(6, Math.round((count / maxTrendCount.value) 
 }
 
 .dashboard-detail-card__heading p,
-.dashboard-trend-range,
 .dashboard-active-job__meta,
 .dashboard-detail-empty > span {
   color: var(--app-text-secondary);
   font-size: var(--td-font-size-caption);
+}
+
+.dashboard-trend-range {
+  flex: 0 0 auto;
+  max-width: 45%;
+  overflow: hidden;
+  color: var(--app-text-secondary);
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dashboard-status-summary__labels {
