@@ -17,8 +17,7 @@ const GRID_METRICS = {
   headerMargin: 8,
   editControlWidth: 68,
   editControlGap: 8,
-  editControlHeight: 32,
-  editGridPadding: 16
+  editControlHeight: 32
 }
 
 const DEFAULT_AISLE = {
@@ -187,9 +186,9 @@ export function calculateGridFit(config, { width = 0, height = 0, isEditMode = f
     sum + (row.type === 'aisle' ? row.height : normalized.CELL_HEIGHT)
   ), 0) + Math.max(rows.length - 1, 0) * GRID_METRICS.trackGap
   const bodyWidth = columnWidth
-    + (isEditMode ? GRID_METRICS.editControlGap + GRID_METRICS.editControlWidth + GRID_METRICS.editGridPadding : 0)
+    + (isEditMode ? GRID_METRICS.editControlGap + GRID_METRICS.editControlWidth : 0)
   const naturalWidth = GRID_METRICS.rowLabelWidth + GRID_METRICS.rootGap + bodyWidth
-  const gridHeight = rowHeight + (isEditMode ? GRID_METRICS.editGridPadding : 0)
+  const gridHeight = rowHeight
   const bodyHeight = GRID_METRICS.headerHeight + GRID_METRICS.headerMargin + gridHeight
   const rowRailHeight = GRID_METRICS.headerHeight + GRID_METRICS.headerMargin + rowHeight
     + (isEditMode ? GRID_METRICS.headerMargin + GRID_METRICS.editControlHeight : 0)

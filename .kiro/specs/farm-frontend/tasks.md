@@ -1,5 +1,28 @@
 # 前端 Kiro 任务清单
 
+## Kiro Task UI-001.33：修复看板行列标签与内容对齐
+
+状态：已完成
+
+范围：
+- `src/components/grid/GridMap.vue`
+- `src/utils/gridLayout.js`
+- `tests/gridLayout.test.js`
+
+目标：
+- 修复表头、行标签与设备网格在编辑态因额外内边距和 TDesign 菜单包装层产生的偏移。
+- 让整体画布适配计算与实际网格盒模型保持一致。
+
+验收标准：
+- 列标题与设备卡片的左边界、宽度和列间距一致。
+- 行名称与设备卡片的上边界、高度和行间距一致。
+- 编辑态和普通态均不产生额外错位，新增过道后仍保持对齐。
+- 对齐计算专项测试、`npm run lint`、`npm run build` 和 `git diff --check` 通过。
+
+提交建议：`fix: 修复看板行列标签对齐`
+
+完成记录：移除编辑态设备网格额外内边距，改用不影响布局尺寸的内描边；让 TDesign 右键菜单包装层完整占据对应网格轨道，并同步修正整体画布适配计算，保证表头、行标签、设备内容和过道对齐。专项 `tests/gridLayout.test.js` 7/7 通过，`npm run lint`、`npm run build`、`git diff --check` 通过。
+
 ## Kiro Task UI-001.32：看板网格整体适配与过道尺寸配置
 
 状态：已完成

@@ -205,7 +205,9 @@ function handleCellClick(device, rowIndex, colIndex) { emit('cell-click', device
 .grid-map__row-rail { display: flex; flex-direction: column; width: 40px; }
 .grid-map__corner { height: 28px; margin-bottom: 8px; }
 .grid-map__rows, .grid-map__device-grid, .grid-map__column-header { display: grid; gap: 12px; }
-.grid-map__rows :deep(.t-dropdown), .grid-map__column-header :deep(.t-dropdown) { min-width: 0; width: 100%; }
+.grid-map__rows :deep(.t-dropdown), .grid-map__column-header :deep(.t-dropdown) {
+    display: block; min-width: 0; width: 100%; height: 100%;
+}
 .grid-map__row-label, .grid-map__column-label {
     display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden;
     color: var(--app-text-secondary); background: var(--app-surface-muted);
@@ -228,7 +230,10 @@ function handleCellClick(device, rowIndex, colIndex) { emit('cell-click', device
     border-color: var(--app-primary); font-weight: 700; cursor: context-menu;
 }
 .is-edit-mode .grid-map__row-label.is-aisle, .is-edit-mode .grid-map__column-label.is-aisle { font-weight: 700; cursor: context-menu; }
-.is-edit-mode .grid-map__device-grid { padding: 8px; background: var(--app-page-background); border-radius: var(--app-radius); }
+.is-edit-mode .grid-map__device-grid {
+    background: var(--app-page-background); border-radius: var(--app-radius);
+    box-shadow: inset 0 0 0 1px var(--app-border);
+}
 @media (max-width: 767px) {
     .grid-map { gap: 4px; }
     .grid-map__row-rail { width: 32px; }
