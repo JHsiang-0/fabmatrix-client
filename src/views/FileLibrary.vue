@@ -959,7 +959,7 @@ const submitBatchUpload = async () => {
         const offset = chunkIndex * UPLOAD_BATCH_SIZE
         const chunk = chunks[chunkIndex]
         if (queueResult.status === 'fulfilled') {
-          normalizeBatchUploadResult(queueResult.value).items.forEach(item => {
+          normalizeBatchUploadResult(queueResult.value.data).items.forEach(item => {
             const file = chunk[item.index]
             items.push({ ...item, index: offset + item.index, fileName: item.fileName || file?.name || '' })
           })

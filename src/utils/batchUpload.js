@@ -48,11 +48,16 @@ export const normalizeBatchUploadResult = data => ({
     index: Number.isInteger(item?.index) ? item.index : fallbackIndex,
     fileId: item?.fileId ?? null,
     fileName: item?.fileName || '',
-    status: String(item?.status || 'FAILED').toUpperCase(),
+    status: normalizeBatchUploadStatus(item?.status),
     errorCode: item?.errorCode ?? null,
     message: item?.message || '',
     retryable: item?.retryable === true
   }))
 })
+
+const normalizeBatchUploadStatus = status => {
+  const normalized = String(status || 'FAILED').toUpperCase()
+  return normalized === 'SUCCEEDED' ? 'SUCCESS' : normalized
+}
 
 export const isBatchUploadSuccess = item => item?.status === 'SUCCESS'

@@ -39,3 +39,12 @@ test('normalizes per-file results and keeps retryable failures distinct', () => 
   assert.equal(result.items[1].retryable, true)
   assert.equal(result.items[1].errorCode, 503)
 })
+
+test('normalizes the backend SUCCEEDED status as a successful upload', () => {
+  const result = normalizeBatchUploadResult({
+    items: [{ index: 0, fileId: '9002', fileName: 'real.gcode', status: 'SUCCEEDED' }]
+  })
+
+  assert.equal(result.items[0].status, 'SUCCESS')
+  assert.equal(isBatchUploadSuccess(result.items[0]), true)
+})

@@ -81,6 +81,11 @@ test('文件库默认使用可滚动 TDesign 列表并通过行或卡片打开�
   assert.doesNotMatch(source, /viewMode = ref\('grid'\)/)
 })
 
+test('文件库批量上传读取批量响应 data 并识别后端成功状态', () => {
+  assert.match(source, /normalizeBatchUploadResult\(queueResult\.value\.data\)/)
+  assert.match(source, /isBatchUploadSuccess/)
+})
+
 test('文件库网格和列表均提供 TDesign 右键辅助菜单且只映射正式动作', () => {
   assert.match(source, /trigger="context-menu"/)
   assert.match(source, /const getContextMenuOptions = file =>/)
