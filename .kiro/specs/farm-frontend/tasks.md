@@ -1,5 +1,28 @@
 # 前端 Kiro 任务清单
 
+## Kiro Task UI-001.25：收紧近七日趋势柱状图
+
+状态：已完成
+
+范围：
+- `src/components/DashboardDetailsPanel.vue`
+- `tests/dashboardOverview.test.js`
+
+目标：
+- 缩短近七日任务趋势图的柱状图轨道高度，减少视觉占用。
+- 保留趋势数据、柱高比例、数量和日期标签的显示逻辑不变。
+
+验收标准：
+- 趋势柱状图轨道高度由 58px 收紧为 46px，图表保持完整显示。
+- 数量、柱状图和日期标签仍按底部对齐，不出现溢出或遮挡。
+- 专项测试、`npm run lint`、`npm run build` 和 `git diff --check` 全部通过。
+
+提交建议：fix: 收紧趋势柱状图高度
+
+完成记录：将近七日趋势柱状图轨道高度由 58px 调整为 46px，减少图表视觉占用，同时保留数量、日期和柱高比例逻辑不变。
+
+验证说明：看板专项测试 10/10 通过；`npm run lint` 通过；`npm run build` 通过；`git diff --check` 通过。构建仅保留项目原有动态导入和大 chunk 提示。
+
 ## Kiro Task UI-001.24：突出看板退出按钮
 
 状态：已完成

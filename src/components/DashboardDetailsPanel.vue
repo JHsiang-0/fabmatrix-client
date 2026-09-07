@@ -365,7 +365,7 @@ const barHeight = count => Math.max(6, Math.round((count / maxTrendCount.value) 
 .dashboard-trend-day__track {
   display: flex;
   width: 100%;
-  height: 58px;
+  height: 46px;
   align-items: end;
   padding: 2px;
   background: var(--app-surface-muted);

@@ -64,6 +64,10 @@ test('近七日趋势时间范围保持紧凑单行显示', () => {
   assert.match(detailsPanelSource, /\.dashboard-trend-range[\s\S]*text-overflow: ellipsis/)
 })
 
+test('近七日趋势柱状图保持紧凑高度', () => {
+  assert.match(detailsPanelSource, /\.dashboard-trend-day__track[\s\S]*height: 46px/)
+})
+
 test('实时告警中的重连按钮与提示文字保持同排右对齐', () => {
   assert.match(farmDashboardSource, /class="dashboard-realtime-alert"/)
   assert.match(farmDashboardSource, /<template #default>\s*<span class="dashboard-alert__message">\{\{ realtimeNotice \}\}/)
