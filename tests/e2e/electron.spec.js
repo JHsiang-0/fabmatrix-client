@@ -127,7 +127,8 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     await expect(page.locator('.file-library-main')).toBeVisible()
     await expect(page.locator('.file-library-sidebar')).toBeVisible()
     await expect(page.locator('.file-folder-tree')).toBeVisible()
-    await expect(page.getByText('我的文件夹', { exact: true })).toBeVisible()
+    const defaultFolderCandidates = page.locator('.file-folder-tree .t-tree__label').filter({ hasText: /^我的文件夹$/ })
+    await expect(defaultFolderCandidates.first()).toBeVisible({ timeout: 10000 })
     await expect(page.locator('.file-table-view')).toBeVisible({ timeout: 10000 })
     await expect(page.getByRole('radio', { name: '列表视图', exact: true }).locator('..')).toBeVisible()
     const fileWorkspaceMetrics = await page.evaluate(() => {
@@ -176,14 +177,23 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     await expect(page.locator('.t-dialog__header-content').filter({ hasText: '批量上传切片文件' })).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(page.locator('.t-dialog__header-content').filter({ hasText: '批量上传切片文件' })).not.toBeVisible()
-    const firstFolderName = await page.locator('.file-table__name').first().innerText()
+    const firstFolderName = '产品样件'
     const treeFolder = page.locator('.file-folder-tree .t-tree__label').filter({ hasText: firstFolderName }).first()
     await expect(treeFolder).toBeVisible()
     await treeFolder.click()
     await expect(page.locator('.file-library-filter-form .t-breadcrumb')).toHaveCount(0)
-    await page.locator('.file-folder-tree .t-tree__label').filter({ hasText: '我的文件夹' }).click()
-    await expect(page.locator('.file-library-filter-form .t-breadcrumb')).toHaveCount(0)
-    const gearboxFile = page.getByText('gearbox.gcode', { exact: true })
+    let gearboxFile = null
+    for (const folderCandidate of await defaultFolderCandidates.all()) {
+      await folderCandidate.click()
+      await expect(page.locator('.file-table-view .t-loading__overlay')).toBeHidden({ timeout: 10000 })
+      const candidateFile = page.getByText('gearbox.gcode', { exact: true })
+      if (await candidateFile.isVisible()) {
+        gearboxFile = candidateFile
+        break
+      }
+    }
+    expect(gearboxFile, '未找到包含 gearbox.gcode 的默认文件夹').not.toBeNull()
+    await expect(gearboxFile).toBeVisible({ timeout: 10000 })
     const gearboxBox = await gearboxFile.boundingBox()
     const contextClick = { x: 24, y: 16 }
     await gearboxFile.click({ button: 'right', position: contextClick })

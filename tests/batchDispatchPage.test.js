@@ -28,13 +28,16 @@ test('批量派发一次只展示当前步骤，并提供可回退的步骤操�
 
 test('批量派发资源来自完整真实文件树并复用上传契约校验', () => {
   assert.match(source, /getFileTree\(\)/)
-  assert.match(source, /flattenFiles/)
+  assert.match(source, /collectFolderIds/)
+  assert.match(source, /getFileList\(/)
+  assert.match(source, /folder: false/)
+  assert.match(source, /parentId: null/)
+  assert.match(source, /seenFileIds/)
   assert.match(source, /validateBatchUploadSelection/)
   assert.match(source, /normalizeBatchUploadResult/)
   assert.match(source, /uploadProgress/)
   assert.match(source, /最多选择 100 个文件和 100 台打印机/)
   assert.match(source, /file\.originalName/)
-  assert.doesNotMatch(source, /getFileList/)
 })
 
 test('批量预览和确认只展示后端字段，并保留幂等回放与恢复入口', () => {

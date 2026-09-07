@@ -64,11 +64,69 @@ test('returns an access-filtered nested file tree without internal fields', asyn
   setupSession()
   const response = await request('GET', '/api/v1/print-files/tree', undefined, operatorHeaders)
   const rootNames = response.data.map(node => node.name)
-  const testFolder = response.data.find(node => node.id === 2)
+  const defaultFolder = response.data.find(node => node.id === 4)
 
-  assert.deepEqual(rootNames, ['测试文件'])
-  assert.deepEqual(testFolder.children.map(node => node.id), [23])
-  assert.equal(testFolder.children[0].name, 'calibration.bgcode')
-  assert.equal('safeName' in testFolder, false)
-  assert.equal('fileUrl' in testFolder.children[0], false)
+  assert.deepEqual(rootNames, ['我的文件夹', '测试文件'])
+  assert.equal(defaultFolder.isDefault, true)
+  assert.deepEqual(defaultFolder.children, [])
+  const defaultFolderFiles = await request('POST', '/api/v1/print-files/page', {
+    pageNum: 1,
+    pageSize: 10,
+    parentId: 4,
+    folder: false
+  }, operatorHeaders)
+  assert.deepEqual(defaultFolderFiles.data.records.map(file => file.id), [23])
+  assert.equal(defaultFolderFiles.data.records[0].originalName, 'calibration.bgcode')
+  assert.equal(response.data.some(node => node.id === 1), false)
+  assert.equal(response.data.every(node => node.userId === 2), true)
+  assert.equal('safeName' in defaultFolder, false)
+  assert.equal('fileUrl' in defaultFolderFiles.data.records[0], false)
+})
+
+test('allows the real default folder as a second-level parent but still caps depth at two', async () => {
+  setupSession()
+
+  const created = await request('POST', '/api/v1/print-files/folder/create', {
+    parentId: 4,
+    folderName: '校准归档'
+  }, operatorHeaders)
+  assert.equal(created.data.parentId, 4)
+  assert.equal(created.data.level, 2)
+
+  await assert.rejects(
+    request('POST', '/api/v1/print-files/folder/create', {
+      parentId: created.data.id,
+      folderName: '不应创建'
+    }, operatorHeaders),
+    error => error.response.status === 422
+  )
+})
+
+test('resolves omitted upload parents to the real default folder and validates page parents', async () => {
+  setupSession()
+
+  const single = await request('POST', '/api/v1/print-files/upload', {
+    file: { name: 'default-single.gcode', size: 12 }
+  }, operatorHeaders)
+  assert.equal(single.data.parentId, 4)
+
+  const batch = await request('POST', '/api/v1/print-files/batch-upload', {
+    files: [{ name: 'default-batch.gcode', size: 12 }]
+  }, operatorHeaders)
+  assert.equal(batch.data.items[0].status, 'SUCCESS')
+  const batchFile = mockState.files.find(file => file.id === batch.data.items[0].fileId)
+  assert.equal(batchFile.parentId, 4)
+
+  await assert.rejects(
+    request('POST', '/api/v1/print-files/page', { pageNum: 1, pageSize: 10, parentId: 20 }, operatorHeaders),
+    error => error.response.status === 422 && error.message === '父级资源不是文件夹'
+  )
+  await assert.rejects(
+    request('POST', '/api/v1/print-files/page', { pageNum: 1, pageSize: 10, parentId: 1 }, operatorHeaders),
+    error => error.response.status === 403 && error.message === '无权访问该文件夹'
+  )
+  await assert.rejects(
+    request('POST', '/api/v1/print-files/page', { pageNum: 1, pageSize: 10, parentId: 999 }, operatorHeaders),
+    error => error.response.status === 404 && error.message === '父文件夹不存在'
+  )
 })

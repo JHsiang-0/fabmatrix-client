@@ -73,6 +73,20 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
   assert.equal(restoredUser.role, 'ADMIN')
   assert.equal('password' in restoredUser, false)
 
+  const fileTree = assertSuccessEnvelope(await request(
+    'GET',
+    '/api/v1/print-files/tree',
+    undefined,
+    sessionHeaders
+  ))
+  const defaultFolder = fileTree.find(folder => (
+    folder.folder === true
+    && folder.isDefault === true
+    && folder.parentId === null
+    && folder.userId === restoredUser.id
+  ))
+  assert.ok(defaultFolder)
+
   const uploadedFile = assertSuccessEnvelope(await request(
     'POST',
     '/api/v1/print-files/upload',
@@ -81,6 +95,7 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
   ))
   assertPublicFile(uploadedFile)
   const uploadedFileId = uploadedFile.id
+  assert.equal(uploadedFile.parentId, defaultFolder.id)
 
   const preview = assertSuccessEnvelope(await request(
     'GET',
@@ -104,7 +119,7 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
   const uploadedPage = assertSuccessEnvelope(await request(
     'POST',
     '/api/v1/print-files/page',
-    { pageNum: 1, pageSize: 10, fileName: 'P1-FLOW', parentId: null },
+    { pageNum: 1, pageSize: 10, fileName: 'P1-FLOW', parentId: defaultFolder.id, folder: false },
     sessionHeaders
   ))
   assertPage(uploadedPage)

@@ -181,7 +181,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, confirmMessage } from '@/utils/message'
-import { batchUploadFiles, getFileTree } from '@/api/printFile'
+import { batchUploadFiles, getFileList, getFileTree } from '@/api/printFile'
 import { getPrinterList } from '@/api/printer'
 import { previewBatchDispatch, confirmBatchDispatch, retryPreviewBatchDispatch } from '@/api/job'
 import { createBatchPreviewRequest, normalizeBatchConfirmResult } from '@/utils/batchDispatch'
@@ -259,17 +259,10 @@ const confirmColumns = [
   { colKey: 'recovery', title: '恢复操作', width: 110 }
 ]
 
-function flattenFiles(nodes, result = []) {
+function collectFolderIds(nodes, result = []) {
   nodes.forEach(node => {
-    if (node.folder !== true) {
-      result.push({
-        id: node.id,
-        originalName: node.name,
-        fileSize: node.fileSize,
-        materialType: node.materialType
-      })
-    }
-    if (Array.isArray(node.children)) flattenFiles(node.children, result)
+    if (node?.folder === true || node?.folder === 1) result.push(node.id)
+    if (Array.isArray(node?.children)) collectFolderIds(node.children, result)
   })
   return result
 }
@@ -329,11 +322,30 @@ function queryIds(value) {
 async function loadResources() {
   loadingResources.value = true
   try {
-    const [fileResponse, printerResponse] = await Promise.all([
+    const [treeResponse, printerResponse] = await Promise.all([
       getFileTree(),
       getPrinterList({ pageNum: 1, pageSize: 100 })
     ])
-    files.value = flattenFiles(Array.isArray(fileResponse?.data) ? fileResponse.data : [])
+    const tree = Array.isArray(treeResponse?.data) ? treeResponse.data : []
+    const folderIds = collectFolderIds(tree)
+    const folderPages = await Promise.all([
+      // 保留根目录查询，以兼容迁移未覆盖的历史根文件。
+      getFileList({ pageNum: 1, pageSize: 100, parentId: null, folder: false }),
+      ...folderIds.map(folderId => getFileList({
+        pageNum: 1,
+        pageSize: 100,
+        parentId: folderId,
+        folder: false
+      }))
+    ])
+    const seenFileIds = new Set()
+    files.value = folderPages.flatMap(page => page?.data?.records || [])
+      .filter(file => {
+        const id = String(file.id)
+        if (seenFileIds.has(id)) return false
+        seenFileIds.add(id)
+        return true
+      })
     printers.value = printerResponse?.data?.records || []
   } catch (error) {
     console.error('加载批量派发资源失败:', error)

@@ -56,7 +56,8 @@ export function normalizePrintFilePageParams(params = {}) {
     pageSize: params.pageSize,
     fileName: fileName || undefined,
     materialType: materialType || undefined,
-    parentId: params.parentId ?? null
+    parentId: params.parentId ?? null,
+    folder: typeof params.folder === 'boolean' ? params.folder : undefined
   })
 }
 

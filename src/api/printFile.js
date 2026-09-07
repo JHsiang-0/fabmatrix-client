@@ -21,6 +21,7 @@ import { normalizeBatchUploadResult } from '@/utils/batchUpload'
  * @param {number} [params.pageNum=1] - 页码
  * @param {number} [params.pageSize=10] - 每页条数
  * @param {string} [params.fileName] - 文件名搜索关键词
+ * @param {boolean} [params.folder] - 是否只查询文件夹；文件列表应传 false
  * @returns {Promise<{code: number, message: string, data: {records: Array<PrintFile>, total: number}}>} 文件列表
  *
  * @typedef {Object} PrintFile
@@ -124,7 +125,7 @@ export function uploadFile(formData, onUploadProgress, options = {}) {
 /**
  * 批量上传切片文件。后端会逐文件返回成功/失败结果，不会因为单个文件失败而丢失整批结果。
  * @param {File[]} files - 文件列表，后端字段名固定为 files
- * @param {number|string|null} [parentId] - 目标虚拟目录
+ * @param {number|string|null} [parentId] - 目标真实目录
  */
 export function batchUploadFiles(files, parentId = null, onUploadProgress, options = {}) {
   const formData = new FormData()

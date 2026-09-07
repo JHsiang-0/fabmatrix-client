@@ -82,6 +82,57 @@ const setJobStatus = (job, nextStatus) => {
 
 const canReadResource = (session, userId) => session.role === 'ADMIN' || String(session.userId) === String(userId)
 
+const getFolderLevel = folder => {
+  let level = 1
+  let current = folder
+  const visited = new Set()
+  while (current.parentId !== null && current.parentId !== undefined) {
+    if (visited.has(String(current.id))) return -1
+    visited.add(String(current.id))
+    const parent = findFile(current.parentId)
+    if (!parent?.folder || String(parent.userId) !== String(folder.userId)) return -1
+    level += 1
+    current = parent
+    if (level > 2) return level
+  }
+  return level
+}
+
+const requireFolderParent = (session, parentId, options = {}) => {
+  if (parentId === null || parentId === undefined || parentId === '') return null
+  const normalizedId = Number(parentId)
+  const parent = findFile(normalizedId)
+  if (!parent) fail(404, 404, '父文件夹不存在')
+  if (!parent.folder) fail(422, 422, '父级资源不是文件夹')
+  if (String(parent.userId) !== String(session.userId)) fail(403, 403, '无权访问该文件夹')
+  const level = getFolderLevel(parent)
+  const maxLevel = options.allowSecondLevel ? 2 : 1
+  if (level < 1 || level > maxLevel) fail(422, 422, '文件夹最多支持两级目录')
+  return parent
+}
+
+const requirePageFolderParent = (session, parentId) => {
+  const parent = findFile(parentId)
+  if (!parent) fail(404, 404, '父文件夹不存在')
+  if (!parent.folder) fail(422, 422, '父级资源不是文件夹')
+  if (!canReadResource(session, parent.userId)) fail(403, 403, '无权访问该文件夹')
+  const level = getFolderLevel(parent)
+  if (level < 1 || level > 2) fail(422, 422, '文件夹最多支持两级目录')
+  return parent
+}
+
+const resolveUploadParent = (session, parentId) => {
+  if (parentId !== null && parentId !== undefined && parentId !== '') {
+    return requireFolderParent(session, parentId, { allowSecondLevel: true }).id
+  }
+  const defaults = mockState.files.filter(item => (
+    item.folder && item.isDefault && item.parentId == null
+      && String(item.userId) === String(session.userId)
+  ))
+  if (defaults.length !== 1) fail(422, 422, '默认文件夹不可用，请先完成目录迁移')
+  return defaults[0].id
+}
+
 const publicUser = user => {
   const data = cloneMockData(user)
   delete data.password
@@ -155,6 +206,7 @@ const handleFirstAdminSetup = config => {
     updatedAt: now()
   }
   mockState.users.push(user)
+  mockState.files.push(createMockDefaultFolder(user.id))
   const token = `mock-token-${user.id}`
   mockState.sessions[token] = { userId: user.id, username: user.username, role: user.role }
   return {
@@ -193,8 +245,32 @@ const handleRegister = config => {
     updatedAt: now()
   }
   mockState.users.push(user)
+  mockState.files.push(createMockDefaultFolder(user.id))
   return user.id
 }
+
+const createMockDefaultFolder = userId => ({
+  id: nextMockId('folder'),
+  parentId: null,
+  folder: true,
+  isFolder: 1,
+  isDefault: true,
+  level: 1,
+  originalName: '我的文件夹',
+  safeName: `folder_default_${userId}`,
+  fileSize: 0,
+  fileUrl: null,
+  userId,
+  createdAt: now(),
+  estTime: 0,
+  estimatedSeconds: 0,
+  materialType: null,
+  nozzleSize: null,
+  filamentWeight: null,
+  filamentLength: null,
+  printCount: 0,
+  successRate: 0
+})
 
 const handleAdminUserPage = config => {
   requireSession(config, ['ADMIN'])
@@ -709,6 +785,7 @@ const handleFilePage = config => {
   const session = requireSession(config, ['ADMIN', 'OPERATOR'])
   const params = getBody(config)
   const parentId = params.parentId == null || params.parentId === '' ? null : Number(params.parentId)
+  if (parentId !== null) requirePageFolderParent(session, parentId)
   let records = mockState.files.filter(item => item.parentId === parentId)
   if (session.role !== 'ADMIN') {
     records = records.filter(item => canReadResource(session, item.userId))
@@ -721,6 +798,9 @@ const handleFilePage = config => {
     const materialType = String(params.materialType).trim().toUpperCase()
     records = records.filter(item => item.materialType === materialType)
   }
+  if (typeof params.folder === 'boolean') {
+    records = records.filter(item => Boolean(item.folder) === params.folder)
+  }
   return createMockPage(records.map(toPublicFile), params)
 }
 
@@ -731,6 +811,7 @@ const createUploadedFile = (session, file, parentId) => {
     parentId: parentId == null || parentId === '' ? null : Number(parentId),
     folder: false,
     isFolder: 0,
+    isDefault: false,
     originalName: file.name,
     safeName: file.name,
     fileSize: file.size || 1024,
@@ -762,7 +843,8 @@ const handleUpload = config => {
   const file = body.file
   if (!file?.name) fail(400, 400, '请选择要上传的文件')
   if (!/\.(gcode|g|3mf|stl)$/i.test(file.name)) fail(400, 400, '仅支持 .gcode、.g、.3mf 或 .stl 文件')
-  return createUploadedFile(session, file, body.parentId)
+  const parentId = resolveUploadParent(session, body.parentId)
+  return createUploadedFile(session, file, parentId)
 }
 
 const handleBatchUpload = config => {
@@ -774,6 +856,7 @@ const handleBatchUpload = config => {
   if (files.length === 0 || files.length > 100) fail(400, 400, '批量上传文件数量必须为 1-100 个')
   const totalBytes = files.reduce((total, file) => total + (Number(file?.size) || 0), 0)
   if (totalBytes > 250 * 1024 * 1024) fail(400, 400, '批量上传文件总大小不能超过 250MB')
+  const parentId = resolveUploadParent(session, body.parentId)
 
   return {
     items: files.map((file, index) => {
@@ -783,7 +866,7 @@ const handleBatchUpload = config => {
       if (!/\.(gcode|g|3mf|stl)$/i.test(file.name)) {
         return { index, fileId: null, fileName: file.name, status: 'FAILED', errorCode: 400, message: '文件类型不支持', retryable: false }
       }
-      const created = createUploadedFile(session, file, body.parentId)
+      const created = createUploadedFile(session, file, parentId)
       return {
         index,
         fileId: created.id,
@@ -807,17 +890,20 @@ const handleCreateFolder = config => {
     fail(400, 400, '文件夹名称不合法')
   }
   const parentId = body.parentId == null || body.parentId === '' ? null : Number(body.parentId)
-  if (parentId !== null) {
-    const parent = findFile(parentId)
-    if (!parent?.folder || !canReadResource(session, parent.userId)) {
-      fail(404, 404, '父文件夹不存在')
-    }
+  requireFolderParent(session, parentId)
+  if (mockState.files.some(file => (
+    file.folder && String(file.userId) === String(session.userId) &&
+    (file.parentId ?? null) === parentId && file.originalName === folderName
+  ))) {
+    fail(409, 'PRINT_FOLDER_NAME_CONFLICT', '该目录下已存在同名文件夹')
   }
   const folder = {
     id: nextMockId('folder'),
     parentId,
     folder: true,
     isFolder: 1,
+    isDefault: false,
+    level: parentId === null ? 1 : 2,
     originalName: folderName,
     safeName: folderName,
     fileSize: 0,
@@ -883,18 +969,32 @@ const handleFileJobs = config => {
 const handleFileTree = config => {
   const session = requireSession(config, ['ADMIN', 'OPERATOR'])
   const files = mockState.files
-    .filter(file => canReadResource(session, file.userId))
+    .filter(file => file.folder && canReadResource(session, file.userId))
     .map(file => ({
       id: file.id,
       parentId: file.parentId ?? null,
-      folder: Boolean(file.folder),
+      folder: true,
+      level: file.level || getFolderLevel(file),
+      isDefault: Boolean(file.isDefault),
+      userId: file.userId,
       name: file.originalName,
-      fileSize: file.fileSize || 0,
-      materialType: file.materialType || null,
       createdAt: file.createdAt
     }))
+  const byId = new Map(files.map(file => [String(file.id), file]))
+  const valid = node => {
+    const level = getFolderLevel(node)
+    if (level < 1 || level > 2) return false
+    let parentId = node.parentId
+    while (parentId !== null && parentId !== undefined) {
+      const parent = byId.get(String(parentId))
+      if (!parent) return false
+      parentId = parent.parentId
+    }
+    return true
+  }
+  const validFiles = files.filter(valid)
   const childrenByParent = new Map()
-  files.forEach(file => {
+  validFiles.forEach(file => {
     const parentKey = file.parentId == null ? 'root' : String(file.parentId)
     const children = childrenByParent.get(parentKey) || []
     children.push(file)
@@ -905,10 +1005,15 @@ const handleFileTree = config => {
     new Date(right.createdAt) - new Date(left.createdAt) ||
     String(left.name).localeCompare(String(right.name), 'zh-CN')
   ))
-  const build = parentKey => sortNodes(childrenByParent.get(parentKey) || []).map(node => ({
+  const build = (parentKey, path = new Set()) => sortNodes(childrenByParent.get(parentKey) || []).map(node => {
+    if (path.has(String(node.id))) return null
+    const nextPath = new Set(path)
+    nextPath.add(String(node.id))
+    return {
     ...node,
-    children: build(String(node.id))
-  }))
+    children: build(String(node.id), nextPath)
+    }
+  }).filter(Boolean)
 
   return build('root')
 }

@@ -65,7 +65,8 @@ test('normalizes file page query with contract fields', () => {
     pageSize: 20,
     fileName: 'gear',
     materialType: 'PLA',
-    parentId: 1
+    parentId: 1,
+    folder: undefined
   })
 })
 

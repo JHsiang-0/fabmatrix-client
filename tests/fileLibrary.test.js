@@ -24,12 +24,12 @@ test('文件中心使用正式分页契约并提供文件夹树与单一主工�
   assert.match(source, /const refreshLibrary = \(\) => fetchData\(\)/)
 })
 
-test('文件夹树只使用正式树接口并保留根目录、父级路径和错误恢复', () => {
+test('文件夹树只消费后端真实目录节点并保留路径和错误恢复', () => {
   assert.match(source, /import FileFolderTree from '@\/components\/file\/FileFolderTree\.vue'/)
   assert.match(folderTreeSource, /import \{ getFileTree \} from '@\/api\/printFile'/)
   assert.match(folderTreeSource, /await getFileTree\(\)/)
-  assert.match(folderTreeSource, /const ROOT_VALUE = '__root__'/)
-  assert.match(folderTreeSource, /label: '我的文件夹'/)
+  assert.doesNotMatch(folderTreeSource, /__root__/)
+  assert.match(folderTreeSource, /folders\.value\.filter\(isFolder\)/)
   assert.match(folderTreeSource, /aria-label="新建文件夹"/)
   assert.match(folderTreeSource, /theme="primary"[\s\S]*variant="outline"[\s\S]*size="small"[\s\S]*aria-label="新建文件夹"/)
   assert.doesNotMatch(folderTreeSource, /刷新文件夹列表|RefreshIcon|按目录查看文件/)
@@ -37,7 +37,10 @@ test('文件夹树只使用正式树接口并保留根目录、父级路径和�
   assert.match(folderTreeSource, /Array\.isArray\(folder\.children\)[\s\S]*folder\.children\.filter\(isFolder\)/)
   assert.match(folderTreeSource, /activable[\s\S]*hover[\s\S]*expand-on-click-node/)
   assert.match(folderTreeSource, /@click="handleTreeClick"/)
-  assert.match(folderTreeSource, /emit\('select', \{ id: null, path: \[\] \}\)/)
+  assert.match(folderTreeSource, /Array\.isArray\(node\.path\)[\s\S]*Array\.isArray\(data\.path\)/)
+  assert.match(folderTreeSource, /path\n {2}\}\)/)
+  assert.match(folderTreeSource, /const path = Array\.isArray\(node\.path\)[\s\S]*Array\.isArray\(data\.path\)/)
+  assert.match(folderTreeSource, /emit\('select', \{[\s\S]*id,[\s\S]*path\n {2}\}\)/)
   assert.match(folderTreeSource, /<t-alert v-if="error" theme="error"/)
   assert.match(folderTreeSource, /@click="refresh">重试<\/t-button>/)
   assert.doesNotMatch(folderTreeSource, /checkable|draggable|allow-drop|onDrop/)
@@ -51,7 +54,7 @@ test('文件中心不伪造材料和统计值，并覆盖上传删除结果态',
   assert.match(source, /formatMetric/)
   assert.match(source, /retryableFiles/)
   assert.match(source, /items.length !== ids.length/)
-  assert.match(source, /error\?\.response\?\.status === 422/)
+  assert.match(source, /message\.error\(error\?\.message \|\| '删除失败'\)/)
 })
 
 test('文件库工具栏将操作、视图和搜索合并为一行', () => {
@@ -78,7 +81,7 @@ test('文件详情仅展示安全元数据并区分缩略图不可用', () => {
 
 test('文件库使用 TDesign 视图分段并永久显示选择列', () => {
   assert.match(source, /const viewMode = ref\('list'\)/)
-  assert.match(source, /const fileRows = computed\(\(\) => fileList\.value\.map/)
+  assert.match(source, /const fileRows = computed\(\(\) => fileList\.value\)/)
   assert.match(source, /<TdTable :data="fileRows" row-key="id"/)
   assert.match(source, /@row-click="handleTableRowClick"/)
   assert.match(source, /@click="handleFileClick\(file\)"/)
@@ -97,7 +100,7 @@ test('文件库使用 TDesign 视图分段并永久显示选择列', () => {
   assert.match(source, /class="file-library-search-actions"/)
   assert.match(source, /class="file-library-search-input"/)
   assert.match(source, /\.file-library-search-input :deep\(\.t-input\)[\s\S]*background: var\(--app-surface-muted\)[\s\S]*border-color: transparent/)
-  assert.match(folderTreeSource, /\.file-folder-tree__search :deep\(\.t-input\)[\s\S]*background: var\(--app-surface-muted\)[\s\S]*box-shadow: var\(--app-shadow\)/)
+  assert.match(folderTreeSource, /\.file-folder-tree__search :deep\(\.t-input\)[\s\S]*background: var\(--app-surface-muted\)[\s\S]*box-shadow: none/)
   assert.match(source, /\.file-library-toolbar-card :deep\(\.t-card__body\)[\s\S]*padding: var\(--app-spacing-3\) var\(--app-spacing-4\)/)
   assert.match(source, /\.file-library-results-card :deep\(\.t-card__body\)[\s\S]*padding: 0/)
   assert.match(source, /<t-card v-if="fileList\.length && viewMode === 'list'" bordered class="file-library-results-card file-library-table-card"/)

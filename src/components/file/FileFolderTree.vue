@@ -64,8 +64,6 @@ import { getFileTree } from '@/api/printFile'
 
 defineOptions({ name: 'FileFolderTree' })
 
-const ROOT_VALUE = '__root__'
-
 const props = defineProps({
   currentParentId: { type: [String, Number], default: null },
   treeMaxHeight: { type: [String, Number], default: '100%' }
@@ -77,7 +75,7 @@ const loading = ref(false)
 const error = ref('')
 const searchKeyword = ref('')
 const folders = ref([])
-const expandedKeys = ref([ROOT_VALUE])
+const expandedKeys = ref([])
 
 const normalizeFolderName = folder => folder?.name ?? folder?.originalName ?? `文件夹 ${folder?.id ?? ''}`
 
@@ -95,16 +93,17 @@ const toTreeNode = (folder, ancestors = []) => {
     value: id,
     label: name,
     path,
+    data: {
+      ...folder,
+      id,
+      parentId: folder.parentId ?? null,
+      isDefault: Boolean(folder.isDefault ?? folder.defaultFolder)
+    },
     children
   }
 }
 
-const treeData = computed(() => [{
-  value: ROOT_VALUE,
-  label: '我的文件夹',
-  path: [],
-  children: folders.value.filter(isFolder).map(folder => toTreeNode(folder))
-}])
+const treeData = computed(() => folders.value.filter(isFolder).map(folder => toTreeNode(folder)))
 
 const filterTree = (nodes, keyword) => {
   if (!keyword) return nodes
@@ -120,9 +119,9 @@ const filterTree = (nodes, keyword) => {
 
 const visibleTreeData = computed(() => filterTree(treeData.value, searchKeyword.value.trim()))
 
-const activeKeys = computed(() => [props.currentParentId === null || props.currentParentId === undefined
-  ? ROOT_VALUE
-  : String(props.currentParentId)])
+const activeKeys = computed(() => props.currentParentId === null || props.currentParentId === undefined
+  ? []
+  : [String(props.currentParentId)])
 
 const normalizeExpandedKeys = keys => {
   const validKeys = new Set()
@@ -150,7 +149,7 @@ const getAllNodeKeys = nodes => nodes.flatMap(node => [
 ])
 
 const syncExpandedKeys = currentId => {
-  const target = currentId === null || currentId === undefined ? ROOT_VALUE : currentId
+  const target = currentId
   expandedKeys.value = normalizeExpandedKeys([
     ...expandedKeys.value,
     ...findNodePath(treeData.value, target),
@@ -182,14 +181,12 @@ const handleTreeClick = context => {
 
   const data = node.data || node
   const id = String(node.value ?? data.value)
-  if (id === ROOT_VALUE) {
-    emit('select', { id: null, path: [] })
-    return
-  }
-
+  const path = Array.isArray(node.path)
+    ? node.path
+    : Array.isArray(data.path) ? data.path : [{ id, name: data.label }]
   emit('select', {
     id,
-    path: Array.isArray(data.path) ? data.path : [{ id, name: data.label }]
+    path
   })
 }
 
@@ -244,13 +241,14 @@ defineExpose({ refresh })
   margin-bottom: var(--app-spacing-3);
   background: var(--app-surface-muted);
   border-radius: var(--app-radius-small);
-  box-shadow: var(--app-shadow);
+  border: 1px solid transparent;
+  box-shadow: none;
 }
 
 .file-folder-tree__search :deep(.t-input) {
   border-color: transparent;
   background: var(--app-surface-muted);
-  box-shadow: var(--app-shadow);
+  box-shadow: none;
 }
 
 .file-folder-tree__error {

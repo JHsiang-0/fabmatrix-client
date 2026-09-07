@@ -1463,7 +1463,7 @@ Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅�
 
 Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅提交本子任务涉及的 5 个文件；提交信息：`refactor: 完成 UI-004.18 文件库入口精简与控件细节修复`。未执行 `git push`。
 
-### [ ] UI-004.19 文件夹层级与目录内容契约改造
+### [x] UI-004.19 文件夹层级与目录内容契约改造
 
 优先级：P1
 
@@ -1523,3 +1523,9 @@ Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅�
 - 不在前端维护旧的 `farm.monitor.printer-ids` 兼容配置。
 - 不新增未被后端支持的重命名、移动、复制、分享操作；如需要，另建目录管理任务并先冻结接口契约。
 - 不通过前端递归拼接完整树来代替分页接口，不在前端伪造默认目录或分页 `total`。
+
+完成记录：后端增加真实默认目录、两级目录校验、目录树与 `folder=false` 分页契约、空 `parentId` 默认目录归属、目录访问校验及重复/越权错误语义；前端移除虚拟根目录，树只展示真实文件夹，右侧只展示当前目录直接文件，并让批量派发按目录分页加载文件。补充默认目录、目录层级、分页与上传 Mock 回归，以及 Electron 异步加载和管理员多用户目录可见范围测试。
+
+迁移说明：已有 MySQL 数据卷不会自动执行初始化目录脚本，升级前必须备份并手工执行 `13-v2-print-file-default-folders.sql`，再按 `OPERATIONS.md` 的默认目录、根文件和异常目录校验项验收；发现冲突、孤儿、循环或超深目录时保留现场并先人工处理。
+
+验证：前端 `npm test`（157/157）、`npm run lint`、`npm run build:desktop`、Browser E2E（9/9）、Electron 相关冒烟和三尺寸滚动测试通过；后端 `mvnw.cmd test`（253/253）通过。构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。

@@ -11,6 +11,7 @@
             ref="folderTreeRef"
             :current-parent-id="currentParentId"
             @select="handleFolderSelect"
+            @loaded="handleFolderTreeLoaded"
             @create="openCreateFolderDialog"
           />
         </t-card>
@@ -20,7 +21,7 @@
               <t-card bordered class="file-library-toolbar-card" aria-label="文件操作工具栏">
                 <div class="file-library-filter-form" aria-label="文件筛选条件">
                 <t-space class="file-library-toolbar-actions" size="small" align="center" break-line>
-                  <t-button theme="primary" size="medium" :icon="renderIcon(Upload)" @click="handleUpload">
+                  <t-button theme="primary" size="medium" :icon="renderIcon(Upload)" :disabled="!canUpload" @click="handleUpload">
                     上传
                   </t-button>
                   <t-button v-if="selectedIds.length > 0" theme="danger" size="medium" :icon="renderIcon(Delete)"
@@ -57,11 +58,11 @@
               @retry="fetchData"
             />
           </div>
-          <t-empty v-else-if="fileList.length === 0" class="file-library-empty" description="当前目录暂无文件或文件夹">
+          <t-empty v-else-if="fileList.length === 0" class="file-library-empty" description="当前目录暂无文件">
             <template #operation>
               <t-space>
                 <t-button size="small" variant="outline" @click="openCreateFolderDialog">新建文件夹</t-button>
-                <t-button size="small" theme="primary" @click="handleUpload">上传</t-button>
+                <t-button size="small" theme="primary" :disabled="!canUpload" @click="handleUpload">上传</t-button>
               </t-space>
             </template>
           </t-empty>
@@ -75,60 +76,9 @@
           <!-- 网格视图 -->
           <t-card v-if="fileList.length && viewMode === 'grid'" bordered class="file-library-results-card file-library-grid-card" aria-label="文件网格列表">
             <div class="file-grid-view app-scroll-region">
-        <!-- 文件夹 -->
-        <div
-          v-for="file in folderList"
-          :key="file.id"
-          class="file-card-context"
-          @contextmenu="captureContextMenu"
-        >
-          <t-dropdown :options="getContextMenuOptions(file)" trigger="context-menu" :popup-props="contextMenuPopupProps"
-            @click="handleContextMenuClick($event, file)">
-            <t-card bordered hover-shadow class="file-card"
-              :class="{ 'file-card--selected': selectedIds.includes(file.id) }"
-              @click="handleFileClick(file)">
-              <!-- 左侧常驻选择状态；文件夹由左侧目录树导航，不参与文件批量操作。 -->
-              <div class="file-card__selection">
-                <t-checkbox :checked="selectedIds.includes(file.id)" :disabled="file.folder"
-                  @click.stop="toggleSelection(file.id)" size="small" />
-              </div>
-
-              <!-- 文件夹图标 -->
-              <div class="file-card__media file-card__media--folder">
-                <IconFolder :size="48" />
-              </div>
-
-              <!-- 卡片内容 -->
-              <div class="file-card__body">
-                <h3 class="file-card__name"
-                  :title="file.originalName">
-                  {{ file.originalName }}
-                </h3>
-
-                <!-- 文件夹统计 -->
-                <div class="file-card__stats">
-                  <div class="file-card__stat">
-                    <span class="file-card__stat-label">类型</span>
-                    <span class="file-card__stat-value">文件夹</span>
-                  </div>
-                </div>
-
-                <!-- 悬浮操作按钮 -->
-                <div class="file-card__actions">
-                  <t-button theme="danger" size="small" :icon="renderIcon(Delete)" :loading="deletingIds.includes(file.id)"
-                    :disabled="batchDeleting || deletingIds.length > 0" @click.stop="handleDelete(file.id)"
-                    class="file-card__action">
-                    删除
-                  </t-button>
-                </div>
-              </div>
-            </t-card>
-          </t-dropdown>
-        </div>
-
         <!-- 文件 -->
         <div
-          v-for="file in fileItemsList"
+          v-for="file in fileRows"
           :key="file.id"
           class="file-card-context"
           @contextmenu="captureContextMenu"
@@ -236,10 +186,7 @@
                 @click="handleContextMenuClick($event, row)">
                 <div class="file-table__name-cell" @contextmenu="captureContextMenu">
                   <div class="file-table__icon">
-                    <span v-if="row.folder" class="file-table__folder-icon">
-                      <IconFolder />
-                    </span>
-                    <t-image v-else-if="row.thumbnailUrl" :src="row.thumbnailUrl" fit="cover" class="file-table__thumbnail" />
+                    <t-image v-if="row.thumbnailUrl" :src="row.thumbnailUrl" fit="cover" class="file-table__thumbnail" />
                     <span v-else class="file-table__file-icon">
                       <Document />
                     </span>
@@ -248,10 +195,7 @@
                     :title="row.originalName">{{
                       row.originalName
                     }}</span>
-                  <t-tag v-if="row.folder" size="small" class="file-table__type-tag">
-                    文件夹
-                  </t-tag>
-                  <t-tag v-else :theme="getMaterialTagType(row.materialType)" size="small" class="file-table__type-tag">
+                  <t-tag :theme="getMaterialTagType(row.materialType)" size="small" class="file-table__type-tag">
                     {{ row.materialType || '未指定' }}
                   </t-tag>
                 </div>
@@ -259,55 +203,53 @@
             </template>
           </TdTableColumn>
 
-          <TdTableColumn prop="fileSize" label="文件大小" width="100" v-if="currentParentId">
+          <TdTableColumn prop="fileSize" label="文件大小" width="100">
             <template #default="{ row }">
-              <span v-if="!row.folder">{{ formatFileSize(row.fileSize) }}</span>
+              <span>{{ formatFileSize(row.fileSize) }}</span>
             </template>
           </TdTableColumn>
 
-          <TdTableColumn prop="estTime" label="预计耗时" width="85" v-if="currentParentId">
+          <TdTableColumn prop="estTime" label="预计耗时" width="85">
             <template #default="{ row }">
-              <span v-if="!row.folder">{{ formatDuration(row.estTime) }}</span>
+              <span>{{ formatDuration(row.estTime) }}</span>
             </template>
           </TdTableColumn>
 
-          <TdTableColumn prop="filamentWeight" label="耗材重量" width="85" v-if="currentParentId">
+          <TdTableColumn prop="filamentWeight" label="耗材重量" width="85">
             <template #default="{ row }">
-              <span v-if="!row.folder">{{ formatMetric(row.filamentWeight, 'g') }}</span>
+              <span>{{ formatMetric(row.filamentWeight, 'g') }}</span>
             </template>
           </TdTableColumn>
 
-          <TdTableColumn prop="filamentLength" label="所需线长" width="85" v-if="currentParentId">
+          <TdTableColumn prop="filamentLength" label="所需线长" width="85">
             <template #default="{ row }">
-              <span v-if="!row.folder">{{ formatMetric(row.filamentLength, 'm') }}</span>
+              <span>{{ formatMetric(row.filamentLength, 'm') }}</span>
             </template>
           </TdTableColumn>
 
-          <TdTableColumn prop="printCount" label="打印次数" width="80" v-if="currentParentId">
+          <TdTableColumn prop="printCount" label="打印次数" width="80">
             <template #default="{ row }">
-              <span v-if="!row.folder">{{ formatMetric(row.printCount, '次') }}</span>
+              <span>{{ formatMetric(row.printCount, '次') }}</span>
             </template>
           </TdTableColumn>
 
-          <TdTableColumn prop="successRate" label="成功率" width="100" v-if="currentParentId">
+          <TdTableColumn prop="successRate" label="成功率" width="100">
             <template #default="{ row }">
-              <div class="file-table__rate" v-if="!row.folder && hasValue(row.successRate)">
+              <div class="file-table__rate" v-if="hasValue(row.successRate)">
                 <t-progress :percentage="row.successRate" :stroke-width="6" :label="false"
                   :class="getSuccessRateClass(row.successRate)" />
                 <span>{{ formatMetric(row.successRate, '%') }}</span>
               </div>
-              <span v-else-if="!row.folder">-</span>
+              <span v-else>-</span>
             </template>
           </TdTableColumn>
 
           <TdTableColumn label="操作" width="220" fixed="right">
             <template #default="{ row }">
               <div class="file-table__actions">
-                <template v-if="!row.folder">
-                  <t-button theme="primary" size="small" :icon="renderIcon(Printer)" @click.stop="handlePrint(row)">
-                    打印
-                  </t-button>
-                </template>
+                <t-button theme="primary" size="small" :icon="renderIcon(Printer)" @click.stop="handlePrint(row)">
+                  打印
+                </t-button>
                 <t-button theme="danger" size="small" :icon="renderIcon(Delete)" :loading="deletingIds.includes(row.id)"
                   :disabled="batchDeleting || deletingIds.length > 0" @click.stop="handleDelete(row.id)">
                   删除
@@ -385,6 +327,22 @@
       <t-form :data="folderForm" :rules="folderRules" ref="folderFormRef" label-width="80px">
         <t-form-item label="文件夹名称" name="name">
           <t-input v-model="folderForm.name" placeholder="请输入文件夹名称" />
+        </t-form-item>
+        <t-form-item label="目录级别" name="level">
+          <t-radio-group v-model="folderForm.level">
+            <t-radio-button :value="1">一级目录</t-radio-button>
+            <t-radio-button :value="2">二级目录</t-radio-button>
+          </t-radio-group>
+        </t-form-item>
+        <t-form-item v-if="folderForm.level === 2" label="一级父目录" name="parentId">
+          <t-select v-model="folderForm.parentId" placeholder="请选择一级父目录" clearable>
+            <t-option
+              v-for="folder in firstLevelFolders"
+              :key="folder.value"
+              :value="folder.value"
+              :label="folder.label"
+            />
+          </t-select>
         </t-form-item>
       </t-form>
 
@@ -544,7 +502,6 @@ import { formatDuration, formatFileSize } from '@/utils/formatters'
 import FileDetailDrawer from '@/components/file/FileDetailDrawer.vue'
 import FileFolderTree from '@/components/file/FileFolderTree.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
-import IconFolder from '@/components/icons/IconFolder.vue'
 import AsyncState from '@/components/AsyncState.vue'
 import TdTable from '@/components/TdTable.vue'
 import TdTableColumn from '@/components/TdTableColumn.vue'
@@ -554,6 +511,7 @@ import {
   validateBatchUploadSelection
 } from '@/utils/batchUpload'
 import { chunkItems, runUploadQueue } from '@/utils/uploadQueue'
+import { useUserStore } from '@/stores/user'
 
 defineOptions({ name: 'FileLibrary' })
 
@@ -600,18 +558,26 @@ const detailJobsError = ref('')
 const FILE_DETAIL_CONTEXT_KEY = 'farm-ui:file-detail'
 // 文件夹导航状态
 const currentParentId = ref(null)
+const directoryReady = ref(false)
 const folderTreeRef = ref(null)
+const folderTreeFolders = ref([])
+const userStore = useUserStore()
+let fileRequestSequence = 0
 
 // 新建文件夹表单
 const folderForm = reactive({
-  name: ''
+  name: '',
+  level: 1,
+  parentId: null
 })
 
 const folderRules = {
   name: [
     { required: true, message: '请输入文件夹名称', trigger: 'blur' },
     { min: 1, max: 50, message: '文件夹名称长度在 1 到 50 个字符之间', trigger: 'blur' }
-  ]
+  ],
+  level: [{ required: true, message: '请选择目录级别', trigger: 'change' }],
+  parentId: [{ required: true, message: '请选择一级父目录', trigger: 'change' }]
 }
 
 const folderFormRef = ref(null)
@@ -623,17 +589,23 @@ const pagination = reactive({
   total: 0
 })
 
-// 计算文件夹和文件列表
-const fileRows = computed(() => fileList.value.map(file => ({
-  ...file,
-  viewType: file.folder ? 'folder' : 'file'
-})))
+// 后端通过 folder=false 保证右侧只返回当前目录的直接文件。
+const fileRows = computed(() => fileList.value)
+const canUpload = computed(() => directoryReady.value && currentParentId.value !== null && currentParentId.value !== undefined)
 
-const folderList = computed(() => fileRows.value.filter(file => file.viewType === 'folder'))
+const flattenFolders = (nodes, result = []) => {
+  nodes.forEach(node => {
+    if (node?.folder !== false) result.push(node)
+    if (Array.isArray(node?.children)) flattenFolders(node.children, result)
+  })
+  return result
+}
 
-const fileItemsList = computed(() => fileRows.value.filter(file => file.viewType === 'file'))
+const firstLevelFolders = computed(() => flattenFolders(folderTreeFolders.value)
+  .filter(folder => Number(folder.level || 1) === 1 && (folder.parentId === null || folder.parentId === undefined))
+  .map(folder => ({ value: folder.id, label: folder.name || folder.originalName || `文件夹 ${folder.id}` })))
 
-const getRowCheckProps = ({ row }) => ({ disabled: Boolean(row.folder) })
+const getRowCheckProps = () => ({})
 
 const contextMenuPosition = reactive({ left: 0, top: 0 })
 
@@ -676,18 +648,14 @@ const contextMenuPopupProps = {
 const getContextMenuOptions = file => {
   if (!file) return []
 
-  const options = file.folder
-    ? [
-        { content: '删除', value: 'delete', theme: 'error', prefixIcon: renderIcon(Delete) }
-      ]
-    : [
-        { content: '查看详情', value: 'detail', prefixIcon: renderIcon(Document) },
-        { content: '打印', value: 'print', prefixIcon: renderIcon(Printer) },
-        { content: '下载', value: 'download', prefixIcon: renderIcon(Download) },
-        { content: '删除', value: 'delete', theme: 'error', prefixIcon: renderIcon(Delete) }
-      ]
+  const options = [
+    { content: '查看详情', value: 'detail', prefixIcon: renderIcon(Document) },
+    { content: '打印', value: 'print', prefixIcon: renderIcon(Printer) },
+    { content: '下载', value: 'download', prefixIcon: renderIcon(Download) },
+    { content: '删除', value: 'delete', theme: 'error', prefixIcon: renderIcon(Delete) }
+  ]
 
-  if (!file.folder && selectedIds.value.includes(file.id) && selectedIds.value.length > 1) {
+  if (selectedIds.value.includes(file.id) && selectedIds.value.length > 1) {
     options.push({
       content: `批量删除 (${selectedIds.value.length})`,
       value: 'batch-delete',
@@ -717,6 +685,7 @@ const restoreFileDetailContext = () => {
  * 获取文件列表
  */
 const fetchData = async () => {
+  const requestSequence = ++fileRequestSequence
   loading.value = true
   loadError.value = ''
   try {
@@ -724,9 +693,11 @@ const fetchData = async () => {
       pageNum: pagination.pageNum,
       pageSize: pagination.pageSize,
       fileName: searchKeyword.value || undefined,
-      parentId: currentParentId.value
+      parentId: currentParentId.value,
+      folder: false
     }
     const res = await getFileList(params)
+    if (requestSequence !== fileRequestSequence) return
     fileList.value = res.data?.records || []
     pagination.total = res.data?.total || 0
 
@@ -734,20 +705,42 @@ const fetchData = async () => {
     selectedIds.value = []
     restoreFileDetailContext()
   } catch (error) {
+    if (requestSequence !== fileRequestSequence) return
     console.error('获取文件列表失败:', error)
     loadError.value = error?.message || '文件列表加载失败，请重试'
     message.error('获取文件列表失败')
   } finally {
-    loading.value = false
+    if (requestSequence === fileRequestSequence) loading.value = false
   }
 }
 
 const refreshLibrary = () => fetchData()
 
 const handleFolderSelect = selection => {
-  currentParentId.value = selection?.id ?? null
+  const nextParentId = selection?.id ?? null
+  if (String(currentParentId.value) === String(nextParentId)) return
+  currentParentId.value = nextParentId
   pagination.pageNum = 1
+  selectedIds.value = []
   fetchData()
+}
+
+const handleFolderTreeLoaded = folders => {
+  folderTreeFolders.value = Array.isArray(folders) ? folders : []
+  directoryReady.value = true
+  if (currentParentId.value !== null && currentParentId.value !== undefined) return
+
+  const currentUserId = userStore.userInfo?.id ?? null
+  const defaultFolder = currentUserId === null || currentUserId === undefined
+    ? null
+    : flattenFolders(folderTreeFolders.value)
+      .find(folder => folder?.isDefault && String(folder.userId) === String(currentUserId))
+  if (defaultFolder) {
+    currentParentId.value = defaultFolder.id
+    pagination.pageNum = 1
+    selectedIds.value = []
+    fetchData()
+  }
 }
 
 /**
@@ -755,6 +748,15 @@ const handleFolderSelect = selection => {
  */
 const openCreateFolderDialog = () => {
   folderForm.name = ''
+  const currentFolder = flattenFolders(folderTreeFolders.value)
+    .find(folder => String(folder.id) === String(currentParentId.value))
+  if (currentFolder?.level === 1) {
+    folderForm.level = 2
+    folderForm.parentId = currentFolder.id
+  } else {
+    folderForm.level = 1
+    folderForm.parentId = null
+  }
   createFolderDialogVisible.value = true
 }
 
@@ -762,12 +764,13 @@ const openCreateFolderDialog = () => {
  * 创建文件夹
  */
 const handleCreateFolder = async () => {
-  await folderFormRef.value?.validate()
+  const validation = await folderFormRef.value?.validate()
+  if (validation !== true && validation !== undefined) return
   creatingFolder.value = true
 
   try {
     await createFolder({
-      parentId: currentParentId.value,
+      parentId: folderForm.level === 2 ? folderForm.parentId : null,
       folderName: folderForm.name
     })
     message.success('文件夹创建成功')
@@ -776,7 +779,7 @@ const handleCreateFolder = async () => {
     await refreshLibrary()
   } catch (error) {
     console.error('创建文件夹失败:', error)
-    message.error('创建文件夹失败')
+    message.error(error?.message || '创建文件夹失败')
   } finally {
     creatingFolder.value = false
   }
@@ -825,7 +828,7 @@ const toggleSelection = (id) => {
  * 列表视图选中处理
  */
 const handleSelectionChange = (selection) => {
-  selectedIds.value = selection.filter(item => !item.folder).map(item => item.id)
+  selectedIds.value = selection.map(item => item.id)
 }
 
 /**
@@ -836,9 +839,7 @@ const handleFileSelect = (files) => {
   const selectedFiles = (Array.isArray(files) ? files : [files])
     .map(file => file?.raw || file)
     .filter(Boolean)
-  const existingNames = fileList.value
-    .filter(item => !item.folder)
-    .map(item => item.originalName)
+  const existingNames = fileList.value.map(item => item.originalName)
   const validation = validateBatchUploadSelection(selectedFiles, existingNames)
   pendingUploadFiles.value = validation.files
   batchUploadResults.value = []
@@ -851,6 +852,10 @@ const handleFileSelect = (files) => {
 
 const submitBatchUpload = async () => {
   if (batchUploading.value || pendingUploadFiles.value.length === 0) return
+  if (!canUpload.value) {
+    message.warning('文件夹尚未就绪，请先选择目录')
+    return
+  }
 
   const files = pendingUploadFiles.value.slice()
   batchUploading.value = true
@@ -969,7 +974,7 @@ const handleDelete = async (id) => {
   }
 
   try {
-    await confirmMessage(file.folder ? '确定要删除这个文件夹吗？空文件夹才允许删除。' : '确定要删除吗？', '提示', {
+    await confirmMessage('确定要删除吗？', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
@@ -989,11 +994,7 @@ const handleDelete = async (id) => {
   } catch (error) {
     if (error !== 'cancel') {
       console.error('删除失败:', error)
-      if (error?.response?.status === 422) {
-        message.warning('文件夹删除失败，请先处理文件夹中的内容')
-      } else {
-        message.error(error?.message || '删除失败')
-      }
+      message.error(error?.message || '删除失败')
     }
   } finally {
     deletingIds.value = deletingIds.value.filter(item => String(item) !== String(id))
@@ -1128,6 +1129,10 @@ const handleSubmitCreateJob = async () => {
  * 打开上传对话框
  */
 const handleUpload = () => {
+  if (!canUpload.value) {
+    message.warning('文件夹尚未就绪，请先选择目录')
+    return
+  }
   pendingUploadFiles.value = []
   batchUploadResults.value = []
   uploadProgress.value = 0
@@ -1262,8 +1267,7 @@ const handleFileDownload = async (file) => {
  * 处理文件点击事件
  */
 const handleFileClick = (file) => {
-  // 文件夹统一由左侧目录树导航，右侧结果区只打开文件详情。
-  if (!file.folder) openFileDetail(file)
+  openFileDetail(file)
 }
 
 const handleContextMenuClick = (value, file) => {
@@ -1273,13 +1277,13 @@ const handleContextMenuClick = (value, file) => {
 
   switch (action) {
     case 'detail':
-      if (!file.folder) openFileDetail(file)
+      openFileDetail(file)
       break
     case 'print':
-      if (!file.folder) handlePrint(file)
+      handlePrint(file)
       break
     case 'download':
-      if (!file.folder) handleFileDownload(file)
+      handleFileDownload(file)
       break
     case 'delete':
       handleDelete(file.id)
@@ -1296,8 +1300,7 @@ const handleContextMenuClick = (value, file) => {
  * 处理表格行点击事件
  */
 const handleTableRowClick = (row) => {
-  // 文件夹只在左侧树中导航；表格行点击仅用于打开文件详情。
-  if (!row.folder) openFileDetail(row)
+  openFileDetail(row)
 }
 
 // ============ 生命周期 ============
@@ -1457,6 +1460,8 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   height: var(--td-comp-size-m);
+  padding: 2px;
+  border-radius: var(--td-radius-medium);
 }
 
 .file-library-view-mode :deep(.t-radio-button) {
@@ -1464,7 +1469,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   width: 36px;
-  height: var(--td-comp-size-m);
+  height: calc(var(--td-comp-size-m) - 4px);
   padding: 0;
 }
 
