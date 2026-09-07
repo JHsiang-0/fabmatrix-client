@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  calculateGridFit,
   createGridConfig,
   getDefaultGridConfig,
   getOutOfBoundsDevices,
@@ -68,6 +69,20 @@ test('行列过道可以同时存在且分别统计视觉尺寸', () => {
   assert.equal(config.TOTAL_COLS, 4)
   assert.equal(getVisualRows(config).length, 3)
   assert.equal(getVisualColumns(config).length, 4)
+})
+
+test('网格整体适配会将过道、间距和编辑控制区纳入缩放范围', () => {
+  const config = createGridConfig({
+    rowCount: 4,
+    columnCount: 12,
+    aisles: [{ axis: 'column', afterIndex: 7, size: 120 }]
+  })
+  const fit = calculateGridFit(config, { width: 900, height: 600, isEditMode: true })
+
+  assert.ok(fit.scale < 1)
+  assert.ok(fit.displayWidth <= 900)
+  assert.ok(fit.displayHeight <= 600)
+  assert.ok(fit.naturalWidth > fit.displayWidth)
 })
 
 test('减少行列时识别超出新范围的设备', () => {

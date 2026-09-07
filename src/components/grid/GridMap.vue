@@ -1,5 +1,6 @@
 <template>
-    <div ref="mapRoot" class="grid-map" :class="{ 'is-edit-mode': isEditMode }">
+    <div ref="mapViewport" class="grid-map-viewport" :style="viewportStyle">
+      <div class="grid-map" :class="{ 'is-edit-mode': isEditMode }" :style="gridMapStyle">
         <div class="grid-map__row-rail">
             <div class="grid-map__corner"></div>
             <div class="grid-map__rows" :style="rowGridStyle">
@@ -66,6 +67,7 @@
                 </template>
             </div>
         </div>
+      </div>
     </div>
 </template>
 
@@ -75,7 +77,7 @@ import { AddIcon, MinusIcon } from 'tdesign-icons-vue-next'
 import { renderIcon } from '@/utils/tdesign'
 import GridCell from './GridCell.vue'
 import { formatRowLabel } from '@/utils/formatters'
-import { getPhysicalColumn, getPhysicalRow, getVisualColumns, getVisualRows } from '@/utils/gridLayout'
+import { calculateGridFit, getPhysicalColumn, getPhysicalRow, getVisualColumns, getVisualRows } from '@/utils/gridLayout'
 
 defineOptions({ name: 'GridMap' })
 
@@ -95,53 +97,40 @@ const emit = defineEmits([
     'dimension-change', 'aisle-context'
 ])
 
-const mapRoot = ref(null)
+const mapViewport = ref(null)
 const containerWidth = ref(0)
 const containerHeight = ref(0)
 let resizeObserver
 
 const visualColumns = computed(() => getVisualColumns(props.gridConfig))
 const visualRows = computed(() => getVisualRows(props.gridConfig))
-const deviceColumnCount = computed(() => visualColumns.value.filter(column => column.type === 'device').length)
-const deviceRowCount = computed(() => visualRows.value.filter(row => row.type === 'device').length)
-
-const cellWidth = computed(() => {
-    const baseWidth = Number(props.gridConfig.CELL_MIN_WIDTH) || 100
-    if (!containerWidth.value || !deviceColumnCount.value) return baseWidth
-    const aisleWidth = visualColumns.value.filter(column => column.type === 'aisle')
-        .reduce((sum, column) => sum + Number(column.width || column.size || baseWidth), 0)
-    const gaps = Math.max(visualColumns.value.length - 1, 0) * 12
-    const controlsWidth = props.isEditMode ? 76 : 0
-    const availableWidth = containerWidth.value - 48 - 8 - controlsWidth
-    const fittedWidth = (availableWidth - aisleWidth - gaps) / deviceColumnCount.value
-    return Math.max(72, Math.min(baseWidth, fittedWidth))
-})
-
-const cellHeight = computed(() => {
-    const baseHeight = Number(props.gridConfig.CELL_HEIGHT) || 120
-    if (!containerHeight.value || !deviceRowCount.value) return baseHeight
-    const aisleHeight = visualRows.value.filter(row => row.type === 'aisle')
-        .reduce((sum, row) => sum + Number(row.height || row.size || baseHeight), 0)
-    const gaps = Math.max(visualRows.value.length - 1, 0) * 12
-    const fittedHeight = (containerHeight.value - 40 - aisleHeight - gaps) / deviceRowCount.value
-    return Math.max(86, Math.min(baseHeight, fittedHeight))
-})
-
 const columnGridTemplate = computed(() => visualColumns.value
-    .map(column => `${column.type === 'aisle' ? Number(column.width || column.size || 100) : cellWidth.value}px`)
+    .map(column => `${column.type === 'aisle' ? Number(column.width || column.size || 100) : Number(props.gridConfig.CELL_MIN_WIDTH) || 100}px`)
     .join(' '))
 const rowGridTemplate = computed(() => visualRows.value
-    .map(row => `${row.type === 'aisle' ? Number(row.height || row.size || 80) : cellHeight.value}px`)
+    .map(row => `${row.type === 'aisle' ? Number(row.height || row.size || 80) : Number(props.gridConfig.CELL_HEIGHT) || 140}px`)
     .join(' '))
 const columnGridStyle = computed(() => ({ gridTemplateColumns: columnGridTemplate.value }))
 const rowGridStyle = computed(() => ({ gridTemplateRows: rowGridTemplate.value }))
 const gridStyle = computed(() => ({ gridTemplateColumns: columnGridTemplate.value, gridTemplateRows: rowGridTemplate.value }))
+const gridFit = computed(() => calculateGridFit(props.gridConfig, {
+    width: containerWidth.value,
+    height: containerHeight.value,
+    isEditMode: props.isEditMode
+}))
+const viewportStyle = computed(() => ({ height: `${gridFit.value.displayHeight}px` }))
+const gridMapStyle = computed(() => ({
+    width: `${gridFit.value.naturalWidth}px`,
+    height: `${gridFit.value.naturalHeight}px`,
+    transform: `scale(${gridFit.value.scale})`
+}))
 
 function updateContainerSize() {
-    const root = mapRoot.value
-    const parent = root?.parentElement
-    containerWidth.value = parent?.clientWidth || root?.clientWidth || 0
-    containerHeight.value = parent?.clientHeight || 0
+    const viewport = mapViewport.value
+    const parent = viewport?.parentElement
+    const scrollRegion = parent?.parentElement
+    containerWidth.value = parent?.clientWidth || viewport?.clientWidth || 0
+    containerHeight.value = scrollRegion?.clientHeight || 0
 }
 
 onMounted(async () => {
@@ -149,8 +138,9 @@ onMounted(async () => {
     updateContainerSize()
     if (typeof ResizeObserver === 'undefined') return
     resizeObserver = new ResizeObserver(updateContainerSize)
-    if (mapRoot.value) resizeObserver.observe(mapRoot.value)
-    if (mapRoot.value?.parentElement) resizeObserver.observe(mapRoot.value.parentElement)
+    if (mapViewport.value) resizeObserver.observe(mapViewport.value)
+    if (mapViewport.value?.parentElement) resizeObserver.observe(mapViewport.value.parentElement)
+    if (mapViewport.value?.parentElement?.parentElement) resizeObserver.observe(mapViewport.value.parentElement.parentElement)
 })
 
 onUnmounted(() => resizeObserver?.disconnect())
@@ -180,7 +170,10 @@ function getColumnLabelClass(column) { return column.type === 'aisle' ? 'is-aisl
 
 function getAxisMenuOptions(axis, item) {
     if (item.type === 'aisle') {
-        return [{ content: `删除${axis === 'row' ? '行' : '列'}过道`, value: 'remove-aisle' }]
+        return [
+            { content: `编辑${axis === 'row' ? '行' : '列'}过道`, value: 'edit-aisle' },
+            { content: `删除${axis === 'row' ? '行' : '列'}过道`, value: 'remove-aisle' }
+        ]
     }
     return [{ content: `在第 ${item.number} ${axis === 'row' ? '行' : '列'}后设置为过道`, value: 'add-aisle' }]
 }
@@ -206,7 +199,8 @@ function handleCellClick(device, rowIndex, colIndex) { emit('cell-click', device
 </script>
 
 <style scoped>
-.grid-map { display: flex; gap: 8px; width: 100%; min-width: 0; min-height: 0; }
+.grid-map-viewport { width: 100%; min-width: 0; overflow: visible; }
+.grid-map { display: flex; gap: 8px; min-width: 0; min-height: 0; transform-origin: left top; }
 .grid-map__row-rail, .grid-map__body { flex: 0 0 auto; }
 .grid-map__row-rail { display: flex; flex-direction: column; width: 40px; }
 .grid-map__corner { height: 28px; margin-bottom: 8px; }

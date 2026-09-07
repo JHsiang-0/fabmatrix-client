@@ -72,6 +72,9 @@
       @action="handlePrinterAction" @emergency-stop="handleEmergencyStop" @remove="handleRemoveFromBoard"
       @closed="handleDrawerClosed" />
 
+    <grid-aisle-settings-dialog v-model:visible="aisleDialogVisible" :axis="aisleDialog.axis"
+      :index="aisleDialog.index" :aisle="aisleDialog.aisle" @confirm="applyAisleSettings" />
+
   </div>
 </template>
 
@@ -88,6 +91,7 @@ import { getJobPage } from '@/api/job'
 import DashboardHeader from './DashboardHeader.vue'
 import DashboardDetailsPanel from './DashboardDetailsPanel.vue'
 import GridMap from './grid/GridMap.vue'
+import GridAisleSettingsDialog from './GridAisleSettingsDialog.vue'
 import BindDeviceDialog from './BindDeviceDialog.vue'
 import DeviceDetailDrawer from './device/DeviceDetailDrawer.vue'
 import { createGridConfig, getOutOfBoundsDevices } from '@/utils/gridLayout'
@@ -123,6 +127,8 @@ const reconnecting = ref(false)
 const isEditMode = ref(false)
 const layoutSnapshot = ref(null)
 const layoutSaving = ref(false)
+const aisleDialogVisible = ref(false)
+const aisleDialog = ref({ axis: 'column', index: 1, aisle: null })
 const canManageLayout = computed(() => userStore.isAdmin)
 
 watch(canManageLayout, canManage => {
@@ -601,19 +607,14 @@ async function handleAisleContext({ action, axis, index, aisle }) {
   const current = store.gridConfig
   const aisles = current.aisles.map(item => ({ ...item }))
 
-  if (action === 'add-aisle') {
-    if (aisles.some(item => item.axis === axis && item.afterIndex === index)) {
-      message.info(`第 ${index} ${axisLabel}后已经设置过道`)
+  if (action === 'add-aisle' || action === 'edit-aisle') {
+    if (aisles.some(item => item.axis === axis && item.afterIndex === index && item.id !== aisle?.id)) {
+      if (action === 'add-aisle') message.info(`第 ${index} ${axisLabel}后已经设置过道`)
       return
     }
-    try {
-      await confirmMessage(`确定要在第 ${index} ${axisLabel}后设置一条过道吗？`, '设置过道', {
-        confirmButtonText: '确认设置', cancelButtonText: '取消', type: 'warning'
-      })
-    } catch {
-      return
-    }
-    aisles.push({ axis, afterIndex: index, label: '过道', size: axis === 'row' ? 80 : 100 })
+    aisleDialog.value = { axis, index, aisle: action === 'edit-aisle' ? aisle : null }
+    aisleDialogVisible.value = true
+    return
   } else if (action === 'remove-aisle') {
     try {
       await confirmMessage(`确定要删除这条${axisLabel}过道吗？`, '删除过道', {
@@ -632,6 +633,34 @@ async function handleAisleContext({ action, axis, index, aisle }) {
   await applyGridConfig(createGridConfig({ ...current, aisles }))
 }
 
+async function applyAisleSettings({ label, size }) {
+  const { axis, index, aisle } = aisleDialog.value
+  const current = store.gridConfig
+  const aisles = current.aisles.map(item => ({ ...item }))
+  const nextAisle = { axis, afterIndex: index, label, size }
+  let applied = false
+
+  if (aisle) {
+    const aisleIndex = aisles.findIndex(item => item.id === aisle.id)
+    if (aisleIndex >= 0) {
+      aisles[aisleIndex] = { ...aisles[aisleIndex], ...nextAisle }
+      applied = true
+    }
+  } else if (!aisles.some(item => item.axis === axis && item.afterIndex === index)) {
+    aisles.push(nextAisle)
+    applied = true
+  }
+
+  if (!applied) {
+    message.info('过道位置已经存在配置')
+    return
+  }
+
+  if (await applyGridConfig(createGridConfig({ ...current, aisles }))) {
+    aisleDialogVisible.value = false
+  }
+}
+
 async function applyGridConfig(nextConfig) {
   const outOfBoundsDevices = getOutOfBoundsDevices(store.rawDeviceList, nextConfig)
   if (outOfBoundsDevices.length) {
@@ -648,12 +677,13 @@ async function applyGridConfig(nextConfig) {
         { confirmButtonText: '继续应用', cancelButtonText: '取消', type: 'warning' }
       )
     } catch {
-      return
+      return false
     }
   }
 
   store.updateGridConfig(nextConfig)
   message.success('网格布局已更新')
+  return true
 }
 
 // ============================================

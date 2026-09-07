@@ -9,6 +9,18 @@ const LIMITS = {
   aisleWidth: { min: 48, max: 240 }
 }
 
+const GRID_METRICS = {
+  rowLabelWidth: 40,
+  rootGap: 8,
+  trackGap: 12,
+  headerHeight: 28,
+  headerMargin: 8,
+  editControlWidth: 68,
+  editControlGap: 8,
+  editControlHeight: 32,
+  editGridPadding: 16
+}
+
 const DEFAULT_AISLE = {
   label: '过道',
   width: LEGACY_GRID_CONFIG.CELL_MIN_WIDTH
@@ -56,7 +68,7 @@ function normalizeAisles(aisles, rowCount, columnCount, legacyAisleCol) {
       }
     })
     .filter(Boolean)
-    .sort((left, right) => left.afterColumn - right.afterColumn)
+    .sort((left, right) => left.axis.localeCompare(right.axis) || left.afterIndex - right.afterIndex)
 }
 
 export function createGridConfig(input = {}) {
@@ -158,6 +170,41 @@ export function getPhysicalRow(visualRow, config) {
 
 export function isAisleVisualRow(visualRow, config) {
   return getVisualRows(config)[Number(visualRow) - 1]?.type === 'aisle'
+}
+
+/**
+ * 根据网格原始尺寸和可用视口计算整体缩放比例。
+ * 由外层统一缩放画布，避免只缩小单元格后仍因过道、间距和控制区溢出。
+ */
+export function calculateGridFit(config, { width = 0, height = 0, isEditMode = false } = {}) {
+  const normalized = createGridConfig(config)
+  const columns = getVisualColumns(normalized)
+  const rows = getVisualRows(normalized)
+  const columnWidth = columns.reduce((sum, column) => (
+    sum + (column.type === 'aisle' ? column.width : normalized.CELL_MIN_WIDTH)
+  ), 0) + Math.max(columns.length - 1, 0) * GRID_METRICS.trackGap
+  const rowHeight = rows.reduce((sum, row) => (
+    sum + (row.type === 'aisle' ? row.height : normalized.CELL_HEIGHT)
+  ), 0) + Math.max(rows.length - 1, 0) * GRID_METRICS.trackGap
+  const bodyWidth = columnWidth
+    + (isEditMode ? GRID_METRICS.editControlGap + GRID_METRICS.editControlWidth + GRID_METRICS.editGridPadding : 0)
+  const naturalWidth = GRID_METRICS.rowLabelWidth + GRID_METRICS.rootGap + bodyWidth
+  const gridHeight = rowHeight + (isEditMode ? GRID_METRICS.editGridPadding : 0)
+  const bodyHeight = GRID_METRICS.headerHeight + GRID_METRICS.headerMargin + gridHeight
+  const rowRailHeight = GRID_METRICS.headerHeight + GRID_METRICS.headerMargin + rowHeight
+    + (isEditMode ? GRID_METRICS.headerMargin + GRID_METRICS.editControlHeight : 0)
+  const naturalHeight = Math.max(bodyHeight, rowRailHeight)
+  const safeWidth = Number(width) > 0 ? Number(width) : naturalWidth
+  const safeHeight = Number(height) > 0 ? Number(height) : naturalHeight
+  const scale = Math.min(1, safeWidth / naturalWidth, safeHeight / naturalHeight)
+
+  return {
+    scale,
+    naturalWidth,
+    naturalHeight,
+    displayWidth: naturalWidth * scale,
+    displayHeight: naturalHeight * scale
+  }
 }
 
 export function getOutOfBoundsDevices(devices, config) {
