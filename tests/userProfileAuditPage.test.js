@@ -24,6 +24,9 @@ test('用户管理覆盖正式筛选、完整表单规则、编辑和当前管�
 
 test('个人中心使用真实资料接口、脏状态取消和改密后重新登录', () => {
   assert.match(profileSource, /<PageHeader title="个人中心"/)
+  assert.match(profileSource, /profile-account-card__meta/)
+  assert.match(profileSource, /用户 ID：\{\{ userId \|\| '—' \}\}/)
+  assert.doesNotMatch(profileSource, /profile-account-card__details/)
   assert.match(profileSource, /profileSaveError/)
   assert.match(profileSource, /passwordError/)
   assert.match(profileSource, /getProfile\(userId\)/)

@@ -11,17 +11,16 @@
             <div>
               <p class="profile-account-card__eyebrow">当前账户</p>
               <h2 class="profile-account-card__title">{{ userStore.userInfo.username || '未登录用户' }}</h2>
-              <t-tag theme="primary" variant="light-outline">
-                {{ userStore.userInfo.role || '未设置角色' }}
-              </t-tag>
+              <div class="profile-account-card__meta">
+                <t-tag theme="primary" variant="light-outline">
+                  {{ userStore.userInfo.role || '未设置角色' }}
+                </t-tag>
+                <span>用户 ID：{{ userId || '—' }}</span>
+              </div>
             </div>
           </div>
           <t-tag theme="success" variant="light-outline">已登录</t-tag>
         </div>
-        <t-descriptions class="profile-account-card__details" :column="2" size="small">
-          <t-descriptions-item label="用户 ID">{{ userId || '—' }}</t-descriptions-item>
-          <t-descriptions-item label="账户角色">{{ userStore.userInfo.role || '—' }}</t-descriptions-item>
-        </t-descriptions>
       </t-card>
 
       <div class="profile-grid">
@@ -268,10 +267,13 @@ onUnmounted(() => window.removeEventListener('beforeunload', handleBeforeUnload)
   line-height: 1.3;
 }
 
-.profile-account-card__details {
-  margin-top: var(--app-spacing-5);
-  padding-top: var(--app-spacing-4);
-  border-top: 1px solid var(--td-brand-color-2);
+.profile-account-card__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--app-spacing-3);
+  color: var(--app-text-secondary);
+  font-size: 12px;
 }
 
 .profile-grid {
