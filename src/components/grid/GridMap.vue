@@ -60,6 +60,7 @@
                     <GridCell v-for="(cell, colIndex) in row" :key="`cell-${rowIndex}-${colIndex}`"
                         :cell-type="getCellType(cell, rowIndex, colIndex)" :device="getDevice(cell)"
                         :real-time-data="getRealTimeData(cell)" :row-index="rowIndex" :col-index="colIndex"
+                        :aisle-axis="getAisleAxis(rowIndex, colIndex)"
                         :slot-label="getSlotLabel(rowIndex, colIndex)" :is-dragging="isDragging(cell)"
                         :is-drag-over="isDragOver(rowIndex, colIndex)" :is-edit-mode="isEditMode"
                         @dragstart="handleDragStart" @dragend="handleDragEnd" @dragenter="handleDragEnter"
@@ -146,9 +147,18 @@ onMounted(async () => {
 onUnmounted(() => resizeObserver?.disconnect())
 
 function getCellType(cell, rowIndex, colIndex) {
-    if (visualRows.value[rowIndex]?.type === 'aisle' || visualColumns.value[colIndex]?.type === 'aisle') return 'aisle'
+    if (getAisleAxis(rowIndex, colIndex)) return 'aisle'
     if (cell === null) return 'empty'
     return 'device'
+}
+
+function getAisleAxis(rowIndex, colIndex) {
+    const rowIsAisle = visualRows.value[rowIndex]?.type === 'aisle'
+    const columnIsAisle = visualColumns.value[colIndex]?.type === 'aisle'
+    if (rowIsAisle && columnIsAisle) return 'cross'
+    if (rowIsAisle) return 'row'
+    if (columnIsAisle) return 'column'
+    return null
 }
 
 function getDevice(cell) { return typeof cell === 'object' && cell !== null ? cell : null }

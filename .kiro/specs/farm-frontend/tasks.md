@@ -1,5 +1,30 @@
 # 前端 Kiro 任务清单
 
+## Kiro Task UI-001.34：修复看板过道方向与网格溢出
+
+状态：已完成
+
+范围：
+- `src/components/grid/GridMap.vue`
+- `src/components/grid/GridCell.vue`
+- `tests/gridAisleUi.test.js`
+- `.kiro/specs/farm-frontend/tasks.md`
+
+目标：
+- 根据视觉行列过道方向渲染横向、纵向及交叉过道标记。
+- 去除过道、空位和设备根单元的固定最小高度，避免 CSS Grid 轨道溢出覆盖相邻内容。
+
+验收标准：
+- GridMap 向 GridCell 传递 `row`、`column` 或 `cross` 过道方向，交叉格同时显示两条标记。
+- 横向过道使用 `repeating-linear-gradient(to right)`，纵向过道使用 `repeating-linear-gradient(to bottom)`，根单元服从 CSS Grid 轨道尺寸。
+- Node 静态测试覆盖方向传递、方向样式和固定 `min-h` 移除，不引入 Vue 测试依赖。
+
+提交建议：`fix: 修复看板过道方向与网格溢出`
+
+完成记录：GridMap 已根据视觉行列向 GridCell 传递 `row`、`column` 或 `cross` 过道方向；GridCell 已将横向过道点线改为横向重复渐变、纵向过道保留纵向重复渐变，交叉过道同时呈现两种方向。过道、空位和设备根单元移除固定响应式最小高度，改为服从 CSS Grid 轨道并限制溢出，避免横向过道覆盖相邻行。新增 Node 静态测试覆盖方向传递、方向样式和根单元尺寸约束。
+
+验证记录：`node --test tests/gridAisleUi.test.js tests/gridLayout.test.js` 10/10 通过；`npm run lint` 通过；`npm run build` 通过；`git diff --check` 通过。构建仍有既有的动态/静态导入及大 chunk 警告。
+
 ## Kiro Task UI-001.33：修复看板行列标签与内容对齐
 
 状态：已完成

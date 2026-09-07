@@ -14,18 +14,16 @@
 
     <!-- 过道占位 -->
     <div v-if="cellType === 'aisle'"
-        class="flex items-center justify-center h-full bg-amber-50 border border-dashed border-amber-200 rounded"
-        :class="{ 'min-h-[60px] sm:min-h-[80px] lg:min-h-[100px]': true }"
+        class="relative flex items-center justify-center w-full h-full min-w-0 min-h-0 overflow-hidden bg-amber-50 border border-dashed border-amber-200 rounded"
     >
-        <div class="hidden sm:block w-1 h-4/5 bg-repeat-y bg-[length:4px_8px] bg-gradient-to-b from-gray-400 via-gray-400 to-transparent opacity-40"
-             style="background-image: repeating-linear-gradient(to bottom, var(--app-text-placeholder) 0, var(--app-text-placeholder) 4px, transparent 4px, transparent 8px);"></div>
+        <div v-if="aisleAxis === 'row' || aisleAxis === 'cross'" class="aisle-marker aisle-marker--horizontal"></div>
+        <div v-if="aisleAxis === 'column' || aisleAxis === 'cross'" class="aisle-marker aisle-marker--vertical"></div>
     </div>
 
     <!-- 空槽位 -->
     <div v-else-if="cellType === 'empty'"
-        class="flex flex-col items-center justify-center h-full bg-gray-50 border border-dashed border-gray-200 rounded cursor-default transition-all"
+        class="flex flex-col items-center justify-center w-full h-full min-w-0 min-h-0 bg-gray-50 border border-dashed border-gray-200 rounded cursor-default transition-all"
         :class="{
-            'min-h-[60px] sm:min-h-[80px] lg:min-h-[100px]': true,
             'ring-1 ring-green-400 bg-green-50 border-green-300': isDragOver,
             'cursor-pointer bg-amber-50 border-amber-300': isEditMode
         }"
@@ -46,11 +44,10 @@
 
     <!-- 设备卡片 - 响应式企业级风格 -->
     <div v-else
-        class="flex flex-col h-full p-1.5 sm:p-2 cursor-pointer transition-all relative overflow-hidden rounded-md border"
+        class="flex flex-col w-full h-full min-w-0 min-h-0 p-1.5 sm:p-2 cursor-pointer transition-all relative overflow-hidden rounded-md border"
         :class="[statusClass, {
             'opacity-70 cursor-grabbing shadow-sm': isDragging,
-            'border-dashed cursor-grab': isEditMode,
-            'min-h-[60px] sm:min-h-[80px] lg:min-h-[100px]': true
+            'border-dashed cursor-grab': isEditMode
         }]"
         :draggable="isEditMode"
         @dragstart="handleDragStart" @dragend="handleDragEnd" @dragenter="handleDragEnter"
@@ -180,6 +177,12 @@ const props = defineProps({
     isEditMode: {
         type: Boolean,
         default: false
+    },
+    /** 过道方向：row 横向、column 纵向、cross 交叉 */
+    aisleAxis: {
+        type: String,
+        default: null,
+        validator: value => value === null || ['row', 'column', 'cross'].includes(value)
     }
 })
 
@@ -337,6 +340,40 @@ function handleClick() {
 </script>
 
 <style scoped>
+/* 过道标记跟随 CSS Grid 轨道尺寸，并在单元格内居中显示。 */
+.aisle-marker {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0.4;
+    background-repeat: repeat;
+}
+
+.aisle-marker--horizontal {
+    width: 80%;
+    height: 4px;
+    background-image: repeating-linear-gradient(
+        to right,
+        var(--app-text-placeholder) 0,
+        var(--app-text-placeholder) 4px,
+        transparent 4px,
+        transparent 8px
+    );
+}
+
+.aisle-marker--vertical {
+    width: 4px;
+    height: 80%;
+    background-image: repeating-linear-gradient(
+        to bottom,
+        var(--app-text-placeholder) 0,
+        var(--app-text-placeholder) 4px,
+        transparent 4px,
+        transparent 8px
+    );
+}
+
 /* 设备卡片深度选择器样式 */
 :deep(.line-clamp-2) {
     overflow: hidden;
