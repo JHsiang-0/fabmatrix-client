@@ -70,3 +70,8 @@ test('实时告警中的重连按钮与提示文字保持同排右对齐', () =>
   assert.match(farmDashboardSource, /dashboard-realtime-alert :deep\(\.t-alert__message\)/)
   assert.match(farmDashboardSource, /dashboard-realtime-alert :deep\(\.t-alert__operation\)/)
 })
+
+test('全屏看板退出按钮使用醒目的 TDesign 主按钮', () => {
+  assert.match(fullscreenSource, /<t-button theme="primary" variant="base" size="small"[^>]*>/)
+  assert.match(fullscreenSource, /退出全屏/)
+})

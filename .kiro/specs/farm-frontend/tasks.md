@@ -1,5 +1,31 @@
 # 前端 Kiro 任务清单
 
+## Kiro Task UI-001.24：突出看板退出按钮
+
+状态：已完成
+
+范围：
+
+- `src/views/FullscreenDashboard.vue`
+- `tests/dashboardOverview.test.js`
+
+目标：
+
+- 将全屏看板右上角的“退出全屏”从低强调文字按钮调整为醒目的 TDesign 主按钮。
+- 保留退出全屏、路由返回和 Electron/浏览器全屏清理逻辑不变。
+
+验收标准：
+
+- “退出全屏”使用 TDesign `primary` 填充按钮，视觉上与“刷新”按钮形成清晰层级。
+- 点击行为、键盘 Escape 和全屏状态监听不发生变化。
+- 专项测试、`npm run lint`、`npm run build` 和 `git diff --check` 全部通过。
+
+提交建议：fix: 突出看板退出按钮
+
+完成记录：将全屏看板的“退出全屏”从低强调文字按钮调整为 TDesign primary 填充按钮，突出退出操作但未改变路由返回、全屏清理、Escape 和状态监听逻辑。
+
+验证说明：看板专项测试 11/11 通过；`npm run lint` 通过；`npm run build` 通过；`git diff --check` 通过。构建仅保留项目原有动态导入和大 chunk 提示。
+
 ## Kiro Task UI-001.23：近 7 日趋势时间范围适配
 
 状态：已完成
