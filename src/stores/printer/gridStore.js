@@ -1,7 +1,8 @@
 import { computed } from 'vue'
 import { defineStore } from 'pinia'
+import { useDeviceStore } from './deviceStore'
 import { useRealtimeStore } from './realtimeStore'
-import { PRINTER_STATE, GRID_CONFIG } from '@/utils/constants'
+import { PRINTER_STATE, PRINTER_STATUS, GRID_CONFIG } from '@/utils/constants'
 
 /**
  * 网格布局计算 Store
@@ -13,6 +14,7 @@ export const useGridStore = defineStore('grid', () => {
   // 依赖其他 Store
   // ============================================
 
+  const deviceStore = useDeviceStore()
   const realtimeStore = useRealtimeStore()
 
   // ============================================
@@ -38,18 +40,42 @@ export const useGridStore = defineStore('grid', () => {
       [PRINTER_STATE.CANCELLED]: 0
     }
 
-    // 从 statusMap 统计状态 - 使用 unifiedState 字段
-    const statusMap = realtimeStore.statusMap
-    statusMap.forEach((status) => {
-      // 优先使用 unifiedState，如果没有则使用 state
-      const state = status.unifiedState || status.state || PRINTER_STATE.UNKNOWN
+    const realtimeStatusMap = realtimeStore.statusMap
+    const toDashboardState = value => {
+      const state = String(value || PRINTER_STATE.UNKNOWN).toUpperCase()
+      const stateMap = {
+        [PRINTER_STATUS.OFFLINE]: PRINTER_STATE.UNKNOWN,
+        [PRINTER_STATUS.UNKNOWN]: PRINTER_STATE.UNKNOWN,
+        [PRINTER_STATUS.IDLE]: PRINTER_STATE.STANDBY,
+        [PRINTER_STATUS.PREPARING]: PRINTER_STATE.STARTING,
+        [PRINTER_STATUS.PRINTING]: PRINTER_STATE.PRINTING,
+        [PRINTER_STATUS.PAUSED]: PRINTER_STATE.PAUSED,
+        [PRINTER_STATUS.ERROR]: PRINTER_STATE.FAULT
+      }
+      return stateMap[state] || state
+    }
+
+    const addStatus = stateValue => {
+      const state = toDashboardState(stateValue)
       if (Object.prototype.hasOwnProperty.call(counts, state)) {
         counts[state]++
       } else {
-        // 未知状态计入 UNKNOWN
         counts[PRINTER_STATE.UNKNOWN]++
       }
-    })
+    }
+
+    // REST 快照提供设备全集，WebSocket 仅覆盖已收到实时事件的设备。
+    if (deviceStore.rawDeviceList.length) {
+      deviceStore.rawDeviceList.forEach(device => {
+        const realtimeStatus = realtimeStatusMap.get(String(device.id))
+        addStatus(realtimeStatus?.unifiedState || realtimeStatus?.state || device.status)
+      })
+    } else {
+      // 首次 REST 请求尚未返回时，保留已有实时快照的即时反馈。
+      realtimeStatusMap.forEach(status => {
+        addStatus(status.unifiedState || status.state)
+      })
+    }
 
     return counts
   })

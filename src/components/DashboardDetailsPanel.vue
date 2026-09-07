@@ -150,19 +150,25 @@ const barHeight = count => Math.max(6, Math.round((count / maxTrendCount.value) 
 
 .dashboard-detail-card {
   min-width: 0;
-  height: 136px;
-  overflow: hidden;
+  min-height: 152px;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
   background: var(--app-surface);
   border-color: var(--app-border);
 }
 
 .dashboard-detail-card :deep(.t-card__header) {
+  flex: 0 0 auto;
   padding: 10px 10px 6px;
   border-bottom: 1px solid var(--app-border);
 }
 
 .dashboard-detail-card :deep(.t-card__body) {
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
   padding: 8px 10px 10px;
 }
 
@@ -179,6 +185,10 @@ const barHeight = count => Math.max(6, Math.round((count / maxTrendCount.value) 
 .dashboard-detail-card__heading h3,
 .dashboard-detail-card__heading p {
   margin: 0;
+}
+
+.dashboard-detail-card__heading > div {
+  min-width: 0;
 }
 
 .dashboard-detail-card__heading h3 {
@@ -364,6 +374,6 @@ const barHeight = count => Math.max(6, Math.round((count / maxTrendCount.value) 
 @media (max-width: 767px) {
   .dashboard-details-panel { grid-template-columns: minmax(0, 1fr); }
   .dashboard-detail-card--trend { grid-column: auto; }
-  .dashboard-detail-card { height: auto; min-height: 136px; }
+  .dashboard-detail-card { min-height: 152px; }
 }
 </style>

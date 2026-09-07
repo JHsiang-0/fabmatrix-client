@@ -71,6 +71,8 @@ export const useDeviceStore = defineStore('device', () => {
     // 使用 Map 优化查找性能 O(n) -> O(1)
     const deviceMap = new Map()
     rawDeviceList.value.forEach(device => {
+      if (typeof device.gridRow !== 'number' || device.gridRow <= 0
+        || typeof device.gridCol !== 'number' || device.gridCol <= 0) return
       const key = `${device.gridRow},${device.gridCol}`
       deviceMap.set(key, device)
     })
@@ -114,15 +116,8 @@ export const useDeviceStore = defineStore('device', () => {
       const response = await getPrinterList({ pageSize: 100 })
       const records = response.data?.records || []
 
-      // 只保留有有效坐标的设备
-      const filtered = records.filter(d => {
-        const hasValidRow = typeof d.gridRow === 'number' && d.gridRow > 0
-        const hasValidCol = typeof d.gridCol === 'number' && d.gridCol > 0
-        return hasValidRow && hasValidCol
-      })
-
-      // 直接赋值，触发 rawDeviceList 的响应式更新，deviceMatrix computed 会自动重新计算
-      rawDeviceList.value = filtered
+      // 保留完整 REST 快照供统计使用，deviceMatrix 内部只渲染有效坐标设备。
+      rawDeviceList.value = records
       version.value++
     } catch (requestError) {
       console.error('[DeviceStore] 获取设备数据失败:', requestError)

@@ -1,5 +1,37 @@
 # 前端 Kiro 任务清单
 
+## Kiro Task UI-001.21：全屏看板快照兜底与信息卡片完整展示
+
+状态：已完成
+
+范围：
+
+- `src/stores/printer/gridStore.js`
+- `src/stores/printer/deviceStore.js`
+- `src/components/DashboardDetailsPanel.vue`
+- `tests/dashboardOverview.test.js`
+
+目标：
+
+- WebSocket 断开时，顶部统计和状态分布继续使用 REST 设备快照，不显示错误的全 0。
+- REST 设备总数不因缺少网格坐标而被过滤，设备矩阵仍只渲染有效坐标设备。
+- 解除 TDesign Card 固定高度裁剪，确保状态内容、活动任务和近 7 日趋势完整展示。
+- 保持 TDesign 组件、现有加载/空数据/错误/重试逻辑和设备矩阵交互不变。
+
+验收标准：
+
+- REST 快照包含 49 台设备且 WebSocket 断开时，统计仍能按设备状态计算，不依赖空的实时状态 Map。
+- 离线、待机、打印中、暂停和故障等状态统一映射到看板状态枚举。
+- 无效网格坐标设备计入统计，但不会污染 `deviceMatrix`。
+- 三张卡片不再使用固定高度裁剪，TDesign Header/Body 正常伸展，活动任务和趋势图不被截断。
+- 专项测试、`npm run lint`、`npm run build` 和 `git diff --check` 全部通过。
+
+提交建议：feat: 完善看板快照兜底与卡片展示
+
+完成记录：状态统计改为 REST 设备全集与 WebSocket 实时覆盖的合并结果，断线时保留快照；设备列表保留无网格坐标记录，矩阵仅渲染有效坐标；三张 TDesign 信息卡片改为可伸展高度，修复状态内容、活动任务和近 7 日趋势被裁剪的问题。
+
+验证说明：看板专项测试 8/8 通过；`npm run lint` 通过；`npm run build` 通过；`git diff --check` 通过。构建仅保留项目原有动态导入和大 chunk 提示。
+
 状态说明：`[x]` 已完成；`[ ]` 待完成或等待后端接口契约。
 
 ## Kiro 三阶段推进情况
