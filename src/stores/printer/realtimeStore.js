@@ -45,6 +45,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
   let wsClient = null
   let mockStream = null
   const mockConnectionState = ref('CLOSED')
+  const connectionState = ref('CLOSED')
   const lastSequence = ref(null)
   const lastEventId = ref(null)
   const seenEventIds = new Set()
@@ -99,7 +100,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
    * @returns {string}
    */
   const wsConnectionState = computed(() => {
-    return isMockEnabled ? mockConnectionState.value : (wsClient ? wsClient.getState() : 'CLOSED')
+    return isMockEnabled ? mockConnectionState.value : connectionState.value
   })
 
   /**
@@ -107,7 +108,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
    * @returns {boolean}
    */
   const isWsConnected = computed(() => {
-    return isMockEnabled ? mockConnectionState.value === 'OPEN' : (wsClient ? wsClient.isConnected() : false)
+    return wsConnectionState.value === 'OPEN'
   })
 
   /**
@@ -407,12 +408,14 @@ export const useRealtimeStore = defineStore('realtime', () => {
     }
 
     if (!userStore.token) {
+      connectionState.value = 'CLOSED'
       console.warn('未检测到登录令牌，跳过 WebSocket 连接')
       return
     }
 
     const wsUrl = getWsUrl()
     if (!wsUrl) {
+      connectionState.value = 'CLOSED'
       console.warn('未配置 WebSocket 地址，跳过 WebSocket 连接')
       return
     }
@@ -437,17 +440,20 @@ export const useRealtimeStore = defineStore('realtime', () => {
 
     // 订阅连接事件
     wsClient.on('open', () => {
+      connectionState.value = 'OPEN'
       resetSequenceBaseline()
       refreshJobState()
       console.log('[RealtimeStore] WebSocket 连接已建立')
     })
 
     wsClient.on('close', event => {
+      connectionState.value = wsClient?.getState() || 'CLOSED'
       if (event?.code !== 1000) isRealtimeStale.value = true
       console.log('[RealtimeStore] WebSocket 连接已关闭')
     })
 
     wsClient.on('error', (error) => {
+      connectionState.value = wsClient?.getState() || 'CLOSED'
       console.error('[RealtimeStore] WebSocket 错误:', error)
     })
 
@@ -455,7 +461,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
       console.warn('[RealtimeStore] WebSocket 连接不活跃，准备重连')
     })
 
-    wsClient.connect().catch(error => {
+    const connectPromise = wsClient.connect()
+    connectionState.value = wsClient.getState() || 'CONNECTING'
+    connectPromise.catch(error => {
       console.error('[RealtimeStore] WebSocket 初次连接失败:', error)
     })
   }
@@ -481,6 +489,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
       wsClient.destroy()
       wsClient = null
     }
+    connectionState.value = 'CLOSED'
 
     // 清空实时状态数据
     jobStore.clearQueuedRealtimeStatuses()

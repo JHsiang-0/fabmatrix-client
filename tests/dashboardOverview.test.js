@@ -6,6 +6,7 @@ const dashboardSource = fs.readFileSync(new URL('../src/views/Dashboard.vue', im
 const fullscreenSource = fs.readFileSync(new URL('../src/views/FullscreenDashboard.vue', import.meta.url), 'utf8')
 const deviceStoreSource = fs.readFileSync(new URL('../src/stores/printer/deviceStore.js', import.meta.url), 'utf8')
 const appSource = fs.readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8')
+const realtimeStoreSource = fs.readFileSync(new URL('../src/stores/printer/realtimeStore.js', import.meta.url), 'utf8')
 
 test('工作台只使用真实设备和任务契约并覆盖核心统计', () => {
   assert.match(dashboardSource, /getPrinterList\(\{ pageNum: 1, pageSize: 100 \}\)/)
@@ -45,4 +46,12 @@ test('实时连接由应用根部按认证路由统一维护', () => {
   assert.match(appSource, /watch\(\s*\[isProtectedRoute, \(\) => userStore\.token\]/)
   assert.match(appSource, /realtimeStore\.connectWs\(\)/)
   assert.match(appSource, /realtimeStore\.disconnectWs\(\)/)
+})
+
+test('实时连接状态使用响应式字段同步原生 WebSocket 生命周期', () => {
+  assert.match(realtimeStoreSource, /const connectionState = ref\('CLOSED'\)/)
+  assert.match(realtimeStoreSource, /return isMockEnabled \? mockConnectionState\.value : connectionState\.value/)
+  assert.match(realtimeStoreSource, /connectionState\.value = 'OPEN'/)
+  assert.match(realtimeStoreSource, /connectionState\.value = wsClient\?\.getState\(\) \|\| 'CLOSED'/)
+  assert.match(realtimeStoreSource, /connectionState\.value = 'CLOSED'/)
 })
