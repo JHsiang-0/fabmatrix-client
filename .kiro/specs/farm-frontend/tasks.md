@@ -1,5 +1,31 @@
 # 前端 Kiro 任务清单
 
+## Kiro Task UI-001.35：重构全屏看板顶部统计卡片
+
+状态：已完成
+
+范围：
+- `src/components/FarmDashboard.vue`
+- `tests/fullscreenDashboardCards.test.js`
+- `.kiro/specs/farm-frontend/tasks.md`
+
+目标：
+- 移除全屏看板顶部的状态分布、活动任务和近 7 日任务趋势详情卡片。
+- 复用打印机管理/总览页面的四张统计卡片结构，展示打印机总数、正在打印、空闲打印机和异常设备。
+- 保持实时状态数据、卡片跳转、加载、错误、空数据和 WebSocket 处理逻辑一致。
+
+验收标准：
+- 全屏看板不再渲染 `DashboardDetailsPanel`，顶部使用四张统计卡片。
+- 卡片使用实时 Store 状态，离线/未知设备纳入异常统计，状态卡片可跳转到对应打印机筛选。
+- 桌面端四列、中等宽度两列、窄屏单列，卡片内容不溢出。
+- 不再为已删除的详情区域发起历史任务请求，并有 Node 静态回归测试覆盖。
+
+提交建议：`feat: 重构全屏看板统计卡片`
+
+完成记录：全屏看板已移除状态分布、活动任务和近 7 日任务趋势详情卡片，改为复用总览页面视觉规范的四张统计卡片。卡片使用打印机 Store 的实时状态统计，支持打印机总数、在线数、正在打印、空闲和异常设备展示，并保留打印机管理及状态筛选跳转。已删除全屏看板不再需要的历史任务请求，保留设备刷新、加载、错误、空数据和 WebSocket 处理。
+
+验证记录：`node --test tests/fullscreenDashboardCards.test.js tests/dashboardOverview.test.js` 15/15 通过；`npm run lint` 通过；`npm run build` 通过；`git diff --check` 通过。完整 `npm test` 为 160 通过、3 个既有任务中心/界面规范测试失败，与本 Task 文件无关；构建仍有既有动态/静态导入及大 chunk 警告。
+
 ## Kiro Task UI-001.34：修复看板过道方向与网格溢出
 
 状态：已完成

@@ -39,14 +39,32 @@
       </div>
     </div>
 
-    <dashboard-details-panel
-      :status-counts="store.statusCounts"
-      :active-jobs="activeJobs"
-      :history-jobs="historyJobs"
-      :history-loading="historyLoading"
-      :history-error="historyError"
-      @retry-history="fetchHistory"
-    />
+    <section class="stat-grid" aria-label="设备统计">
+      <div
+        v-for="stat in statCards"
+        :key="stat.key"
+        class="stat-card"
+        :class="[`stat-card--${stat.tone}`, { 'stat-card--interactive': stat.to }]"
+        :role="stat.to ? 'button' : undefined"
+        :tabindex="stat.to ? 0 : undefined"
+        :aria-label="stat.to ? `查看${stat.label}` : undefined"
+        @click="stat.to && goTo(stat.to)"
+        @keydown.enter.prevent="stat.to && goTo(stat.to)"
+        @keydown.space.prevent="stat.to && goTo(stat.to)"
+      >
+        <div class="stat-card__body">
+          <div class="stat-card__topline">
+            <span class="stat-card__label">{{ stat.label }}</span>
+            <span class="stat-card__icon"><component :is="stat.icon" :size="22" /></span>
+          </div>
+          <div class="stat-card__value">{{ stat.value }}</div>
+          <div class="stat-card__footer">
+            <span>{{ stat.description }}</span>
+            <ChevronRightIcon :size="16" />
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- 独立车间看板容器 - 响应式布局，与状态栏对齐 -->
     <div class="dashboard-workshop-scroll app-scroll-region relative w-full flex-1 px-4 pb-4 bg-gray-100">
@@ -80,16 +98,23 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import {
+  CheckCircleIcon,
+  ChevronRightIcon,
+  DashboardIcon,
+  ErrorCircleIcon,
+  LockOnIcon as Lock,
+  LockOffIcon as Unlock,
+  PrintIcon
+} from 'tdesign-icons-vue-next'
 import { message, confirmMessage } from '@/utils/message'
 import { renderIcon } from '@/utils/tdesign'
 import { useUserStore } from '@/stores/user'
-import { LockOnIcon as Lock, LockOffIcon as Unlock } from 'tdesign-icons-vue-next'
 import { usePrinterStore } from '@/stores/printer'
-import { useJobStore } from '@/stores/jobStore'
 import { emergencyStopPrinter, pausePrinter, resumePrinter, cancelPrinter } from '@/api/printer'
-import { getJobPage } from '@/api/job'
+import { PRINTER_STATE, PRINTER_STATUS } from '@/utils/constants'
 import DashboardHeader from './DashboardHeader.vue'
-import DashboardDetailsPanel from './DashboardDetailsPanel.vue'
 import GridMap from './grid/GridMap.vue'
 import GridAisleSettingsDialog from './GridAisleSettingsDialog.vue'
 import BindDeviceDialog from './BindDeviceDialog.vue'
@@ -111,12 +136,8 @@ const props = defineProps({
 
 const store = usePrinterStore()
 const userStore = useUserStore()
-const jobStore = useJobStore()
+const router = useRouter()
 const controlLoading = ref(false)
-const activeJobs = computed(() => jobStore.activeJobs)
-const historyJobs = ref([])
-const historyLoading = ref(false)
-const historyError = ref('')
 const reconnecting = ref(false)
 
 // ============================================
@@ -197,23 +218,59 @@ const activeRealTimeData = computed(() => {
   return store.realTimeStatus[String(activeDevice.value.id)]
 })
 
-async function fetchHistory() {
-  historyLoading.value = true
-  historyError.value = ''
-  try {
-    const [completedResult, failedResult] = await Promise.all([
-      getJobPage({ pageNum: 1, pageSize: 100, status: 'COMPLETED' }),
-      getJobPage({ pageNum: 1, pageSize: 100, status: 'FAILED' })
-    ])
-    historyJobs.value = [
-      ...(completedResult.data?.records || []),
-      ...(failedResult.data?.records || [])
-    ]
-  } catch (error) {
-    historyError.value = error?.message || '历史任务加载失败，请重试'
-  } finally {
-    historyLoading.value = false
-  }
+const statCards = computed(() => {
+  const counts = store.statusCounts || {}
+  const total = Number(store.totalDevices) || 0
+  const unknown = Number(counts[PRINTER_STATE.UNKNOWN]) || 0
+  const printing = Number(counts[PRINTER_STATE.PRINTING]) || 0
+  const idle = Number(counts[PRINTER_STATE.STANDBY]) || 0
+  const errors = unknown
+    + (Number(counts[PRINTER_STATE.FAULT]) || 0)
+    + (Number(counts[PRINTER_STATE.SYS_ERROR]) || 0)
+    + (Number(counts[PRINTER_STATE.PRINT_ERROR]) || 0)
+
+  return [
+    {
+      key: 'printers',
+      label: '打印机总数',
+      value: total,
+      description: `${Math.max(0, total - unknown)} 台设备在线`,
+      icon: DashboardIcon,
+      tone: 'primary',
+      to: '/printers'
+    },
+    {
+      key: 'printing',
+      label: '正在打印',
+      value: printing,
+      description: '实时打印中的设备',
+      icon: PrintIcon,
+      tone: 'blue',
+      to: { path: '/printers', query: { status: PRINTER_STATUS.PRINTING } }
+    },
+    {
+      key: 'idle',
+      label: '空闲打印机',
+      value: idle,
+      description: '当前可分配任务的设备',
+      icon: CheckCircleIcon,
+      tone: 'orange',
+      to: { path: '/printers', query: { status: PRINTER_STATUS.IDLE } }
+    },
+    {
+      key: 'errors',
+      label: '异常设备',
+      value: errors,
+      description: errors ? '请及时处理异常' : '当前运行正常',
+      icon: ErrorCircleIcon,
+      tone: errors ? 'red' : 'green',
+      to: '/printers'
+    }
+  ]
+})
+
+function goTo(path) {
+  router.push(path)
 }
 
 // ============================================
@@ -703,7 +760,7 @@ async function handleRefresh() {
   message.info('正在重新连接打印机...')
 
     // 重新获取设备数据并建立 WebSocket 连接
-    await Promise.all([store.fetchDeviceData(), fetchHistory()])
+    await store.fetchDeviceData()
     store.connectWs()
 
     updateLastUpdateTime()
@@ -731,7 +788,6 @@ onMounted(() => {
   // 获取设备数据并建立 WebSocket 连接
   store.fetchDeviceData()
   store.connectWs()
-  fetchHistory()
 })
 
 onUnmounted(() => {
@@ -788,6 +844,128 @@ onUnmounted(() => {
   opacity: 0.8;
 }
 
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--app-spacing-4);
+  padding: var(--app-spacing-3) var(--app-spacing-4) var(--app-spacing-4);
+  background: var(--app-page-background);
+}
+
+.stat-card {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 142px;
+  padding: var(--app-spacing-4);
+  overflow: hidden;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-medium);
+}
+
+.stat-card--interactive {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card--interactive:hover {
+  box-shadow: var(--app-shadow);
+  transform: translateY(-2px);
+}
+
+.stat-card--interactive:focus-visible {
+  outline: 2px solid var(--app-primary);
+  outline-offset: 2px;
+}
+
+.stat-card__body {
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.stat-card__topline,
+.stat-card__footer {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-spacing-2);
+}
+
+.stat-card__label,
+.stat-card__footer > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stat-card__label {
+  color: var(--app-text-secondary);
+  font-size: var(--app-font-size-body-small);
+}
+
+.stat-card__icon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  color: var(--app-primary);
+  background: var(--app-primary-light);
+  border-radius: var(--app-radius-round);
+  flex-shrink: 0;
+}
+
+.stat-card__value {
+  margin: var(--app-spacing-3) 0 var(--app-spacing-2);
+  color: var(--app-text-primary);
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.stat-card__footer {
+  margin-top: auto;
+  color: var(--app-text-secondary);
+  font-size: var(--app-font-size-caption);
+}
+
+.stat-card--primary {
+  color: var(--app-text-on-brand);
+  background: var(--app-primary);
+  border-color: var(--app-primary);
+}
+
+.stat-card--primary .stat-card__label,
+.stat-card--primary .stat-card__value,
+.stat-card--primary .stat-card__footer {
+  color: var(--app-text-on-brand);
+}
+
+.stat-card--primary .stat-card__icon {
+  color: var(--app-text-on-brand);
+  background: rgb(255 255 255 / 18%);
+}
+
+.stat-card--orange .stat-card__icon {
+  color: var(--app-warning);
+  background: var(--app-warning-light);
+}
+
+.stat-card--green .stat-card__icon {
+  color: var(--app-success);
+  background: var(--app-success-light);
+}
+
+.stat-card--red .stat-card__icon {
+  color: var(--app-danger);
+  background: var(--app-danger-light);
+}
+
 .dashboard-workshop-scroll {
   min-height: 0;
   overflow: auto;
@@ -835,5 +1013,17 @@ onUnmounted(() => {
   flex: 0 0 auto;
   margin-left: auto;
   padding: 0;
+}
+
+@media (max-width: 1100px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
