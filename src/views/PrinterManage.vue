@@ -41,13 +41,10 @@
       </template>
       <template #actions>
       <div class="app-page-toolbar__actions">
-        <t-button v-if="isAdmin" theme="success" variant="outline" :disabled="selectedPrinterIds.length === 0 || monitorBatchLoading"
-          :loading="monitorBatchLoading && monitorBatchTarget === true" @click="handleBatchMonitor(true)">
-          启用监控{{ selectedPrinterIds.length ? ` (${selectedPrinterIds.length})` : '' }}
-        </t-button>
-        <t-button v-if="isAdmin" theme="warning" variant="outline" :disabled="selectedPrinterIds.length === 0 || monitorBatchLoading"
-          :loading="monitorBatchLoading && monitorBatchTarget === false" @click="handleBatchMonitor(false)">
-          停用监控{{ selectedPrinterIds.length ? ` (${selectedPrinterIds.length})` : '' }}
+        <t-button v-if="isAdmin" :theme="batchMonitorTarget ? 'success' : 'warning'" variant="outline"
+          :disabled="selectedPrinterIds.length === 0 || monitorActionLoading" :loading="monitorActionLoading"
+          @click="handleBatchMonitorToggle">
+          {{ batchMonitorTarget ? '启用监控' : '停用监控' }}{{ selectedPrinterIds.length ? ` (${selectedPrinterIds.length})` : '' }}
         </t-button>
         <t-button :icon="renderIcon(Refresh)" :loading="loading" @click="fetchData" size="medium">
           刷新
@@ -601,7 +598,6 @@ const monitorLoading = ref(false)
 const monitorError = ref('')
 const monitorUpdatingIds = ref([])
 const monitorBatchLoading = ref(false)
-const monitorBatchTarget = ref(null)
 const selectedPrinterIds = ref([])
 
 // ===== 表单与弹窗状态 =====
@@ -676,6 +672,22 @@ const displayTableData = computed(() => tableData.value.map(printer => {
   if (realtimeState) merged.status = normalizePrinterStatus(realtimeState)
   return merged
 }))
+
+const selectedPrinterRows = computed(() => {
+  const selectedIds = new Set(selectedPrinterIds.value.map(id => String(id)))
+  return displayTableData.value.filter(printer => selectedIds.has(String(printer.id)))
+})
+
+// 混合选择时统一执行启用，全部已启用时执行停用。
+const batchMonitorTarget = computed(() => (
+  selectedPrinterRows.value.length > 0
+    ? !selectedPrinterRows.value.every(printer => printer.monitorEnabled === true)
+    : true
+))
+
+const monitorActionLoading = computed(() => (
+  monitorBatchLoading.value || selectedPrinterIds.value.some(id => monitorUpdatingIds.value.includes(id))
+))
 
 const getConnectionLabel = status => ({
   ONLINE: '在线',
@@ -878,7 +890,6 @@ const updateMonitorForIds = async (ids, enabled, printer = null) => {
     monitorUpdatingIds.value.push(normalizedIds[0])
   } else {
     monitorBatchLoading.value = true
-    monitorBatchTarget.value = enabled
   }
 
   try {
@@ -899,12 +910,11 @@ const updateMonitorForIds = async (ids, enabled, printer = null) => {
       if (index > -1) monitorUpdatingIds.value.splice(index, 1)
     } else {
       monitorBatchLoading.value = false
-      monitorBatchTarget.value = null
     }
   }
 }
 
-const handleBatchMonitor = enabled => updateMonitorForIds([...selectedPrinterIds.value], enabled)
+const handleBatchMonitorToggle = () => updateMonitorForIds([...selectedPrinterIds.value], batchMonitorTarget.value)
 
 const handleDetailMonitorChange = enabled => {
   const printer = selectedDevice.value

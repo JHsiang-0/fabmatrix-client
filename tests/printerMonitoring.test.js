@@ -108,3 +108,11 @@ test('监控和人工核对界面保留业务状态与通信状态的独立语�
   assert.match(realtimeSource, /PRINTER_OFFLINE/)
   assert.match(realtimeSource, /refreshPrinterSnapshot/)
 })
+
+test('打印机管理顶部批量监控操作使用单个状态切换按钮', () => {
+  assert.match(printerSource, /batchMonitorTarget/)
+  assert.match(printerSource, /handleBatchMonitorToggle/)
+  assert.match(printerSource, /selectedPrinterRows/)
+  assert.doesNotMatch(printerSource, /handleBatchMonitor\(true\)/)
+  assert.doesNotMatch(printerSource, /handleBatchMonitor\(false\)/)
+})

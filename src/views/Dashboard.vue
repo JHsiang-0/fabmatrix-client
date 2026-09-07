@@ -243,7 +243,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import {
@@ -416,10 +416,6 @@ async function fetchOverview() {
   loading.value = false
 }
 
-function reconnectRealtime() {
-  if (!isWsConnected.value) realtimeStore.connectWs()
-}
-
 function goTo(path) {
   router.push(path)
 }
@@ -447,11 +443,6 @@ watch(statusMap, value => {
 
 onMounted(() => {
   fetchOverview()
-  reconnectRealtime()
-})
-
-onUnmounted(() => {
-  realtimeStore.disconnectWs()
 })
 </script>
 

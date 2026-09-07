@@ -69,7 +69,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { message, confirmMessage } from '@/utils/message'
 import { renderIcon } from '@/utils/tdesign'
 import { useUserStore } from '@/stores/user'
@@ -545,8 +545,6 @@ async function saveLayout() {
  */
 async function handleRefresh() {
   try {
-    // 先断开现有 WebSocket 连接
-    store.disconnectWs()
   message.info('正在重新连接打印机...')
 
     // 重新获取设备数据并建立 WebSocket 连接
@@ -566,15 +564,9 @@ async function handleRefresh() {
 // ============================================
 
 onMounted(() => {
-  // 获取设备数据并建立 WebSocket 连接
+  // 获取设备数据；实时连接由应用根部统一维护
   store.fetchDeviceData()
-  store.connectWs()
   fetchHistory()
-})
-
-onUnmounted(() => {
-  // 断开 WebSocket 连接
-  store.disconnectWs()
 })
 </script>
 
