@@ -1,5 +1,32 @@
 # 前端 Kiro 任务清单
 
+## Kiro Task UI-001.22：告警条重连按钮右对齐
+
+状态：已完成
+
+范围：
+
+- `src/components/FarmDashboard.vue`
+- `tests/dashboardOverview.test.js`
+
+目标：
+
+- 将实时连接告警文字和“重新连接”按钮放在同一行。
+- 按钮固定靠告警条最右侧，文字区域支持溢出省略。
+- 保留 TDesign Alert 的告警语义、重连 Loading 和现有告警处理逻辑。
+
+验收标准：
+
+- 不再使用 TDesign Alert 的标题行承载实时告警文字，避免 operation 插槽自动换到下一行。
+- 实时告警文字位于左侧，重连按钮位于最右侧，窄屏下文字不挤压按钮。
+- 专项测试、`npm run lint`、`npm run build` 和 `git diff --check` 全部通过。
+
+提交建议：fix: 调整看板重连按钮位置
+
+完成记录：实时连接告警改为使用 TDesign Alert 默认消息插槽承载文字，并将重连操作保持在同一消息行的最右侧；文字区域支持省略，按钮继续保留 Loading 和重连行为。
+
+验证说明：看板专项测试 9/9 通过；`npm run lint` 通过；`npm run build` 通过；`git diff --check` 通过。构建仅保留项目原有动态导入和大 chunk 提示。
+
 ## Kiro Task UI-001.21：全屏看板快照兜底与信息卡片完整展示
 
 状态：已完成

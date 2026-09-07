@@ -3,6 +3,7 @@ import test from 'node:test'
 import fs from 'node:fs'
 
 const dashboardSource = fs.readFileSync(new URL('../src/views/Dashboard.vue', import.meta.url), 'utf8')
+const farmDashboardSource = fs.readFileSync(new URL('../src/components/FarmDashboard.vue', import.meta.url), 'utf8')
 const fullscreenSource = fs.readFileSync(new URL('../src/views/FullscreenDashboard.vue', import.meta.url), 'utf8')
 const deviceStoreSource = fs.readFileSync(new URL('../src/stores/printer/deviceStore.js', import.meta.url), 'utf8')
 const gridStoreSource = fs.readFileSync(new URL('../src/stores/printer/gridStore.js', import.meta.url), 'utf8')
@@ -54,4 +55,11 @@ test('看板信息卡片不使用固定高度裁剪内容', () => {
   assert.match(detailsPanelSource, /height: auto/)
   assert.match(detailsPanelSource, /overflow: visible/)
   assert.match(detailsPanelSource, /flex: 1 1 auto/)
+})
+
+test('实时告警中的重连按钮与提示文字保持同排右对齐', () => {
+  assert.match(farmDashboardSource, /class="dashboard-realtime-alert"/)
+  assert.match(farmDashboardSource, /<template #default>\s*<span class="dashboard-alert__message">\{\{ realtimeNotice \}\}/)
+  assert.match(farmDashboardSource, /dashboard-realtime-alert :deep\(\.t-alert__message\)/)
+  assert.match(farmDashboardSource, /dashboard-realtime-alert :deep\(\.t-alert__operation\)/)
 })

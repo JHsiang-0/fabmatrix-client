@@ -16,7 +16,10 @@
       </template>
       </dashboard-header>
       <div v-if="realtimeNotice || store.alerts.length" class="dashboard-alert-stack" aria-live="polite">
-        <t-alert v-if="realtimeNotice" theme="warning" :title="realtimeNotice" :close-btn="false">
+        <t-alert v-if="realtimeNotice" theme="warning" class="dashboard-realtime-alert" :close-btn="false">
+          <template #default>
+            <span class="dashboard-alert__message">{{ realtimeNotice }}</span>
+          </template>
           <template #operation>
             <t-button size="small" variant="outline" :loading="reconnecting" @click="reconnectRealtime">
               重新连接
@@ -677,9 +680,29 @@ onUnmounted(() => {
   border-radius: 0;
 }
 
-.dashboard-alert-stack :deep(.t-alert__title) {
+.dashboard-realtime-alert :deep(.t-alert__content),
+.dashboard-realtime-alert :deep(.t-alert__message) {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.dashboard-realtime-alert :deep(.t-alert__message) {
+  justify-content: space-between;
+  gap: var(--app-spacing-3);
+}
+
+.dashboard-realtime-alert :deep(.t-alert__description),
+.dashboard-alert__message {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dashboard-realtime-alert :deep(.t-alert__operation) {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0;
 }
 </style>
