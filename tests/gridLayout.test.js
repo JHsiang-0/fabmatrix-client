@@ -5,7 +5,9 @@ import {
   getDefaultGridConfig,
   getOutOfBoundsDevices,
   getPhysicalColumn,
-  getVisualColumns
+  getPhysicalRow,
+  getVisualColumns,
+  getVisualRows
 } from '../src/utils/gridLayout.js'
 import { formatRowLabel } from '../src/utils/formatters.js'
 
@@ -35,6 +37,37 @@ test('自定义多个过道后可正确生成视觉列和物理列映射', () =>
   assert.equal(getPhysicalColumn(3, config), null)
   assert.equal(getPhysicalColumn(4, config), 3)
   assert.equal(getPhysicalColumn(8, config), 6)
+})
+
+test('行过道不会改变设备物理行坐标', () => {
+  const config = createGridConfig({
+    rowCount: 3,
+    columnCount: 2,
+    aisles: [{ axis: 'row', afterIndex: 1, label: '横向过道', size: 80 }]
+  })
+  const rows = getVisualRows(config)
+
+  assert.deepEqual(rows.map(row => row.type), ['device', 'aisle', 'device', 'device'])
+  assert.equal(getPhysicalRow(1, config), 1)
+  assert.equal(getPhysicalRow(2, config), null)
+  assert.equal(getPhysicalRow(3, config), 2)
+  assert.equal(rows[1].label, '横向过道')
+})
+
+test('行列过道可以同时存在且分别统计视觉尺寸', () => {
+  const config = createGridConfig({
+    rowCount: 2,
+    columnCount: 3,
+    aisles: [
+      { axis: 'row', afterIndex: 1 },
+      { axis: 'column', afterIndex: 2 }
+    ]
+  })
+
+  assert.equal(config.TOTAL_ROWS, 3)
+  assert.equal(config.TOTAL_COLS, 4)
+  assert.equal(getVisualRows(config).length, 3)
+  assert.equal(getVisualColumns(config).length, 4)
 })
 
 test('减少行列时识别超出新范围的设备', () => {

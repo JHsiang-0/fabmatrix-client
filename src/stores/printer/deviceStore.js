@@ -5,6 +5,7 @@ import {
   createGridConfig,
   getDefaultGridConfig,
   getVisualColumns,
+  getVisualRows,
   loadGridConfig,
   saveGridConfig
 } from '@/utils/gridLayout'
@@ -72,7 +73,7 @@ export const useDeviceStore = defineStore('device', () => {
   const totalDevices = computed(() => rawDeviceList.value.length)
 
   /**
-   * 将扁平设备数组转换为4行13列的二维矩阵（包含过道列）
+   * 将扁平设备数组转换为包含行列过道的二维视觉矩阵
    * 直接依赖 rawDeviceList.value，确保数据更新后自动重新计算
    */
   const deviceMatrix = computed(() => {
@@ -87,26 +88,21 @@ export const useDeviceStore = defineStore('device', () => {
     })
 
     const visualColumns = getVisualColumns(config)
+    const visualRows = getVisualRows(config)
     const matrix = []
-    for (let row = 1; row <= config.ROWS; row++) {
+    visualRows.forEach(visualRow => {
       const rowData = []
       visualColumns.forEach(column => {
-        // 过道位置
-        if (column.type === 'aisle') {
-          rowData.push(`aisle:${column.id}`)
+        if (visualRow.type === 'aisle' || column.type === 'aisle') {
+          rowData.push(`aisle:${visualRow.id || column.id}`)
           return
         }
 
-        // 计算物理列号（排除过道）
-        const physicalCol = column.number
-
-        // 使用 Map 查找设备 O(1)
-        const key = `${row},${physicalCol}`
-        const device = deviceMap.get(key)
-        rowData.push(device || null)
+        const key = `${visualRow.number},${column.number}`
+        rowData.push(deviceMap.get(key) || null)
       })
       matrix.push(rowData)
-    }
+    })
 
     return matrix
   })

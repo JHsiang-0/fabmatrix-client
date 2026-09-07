@@ -4,16 +4,14 @@
     <div class="dashboard-top-shell">
       <dashboard-header :status-counts="store.statusCounts" :workshop-name="workshopName"
         :last-update-time="lastUpdateTime" @refresh="handleRefresh">
-      <!-- 布局锁定/编辑模式切换按钮 -->
+      <!-- 布局编辑入口：管理员在这里完成解锁、调整和保存 -->
       <template #actions>
-        <t-button v-if="canManageLayout" variant="outline" @click="layoutDialogVisible = true">
-          布局设置
+        <t-button v-if="canManageLayout" :theme="isEditMode ? 'primary' : 'default'"
+          :icon="renderIcon(isEditMode ? Unlock : Lock)" :loading="layoutSaving" @click="toggleLayoutEditing">
+          {{ isEditMode ? '完成布局' : '布局设置' }}
         </t-button>
-        <t-button v-if="canManageLayout && !isEditMode" theme="default" :icon="renderIcon(Lock)" @click="toggleEditMode">
-          解锁布局
-        </t-button>
-        <t-button v-else-if="canManageLayout" theme="primary" :icon="renderIcon(Unlock)" @click="saveLayout">
-          保存布局
+        <t-button v-if="canManageLayout && isEditMode" variant="outline" @click="cancelLayoutEditing">
+          取消编辑
         </t-button>
         <slot name="fullscreen-action"></slot>
       </template>
@@ -59,7 +57,8 @@
         <grid-map :device-matrix="store.deviceMatrix" :real-time-status="store.realTimeStatus"
           :grid-config="store.gridConfig" :is-edit-mode="isEditMode" :dragged-device="draggedDevice"
           :drag-over-cell="dragOverCell" @dragstart="handleDragStart" @dragend="handleDragEnd"
-          @dragenter="handleDragEnter" @dragleave="handleDragLeave" @drop="handleDrop" @cell-click="handleCellClick" />
+          @dragenter="handleDragEnter" @dragleave="handleDragLeave" @drop="handleDrop" @cell-click="handleCellClick"
+          @dimension-change="handleDimensionChange" @aisle-context="handleAisleContext" />
       </div>
     </div>
 
@@ -73,11 +72,6 @@
       @action="handlePrinterAction" @emergency-stop="handleEmergencyStop" @remove="handleRemoveFromBoard"
       @closed="handleDrawerClosed" />
 
-    <grid-layout-settings-dialog
-      v-model:visible="layoutDialogVisible"
-      :config="store.gridConfig"
-      @confirm="applyGridConfig"
-    />
   </div>
 </template>
 
@@ -94,10 +88,9 @@ import { getJobPage } from '@/api/job'
 import DashboardHeader from './DashboardHeader.vue'
 import DashboardDetailsPanel from './DashboardDetailsPanel.vue'
 import GridMap from './grid/GridMap.vue'
-import GridLayoutSettingsDialog from './GridLayoutSettingsDialog.vue'
 import BindDeviceDialog from './BindDeviceDialog.vue'
 import DeviceDetailDrawer from './device/DeviceDetailDrawer.vue'
-import { getOutOfBoundsDevices } from '@/utils/gridLayout'
+import { createGridConfig, getOutOfBoundsDevices } from '@/utils/gridLayout'
 
 defineOptions({ name: 'FarmDashboard' })
 
@@ -121,7 +114,6 @@ const historyJobs = ref([])
 const historyLoading = ref(false)
 const historyError = ref('')
 const reconnecting = ref(false)
-const layoutDialogVisible = ref(false)
 
 // ============================================
 // Reactive State
@@ -129,6 +121,8 @@ const layoutDialogVisible = ref(false)
 
 /** 编辑模式状态 - 默认锁定监控模式 */
 const isEditMode = ref(false)
+const layoutSnapshot = ref(null)
+const layoutSaving = ref(false)
 const canManageLayout = computed(() => userStore.isAdmin)
 
 watch(canManageLayout, canManage => {
@@ -187,7 +181,7 @@ updateLastUpdateTime()
  */
 const targetSlotLabel = computed(() => {
   if (targetSlot.value.row === null || targetSlot.value.col === null) return ''
-  const rowLabel = String.fromCharCode(65 + targetSlot.value.row - 1)
+  const rowLabel = store.formatRowLabel(targetSlot.value.row)
   return `${rowLabel}-${targetSlot.value.col.toString().padStart(2, '0')}`
 })
 
@@ -237,8 +231,8 @@ function handleDragStart(device, rowIndex, colIndex) {
  * @param {number} colIndex - 目标列索引
  */
 function handleDragEnter(rowIndex, colIndex) {
-  // 不能放置到过道
-  if (store.isAisleCell(colIndex)) return
+  // 不能放置到行过道或列过道
+  if (store.isAisleRowCell(rowIndex) || store.isAisleCell(colIndex)) return
   dragOverCell.value = { row: rowIndex, col: colIndex }
 }
 
@@ -264,8 +258,8 @@ function handleDragEnd() {
  * @param {number} targetColIndex - 目标列索引
  */
 async function handleDrop(targetRowIndex, targetColIndex) {
-  // 防止放置到过道
-  if (store.isAisleCell(targetColIndex)) return
+  // 防止放置到行过道或列过道
+  if (store.isAisleRowCell(targetRowIndex) || store.isAisleCell(targetColIndex)) return
 
   // 如果没有拖拽的设备，不处理
   if (!draggedDevice.value || !draggedFrom.value) return
@@ -279,9 +273,13 @@ async function handleDrop(targetRowIndex, targetColIndex) {
     return
   }
 
-  // 计算新的物理坐标
-  const newGridRow = targetRowIndex + 1
+  // 将视觉坐标还原为后端使用的物理坐标
+  const newGridRow = store.getPhysicalRowByIndex(targetRowIndex)
   const newGridCol = store.getPhysicalColByIndex(targetColIndex)
+  if (newGridRow === null || newGridCol === null) {
+    handleDragEnd()
+    return
+  }
 
   // 获取目标位置的设备（如果有）
   const targetDevice = store.deviceMatrix[targetRowIndex][targetColIndex]
@@ -342,10 +340,11 @@ async function moveDeviceToEmptySlot(device, from, to) {
  */
 async function swapDevicesPosition(device1, pos1, device2, pos2) {
   // 计算物理坐标
-  const device1NewRow = pos2.row + 1
+  const device1NewRow = store.getPhysicalRowByIndex(pos2.row)
   const device1NewCol = store.getPhysicalColByIndex(pos2.col)
-  const device2NewRow = pos1.row + 1
+  const device2NewRow = store.getPhysicalRowByIndex(pos1.row)
   const device2NewCol = store.getPhysicalColByIndex(pos1.col)
+  if ([device1NewRow, device1NewCol, device2NewRow, device2NewCol].some(value => value === null)) return
 
   // 批量更新两个设备的位置
   const payload = [
@@ -382,9 +381,12 @@ function handleCellClick(device, rowIndex, colIndex) {
     drawerVisible.value = true
   } else {
     // 点击空槽位 - 打开绑定弹窗（仅在编辑模式下）
+    const physicalRow = store.getPhysicalRowByIndex(rowIndex)
+    const physicalCol = store.getPhysicalColByIndex(colIndex)
+    if (physicalRow === null || physicalCol === null) return
     targetSlot.value = {
-      row: rowIndex + 1,
-      col: store.getPhysicalColByIndex(colIndex)
+      row: physicalRow,
+      col: physicalCol
     }
     bindDialogVisible.value = true
   }
@@ -527,16 +529,26 @@ function handleDrawerClosed() {
 // Layout Edit Mode Functions
 // ============================================
 
-/**
- * 切换编辑模式
- */
-function toggleEditMode() {
+/** 进入或完成布局编辑。 */
+function toggleLayoutEditing() {
   if (!canManageLayout.value) {
     message.error('当前账号没有维护网格布局的权限')
     return
   }
+  if (isEditMode.value) {
+    saveLayout()
+    return
+  }
+  layoutSnapshot.value = createGridConfig(store.gridConfig)
   isEditMode.value = true
-  message.info('已进入编辑模式，现在可以拖拽设备调整位置')
+  message.info('已进入布局编辑模式，可调整行列或右键设置过道')
+}
+
+function cancelLayoutEditing() {
+  if (layoutSnapshot.value) store.updateGridConfig(layoutSnapshot.value)
+  layoutSnapshot.value = null
+  isEditMode.value = false
+  message.info('已取消布局编辑')
 }
 
 /**
@@ -558,13 +570,66 @@ async function saveLayout() {
   }
 
   try {
+    layoutSaving.value = true
     await saveLayoutPositions()
     isEditMode.value = false
-  message.success('布局已保存')
+    layoutSnapshot.value = null
+    message.success('布局已保存')
   } catch (error) {
     console.error('保存布局失败:', error)
-  message.error('保存布局失败，请重试')
+    message.error('保存布局失败，请重试')
+  } finally {
+    layoutSaving.value = false
   }
+}
+
+async function handleDimensionChange({ axis, delta }) {
+  if (!isEditMode.value || !canManageLayout.value) return
+  const current = store.gridConfig
+  const nextConfig = createGridConfig({
+    ...current,
+    rowCount: axis === 'row' ? current.rowCount + delta : current.rowCount,
+    columnCount: axis === 'column' ? current.columnCount + delta : current.columnCount
+  })
+  if (nextConfig.rowCount === current.rowCount && nextConfig.columnCount === current.columnCount) return
+  await applyGridConfig(nextConfig)
+}
+
+async function handleAisleContext({ action, axis, index, aisle }) {
+  if (!isEditMode.value || !canManageLayout.value) return
+  const axisLabel = axis === 'row' ? '行' : '列'
+  const current = store.gridConfig
+  const aisles = current.aisles.map(item => ({ ...item }))
+
+  if (action === 'add-aisle') {
+    if (aisles.some(item => item.axis === axis && item.afterIndex === index)) {
+      message.info(`第 ${index} ${axisLabel}后已经设置过道`)
+      return
+    }
+    try {
+      await confirmMessage(`确定要在第 ${index} ${axisLabel}后设置一条过道吗？`, '设置过道', {
+        confirmButtonText: '确认设置', cancelButtonText: '取消', type: 'warning'
+      })
+    } catch {
+      return
+    }
+    aisles.push({ axis, afterIndex: index, label: '过道', size: axis === 'row' ? 80 : 100 })
+  } else if (action === 'remove-aisle') {
+    try {
+      await confirmMessage(`确定要删除这条${axisLabel}过道吗？`, '删除过道', {
+        confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning'
+      })
+    } catch {
+      return
+    }
+    const aisleId = aisle?.id
+    const aisleIndex = aisles.findIndex(item => item.id === aisleId)
+    if (aisleIndex >= 0) aisles.splice(aisleIndex, 1)
+  } else {
+    return
+  }
+
+  await applyGridConfig(createGridConfig({ ...current, aisles }))
 }
 
 async function applyGridConfig(nextConfig) {
@@ -588,8 +653,6 @@ async function applyGridConfig(nextConfig) {
   }
 
   store.updateGridConfig(nextConfig)
-  isEditMode.value = false
-  layoutDialogVisible.value = false
   message.success('网格布局已更新')
 }
 

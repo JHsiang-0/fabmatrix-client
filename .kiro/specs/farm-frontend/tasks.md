@@ -1,5 +1,38 @@
 # 前端 Kiro 任务清单
 
+## Kiro Task UI-001.31：看板布局编辑与行列过道管理
+
+状态：已完成
+
+范围：
+- `src/components/FarmDashboard.vue`
+- `src/components/grid/GridMap.vue`
+- `src/components/GridLayoutSettingsDialog.vue`
+- `src/utils/gridLayout.js`
+- `src/stores/printer/deviceStore.js`
+- `src/stores/printer/gridStore.js`
+- `src/stores/printer/index.js`
+- `tests/gridLayout.test.js`
+
+目标：
+- 将布局设置与解锁布局合并为统一的管理员编辑入口。
+- 在编辑态提供行列末端增减控制，保持设备物理坐标兼容。
+- 根据看板容器尺寸自适应网格，同时只保留外层滚动区域。
+- 支持通过行号、列号右键在指定行列后插入、修改和删除过道。
+- 保证布局变更的确认提示、取消编辑、越界设备保护和本地持久化行为。
+
+验收标准：
+- 管理员点击“布局设置”即可进入编辑态，再次点击“完成布局”退出；非管理员不可操作。
+- 行数、设备列数可以在网格末端增加或删除，最小值和最大值受到限制。
+- 增加行列或过道后，行标签、列标题、设备卡片和过道保持对齐；窗口缩放时优先自适应，必要时仅由外层区域滚动。
+- 右键行号或列号可弹出 TDesign 操作菜单，并通过确认对话框管理对应方向的过道。
+- 行过道和列过道不改变设备的物理 `gridRow/gridCol`；缩小范围可能隐藏设备时必须明确提示。
+- 相关单元测试、`npm run lint`、`npm run build` 和 `git diff --check` 通过。
+
+提交建议：`feat: 支持看板布局编辑与行列过道管理`
+
+完成记录：已将布局设置与解锁布局合并，新增行列末端增减控制、行列过道右键菜单、行列视觉/物理坐标映射和容器尺寸自适应；保留设备拖拽、绑定、实时状态和越界设备确认逻辑。专项 `tests/gridLayout.test.js` 6/6 通过，`npm run lint`、`npm run build`、`git diff --check` 通过。完整 `npm test` 的 3 个失败来自既有任务中心和总览页面契约测试，不涉及本 Task 修改文件。
+
 ## Kiro Task UI-001.30：支持全屏看板自定义行列与过道布局
 
 状态：已完成

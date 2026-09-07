@@ -3,7 +3,8 @@ import { defineStore } from 'pinia'
 import { useDeviceStore } from './deviceStore'
 import { useRealtimeStore } from './realtimeStore'
 import { PRINTER_STATE, PRINTER_STATUS } from '@/utils/constants'
-import { getPhysicalColumn, isAisleVisualColumn } from '@/utils/gridLayout'
+import { getPhysicalColumn, getPhysicalRow, isAisleVisualColumn, isAisleVisualRow } from '@/utils/gridLayout'
+import { formatRowLabel as formatGridRowLabel } from '@/utils/formatters'
 
 /**
  * 网格布局计算 Store
@@ -93,7 +94,7 @@ export const useGridStore = defineStore('grid', () => {
    * @returns {string} 行标签（如 A, B, C...）
    */
   function formatRowLabel(row) {
-    return String.fromCharCode(65 + row - 1)
+    return formatGridRowLabel(row)
   }
 
   /**
@@ -114,6 +115,10 @@ export const useGridStore = defineStore('grid', () => {
     return getPhysicalCol(colIndex + 1)
   }
 
+  function getPhysicalRowByIndex(rowIndex) {
+    return getPhysicalRow(rowIndex + 1, gridConfig.value)
+  }
+
   /**
    * 判断是否为过道单元格
    * @param {number} colIndex - 列索引（0-based）
@@ -121,6 +126,10 @@ export const useGridStore = defineStore('grid', () => {
    */
   function isAisleCell(colIndex) {
     return isAisleVisualColumn(colIndex + 1, gridConfig.value)
+  }
+
+  function isAisleRowCell(rowIndex) {
+    return isAisleVisualRow(rowIndex + 1, gridConfig.value)
   }
 
   // ============================================
@@ -139,6 +148,8 @@ export const useGridStore = defineStore('grid', () => {
     formatRowLabel,
     getPhysicalCol,
     getPhysicalColByIndex,
+    getPhysicalRowByIndex,
+    isAisleRowCell,
     isAisleCell
   }
 })

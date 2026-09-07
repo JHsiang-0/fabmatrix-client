@@ -124,6 +124,8 @@ export function usePrinterStore() {
     formatRowLabel: grid.formatRowLabel,
     getPhysicalCol: grid.getPhysicalCol,
     getPhysicalColByIndex: grid.getPhysicalColByIndex,
+    getPhysicalRowByIndex: grid.getPhysicalRowByIndex,
+    isAisleRowCell: grid.isAisleRowCell,
     isAisleCell: grid.isAisleCell,
 
     // ============================================

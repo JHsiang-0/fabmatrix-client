@@ -20,28 +20,39 @@ function toInteger(value, fallback, { min, max }) {
   return Math.min(Math.max(Math.round(number), min), max)
 }
 
-function normalizeAisles(aisles, columnCount, legacyAisleCol) {
+function normalizeAisles(aisles, rowCount, columnCount, legacyAisleCol) {
   const source = Array.isArray(aisles) && aisles.length
     ? aisles
     : legacyAisleCol
-      ? [{ afterColumn: Number(legacyAisleCol) - 1 }]
+      ? [{ axis: 'column', afterIndex: Number(legacyAisleCol) - 1 }]
       : []
   const seen = new Set()
 
   return source
     .map((aisle, index) => {
-      const afterColumn = toInteger(
-        aisle?.afterColumn,
-        Math.min(index + 1, columnCount),
-        { ...LIMITS.aislePosition, max: columnCount }
+      const axis = aisle?.axis === 'row' ? 'row' : 'column'
+      const limit = axis === 'row' ? rowCount : columnCount
+      const legacyPosition = axis === 'row' ? aisle?.afterRow : aisle?.afterColumn
+      const afterIndex = toInteger(
+        aisle?.afterIndex ?? legacyPosition,
+        Math.min(index + 1, limit),
+        { ...LIMITS.aislePosition, max: limit }
       )
-      if (seen.has(afterColumn)) return null
-      seen.add(afterColumn)
+      const key = `${axis}:${afterIndex}`
+      if (seen.has(key)) return null
+      seen.add(key)
+      const size = toInteger(
+        aisle?.size ?? (axis === 'row' ? aisle?.height : aisle?.width),
+        axis === 'row' ? LEGACY_GRID_CONFIG.CELL_HEIGHT : DEFAULT_AISLE.width,
+        { min: LIMITS.aisleWidth.min, max: LIMITS.aisleWidth.max }
+      )
       return {
-        id: String(aisle?.id || `aisle-${afterColumn}`),
-        afterColumn,
+        id: String(aisle?.id || `aisle-${axis}-${afterIndex}`),
+        axis,
+        afterIndex,
+        ...(axis === 'row' ? { afterRow: afterIndex, height: size } : { afterColumn: afterIndex, width: size }),
         label: String(aisle?.label || DEFAULT_AISLE.label).trim() || DEFAULT_AISLE.label,
-        width: toInteger(aisle?.width, DEFAULT_AISLE.width, LIMITS.aisleWidth)
+        size
       }
     })
     .filter(Boolean)
@@ -51,8 +62,10 @@ function normalizeAisles(aisles, columnCount, legacyAisleCol) {
 export function createGridConfig(input = {}) {
   const rowCount = toInteger(input.rowCount ?? input.ROWS, LEGACY_GRID_CONFIG.ROWS, LIMITS.rows)
   const columnCount = toInteger(input.columnCount ?? input.COLS, LEGACY_GRID_CONFIG.COLS, LIMITS.columns)
-  const aisles = normalizeAisles(input.aisles, columnCount, input.AISLE_COL)
-  const firstAisle = aisles[0]
+  const aisles = normalizeAisles(input.aisles, rowCount, columnCount, input.AISLE_COL)
+  const firstColumnAisle = aisles.find(aisle => aisle.axis === 'column')
+  const rowAisleCount = aisles.filter(aisle => aisle.axis === 'row').length
+  const columnAisleCount = aisles.filter(aisle => aisle.axis === 'column').length
 
   return {
     rowCount,
@@ -60,9 +73,10 @@ export function createGridConfig(input = {}) {
     aisles,
     ROWS: rowCount,
     COLS: columnCount,
-    TOTAL_COLS: columnCount + aisles.length,
-    AISLE_COL: firstAisle ? firstAisle.afterColumn + 1 : null,
-    AISLE_COL_INDEX: firstAisle ? firstAisle.afterColumn : -1,
+    TOTAL_ROWS: rowCount + rowAisleCount,
+    TOTAL_COLS: columnCount + columnAisleCount,
+    AISLE_COL: firstColumnAisle ? firstColumnAisle.afterColumn + 1 : null,
+    AISLE_COL_INDEX: firstColumnAisle ? firstColumnAisle.afterColumn : -1,
     CELL_HEIGHT: Number(input.CELL_HEIGHT) || LEGACY_GRID_CONFIG.CELL_HEIGHT,
     CELL_MIN_WIDTH: Number(input.CELL_MIN_WIDTH) || LEGACY_GRID_CONFIG.CELL_MIN_WIDTH
   }
@@ -98,7 +112,9 @@ export function saveGridConfig(config) {
 
 export function getVisualColumns(config) {
   const normalized = createGridConfig(config)
-  const aislesByPosition = new Map(normalized.aisles.map(aisle => [aisle.afterColumn, aisle]))
+  const aislesByPosition = new Map(normalized.aisles
+    .filter(aisle => aisle.axis === 'column')
+    .map(aisle => [aisle.afterColumn, aisle]))
   const columns = []
 
   for (let physicalColumn = 1; physicalColumn <= normalized.columnCount; physicalColumn += 1) {
@@ -117,6 +133,31 @@ export function getPhysicalColumn(visualColumn, config) {
 
 export function isAisleVisualColumn(visualColumn, config) {
   return getVisualColumns(config)[Number(visualColumn) - 1]?.type === 'aisle'
+}
+
+export function getVisualRows(config) {
+  const normalized = createGridConfig(config)
+  const aislesByPosition = new Map(normalized.aisles
+    .filter(aisle => aisle.axis === 'row')
+    .map(aisle => [aisle.afterRow, aisle]))
+  const rows = []
+
+  for (let physicalRow = 1; physicalRow <= normalized.rowCount; physicalRow += 1) {
+    rows.push({ type: 'device', number: physicalRow })
+    const aisle = aislesByPosition.get(physicalRow)
+    if (aisle) rows.push({ type: 'aisle', ...aisle })
+  }
+
+  const leadingAisles = normalized.aisles.filter(aisle => aisle.axis === 'row' && aisle.afterRow === 0)
+  return [...leadingAisles.map(aisle => ({ type: 'aisle', ...aisle })), ...rows]
+}
+
+export function getPhysicalRow(visualRow, config) {
+  return getVisualRows(config)[Number(visualRow) - 1]?.number ?? null
+}
+
+export function isAisleVisualRow(visualRow, config) {
+  return getVisualRows(config)[Number(visualRow) - 1]?.type === 'aisle'
 }
 
 export function getOutOfBoundsDevices(devices, config) {
