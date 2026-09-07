@@ -17,8 +17,14 @@
       :statistics="printerStatistics"
       :statistics-loading="statisticsLoading"
       :statistics-error="statisticsError"
+      :monitor-config="monitorConfig"
+      :monitor-loading="monitorLoading"
+      :monitor-error="monitorError"
+      :monitor-updating="monitorUpdatingIds.includes(selectedDevice?.id)"
+      :can-manage-monitor="isAdmin"
       @history-query="handleHistoryQuery"
       @history-page-change="handleHistoryPageChange"
+      @monitor-change="handleDetailMonitorChange"
       @closed="clearPrinterDetailContext"
       @retry="retryPrinterDetail"
     />
@@ -35,6 +41,14 @@
       </template>
       <template #actions>
       <div class="app-page-toolbar__actions">
+        <t-button v-if="isAdmin" theme="success" variant="outline" :disabled="selectedPrinterIds.length === 0 || monitorBatchLoading"
+          :loading="monitorBatchLoading && monitorBatchTarget === true" @click="handleBatchMonitor(true)">
+          启用监控{{ selectedPrinterIds.length ? ` (${selectedPrinterIds.length})` : '' }}
+        </t-button>
+        <t-button v-if="isAdmin" theme="warning" variant="outline" :disabled="selectedPrinterIds.length === 0 || monitorBatchLoading"
+          :loading="monitorBatchLoading && monitorBatchTarget === false" @click="handleBatchMonitor(false)">
+          停用监控{{ selectedPrinterIds.length ? ` (${selectedPrinterIds.length})` : '' }}
+        </t-button>
         <t-button :icon="renderIcon(Refresh)" :loading="loading" @click="fetchData" size="medium">
           刷新
         </t-button>
@@ -95,8 +109,10 @@
           style="width: 100%"
           class="printer-table"
           @row-click="handleRowClick"
+          @selection-change="handlePrinterSelectionChange"
           row-class-name="printer-table-row"
         >
+        <TdTableColumn v-if="isAdmin" type="selection" width="52" align="center" />
         <TdTableColumn prop="id" label="ID" width="80" align="center">
           <template #default="scope">
             <span class="font-mono font-semibold text-gray-600">{{ scope.row.id }}</span>
@@ -127,6 +143,38 @@
         <TdTableColumn prop="status" label="当前状态" width="120" align="center">
           <template #default="scope">
             <StatusTag domain="printer" :status="scope.row.status" />
+          </template>
+        </TdTableColumn>
+
+        <TdTableColumn prop="connectionStatus" label="通信状态" width="150" align="center">
+          <template #default="scope">
+            <div class="flex flex-col items-center gap-1">
+              <t-tag size="small" :theme="getConnectionTheme(scope.row.connectionStatus)" variant="light">
+                {{ getConnectionLabel(scope.row.connectionStatus) }}
+              </t-tag>
+              <span v-if="scope.row.connectionStatus === 'OFFLINE' && scope.row.lastCommunicationError"
+                class="max-w-32 truncate text-xs text-gray-500" :title="scope.row.lastCommunicationError">
+                {{ scope.row.lastCommunicationError }}
+              </span>
+            </div>
+          </template>
+        </TdTableColumn>
+
+        <TdTableColumn label="监控" width="110" align="center">
+          <template #default="scope">
+            <t-switch :value="scope.row.monitorEnabled === true" :disabled="!isAdmin || monitorUpdatingIds.includes(scope.row.id)"
+              :loading="monitorUpdatingIds.includes(scope.row.id)" @click.stop @change="value => handleMonitorChange(scope.row, value)" />
+          </template>
+        </TdTableColumn>
+
+        <TdTableColumn label="最近通信" width="180" align="center">
+          <template #default="scope">
+            <div class="flex flex-col items-center gap-1 text-xs text-gray-600">
+              <span>{{ formatDateTime(scope.row.lastSeenAt) }}</span>
+              <span v-if="Number(scope.row.consecutiveFailureCount) > 0" class="text-orange-600">
+                连续失败 {{ scope.row.consecutiveFailureCount }} 次
+              </span>
+            </div>
           </template>
         </TdTableColumn>
 
@@ -471,7 +519,10 @@ import {
   getUnallocatedPrinters,
   confirmSafe,
   getPrinterStatusHistory,
-  getPrinterStatistics
+  getPrinterStatistics,
+  getPrinterMonitor,
+  updatePrinterMonitor,
+  updatePrinterMonitorBatch
 } from '@/api/printer'
 import { startJob } from '@/api/job'
 import { message, confirmMessage } from '@/utils/message'
@@ -481,6 +532,7 @@ import { useDeviceStore } from '@/stores/printer/deviceStore'
 import { useRealtimeStore } from '@/stores/printer/realtimeStore'
 import { PRINTER_STATUS, PRINTER_STATUS_MAP } from '@/utils/constants'
 import { normalizePrinterStatus } from '@/utils/dataAdapters'
+import { formatDateTime } from '@/utils/formatters'
 import DeviceDetailDrawer from '@/components/device/DeviceDetailDrawer.vue'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
@@ -544,6 +596,13 @@ const historyRange = ref([])
 const printerStatistics = ref(null)
 const statisticsLoading = ref(false)
 const statisticsError = ref('')
+const monitorConfig = ref(null)
+const monitorLoading = ref(false)
+const monitorError = ref('')
+const monitorUpdatingIds = ref([])
+const monitorBatchLoading = ref(false)
+const monitorBatchTarget = ref(null)
+const selectedPrinterIds = ref([])
 
 // ===== 表单与弹窗状态 =====
 const dialogVisible = ref(false)
@@ -594,9 +653,41 @@ const deletingIds = ref([])
 
 const displayTableData = computed(() => tableData.value.map(printer => {
   const realtime = statusMap.value.get(String(printer.id))
-  const realtimeState = realtime?.unifiedState || realtime?.state
-  return realtimeState ? { ...printer, status: normalizePrinterStatus(realtimeState) } : printer
+  if (!realtime) return printer
+
+  const merged = { ...printer }
+  const healthFields = [
+    'connectionStatus',
+    'lastSeenAt',
+    'lastCommunicationError',
+    'consecutiveFailureCount',
+    'lastKnownStatus',
+    'lastProtocolState',
+    'lastDeviceUptime',
+    'currentJobId',
+    'currentJobFileName',
+    'currentJobStatus',
+    'progress'
+  ]
+  healthFields.forEach(field => {
+    if (realtime[field] !== undefined) merged[field] = realtime[field]
+  })
+  const realtimeState = realtime.businessStatus || realtime.unifiedState || realtime.state
+  if (realtimeState) merged.status = normalizePrinterStatus(realtimeState)
+  return merged
 }))
+
+const getConnectionLabel = status => ({
+  ONLINE: '在线',
+  OFFLINE: '离线',
+  UNKNOWN: '未知'
+}[String(status || 'UNKNOWN').toUpperCase()] || '未知')
+
+const getConnectionTheme = status => ({
+  ONLINE: 'success',
+  OFFLINE: 'danger',
+  UNKNOWN: 'default'
+}[String(status || 'UNKNOWN').toUpperCase()] || 'default')
 
 // 扫描统计文案
 const scanStatsText = computed(() => {
@@ -698,6 +789,12 @@ const handleStartJob = async (printer) => {
 }
 
 // 表格行点击事件
+const handlePrinterSelectionChange = rows => {
+  selectedPrinterIds.value = Array.isArray(rows)
+    ? rows.map(row => row?.id).filter(Boolean)
+    : []
+}
+
 const handleRowClick = (row) => {
   selectedDevice.value = row
   sessionStorage.setItem(PRINTER_DETAIL_CONTEXT_KEY, String(row.id))
@@ -711,6 +808,7 @@ const handleRowClick = (row) => {
   statisticsError.value = ''
   detailDrawerVisible.value = true
   loadPrinterDetail(row.id)
+  loadPrinterMonitor(row.id)
   loadPrinterAnalytics(row.id)
 }
 
@@ -733,7 +831,84 @@ const loadPrinterDetail = async deviceId => {
 
 const retryPrinterDetail = () => {
   const deviceId = selectedDevice.value?.id
-  if (deviceId) loadPrinterDetail(deviceId)
+  if (deviceId) {
+    loadPrinterDetail(deviceId)
+    loadPrinterMonitor(deviceId)
+  }
+}
+
+const loadPrinterMonitor = async deviceId => {
+  monitorLoading.value = true
+  monitorError.value = ''
+  try {
+    const response = await getPrinterMonitor(deviceId)
+    if (String(selectedDevice.value?.id) === String(deviceId)) {
+      monitorConfig.value = response?.data || null
+    }
+  } catch (error) {
+    if (String(selectedDevice.value?.id) === String(deviceId)) {
+      monitorError.value = error?.message || '监控配置加载失败，请重试'
+    }
+  } finally {
+    if (String(selectedDevice.value?.id) === String(deviceId)) monitorLoading.value = false
+  }
+}
+
+const updateMonitorRows = (ids, enabled) => {
+  const idSet = new Set(ids.map(id => String(id)))
+  tableData.value = tableData.value.map(row => idSet.has(String(row.id))
+    ? { ...row, monitorEnabled: enabled }
+    : row)
+}
+
+const handleMonitorChange = (printer, enabled) => {
+  if (!isAdmin.value || monitorUpdatingIds.value.includes(printer.id)) return
+  return updateMonitorForIds([printer.id], enabled, printer)
+}
+
+const updateMonitorForIds = async (ids, enabled, printer = null) => {
+  const normalizedIds = ids.filter(Boolean)
+  if (normalizedIds.length === 0) {
+    message.warning('请先选择打印机')
+    return
+  }
+  if (monitorBatchLoading.value || normalizedIds.some(id => monitorUpdatingIds.value.includes(id))) return
+
+  if (normalizedIds.length === 1) {
+    monitorUpdatingIds.value.push(normalizedIds[0])
+  } else {
+    monitorBatchLoading.value = true
+    monitorBatchTarget.value = enabled
+  }
+
+  try {
+    if (normalizedIds.length === 1) await updatePrinterMonitor(normalizedIds[0], enabled)
+    else await updatePrinterMonitorBatch(normalizedIds, enabled)
+    updateMonitorRows(normalizedIds, enabled)
+    if (printer && String(selectedDevice.value?.id) === String(printer.id)) {
+      monitorConfig.value = { ...monitorConfig.value, monitorEnabled: enabled }
+    }
+    selectedPrinterIds.value = []
+    message.success(enabled ? '监控已启用' : '监控已停用')
+    await fetchData()
+  } catch (error) {
+    if (!error?.toastShown) message.error(error?.message || '监控配置更新失败')
+  } finally {
+    if (normalizedIds.length === 1) {
+      const index = monitorUpdatingIds.value.indexOf(normalizedIds[0])
+      if (index > -1) monitorUpdatingIds.value.splice(index, 1)
+    } else {
+      monitorBatchLoading.value = false
+      monitorBatchTarget.value = null
+    }
+  }
+}
+
+const handleBatchMonitor = enabled => updateMonitorForIds([...selectedPrinterIds.value], enabled)
+
+const handleDetailMonitorChange = enabled => {
+  const printer = selectedDevice.value
+  if (printer) return updateMonitorForIds([printer.id], enabled, printer)
 }
 
 const loadPrinterAnalytics = async deviceId => {
@@ -804,6 +979,9 @@ const clearPrinterDetailContext = () => {
   printerStatistics.value = null
   statisticsLoading.value = false
   statisticsError.value = ''
+  monitorConfig.value = null
+  monitorLoading.value = false
+  monitorError.value = ''
 }
 
 const restorePrinterDetailContext = () => {

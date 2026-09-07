@@ -200,10 +200,10 @@ const emit = defineEmits([
 // Computed - 状态相关
 // ============================================
 
-/** 当前状态 - 严格使用 unifiedState 字段 */
+/** 当前业务状态，不使用通信健康消息覆盖业务状态 */
 const status = computed(() => {
     if (!props.realTimeData) return PRINTER_STATE.UNKNOWN
-    return props.realTimeData.unifiedState || PRINTER_STATE.UNKNOWN
+    return props.realTimeData.businessStatus || props.realTimeData.unifiedState || PRINTER_STATE.UNKNOWN
 })
 
 /** 状态文本 - 使用 PRINTER_STATE_MAP */

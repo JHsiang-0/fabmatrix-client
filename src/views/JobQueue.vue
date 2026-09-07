@@ -374,7 +374,9 @@
       :task="selectedJob"
       :loading="detailLoading"
       :error="detailErrorText"
+      :reconcile-loading="reconcileSubmitting"
       @update:model-value="handleTaskDetailVisibility"
+      @reconcile="handleReconcile"
     />
   </div>
 </template>
@@ -388,7 +390,7 @@ import {
   SendIcon as Promotion,
   CheckIcon as Check
 } from 'tdesign-icons-vue-next'
-import { cancelJob, assignJobToPrinter, requeueJob, updateJobPriority, startJob, createPrintJob } from '@/api/job'
+import { cancelJob, assignJobToPrinter, requeueJob, updateJobPriority, startJob, createPrintJob, reconcilePrintJob } from '@/api/job'
 import { confirmSafe, getPrinterList, pausePrinter, resumePrinter } from '@/api/printer'
 import { getFileTree } from '@/api/printFile'
 import { message, confirmMessage } from '@/utils/message'
@@ -401,10 +403,12 @@ import PageHeader from '@/components/layout/PageHeader.vue'
 import StatusTag from '@/components/StatusTag.vue'
 import TaskDetailDrawer from '@/components/TaskDetailDrawer.vue'
 import { useJobStore } from '@/stores/jobStore'
+import { useRealtimeStore } from '@/stores/printer/realtimeStore'
 
 defineOptions({ name: 'JobQueue' })
 
 const jobStore = useJobStore()
+const realtimeStore = useRealtimeStore()
 const {
   queueJobs: queueData,
   activePageJobs: activePageData,
@@ -450,6 +454,7 @@ const activeTab = ref('queue')
 const createTaskResults = ref([])
 const createTaskBatchKey = ref('')
 const actionLoadingKey = ref('')
+const reconcileSubmitting = ref(false)
 
 const createTaskForm = ref({
   fileId: undefined,
@@ -485,6 +490,32 @@ const handleTaskDetailVisibility = visible => {
     detailDrawerVisible.value = false
     selectedJob.value = null
     sessionStorage.removeItem(JOB_QUEUE_DETAIL_CONTEXT_KEY)
+  }
+}
+
+const handleReconcile = async payload => {
+  const job = selectedJob.value
+  if (reconcileSubmitting.value || !job || job.status !== 'RECONCILING') return
+
+  reconcileSubmitting.value = true
+  try {
+    await reconcilePrintJob(job.id, payload)
+    message.success('人工核对已提交')
+
+    const refreshResults = await Promise.allSettled([
+      jobStore.fetchJobDetail(job.id),
+      jobStore.refresh(),
+      realtimeStore.refreshPrinterSnapshot()
+    ])
+    const detailResult = refreshResults[0]
+    if (detailResult.status === 'fulfilled' && selectedJob.value && String(selectedJob.value.id) === String(job.id)) {
+      selectedJob.value = detailResult.value
+    }
+  } catch (error) {
+    if (!error?.toastShown) message.error(error?.message || '人工核对失败')
+    await fetchQueue()
+  } finally {
+    reconcileSubmitting.value = false
   }
 }
 

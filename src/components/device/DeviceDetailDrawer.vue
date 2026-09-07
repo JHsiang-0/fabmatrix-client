@@ -34,7 +34,7 @@
         </template>
 
         <!-- 内容区域 - 使用流式内边距 -->
-        <div v-if="detailLoading" class="flex min-h-48 items-center justify-center">
+            <div v-if="detailLoading" class="flex min-h-48 items-center justify-center">
             <t-loading text="正在加载打印机详情..." />
         </div>
 
@@ -69,6 +69,45 @@
                     <span class="line-clamp-3">{{ realTimeData.systemMessage }}</span>
                 </div>
             </div>
+
+            <section class="printer-detail-drawer__monitor-section" aria-labelledby="printer-monitor-title">
+                <div class="flex items-center justify-between gap-2 text-fluid-sm font-semibold text-gray-900">
+                    <span id="printer-monitor-title">监控与通信</span>
+                    <t-switch :value="monitorEnabled" :disabled="!canManageMonitor || monitorLoading || monitorUpdating"
+                        :loading="monitorUpdating" @change="handleMonitorChange" />
+                </div>
+                <t-alert v-if="monitorError" theme="error" :title="monitorError" :close-btn="false" />
+                <t-skeleton v-else-if="monitorLoading" :loading="true" theme="paragraph" />
+                <t-descriptions v-else :column="descriptionColumn" size="small" bordered>
+                    <t-descriptions-item label="后台监控">
+                        {{ monitorEnabled ? '已启用' : '已停用' }}
+                    </t-descriptions-item>
+                    <t-descriptions-item label="通信状态">
+                        <t-tag size="small" :theme="connectionTheme" variant="light">{{ connectionLabel }}</t-tag>
+                    </t-descriptions-item>
+                    <t-descriptions-item label="最近通信">
+                        {{ formatDateTime(monitorValue.lastSeenAt) }}
+                    </t-descriptions-item>
+                    <t-descriptions-item label="连续失败">
+                        {{ monitorValue.consecutiveFailureCount ?? 0 }} 次
+                    </t-descriptions-item>
+                    <t-descriptions-item label="最近已知状态">
+                        <StatusTag domain="printer" :status="monitorValue.lastKnownStatus || currentState" />
+                    </t-descriptions-item>
+                    <t-descriptions-item label="协议原始状态">
+                        {{ monitorValue.lastProtocolState || '-' }}
+                    </t-descriptions-item>
+                    <t-descriptions-item label="设备运行时间">
+                        {{ monitorValue.lastDeviceUptime ?? '-' }}
+                    </t-descriptions-item>
+                    <t-descriptions-item v-if="monitorValue.lastCommunicationError" label="最近通信错误" :span="descriptionColumn">
+                        <span class="text-red-600">{{ monitorValue.lastCommunicationError }}</span>
+                    </t-descriptions-item>
+                </t-descriptions>
+            </section>
+
+            <t-alert v-if="currentJobStatus === 'RECONCILING'" theme="warning" :close-btn="false"
+                title="设备状态无法自动确认，请人工核对打印结果。" />
 
             <!-- 温度监控 -->
             <div class="flex flex-col gap-fluid-sm">
@@ -533,6 +572,26 @@ const props = defineProps({
     statisticsError: {
         type: String,
         default: ''
+    },
+    monitorConfig: {
+        type: Object,
+        default: null
+    },
+    monitorLoading: {
+        type: Boolean,
+        default: false
+    },
+    monitorError: {
+        type: String,
+        default: ''
+    },
+    monitorUpdating: {
+        type: Boolean,
+        default: false
+    },
+    canManageMonitor: {
+        type: Boolean,
+        default: false
     }
 })
 
@@ -548,7 +607,8 @@ const emit = defineEmits([
     'closed',
     'history-query',
     'history-page-change',
-    'retry'
+    'retry',
+    'monitor-change'
 ])
 
 const historyRangeModel = ref([])
@@ -634,11 +694,33 @@ const drawerTitle = computed(() => {
 
 /** 当前状态 */
 const currentState = computed(() => {
-    const sourceState = props.realTimeData?.state || props.device?.status
+    const sourceState = props.realTimeData?.businessStatus || props.realTimeData?.state || props.device?.status
     if (String(sourceState || '').toUpperCase() === 'ASSIGNED') return PRINTER_STATUS.IDLE
     return normalizePrinterStatus(sourceState)
 })
 
+const monitorValue = computed(() => ({
+    ...props.device,
+    ...props.monitorConfig,
+    ...props.realTimeData
+}))
+
+const monitorEnabled = computed(() => (
+    (props.monitorConfig?.monitorEnabled ?? props.device?.monitorEnabled) === true
+))
+const connectionLabel = computed(() => ({
+    ONLINE: '在线',
+    OFFLINE: '离线',
+    UNKNOWN: '未知'
+}[String(monitorValue.value.connectionStatus || 'UNKNOWN').toUpperCase()] || '未知'))
+const connectionTheme = computed(() => ({
+    ONLINE: 'success',
+    OFFLINE: 'danger',
+    UNKNOWN: 'default'
+}[String(monitorValue.value.connectionStatus || 'UNKNOWN').toUpperCase()] || 'default'))
+const currentJobStatus = computed(() => String(
+    props.realTimeData?.currentJobStatus || props.device?.currentJobStatus || ''
+).toUpperCase())
 /** 当前状态类名 */
 const currentStateClass = computed(() => {
     return currentState.value.toLowerCase()
@@ -723,6 +805,10 @@ const canCancel = computed(() => {
 
 function handleAction(action) {
     emit('action', action, props.device)
+}
+
+function handleMonitorChange(enabled) {
+    if (props.canManageMonitor && !props.monitorUpdating) emit('monitor-change', enabled)
 }
 
 function handleEmergencyStop() {

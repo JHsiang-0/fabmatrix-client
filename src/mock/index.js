@@ -307,7 +307,10 @@ const handlePrinterPage = config => {
       ? records.filter(item => ATTENTION_PRINTER_STATUSES.includes(String(item.status || '').toUpperCase()))
       : records.filter(item => item.status === params.status)
   }
-  return createMockPage(records.map(toPublicPrinter), params)
+  return createMockPage(records.map(printer => ({
+    ...toPublicPrinter(printer),
+    ...getMockMonitorData(printer)
+  })), params)
 }
 
 const handlePrinterDetail = config => {
@@ -315,7 +318,67 @@ const handlePrinterDetail = config => {
   const id = getPath(config.url).split('/').pop()
   const printer = findPrinter(id)
   if (!printer) fail(404, 404, '打印机不存在')
-  return toPublicPrinter(printer)
+  return {
+    ...toPublicPrinter(printer),
+    ...getMockMonitorData(printer)
+  }
+}
+
+const getMockMonitorData = printer => {
+  const connectionStatus = String(
+    printer.connectionStatus || (printer.status === 'OFFLINE'
+      ? 'OFFLINE'
+      : printer.status === 'UNKNOWN' ? 'UNKNOWN' : 'ONLINE')
+  ).toUpperCase()
+  return {
+    printerId: printer.id,
+    monitorEnabled: printer.monitorEnabled !== false,
+    connectionStatus,
+    lastSeenAt: printer.lastSeenAt ?? printer.updatedAt ?? null,
+    lastCommunicationError: printer.lastCommunicationError ?? (connectionStatus === 'OFFLINE' ? '设备暂时离线' : null),
+    consecutiveFailureCount: Number(printer.consecutiveFailureCount || 0),
+    lastKnownStatus: printer.lastKnownStatus ?? printer.status ?? null,
+    lastProtocolState: printer.lastProtocolState ?? null,
+    lastDeviceUptime: printer.lastDeviceUptime ?? null
+  }
+}
+
+const handleGetPrinterMonitor = config => {
+  requireSession(config, ['ADMIN', 'OPERATOR'])
+  const id = getPath(config.url).split('/').at(-2)
+  const printer = findPrinter(id)
+  if (!printer) fail(404, 404, '打印机不存在')
+  return getMockMonitorData(printer)
+}
+
+const handleUpdatePrinterMonitor = config => {
+  requireSession(config, ['ADMIN'])
+  const id = getPath(config.url).split('/').at(-2)
+  const printer = findPrinter(id)
+  if (!printer) fail(404, 404, '打印机不存在')
+  const body = getBody(config)
+  if (typeof body.monitorEnabled !== 'boolean') fail(400, 400, 'monitorEnabled 必须为布尔值')
+  printer.monitorEnabled = body.monitorEnabled
+  printer.updatedAt = now()
+  return getMockMonitorData(printer)
+}
+
+const handleBatchUpdatePrinterMonitor = config => {
+  requireSession(config, ['ADMIN'])
+  const body = getBody(config)
+  if (!Array.isArray(body.printerIds) || body.printerIds.length === 0) fail(400, 400, '请选择至少一台打印机')
+  if (body.printerIds.length > 100) fail(400, 400, '单次最多更新 100 台打印机')
+  if (typeof body.monitorEnabled !== 'boolean') fail(400, 400, 'monitorEnabled 必须为布尔值')
+  const printers = body.printerIds.map(findPrinter)
+  if (printers.some(printer => !printer)) fail(404, 404, '打印机不存在')
+  printers.forEach(printer => {
+    printer.monitorEnabled = body.monitorEnabled
+    printer.updatedAt = now()
+  })
+  return {
+    updatedCount: printers.length,
+    monitorEnabled: body.monitorEnabled
+  }
 }
 
 const getPrinterForAnalytics = config => {
@@ -936,6 +999,41 @@ const handleJobDetail = config => {
   return toPublicJob(job)
 }
 
+const handleReconcileJob = config => {
+  const session = requireSession(config, ['ADMIN', 'OPERATOR'])
+  const id = getPath(config.url).split('/').at(-2)
+  const job = findJob(id)
+  if (!job) fail(404, 404, '任务不存在')
+  if (!canReadResource(session, job.userId)) fail(403, 403, '无权操作此任务')
+  if (job.status !== 'RECONCILING') fail(422, 422, '当前任务状态不允许人工核对')
+
+  const body = getBody(config)
+  const result = String(body.result || '').toUpperCase()
+  const reason = String(body.reason || '').trim()
+  if (!['COMPLETED', 'FAILED', 'CANCELLED', 'QUEUED'].includes(result)) fail(400, 400, '核对结果不合法')
+  if (!reason) fail(400, 400, '核对原因不能为空')
+  if (reason.length > 255) fail(400, 400, '核对原因最多 255 个字符')
+
+  if (job.printerId) {
+    const printer = findPrinter(job.printerId)
+    if (printer?.currentJobId === job.id) {
+      printer.currentJobId = null
+      printer.isSafeToPrint = false
+      printer.status = 'IDLE'
+      printer.updatedAt = now()
+    }
+  }
+
+  if (result === 'QUEUED') {
+    Object.assign(job, { printerId: null, operatorId: null, progress: 0, errorReason: reason })
+  } else {
+    job.errorReason = reason
+    job.completedAt = now()
+  }
+  setJobStatus(job, result)
+  return toPublicJob(job)
+}
+
 const handleCreateJob = config => {
   const session = requireSession(config, ['ADMIN', 'OPERATOR'])
   const body = getBody(config)
@@ -1415,6 +1513,9 @@ const route = async config => {
   if (/^(GET|PUT) \/api\/v1\/auth\/[^/]+\/profile$/.test(key)) return handleProfile(config)
   if (/^POST \/api\/v1\/auth\/[^/]+\/change-password$/.test(key)) return handleChangePassword(config)
   if (key === 'GET /api/v1/printers/page') return handlePrinterPage(config)
+  if (key === 'PUT /api/v1/printers/monitor/batch') return handleBatchUpdatePrinterMonitor(config)
+  if (/^GET \/api\/v1\/printers\/[^/]+\/monitor$/.test(key)) return handleGetPrinterMonitor(config)
+  if (/^PUT \/api\/v1\/printers\/[^/]+\/monitor$/.test(key)) return handleUpdatePrinterMonitor(config)
   if (/^GET \/api\/v1\/printers\/[^/]+\/history$/.test(key)) return handlePrinterHistory(config)
   if (/^GET \/api\/v1\/printers\/[^/]+\/statistics$/.test(key)) return handlePrinterStatistics(config)
   if (/^GET \/api\/v1\/printers\/[^/]+$/.test(key)) return handlePrinterDetail(config)
@@ -1439,6 +1540,7 @@ const route = async config => {
   if (key === 'POST /api/v1/print-jobs/batch/retry-preview') return handleBatchRetryPreview(config)
   if (key === 'POST /api/v1/print-jobs/batch/confirm') return handleBatchConfirm(config)
   if (/^GET \/api\/v1\/print-jobs\/[^/]+$/.test(key)) return handleJobDetail(config)
+  if (/^POST \/api\/v1\/print-jobs\/[^/]+\/reconcile$/.test(key)) return handleReconcileJob(config)
   if (key === 'POST /api/v1/print-jobs/create' || key === 'POST /api/v1/print-jobs') return handleCreateJob(config)
   if (key === 'POST /api/v1/print-jobs/safe/assign') return handleAssignJob(config)
   if (key === 'POST /api/v1/print-jobs/safe/confirm') return handleConfirmSafe(config)

@@ -69,6 +69,14 @@ export function getRealtimeAlertClearId(message = {}) {
   const printerId = message.printerId
   const data = message.data || {}
 
+  const stateSource = String(message.stateSource || data.stateSource || '').toUpperCase()
+  const connectionStatus = String(data.connectionStatus || '').toUpperCase()
+  if ((type === 'COMMUNICATION_HEALTH' || stateSource === 'COMMUNICATION_HEALTH')
+    && connectionStatus === 'ONLINE'
+    && printerId !== undefined && printerId !== null) {
+    return `printer-offline:${printerId}`
+  }
+
   if (type === 'PRINTER_STATUS' && printerId !== undefined && printerId !== null) {
     const state = String(data.unifiedState || data.state || '').toUpperCase()
     if (state && state !== 'OFFLINE' && state !== 'UNKNOWN') {

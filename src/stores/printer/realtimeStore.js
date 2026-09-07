@@ -174,36 +174,59 @@ export const useRealtimeStore = defineStore('realtime', () => {
 
     pendingUpdates.forEach((update, idKey) => {
       const { data, timestamp } = update
+      const previous = statusMap.value.get(idKey) || {}
+      const stateSource = String(data.stateSource || '').toUpperCase()
+      const isCommunicationHealth = stateSource === 'COMMUNICATION_HEALTH'
+      const hasBusinessState = data.status !== undefined || data.unifiedState !== undefined || data.state !== undefined
+      const next = { ...previous }
 
-      // 将后端数据格式转换为前端组件期望的格式
-      newMap.set(idKey, {
-        // 优先使用 unifiedState，这是后端融合后的最终状态
-        unifiedState: normalizeRealtimeState(data),
-        state: normalizeRealtimeState(data),
-        progress: normalizeProgress(data.progress), // 契约统一为 0-100
-        // 温度数据 - 兼容 extruder/heaterBed 嵌套格式
-        extruder: {
-          temperature: data.toolTemperature ?? 0,
-          target: data.toolTarget ?? 0
-        },
-        heaterBed: {
-          temperature: data.bedTemperature ?? 0,
-          target: data.bedTarget ?? 0
-        },
-        // 保留原始字段供直接访问
-        toolTemperature: data.toolTemperature ?? 0,
-        toolTarget: data.toolTarget ?? 0,
-        bedTemperature: data.bedTemperature ?? 0,
-        bedTarget: data.bedTarget ?? 0,
-        printDuration: data.printDuration ?? 0,
-        filamentUsed: data.filamentUsed ?? 0,
-        systemMessage: data.systemMessage || '',
-        lastUpdate: timestamp,
-        // 任务相关字段
-        currentJobId: normalizeId(data.currentJobId),
-        currentJobFileName: data.currentJobFileName,
-        currentJobStatus: data.currentJobStatus
-      })
+      // COMMUNICATION_HEALTH 只更新通信字段，不能用不完整的消息清空或覆盖业务状态。
+      if (!isCommunicationHealth && hasBusinessState) {
+        const businessState = normalizeRealtimeState(data)
+        next.businessStatus = businessState
+        next.unifiedState = businessState
+        next.state = businessState
+      }
+
+      const assignIfPresent = (key, value, mapper = value => value) => {
+        if (value === undefined || (isCommunicationHealth && value === null)) return
+        next[key] = value === null ? null : mapper(value)
+      }
+
+      assignIfPresent('connectionStatus', data.connectionStatus, value => String(value).toUpperCase())
+      assignIfPresent('lastSeenAt', data.lastSeenAt)
+      assignIfPresent('lastCommunicationError', data.lastCommunicationError)
+      assignIfPresent('consecutiveFailureCount', data.consecutiveFailureCount, value => Math.max(Number(value) || 0, 0))
+      assignIfPresent('lastKnownStatus', data.lastKnownStatus)
+      assignIfPresent('lastProtocolState', data.lastProtocolState)
+      assignIfPresent('lastDeviceUptime', data.lastDeviceUptime)
+      assignIfPresent('progress', data.progress, value => normalizeProgress(value))
+      assignIfPresent('toolTemperature', data.toolTemperature)
+      assignIfPresent('toolTarget', data.toolTarget)
+      assignIfPresent('bedTemperature', data.bedTemperature)
+      assignIfPresent('bedTarget', data.bedTarget)
+      assignIfPresent('printDuration', data.printDuration)
+      assignIfPresent('filamentUsed', data.filamentUsed)
+      assignIfPresent('systemMessage', data.systemMessage)
+      assignIfPresent('currentJobId', data.currentJobId, normalizeId)
+      assignIfPresent('currentJobFileName', data.currentJobFileName)
+      assignIfPresent('currentJobStatus', data.currentJobStatus)
+      if (next.toolTemperature !== undefined || next.toolTarget !== undefined) {
+        next.extruder = {
+          ...previous.extruder,
+          ...(next.toolTemperature !== undefined ? { temperature: next.toolTemperature } : {}),
+          ...(next.toolTarget !== undefined ? { target: next.toolTarget } : {})
+        }
+      }
+      if (next.bedTemperature !== undefined || next.bedTarget !== undefined) {
+        next.heaterBed = {
+          ...previous.heaterBed,
+          ...(next.bedTemperature !== undefined ? { temperature: next.bedTemperature } : {}),
+          ...(next.bedTarget !== undefined ? { target: next.bedTarget } : {})
+        }
+      }
+      next.lastUpdate = timestamp
+      newMap.set(idKey, next)
     })
 
     // 替换整个 Map，触发响应式更新
@@ -258,7 +281,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
   }
 
   function handleWebSocketMessage(message) {
-    const { version, type, printerId, data, timestamp, sequence, eventId } = message || {}
+    const { version, type, printerId, data, timestamp, sequence, eventId, stateSource } = message || {}
 
     if (!isSupportedRealtimeVersion(version)) {
       isRealtimeStale.value = true
@@ -299,9 +322,8 @@ export const useRealtimeStore = defineStore('realtime', () => {
 
     if (type === 'PRINTER_OFFLINE') {
       queueRealtimeUpdate(printerId, {
-        unifiedState: PRINTER_STATE.UNKNOWN,
-        state: PRINTER_STATE.UNKNOWN,
-        systemMessage: data?.reason || data?.message || data?.systemMessage || '设备已离线'
+        connectionStatus: 'OFFLINE',
+        lastCommunicationError: data?.reason || data?.message || data?.systemMessage || '设备已离线'
       }, timestamp)
       return
     }
@@ -321,8 +343,14 @@ export const useRealtimeStore = defineStore('realtime', () => {
       return
     }
 
+    // stateSource 可能位于消息顶层，也可能位于 data 内，统一交给合并层判断。
+    const normalizedStateSource = stateSource || (type === 'COMMUNICATION_HEALTH' ? 'COMMUNICATION_HEALTH' : '')
+    const updateData = normalizedStateSource && data.stateSource === undefined
+      ? { ...data, stateSource: normalizedStateSource }
+      : data
+
     // 将消息加入待处理队列
-    queueRealtimeUpdate(printerId, data, timestamp)
+    queueRealtimeUpdate(printerId, updateData, timestamp)
 
     // 调度批量更新
     scheduleBatchUpdate()
@@ -340,11 +368,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
         const records = response?.data?.records || []
         records.forEach(printer => {
           queueRealtimeUpdate(printer.id, {
+            ...printer,
             unifiedState: printer.status,
-            state: printer.status,
-            currentJobId: printer.currentJobId,
-            currentJobStatus: printer.currentJobStatus,
-            progress: printer.progress
+            state: printer.status
           }, printer.updatedAt || Date.now())
         })
         isRealtimeStale.value = false
@@ -481,6 +507,11 @@ export const useRealtimeStore = defineStore('realtime', () => {
     statusMap.value = new Map()
   }
 
+  /** 断线或人工核对后重新用 REST 快照补齐设备状态，保留实时状态合并语义。 */
+  function refreshPrinterSnapshot() {
+    return recoverRealtimeSnapshot()
+  }
+
   function dismissAlert(alertId) {
     alerts.value = alerts.value.filter(item => item.id !== alertId)
   }
@@ -508,6 +539,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
     lastSequence,
     lastEventId,
     isRealtimeStale,
-    isRecovering
+    isRecovering,
+    refreshPrinterSnapshot
   }
 })

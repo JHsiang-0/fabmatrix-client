@@ -23,6 +23,23 @@
       </div>
       <template v-else-if="task">
         <t-alert v-if="error" theme="error" :title="error" :close-btn="false" />
+        <t-alert
+          v-if="task.status === 'RECONCILING'"
+          theme="warning"
+          :close-btn="false"
+          class="task-detail-drawer__reconcile-alert"
+        >
+          <template #default>设备状态无法自动确认，请人工核对打印结果。</template>
+          <template #operation>
+            <t-space size="small" break-line>
+              <t-button size="small" theme="success" :disabled="reconcileLoading" @click="openReconcile('COMPLETED')">确认完成</t-button>
+              <t-button size="small" theme="danger" variant="outline" :disabled="reconcileLoading" @click="openReconcile('FAILED')">确认失败</t-button>
+              <t-button size="small" theme="warning" variant="outline" :disabled="reconcileLoading" @click="openReconcile('CANCELLED')">确认取消</t-button>
+              <t-button size="small" variant="outline" :disabled="reconcileLoading" @click="openReconcile('QUEUED')">重新排队</t-button>
+            </t-space>
+          </template>
+        </t-alert>
+
         <t-descriptions bordered :column="1" size="small">
           <t-descriptions-item label="任务 ID">#{{ task.id }}</t-descriptions-item>
           <t-descriptions-item label="文件 ID">{{ formatValue(task.fileId) }}</t-descriptions-item>
@@ -61,10 +78,43 @@
       <t-empty v-else description="未选择任务" />
     </div>
   </t-drawer>
+
+  <t-dialog
+    v-model:visible="reconcileDialogVisible"
+    header="人工核对打印结果"
+    width="480px"
+    :confirm-btn="{ content: '提交核对', loading: reconcileLoading }"
+    :cancel-btn="{ content: '取消', disabled: reconcileLoading }"
+    :close-on-overlay-click="!reconcileLoading"
+    :close-on-esc-keydown="!reconcileLoading"
+    destroy-on-close
+    @confirm="submitReconcile"
+  >
+    <t-form ref="reconcileFormRef" :data="reconcileForm" :rules="reconcileRules" label-align="top">
+      <t-form-item label="核对结果" name="result">
+        <t-select v-model="reconcileForm.result" :disabled="reconcileLoading">
+          <t-option value="COMPLETED" label="确认完成" />
+          <t-option value="FAILED" label="确认失败" />
+          <t-option value="CANCELLED" label="确认取消" />
+          <t-option value="QUEUED" label="重新排队" />
+        </t-select>
+      </t-form-item>
+      <t-form-item label="核对原因" name="reason">
+        <t-textarea
+          v-model="reconcileForm.reason"
+          :maxlength="255"
+          :disabled="reconcileLoading"
+          placeholder="请填写现场核对结果或重新排队原因"
+          :autosize="{ minRows: 3, maxRows: 6 }"
+          allow-input-over-max
+        />
+      </t-form-item>
+    </t-form>
+  </t-dialog>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { CloseIcon as Close } from 'tdesign-icons-vue-next'
 import { formatDateTime } from '@/utils/formatters'
 import StatusTag from './StatusTag.vue'
@@ -73,10 +123,11 @@ const props = defineProps({
   modelValue: { type: Boolean, default: false },
   task: { type: Object, default: null },
   loading: { type: Boolean, default: false },
-  error: { type: String, default: '' }
+  error: { type: String, default: '' },
+  reconcileLoading: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'reconcile'])
 
 const drawerVisible = computed({
   get: () => props.modelValue,
@@ -89,6 +140,41 @@ const handleClose = () => {
 
 const hasValue = value => value !== undefined && value !== null && value !== ''
 const formatValue = value => hasValue(value) ? value : '-'
+
+const reconcileDialogVisible = ref(false)
+const reconcileFormRef = ref(null)
+const reconcileForm = ref({
+  result: 'COMPLETED',
+  reason: ''
+})
+const reconcileRules = {
+  result: [{ required: true, message: '请选择核对结果', trigger: 'change' }],
+  reason: [
+    { required: true, message: '请填写核对原因', trigger: 'blur' },
+    { max: 255, message: '核对原因最多 255 个字符', trigger: 'blur' }
+  ]
+}
+
+const openReconcile = result => {
+  if (props.reconcileLoading || props.task?.status !== 'RECONCILING') return
+  reconcileForm.value = { result, reason: '' }
+  reconcileDialogVisible.value = true
+}
+
+const submitReconcile = async () => {
+  if (props.reconcileLoading || props.task?.status !== 'RECONCILING') return
+  try {
+    await reconcileFormRef.value?.validate()
+  } catch {
+    return
+  }
+
+  emit('reconcile', {
+    result: reconcileForm.value.result,
+    reason: reconcileForm.value.reason.trim()
+  })
+  reconcileDialogVisible.value = false
+}
 </script>
 
 <style scoped>
@@ -114,6 +200,12 @@ const formatValue = value => hasValue(value) ? value : '-'
 
 .task-detail-drawer__loading {
   padding: var(--app-spacing-2);
+}
+
+.task-detail-drawer__reconcile-alert {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-spacing-3);
 }
 
 .task-detail-drawer__timeline {

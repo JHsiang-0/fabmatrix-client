@@ -5,7 +5,7 @@ export const MOCK_JOB_STATUS_TRANSITIONS = Object.freeze({
   READY: Object.freeze(['PRINTING', 'QUEUED', 'CANCELLED']),
   PRINTING: Object.freeze(['PAUSED', 'RECONCILING', 'CANCELLED', 'COMPLETED', 'FAILED']),
   PAUSED: Object.freeze(['PRINTING', 'RECONCILING', 'CANCELLED']),
-  RECONCILING: Object.freeze(['COMPLETED', 'FAILED', 'CANCELLED']),
+  RECONCILING: Object.freeze(['COMPLETED', 'FAILED', 'CANCELLED', 'QUEUED']),
   COMPLETED: Object.freeze([]),
   FAILED: Object.freeze(['QUEUED']),
   CANCELLED: Object.freeze([])

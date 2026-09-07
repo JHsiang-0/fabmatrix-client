@@ -10,6 +10,7 @@ const toState = status => ({
 })
 
 const buildPrinterData = printer => ({
+  stateSource: 'DEVICE_POLL',
   ...toState(printer.status),
   currentJobId: printer.currentJobId,
   currentJobFileName: printer.currentJobFileName,

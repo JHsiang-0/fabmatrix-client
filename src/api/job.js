@@ -118,6 +118,15 @@ export function requeueJob(id) {
   return request({ url: `/api/v1/print-jobs/${id}/requeue`, method: 'post' })
 }
 
+/** 人工核对 RECONCILING 任务结果。 */
+export function reconcilePrintJob(id, data) {
+  return request({
+    url: `/api/v1/print-jobs/${id}/reconcile`,
+    method: 'post',
+    data
+  }).then(response => mapResponseData(response, normalizePrintJob))
+}
+
 /** 调整排队任务优先级，范围 0-100。 */
 export function updateJobPriority(id, priority) {
   return request({

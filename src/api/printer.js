@@ -45,6 +45,35 @@ export function getPrinterDetail(id) {
   }).then(normalizePrinterDetailResponse)
 }
 
+/** 查询单台打印机监控配置及通信健康信息。 */
+export function getPrinterMonitor(id) {
+  return request({
+    url: `/api/v1/printers/${id}/monitor`,
+    method: 'get'
+  }).then(response => mapResponseData(response, data => data && typeof data === 'object' ? data : null))
+}
+
+/** 更新单台打印机是否纳入后台监控。仅 ADMIN 可调用。 */
+export function updatePrinterMonitor(id, monitorEnabled) {
+  return request({
+    url: `/api/v1/printers/${id}/monitor`,
+    method: 'put',
+    data: { monitorEnabled: monitorEnabled === true }
+  }).then(response => mapResponseData(response, data => data && typeof data === 'object' ? data : null))
+}
+
+/** 批量更新打印机监控开关。仅 ADMIN 可调用，最多100台。 */
+export function updatePrinterMonitorBatch(printerIds, monitorEnabled) {
+  return request({
+    url: '/api/v1/printers/monitor/batch',
+    method: 'put',
+    data: {
+      printerIds: Array.isArray(printerIds) ? printerIds : [],
+      monitorEnabled: monitorEnabled === true
+    }
+  })
+}
+
 /**
  * 规范化单个打印机响应中的 Long 类型 ID。
  */

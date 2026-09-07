@@ -194,7 +194,9 @@
       :task="selectedJob"
       :loading="detailLoading"
       :error="detailErrorText"
+      :reconcile-loading="reconcileSubmitting"
       @update:model-value="handleTaskDetailVisibility"
+      @reconcile="handleReconcile"
     />
   </div>
 </template>
@@ -208,7 +210,7 @@ import {
   TaskTimeIcon as Timer,
   CloseCircleIcon as CircleClose
 } from 'tdesign-icons-vue-next'
-import { getJobPage, cancelJob, retryJob, requeueJob, updateJobPriority } from '@/api/job'
+import { getJobPage, cancelJob, retryJob, requeueJob, updateJobPriority, reconcilePrintJob } from '@/api/job'
 import { message } from '@/utils/message'
 import { formatDateTime } from '@/utils/formatters'
 import { renderIcon } from '@/utils/tdesign'
@@ -220,12 +222,14 @@ import QueryToolbar from '@/components/layout/QueryToolbar.vue'
 import StatusTag from '@/components/StatusTag.vue'
 import TaskDetailDrawer from '@/components/TaskDetailDrawer.vue'
 import { useJobStore } from '@/stores/jobStore'
+import { useRealtimeStore } from '@/stores/printer/realtimeStore'
 
 defineOptions({ name: 'JobHistory' })
 
 const loading = ref(false)
 const loadError = ref('')
 const jobStore = useJobStore()
+const realtimeStore = useRealtimeStore()
 const detailLoading = computed(() => jobStore.detailLoading)
 const detailErrorText = computed(() => jobStore.detailError?.message || '')
 const tableData = ref([])
@@ -234,6 +238,7 @@ const historyTableHeight = computed(() => tableData.value.length > 8
   : undefined)
 const detailDrawerVisible = ref(false)
 const selectedJob = ref(null)
+const reconcileSubmitting = ref(false)
 const JOB_HISTORY_DETAIL_CONTEXT_KEY = 'farm-ui:job-history-detail'
 
 const openTaskDetail = job => {
@@ -252,6 +257,32 @@ const handleTaskDetailVisibility = visible => {
     detailDrawerVisible.value = false
     selectedJob.value = null
     sessionStorage.removeItem(JOB_HISTORY_DETAIL_CONTEXT_KEY)
+  }
+}
+
+const handleReconcile = async payload => {
+  const job = selectedJob.value
+  if (reconcileSubmitting.value || !job || job.status !== 'RECONCILING') return
+
+  reconcileSubmitting.value = true
+  try {
+    await reconcilePrintJob(job.id, payload)
+    message.success('人工核对已提交')
+
+    const refreshResults = await Promise.allSettled([
+      jobStore.fetchJobDetail(job.id),
+      fetchData(),
+      realtimeStore.refreshPrinterSnapshot()
+    ])
+    const detailResult = refreshResults[0]
+    if (detailResult.status === 'fulfilled' && selectedJob.value && String(selectedJob.value.id) === String(job.id)) {
+      selectedJob.value = detailResult.value
+    }
+  } catch (error) {
+    if (!error?.toastShown) message.error(error?.message || '人工核对失败')
+    await fetchData()
+  } finally {
+    reconcileSubmitting.value = false
   }
 }
 
