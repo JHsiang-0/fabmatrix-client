@@ -2,7 +2,8 @@ import { computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useDeviceStore } from './deviceStore'
 import { useRealtimeStore } from './realtimeStore'
-import { PRINTER_STATE, PRINTER_STATUS, GRID_CONFIG } from '@/utils/constants'
+import { PRINTER_STATE, PRINTER_STATUS } from '@/utils/constants'
+import { getPhysicalColumn, isAisleVisualColumn } from '@/utils/gridLayout'
 
 /**
  * 网格布局计算 Store
@@ -16,6 +17,8 @@ export const useGridStore = defineStore('grid', () => {
 
   const deviceStore = useDeviceStore()
   const realtimeStore = useRealtimeStore()
+
+  const gridConfig = computed(() => deviceStore.gridConfig)
 
   // ============================================
   // Getters (Computed)
@@ -95,15 +98,11 @@ export const useGridStore = defineStore('grid', () => {
 
   /**
    * 根据网格列号获取物理列号（排除过道）
-   * @param {number} gridCol - 网格列号（1-13）
+   * @param {number} gridCol - 网格列号（1-based）
    * @returns {number} 物理列号（1-12）
    */
   function getPhysicalCol(gridCol) {
-    if (gridCol < GRID_CONFIG.AISLE_COL) {
-      return gridCol
-    }
-    // 过道右侧的列，物理列号减1
-    return gridCol - 1
+    return getPhysicalColumn(gridCol, gridConfig.value)
   }
 
   /**
@@ -121,7 +120,7 @@ export const useGridStore = defineStore('grid', () => {
    * @returns {boolean} 是否为过道
    */
   function isAisleCell(colIndex) {
-    return colIndex === GRID_CONFIG.AISLE_COL_INDEX
+    return isAisleVisualColumn(colIndex + 1, gridConfig.value)
   }
 
   // ============================================
@@ -130,7 +129,8 @@ export const useGridStore = defineStore('grid', () => {
 
   return {
     // Constants
-    GRID_CONFIG,
+    GRID_CONFIG: gridConfig,
+    gridConfig,
 
     // Getters
     statusCounts,

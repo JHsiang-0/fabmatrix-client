@@ -53,6 +53,7 @@ export function usePrinterStore() {
 
   const {
     statusCounts,
+    gridConfig,
   } = storeToRefs(grid)
 
   // ============================================
@@ -94,7 +95,8 @@ export function usePrinterStore() {
     // ============================================
     // Constants (来自 gridStore) - 非响应式
     // ============================================
-    GRID_CONFIG: grid.GRID_CONFIG,
+    GRID_CONFIG: gridConfig,
+    gridConfig,
 
     // ============================================
     // Actions (来自 deviceStore) - 非响应式函数
@@ -102,6 +104,8 @@ export function usePrinterStore() {
     fetchDeviceData: device.fetchDeviceData,
     updateDevicePositions: device.updatePositions,
     updateDevice: device.updateDevice,
+    updateGridConfig: device.updateGridConfig,
+    resetGridConfig: device.resetGridConfig,
     removeDeviceFromBoard: device.removeDeviceFromBoard,
     getDeviceById: device.getDeviceById,
 

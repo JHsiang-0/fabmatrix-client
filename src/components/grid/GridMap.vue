@@ -5,11 +5,11 @@
             <!-- 对齐填充层 - 与列标题高度一致 -->
             <div class="h-7"></div>
 
-            <div class="grid gap-3" style="grid-template-rows: repeat(4, 120px);">
+            <div class="grid gap-3" :style="rowGridStyle">
                 <div v-for="row in gridConfig.ROWS" :key="`label-${row}`"
                     class="flex items-center justify-center w-10 bg-gray-100 border border-dashed border-gray-300 rounded text-sm font-medium text-gray-600"
                     :class="{ 'bg-gray-50 border-gray-300 text-gray-700 font-bold': isEditMode }"
-                    style="writing-mode: vertical-rl; text-orientation: mixed; min-height: 120px;">
+                    style="writing-mode: vertical-rl; text-orientation: mixed;">
                     {{ formatRowLabel(row) }}{{ rowSuffix }}
                 </div>
             </div>
@@ -18,23 +18,23 @@
         <!-- 网格主体 -->
         <div class="flex flex-col shrink-0 overflow-visible">
             <!-- 列标题 -->
-            <div class="grid gap-3 mb-2" style="grid-template-columns: repeat(13, 100px);">
-                <div v-for="col in gridConfig.TOTAL_COLS" :key="`header-${col}`"
+            <div class="grid gap-3 mb-2" :style="columnGridStyle">
+                <div v-for="(column, columnIndex) in visualColumns" :key="`header-${columnIndex}`"
                     class="flex items-center justify-center h-7 bg-gray-100 border border-dashed border-gray-300 rounded text-xs font-medium text-gray-600"
                     :class="[
-                        col === gridConfig.AISLE_COL ? 'bg-amber-50 border-amber-300 text-amber-700 font-semibold' : '',
-                        isEditMode && col !== gridConfig.AISLE_COL ? 'bg-gray-50 border-gray-300 text-gray-700 font-bold' : '',
-                        isEditMode && col === gridConfig.AISLE_COL ? 'bg-amber-100 border-amber-400 text-amber-800' : ''
+                        column.type === 'aisle' ? 'bg-amber-50 border-amber-300 text-amber-700 font-semibold' : '',
+                        isEditMode && column.type !== 'aisle' ? 'bg-gray-50 border-gray-300 text-gray-700 font-bold' : '',
+                        isEditMode && column.type === 'aisle' ? 'bg-amber-100 border-amber-400 text-amber-800' : ''
                     ]">
-                    <template v-if="col === gridConfig.AISLE_COL">{{ aisleLabel }}</template>
-                    <template v-else>{{ getPhysicalCol(col) }}</template>
+                    <template v-if="column.type === 'aisle'">{{ column.label || aisleLabel }}</template>
+                    <template v-else>{{ column.number }}</template>
                 </div>
             </div>
 
             <!-- 设备网格 - 4行 x 13列 - 统一容器 -->
             <div class="grid gap-3 shrink-0"
                 :class="{ 'bg-gray-100 rounded': isEditMode }"
-                style="grid-template-columns: repeat(13, 100px); grid-template-rows: repeat(4, 120px);">
+                :style="gridStyle">
                 <template v-for="(row, rowIndex) in deviceMatrix" :key="`row-${rowIndex}`">
                     <GridCell v-for="(cell, colIndex) in row" :key="`cell-${rowIndex}-${colIndex}`"
                         :cell-type="getCellType(cell, colIndex)" :device="getDevice(cell)"
@@ -53,6 +53,7 @@
 import { computed } from 'vue'
 import GridCell from './GridCell.vue'
 import { formatRowLabel } from '@/utils/formatters'
+import { getPhysicalColumn, getVisualColumns, isAisleVisualColumn } from '@/utils/gridLayout'
 
 defineOptions({ name: 'GridMap' })
 
@@ -121,7 +122,17 @@ const emit = defineEmits([
 // ============================================
 
 /** 过道列索引（0-based） */
-const aisleColIndex = computed(() => props.gridConfig.AISLE_COL - 1)
+const visualColumns = computed(() => getVisualColumns(props.gridConfig))
+const columnGridTemplate = computed(() => visualColumns.value
+    .map(column => `${column.type === 'aisle' ? column.width : props.gridConfig.CELL_MIN_WIDTH}px`)
+    .join(' '))
+const rowGridTemplate = computed(() => `repeat(${props.gridConfig.ROWS}, ${props.gridConfig.CELL_HEIGHT}px)`)
+const columnGridStyle = computed(() => ({ gridTemplateColumns: columnGridTemplate.value }))
+const rowGridStyle = computed(() => ({ gridTemplateRows: rowGridTemplate.value }))
+const gridStyle = computed(() => ({
+    gridTemplateColumns: columnGridTemplate.value,
+    gridTemplateRows: rowGridTemplate.value
+}))
 
 // ============================================
 // Methods
@@ -131,7 +142,7 @@ const aisleColIndex = computed(() => props.gridConfig.AISLE_COL - 1)
  * 获取单元格类型
  */
 function getCellType(cell, colIndex) {
-    if (colIndex === aisleColIndex.value) return 'aisle'
+    if (isAisleVisualColumn(colIndex + 1, props.gridConfig)) return 'aisle'
     if (cell === null) return 'empty'
     return 'device'
 }
@@ -156,22 +167,15 @@ function getRealTimeData(cell) {
  * 获取槽位标签
  */
 function getSlotLabel(rowIndex, colIndex) {
-    if (colIndex === aisleColIndex.value) return ''
+    const physicalColumn = getPhysicalColumn(colIndex + 1, props.gridConfig)
+    if (physicalColumn === null) return ''
     const row = rowIndex + 1
-    const col = getPhysicalCol(colIndex + 1)
-    return formatRowLabel(row) + '-' + col.toString().padStart(2, '0')
+    return formatRowLabel(row) + '-' + physicalColumn.toString().padStart(2, '0')
 }
 
 /**
  * 根据网格列号获取物理列号（排除过道）
  */
-function getPhysicalCol(gridCol) {
-    if (gridCol < props.gridConfig.AISLE_COL) {
-        return gridCol
-    }
-    return gridCol - 1
-}
-
 /**
  * 判断设备是否正在拖拽中
  */

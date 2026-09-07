@@ -6,6 +6,9 @@
         :last-update-time="lastUpdateTime" @refresh="handleRefresh">
       <!-- 布局锁定/编辑模式切换按钮 -->
       <template #actions>
+        <t-button v-if="canManageLayout" variant="outline" @click="layoutDialogVisible = true">
+          布局设置
+        </t-button>
         <t-button v-if="canManageLayout && !isEditMode" theme="default" :icon="renderIcon(Lock)" @click="toggleEditMode">
           解锁布局
         </t-button>
@@ -54,7 +57,7 @@
       <div class="w-full max-w-[1920px] mx-auto bg-gray-100 border border-gray-200 rounded-xl shadow-sm p-4">
         <!-- 使用 GridMap 组件 -->
         <grid-map :device-matrix="store.deviceMatrix" :real-time-status="store.realTimeStatus"
-          :grid-config="store.GRID_CONFIG" :is-edit-mode="isEditMode" :dragged-device="draggedDevice"
+          :grid-config="store.gridConfig" :is-edit-mode="isEditMode" :dragged-device="draggedDevice"
           :drag-over-cell="dragOverCell" @dragstart="handleDragStart" @dragend="handleDragEnd"
           @dragenter="handleDragEnter" @dragleave="handleDragLeave" @drop="handleDrop" @cell-click="handleCellClick" />
       </div>
@@ -69,6 +72,12 @@
       :can-manage-device="userStore.isAdmin" :action-loading="controlLoading"
       @action="handlePrinterAction" @emergency-stop="handleEmergencyStop" @remove="handleRemoveFromBoard"
       @closed="handleDrawerClosed" />
+
+    <grid-layout-settings-dialog
+      v-model:visible="layoutDialogVisible"
+      :config="store.gridConfig"
+      @confirm="applyGridConfig"
+    />
   </div>
 </template>
 
@@ -85,8 +94,10 @@ import { getJobPage } from '@/api/job'
 import DashboardHeader from './DashboardHeader.vue'
 import DashboardDetailsPanel from './DashboardDetailsPanel.vue'
 import GridMap from './grid/GridMap.vue'
+import GridLayoutSettingsDialog from './GridLayoutSettingsDialog.vue'
 import BindDeviceDialog from './BindDeviceDialog.vue'
 import DeviceDetailDrawer from './device/DeviceDetailDrawer.vue'
+import { getOutOfBoundsDevices } from '@/utils/gridLayout'
 
 defineOptions({ name: 'FarmDashboard' })
 
@@ -110,6 +121,7 @@ const historyJobs = ref([])
 const historyLoading = ref(false)
 const historyError = ref('')
 const reconnecting = ref(false)
+const layoutDialogVisible = ref(false)
 
 // ============================================
 // Reactive State
@@ -553,6 +565,32 @@ async function saveLayout() {
     console.error('保存布局失败:', error)
   message.error('保存布局失败，请重试')
   }
+}
+
+async function applyGridConfig(nextConfig) {
+  const outOfBoundsDevices = getOutOfBoundsDevices(store.rawDeviceList, nextConfig)
+  if (outOfBoundsDevices.length) {
+    const deviceNames = outOfBoundsDevices
+      .slice(0, 5)
+      .map(device => device.machineNumber || device.name || `#${device.id}`)
+      .join('、')
+    const suffix = outOfBoundsDevices.length > 5 ? '等' : ''
+
+    try {
+      await confirmMessage(
+        `${deviceNames}${suffix} 共 ${outOfBoundsDevices.length} 台设备超出新布局范围，应用后将暂不显示在网格中，确定继续吗？`,
+        '确认调整布局',
+        { confirmButtonText: '继续应用', cancelButtonText: '取消', type: 'warning' }
+      )
+    } catch {
+      return
+    }
+  }
+
+  store.updateGridConfig(nextConfig)
+  isEditMode.value = false
+  layoutDialogVisible.value = false
+  message.success('网格布局已更新')
 }
 
 // ============================================

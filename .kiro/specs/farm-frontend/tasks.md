@@ -1,5 +1,39 @@
 # 前端 Kiro 任务清单
 
+## Kiro Task UI-001.30：支持全屏看板自定义行列与过道布局
+
+状态：已完成
+范围：
+- `src/utils/gridLayout.js`
+- `src/stores/printer/deviceStore.js`
+- `src/stores/printer/gridStore.js`
+- `src/stores/printer/index.js`
+- `src/components/grid/GridMap.vue`
+- `src/components/GridLayoutSettingsDialog.vue`
+- `src/components/FarmDashboard.vue`
+- `src/utils/formatters.js`
+- `tests/dashboardOverview.test.js`
+- `tests/gridLayout.test.js`
+
+目标：
+- 支持管理员自定义全屏看板的行数、实际设备列数和多个过道。
+- 使用动态矩阵和动态 CSS Grid 渲染，移除网格视图中的固定行列与固定过道依赖。
+- 保持已有 `gridRow/gridCol` 物理坐标兼容，布局配置先保存在当前客户端。
+- 在布局调整时提示超出新范围的设备，避免设备位置无提示地消失。
+
+验收标准：
+- 默认布局仍为 4 行、12 个设备列、设备第 7 列后设置一个“过道”。
+- 管理员可通过 TDesign 设置面板修改行数、列数、过道位置和名称，并恢复默认配置。
+- 多个过道、空槽位、设备拖拽、绑定、解绑、状态展示和实时数据映射正常。
+- 调整布局不会改变已有设备的后端物理坐标；越界设备会在应用前被明确提示。
+- 相关测试、lint、build 和 `git diff --check` 通过。
+
+提交建议：`feat: 支持看板自定义网格布局`
+
+完成记录：新增网格布局配置工具和管理员设置弹窗，支持自定义行数、设备列数、多个过道的位置/名称/宽度；网格矩阵、物理列映射和拖拽目标均改为动态计算，布局配置保存于当前客户端，并对超出新范围的设备进行确认提示。
+
+验证说明：网格与看板专项测试 16/16 通过；`npm run lint` 通过；`npm run build` 通过；`git diff --check` 通过。构建仅保留项目原有的分包体积提示。
+
 ## Kiro Task UI-001.29：让总览页面填充可用内容区域
 
 状态：已完成

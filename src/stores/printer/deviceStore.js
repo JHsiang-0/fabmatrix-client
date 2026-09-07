@@ -1,7 +1,13 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { getPrinterDetail, getPrinterList, batchUpdatePositions, updatePrinter } from '@/api/printer'
-import { GRID_CONFIG } from '@/utils/constants'
+import {
+  createGridConfig,
+  getDefaultGridConfig,
+  getVisualColumns,
+  loadGridConfig,
+  saveGridConfig
+} from '@/utils/gridLayout'
 
 const MAX_DETAIL_CACHE_SIZE = 100
 
@@ -25,6 +31,8 @@ export const useDeviceStore = defineStore('device', () => {
 
   /** 数据版本号 */
   const version = ref(0)
+
+  const gridConfig = ref(loadGridConfig())
 
   /** 按 ID 缓存后端返回的 PrinterVO 详情 */
   const detailsById = ref(new Map())
@@ -68,6 +76,7 @@ export const useDeviceStore = defineStore('device', () => {
    * 直接依赖 rawDeviceList.value，确保数据更新后自动重新计算
    */
   const deviceMatrix = computed(() => {
+    const config = gridConfig.value
     // 使用 Map 优化查找性能 O(n) -> O(1)
     const deviceMap = new Map()
     rawDeviceList.value.forEach(device => {
@@ -77,24 +86,25 @@ export const useDeviceStore = defineStore('device', () => {
       deviceMap.set(key, device)
     })
 
+    const visualColumns = getVisualColumns(config)
     const matrix = []
-    for (let row = 1; row <= GRID_CONFIG.ROWS; row++) {
+    for (let row = 1; row <= config.ROWS; row++) {
       const rowData = []
-      for (let col = 1; col <= GRID_CONFIG.TOTAL_COLS; col++) {
+      visualColumns.forEach(column => {
         // 过道位置
-        if (col === GRID_CONFIG.AISLE_COL) {
-          rowData.push('aisle')
-          continue
+        if (column.type === 'aisle') {
+          rowData.push(`aisle:${column.id}`)
+          return
         }
 
         // 计算物理列号（排除过道）
-        const physicalCol = col < GRID_CONFIG.AISLE_COL ? col : col - 1
+        const physicalCol = column.number
 
         // 使用 Map 查找设备 O(1)
         const key = `${row},${physicalCol}`
         const device = deviceMap.get(key)
         rowData.push(device || null)
-      }
+      })
       matrix.push(rowData)
     }
 
@@ -161,6 +171,16 @@ export const useDeviceStore = defineStore('device', () => {
     await fetchDeviceData()
   }
 
+  function updateGridConfig(config) {
+    gridConfig.value = saveGridConfig(createGridConfig(config))
+    return gridConfig.value
+  }
+
+  function resetGridConfig() {
+    gridConfig.value = saveGridConfig(getDefaultGridConfig())
+    return gridConfig.value
+  }
+
   /**
    * 从看板移除设备（设置 gridRow/gridCol 为 null）
    */
@@ -190,6 +210,7 @@ export const useDeviceStore = defineStore('device', () => {
     loading,
     error,
     version,
+    gridConfig,
     detailsById,
     detailLoading,
 
@@ -203,6 +224,8 @@ export const useDeviceStore = defineStore('device', () => {
     fetchDeviceDetail,
     updatePositions,
     updateDevice,
+    updateGridConfig,
+    resetGridConfig,
     removeDeviceFromBoard,
     getDeviceById
   }
