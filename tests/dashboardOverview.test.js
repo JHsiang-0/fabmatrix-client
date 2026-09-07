@@ -55,3 +55,7 @@ test('实时连接状态使用响应式字段同步原生 WebSocket 生命周期
   assert.match(realtimeStoreSource, /connectionState\.value = wsClient\?\.getState\(\) \|\| 'CLOSED'/)
   assert.match(realtimeStoreSource, /connectionState\.value = 'CLOSED'/)
 })
+
+test('实时连接不使用业务消息不活跃超时，避免误判协议级 Ping 保活连接', () => {
+  assert.match(realtimeStoreSource, /inactivityTimeout: null/)
+})

@@ -87,7 +87,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
     maxReconnectDelay: 60000,
     reconnectBackoffMultiplier: 2,
     maxReconnectAttempts: null, // 无限重连
-    inactivityTimeout: 90000,   // 90秒无连接/业务消息活动后重连
+    // 后端使用协议级 Ping 保活，浏览器不会将 Ping/Pong 暴露给 JavaScript。
+    // 不能因设备状态没有变化就把正常连接判定为不活跃。
+    inactivityTimeout: null,
     autoConnect: false          // 手动连接
   }
 
