@@ -598,7 +598,7 @@ onUnmounted(() => {
   padding: var(--app-spacing-4);
   overflow: hidden;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-medium);
+  border-radius: var(--app-radius);
 }
 
 .stat-card--interactive {
@@ -960,7 +960,7 @@ onUnmounted(() => {
   padding: var(--app-spacing-4);
   background: var(--app-surface);
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-medium);
+  border-radius: var(--app-radius);
 }
 
 .quick-links__title {

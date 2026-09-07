@@ -890,7 +890,7 @@ onUnmounted(() => {
   overflow: hidden;
   background: var(--app-surface);
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-medium);
+  border-radius: var(--app-radius);
 }
 
 .stat-card--interactive {
