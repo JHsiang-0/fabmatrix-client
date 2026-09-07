@@ -15,15 +15,19 @@ test('工作台只使用真实设备和任务契约并覆盖核心统计', () =>
   assert.match(dashboardSource, /getJobPage\(\{ pageNum: 1, pageSize: 100, status: 'FAILED' \}\)/)
   assert.match(dashboardSource, /status: 'COMPLETED'/)
   assert.match(dashboardSource, /status: 'CANCELLED'/)
-  assert.match(dashboardSource, /近 7 日任务趋势/)
-  assert.match(dashboardSource, /活动任务进度/)
-  assert.match(dashboardSource, /暂无打印机设备/)
+  assert.match(dashboardSource, /stat-card--primary/)
+  assert.match(dashboardSource, /status-donut/)
+  assert.match(dashboardSource, /bottom-grid/)
+  assert.match(dashboardSource, /activeJobs\.length/)
+  assert.match(dashboardSource, /设备运行正常/)
   assert.doesNotMatch(dashboardSource, /Math\.random\(/)
 })
 
-test('工作台不把缺失任务进度伪造成零值', () => {
-  assert.match(dashboardSource, /进度未上报/)
-  assert.match(dashboardSource, /v-if="hasProgress\(job\)"/)
+test('美化总览复用 Electron 的状态归一化和任务状态标签', () => {
+  assert.match(dashboardSource, /normalizePrinterStatus/)
+  assert.match(dashboardSource, /statusOverviewSegments/)
+  assert.match(dashboardSource, /getJobStatusLabel/)
+  assert.match(dashboardSource, /getJobStatusType/)
 })
 
 test('全屏看板覆盖快照恢复、实时断线、全屏能力和缩放场景', () => {

@@ -40,27 +40,30 @@
       </section>
 
       <section class="stat-grid" aria-label="设备和任务统计">
-        <t-card
+        <div
           v-for="stat in statCards"
           :key="stat.key"
-          bordered
-          hover-shadow
           class="stat-card"
-          :class="{ 'stat-card--interactive': stat.to }"
+          :class="[`stat-card--${stat.tone}`, { 'stat-card--interactive': stat.to }]"
           :role="stat.to ? 'button' : undefined"
           :tabindex="stat.to ? 0 : undefined"
-          :aria-label="stat.to ? `查看${stat.title}` : undefined"
+          :aria-label="stat.to ? `查看${stat.label}` : undefined"
           @click="stat.to && goTo(stat.to)"
           @keydown.enter.prevent="stat.to && goTo(stat.to)"
           @keydown.space.prevent="stat.to && goTo(stat.to)"
         >
-          <t-statistic :title="stat.title" :value="stat.value" :loading="stat.loading">
-            <template #prefix>
-              <span class="stat-card__icon"><component :is="stat.icon" size="20" /></span>
-            </template>
-            <template #extra>{{ stat.description }}</template>
-          </t-statistic>
-        </t-card>
+          <div class="stat-card__body">
+            <div class="stat-card__topline">
+              <span class="stat-card__label">{{ stat.label }}</span>
+              <span class="stat-card__icon"><component :is="stat.icon" :size="22" /></span>
+            </div>
+            <div class="stat-card__value">{{ stat.value }}</div>
+            <div class="stat-card__footer">
+              <span>{{ stat.description }}</span>
+              <ChevronRightIcon :size="16" />
+            </div>
+          </div>
+        </div>
       </section>
 
       <section class="dashboard-grid">
@@ -68,10 +71,9 @@
           <template #header>
             <div class="card-heading">
               <div>
-                <h2>近 7 日任务趋势</h2>
-                <p>按真实任务的创建或完成时间统计</p>
+                <h2>打印任务趋势</h2>
               </div>
-              <t-tag theme="primary" variant="light">任务趋势</t-tag>
+              <t-tag theme="primary" variant="light">任务统计</t-tag>
             </div>
           </template>
           <div v-if="trendData.length" class="trend-chart">
@@ -112,65 +114,37 @@
               </div>
             </div>
           </template>
-          <div v-if="totalPrinters" class="status-list">
-            <div v-for="item in statusSegments" :key="item.key" class="status-list__item">
-              <div class="status-list__heading">
-                <span>{{ item.label }}</span>
+          <div v-if="totalPrinters" class="status-overview">
+            <div class="status-donut" :style="donutStyle">
+              <div class="status-donut__content">
+                <strong>{{ totalPrinters }}</strong>
+                <span>台设备</span>
+              </div>
+            </div>
+            <div class="status-legend">
+              <div v-for="item in statusOverviewSegments" :key="item.key" class="status-legend__item">
+                <span class="status-legend__name">
+                  <i :style="{ backgroundColor: item.color }" />
+                  {{ item.label }}
+                </span>
                 <strong>{{ item.count }}</strong>
               </div>
-              <t-progress
-                :percentage="item.percent"
-                :status="item.progressStatus"
-                :show-info="false"
-                size="small"
-              />
             </div>
           </div>
-          <t-empty v-else description="暂无打印机设备" />
+          <t-empty v-else :description="loadError ? '设备状态暂不可用' : '设备运行正常'" />
         </t-card>
       </section>
 
-      <section class="dashboard-grid dashboard-grid--three">
-        <t-card bordered class="dashboard-card activity-card">
-          <template #header>
-            <div class="card-heading">
-              <div>
-                <h2>活动任务进度</h2>
-                <p>来自任务 Store 的 REST/WS 合并状态</p>
-              </div>
-              <t-tag theme="primary" variant="light">{{ activeJobs.length }} 项</t-tag>
-            </div>
-          </template>
-          <div v-if="activeJobs.length" class="activity-list">
-            <div v-for="job in activeJobs.slice(0, 5)" :key="String(job.id)" class="activity-row">
-              <div class="activity-row__heading">
-                <span class="activity-row__name">{{ job.fileName || `任务 #${job.id}` }}</span>
-                <StatusTag domain="job" :status="job.status" />
-              </div>
-              <div class="activity-row__meta">
-                <span>打印机：{{ job.printerId || '未分配' }}</span>
-                <span v-if="hasProgress(job)">{{ progressValue(job) }}%</span>
-                <span v-else>进度未上报</span>
-              </div>
-              <t-progress
-                v-if="hasProgress(job)"
-                :percentage="progressValue(job)"
-                :status="job.status === 'RECONCILING' ? 'warning' : 'active'"
-                :show-info="false"
-                size="small"
-              />
-            </div>
-          </div>
-          <t-empty v-else description="当前没有活动任务" />
-        </t-card>
-
+      <section class="bottom-grid">
         <t-card bordered class="dashboard-card recent-card">
           <template #header>
             <div class="card-heading">
               <div>
-                <h2>最近任务</h2>
-                <p>来自任务分页接口的最新记录</p>
+                <h2>最近打印任务</h2>
               </div>
+              <t-tag theme="primary" variant="light">
+                活动 {{ activeJobs.length }} 项 · 失败 {{ failedJobTotal === null ? '—' : failedJobTotal }} 项
+              </t-tag>
               <t-button variant="text" @click="goTo('/tasks/history')">查看全部</t-button>
             </div>
           </template>
@@ -184,13 +158,15 @@
               @click="goTo(`/tasks/history?jobId=${job.id}`)"
             >
               <span class="job-row__main">
-                <FileIcon size="18" />
+                <span class="job-row__icon"><FileIcon :size="18" /></span>
                 <span class="job-row__content">
                   <strong>{{ job.fileName || `任务 #${job.id}` }}</strong>
                   <small>{{ formatJobTime(job.createdAt) }}</small>
                 </span>
               </span>
-              <StatusTag domain="job" :status="job.status" />
+              <t-tag :theme="getJobStatusType(job.status)" variant="light" size="small">
+                {{ getJobStatusLabel(job.status) }}
+              </t-tag>
             </t-button>
           </div>
           <t-empty v-else description="暂无打印任务" />
@@ -200,8 +176,7 @@
           <template #header>
             <div class="card-heading">
               <div>
-                <h2>异常设备</h2>
-                <p>需要关注的离线、未知或故障设备</p>
+                <h2>设备提醒</h2>
               </div>
               <t-button variant="text" @click="goTo('/printers')">设备列表</t-button>
             </div>
@@ -215,17 +190,15 @@
               class="alert-row"
               @click="goTo('/printers')"
             >
-              <span class="alert-row__main">
-                <ErrorCircleIcon size="18" />
-                <span class="alert-row__content">
-                  <strong>{{ printer.name || `打印机 #${printer.id}` }}</strong>
-                  <small>{{ printerStatusLabel(printer.status) }}</small>
-                </span>
+              <span class="alert-row__icon"><ErrorCircleIcon :size="18" /></span>
+              <span class="alert-row__content">
+                <strong>{{ printer.name || `打印机 #${printer.id}` }}</strong>
+                <span>{{ printerStatusLabel(printer.status) }}</span>
               </span>
-              <ChevronRightIcon size="16" />
+              <ChevronRightIcon :size="16" />
             </t-button>
           </div>
-          <t-empty v-else description="暂无需要处理的设备" />
+          <t-empty v-else description="设备运行正常" />
         </t-card>
       </section>
 
@@ -247,18 +220,17 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import {
+  CheckCircleIcon,
   ChevronRightIcon,
   DashboardIcon,
   ErrorCircleIcon,
   FileIcon,
   PrintIcon,
-  RefreshIcon,
-  TaskIcon
+  RefreshIcon
 } from 'tdesign-icons-vue-next'
 import { getJobPage } from '@/api/job'
 import { getPrinterList } from '@/api/printer'
 import AsyncState from '@/components/AsyncState.vue'
-import StatusTag from '@/components/StatusTag.vue'
 import { useJobStore } from '@/stores/jobStore'
 import { useRealtimeStore } from '@/stores/printer/realtimeStore'
 import { PRINTER_STATUS, PRINTER_STATUS_MAP } from '@/utils/constants'
@@ -271,7 +243,7 @@ defineOptions({ name: 'DashboardView' })
 const router = useRouter()
 const jobStore = useJobStore()
 const realtimeStore = useRealtimeStore()
-const { queueJobs, activeJobs } = storeToRefs(jobStore)
+const { activeJobs } = storeToRefs(jobStore)
 const { statusMap, wsConnectionState, isWsConnected, isRealtimeStale, isRecovering } = storeToRefs(realtimeStore)
 
 const loading = ref(false)
@@ -283,16 +255,6 @@ const failedJobTotal = ref(null)
 const trendJobs = ref([])
 const overviewReferenceTime = ref(null)
 const lastUpdateAt = ref(null)
-
-const statusSegmentsConfig = [
-  { key: PRINTER_STATUS.PRINTING, label: '打印中', progressStatus: 'active' },
-  { key: PRINTER_STATUS.PREPARING, label: '准备中', progressStatus: 'warning' },
-  { key: PRINTER_STATUS.PAUSED, label: '已暂停', progressStatus: 'warning' },
-  { key: PRINTER_STATUS.IDLE, label: '空闲', progressStatus: 'success' },
-  { key: PRINTER_STATUS.ERROR, label: '故障', progressStatus: 'error' },
-  { key: PRINTER_STATUS.OFFLINE, label: '离线', progressStatus: 'active' },
-  { key: PRINTER_STATUS.UNKNOWN, label: '未知', progressStatus: 'active' }
-]
 
 const effectivePrinters = computed(() => printers.value.map(printer => {
   const realtime = statusMap.value.get(String(printer.id))
@@ -306,8 +268,6 @@ const printerStatusCounts = computed(() => effectivePrinters.value.reduce((count
 }, {}))
 
 const totalPrinters = computed(() => effectivePrinters.value.length)
-const busyPrinters = computed(() => [PRINTER_STATUS.PREPARING, PRINTER_STATUS.PRINTING, PRINTER_STATUS.PAUSED]
-  .reduce((count, status) => count + (printerStatusCounts.value[status] || 0), 0))
 const idlePrinters = computed(() => printerStatusCounts.value[PRINTER_STATUS.IDLE] || 0)
 const offlinePrinters = computed(() => printerStatusCounts.value[PRINTER_STATUS.OFFLINE] || 0)
 const unknownPrinters = computed(() => printerStatusCounts.value[PRINTER_STATUS.UNKNOWN] || 0)
@@ -318,22 +278,77 @@ const attentionPrinters = computed(() => effectivePrinters.value.filter(printer 
 ].includes(printer.status)))
 
 const statCards = computed(() => [
-  { key: 'total', title: '打印机总数', value: totalPrinters.value, description: '已纳入当前看板的设备', icon: DashboardIcon, to: '/printers' },
-  { key: 'busy', title: '忙碌设备', value: busyPrinters.value, description: '准备中、打印中或暂停', icon: PrintIcon, to: '/printers' },
-  { key: 'idle', title: '空闲设备', value: idlePrinters.value, description: '当前处于 IDLE 状态', icon: TaskIcon, to: { path: '/printers', query: { status: 'IDLE' } } },
-  { key: 'offline', title: '离线设备', value: offlinePrinters.value, description: 'REST/实时状态为 OFFLINE', icon: ErrorCircleIcon, to: { path: '/printers', query: { status: 'OFFLINE' } } },
-  { key: 'unknown', title: '未知设备', value: unknownPrinters.value, description: '尚未取得可靠状态', icon: ErrorCircleIcon, to: { path: '/printers', query: { status: 'UNKNOWN' } } },
-  { key: 'queued', title: '排队任务', value: queueJobs.value.length, description: '来自 QUEUED 队列接口', icon: TaskIcon, to: '/tasks/queue' },
-  { key: 'active', title: '活动任务', value: activeJobs.value.length, description: 'ASSIGNED 至 RECONCILING', icon: PrintIcon, to: '/tasks/queue' },
-  { key: 'failed', title: '失败任务', value: failedJobTotal.value === null ? '—' : failedJobTotal.value, description: '来自 FAILED 分页接口', icon: ErrorCircleIcon, to: '/tasks/history' }
+  {
+    key: 'printers',
+    label: '打印机总数',
+    value: totalPrinters.value,
+    description: `${Math.max(0, totalPrinters.value - offlinePrinters.value - unknownPrinters.value)} 台设备在线`,
+    icon: DashboardIcon,
+    tone: 'primary',
+    to: '/printers'
+  },
+  {
+    key: 'printing',
+    label: '正在打印',
+    value: printerStatusCounts.value[PRINTER_STATUS.PRINTING] || 0,
+    description: '实时打印中的设备',
+    icon: PrintIcon,
+    tone: 'blue',
+    to: { path: '/printers', query: { status: PRINTER_STATUS.PRINTING } }
+  },
+  {
+    key: 'idle',
+    label: '空闲打印机',
+    value: idlePrinters.value,
+    description: '当前可分配任务的设备',
+    icon: CheckCircleIcon,
+    tone: 'orange',
+    to: { path: '/printers', query: { status: PRINTER_STATUS.IDLE } }
+  },
+  {
+    key: 'errors',
+    label: '异常设备',
+    value: attentionPrinters.value.length,
+    description: attentionPrinters.value.length ? '请及时处理异常' : '当前运行正常',
+    icon: ErrorCircleIcon,
+    tone: attentionPrinters.value.length ? 'red' : 'green',
+    to: '/printers'
+  }
 ])
 
-const statusSegments = computed(() => {
+const statusOverviewConfig = [
+  { key: PRINTER_STATUS.PRINTING, label: '打印中', color: 'var(--app-primary)' },
+  { key: PRINTER_STATUS.IDLE, label: '空闲', color: 'var(--app-success)' },
+  { key: PRINTER_STATUS.PREPARING, label: '准备中', color: 'var(--app-warning)' },
+  { key: PRINTER_STATUS.PAUSED, label: '已暂停', color: 'var(--app-warning)' },
+  { key: PRINTER_STATUS.ERROR, label: '故障', color: 'var(--app-danger)' },
+  { key: 'UNAVAILABLE', label: '离线/未知', color: 'var(--app-text-placeholder)' }
+]
+
+const statusOverviewSegments = computed(() => {
   const total = totalPrinters.value
-  return statusSegmentsConfig.map(item => {
-    const count = printerStatusCounts.value[item.key] || 0
-    return { ...item, count, percent: total ? Math.round((count / total) * 100) : 0 }
+  return statusOverviewConfig.map(item => {
+    const count = item.key === 'UNAVAILABLE'
+      ? (printerStatusCounts.value[PRINTER_STATUS.OFFLINE] || 0) + (printerStatusCounts.value[PRINTER_STATUS.UNKNOWN] || 0)
+      : printerStatusCounts.value[item.key] || 0
+    return { ...item, count, percent: total ? (count / total) * 100 : 0 }
   })
+})
+
+const donutStyle = computed(() => {
+  if (!totalPrinters.value) return { background: 'var(--app-border)' }
+
+  let start = 0
+  const segments = statusOverviewSegments.value
+    .filter(item => item.percent > 0)
+    .map(item => {
+      const end = start + item.percent
+      const segment = `${item.color} ${start}% ${end}%`
+      start = end
+      return segment
+    })
+
+  return { background: `conic-gradient(${segments.join(', ')})` }
 })
 
 const trendData = computed(() => trendJobs.value.length
@@ -424,13 +439,34 @@ function goTo(path) {
   router.push(path)
 }
 
-function hasProgress(job) {
-  const value = Number(job?.progress)
-  return Number.isFinite(value) && value >= 0 && value <= 100
+function getJobStatusLabel(status) {
+  return {
+    QUEUED: '排队中',
+    ASSIGNED: '已分配',
+    UPLOADING: '上传中',
+    READY: '待启动',
+    PRINTING: '打印中',
+    PAUSED: '已暂停',
+    RECONCILING: '核对中',
+    COMPLETED: '已完成',
+    FAILED: '失败',
+    CANCELLED: '已取消'
+  }[status] || status || '未知'
 }
 
-function progressValue(job) {
-  return Math.min(100, Math.max(0, Number(job.progress)))
+function getJobStatusType(status) {
+  return {
+    QUEUED: 'primary',
+    ASSIGNED: 'warning',
+    UPLOADING: 'warning',
+    READY: 'warning',
+    PRINTING: 'success',
+    PAUSED: 'warning',
+    RECONCILING: 'warning',
+    FAILED: 'danger',
+    CANCELLED: 'default',
+    COMPLETED: 'default'
+  }[status] || 'default'
 }
 
 function printerStatusLabel(status) {
@@ -456,57 +492,489 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.dashboard-page { min-width: 0; padding-bottom: var(--app-spacing-6); }
-.dashboard-heading, .dashboard-meta, .card-heading, .status-list__heading, .activity-row__heading, .activity-row__meta, .job-row, .alert-row, .job-row__main, .alert-row__main { display: flex; align-items: center; }
-.dashboard-heading, .dashboard-meta, .card-heading, .status-list__heading, .activity-row__heading, .activity-row__meta, .job-row, .alert-row { justify-content: space-between; }
-.dashboard-heading { gap: var(--app-spacing-4); margin-bottom: var(--app-spacing-4); }
-.dashboard-heading h1, .dashboard-heading p, .card-heading h2, .card-heading p { margin: 0; }
-.dashboard-heading h1, .card-heading h2 { color: var(--app-text-primary); }
-.dashboard-heading__description, .card-heading p { margin-top: var(--app-spacing-1) !important; color: var(--app-text-secondary); font-size: var(--app-font-size-caption); }
-.dashboard-heading__actions { flex-shrink: 0; }
-.dashboard-alert { margin-bottom: var(--app-spacing-4); }
-.dashboard-meta { margin-bottom: var(--app-spacing-4); color: var(--app-text-secondary); font-size: var(--app-font-size-caption); }
-.dashboard-meta__label { color: var(--app-text-secondary); }
-.stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--app-spacing-4); margin-bottom: var(--app-spacing-4); }
-.stat-card, .dashboard-card { min-width: 0; background: var(--app-surface); border-color: var(--app-border); }
-.stat-card--interactive { cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; }
-.stat-card--interactive:hover { transform: translateY(-2px); }
-.stat-card--interactive:focus-visible { outline: 2px solid var(--app-primary); outline-offset: 2px; }
-.stat-card :deep(.t-card__body) { padding: var(--app-spacing-4); }
-.stat-card :deep(.t-statistic__title) { color: var(--app-text-secondary); }
-.stat-card :deep(.t-statistic__content) { color: var(--app-text-primary); }
-.stat-card :deep(.t-statistic__extra) { color: var(--app-text-secondary); font-size: var(--app-font-size-caption); }
-.stat-card__icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; color: var(--app-primary); background: var(--app-primary-light); border-radius: var(--app-radius-round); }
-.dashboard-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); gap: var(--app-spacing-4); margin-bottom: var(--app-spacing-4); }
-.dashboard-grid--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.dashboard-card :deep(.t-card__header) { padding: var(--app-spacing-4) var(--app-spacing-6) 0; border-bottom: 0; }
-.dashboard-card :deep(.t-card__body) { padding: var(--app-spacing-4) var(--app-spacing-6) var(--app-spacing-6); }
-.card-heading h2 { font-size: var(--app-font-size-subtitle); font-weight: 600; }
-.trend-chart { width: 100%; padding-top: var(--app-spacing-2); }
-.trend-chart svg { display: block; width: 100%; height: 230px; overflow: visible; }
-.chart-grid-line { stroke: var(--app-border); stroke-width: 1; }
-.chart-area { fill: var(--app-primary-light); }
-.chart-line { fill: none; stroke: var(--app-primary); stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; }
-.chart-point { fill: var(--app-surface); stroke: var(--app-primary); stroke-width: 3; }
-.chart-labels { display: flex; justify-content: space-between; padding: 0 var(--app-spacing-2); color: var(--app-text-placeholder); font-size: 0.6875rem; }
-.status-list, .activity-list, .job-list, .alert-list { display: flex; flex-direction: column; gap: var(--app-spacing-3); }
-.status-list__item { display: grid; gap: var(--app-spacing-1); }
-.status-list__heading, .activity-row__meta { color: var(--app-text-secondary); font-size: var(--app-font-size-caption); }
-.status-list__heading strong { color: var(--app-text-primary); }
-.activity-row, .job-row, .alert-row { min-width: 0; padding: var(--app-spacing-2) 0; border-bottom: 1px solid var(--app-border); }
-.activity-row:last-child, .job-row:last-child, .alert-row:last-child { border-bottom: 0; }
-.activity-row__heading { gap: var(--app-spacing-2); }
-.activity-row__name, .job-row strong, .alert-row strong { overflow: hidden; color: var(--app-text-primary); font-size: var(--app-font-size-body); text-overflow: ellipsis; white-space: nowrap; }
-.activity-row__meta { margin: var(--app-spacing-2) 0 var(--app-spacing-1); }
-.job-row, .alert-row { height: auto; justify-content: space-between; color: var(--app-text-secondary); text-align: left; }
-.job-row__main, .alert-row__main { min-width: 0; gap: var(--app-spacing-3); }
-.job-row__main > svg, .alert-row__main > svg { flex-shrink: 0; color: var(--app-primary); }
-.alert-row__main > svg { color: var(--app-danger); }
-.job-row__content, .alert-row__content { display: flex; flex-direction: column; min-width: 0; gap: var(--app-spacing-1); }
-.job-row small, .alert-row small { color: var(--app-text-secondary); font-size: var(--app-font-size-caption); }
-.quick-links { display: flex; align-items: center; justify-content: space-between; gap: var(--app-spacing-4); padding: var(--app-spacing-4); background: var(--app-surface); border: 1px solid var(--app-border); border-radius: var(--app-radius-medium); }
-.quick-links__title { color: var(--app-text-primary); font-weight: 600; }
-@media (max-width: 1200px) { .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dashboard-grid--three { grid-template-columns: 1fr 1fr; } .alert-card { grid-column: span 2; } }
-@media (max-width: 800px) { .dashboard-heading, .dashboard-meta, .quick-links { align-items: flex-start; flex-direction: column; } .dashboard-heading__actions, .quick-links .t-space { width: 100%; } .dashboard-heading__actions .t-button { flex: 1; } .dashboard-grid, .dashboard-grid--three { grid-template-columns: 1fr; } .alert-card { grid-column: auto; } }
-@media (max-width: 520px) { .stat-grid { grid-template-columns: 1fr; } .dashboard-card :deep(.t-card__header), .dashboard-card :deep(.t-card__body) { padding-left: var(--app-spacing-4); padding-right: var(--app-spacing-4); } }
+.dashboard-page {
+  min-width: 0;
+  padding-bottom: var(--app-spacing-6);
+}
+
+.dashboard-heading,
+.dashboard-meta,
+.card-heading,
+.stat-card__topline,
+.stat-card__footer,
+.job-row,
+.job-row__main,
+.alert-row {
+  display: flex;
+  align-items: center;
+}
+
+.dashboard-heading,
+.dashboard-meta,
+.card-heading,
+.stat-card__topline,
+.stat-card__footer,
+.job-row,
+.alert-row {
+  justify-content: space-between;
+}
+
+.dashboard-heading {
+  gap: var(--app-spacing-4);
+  margin-bottom: var(--app-spacing-4);
+}
+
+.dashboard-heading h1,
+.dashboard-heading p,
+.card-heading h2,
+.card-heading p {
+  margin: 0;
+}
+
+.dashboard-heading h1,
+.card-heading h2 {
+  color: var(--app-text-primary);
+}
+
+.dashboard-heading__description {
+  margin-top: var(--app-spacing-1);
+  color: var(--app-text-secondary);
+  font-size: var(--app-font-size-caption);
+}
+
+.dashboard-heading__actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--app-spacing-3);
+}
+
+.dashboard-alert {
+  margin-bottom: var(--app-spacing-4);
+}
+
+.dashboard-meta {
+  margin-bottom: var(--app-spacing-4);
+  color: var(--app-text-secondary);
+  font-size: var(--app-font-size-caption);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--app-spacing-4);
+  margin-bottom: var(--app-spacing-4);
+}
+
+.stat-card,
+.dashboard-card {
+  min-width: 0;
+  background: var(--app-surface);
+  border-color: var(--app-border);
+}
+
+.stat-card {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 142px;
+  padding: var(--app-spacing-4);
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-medium);
+}
+
+.stat-card--interactive {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card--interactive:hover {
+  box-shadow: var(--app-shadow);
+  transform: translateY(-2px);
+}
+
+.stat-card--interactive:focus-visible {
+  outline: 2px solid var(--app-primary);
+  outline-offset: 2px;
+}
+
+.stat-card__body {
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.stat-card__topline,
+.stat-card__footer {
+  min-width: 0;
+  gap: var(--app-spacing-2);
+}
+
+.stat-card__label,
+.stat-card__footer > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stat-card__label {
+  color: var(--app-text-secondary);
+  font-size: var(--app-font-size-body-small);
+}
+
+.stat-card__icon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  color: var(--app-primary);
+  background: var(--app-primary-light);
+  border-radius: var(--app-radius-round);
+  flex-shrink: 0;
+}
+
+.stat-card__value {
+  margin: var(--app-spacing-3) 0 var(--app-spacing-2);
+  color: var(--app-text-primary);
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.stat-card__footer {
+  margin-top: auto;
+  color: var(--app-text-secondary);
+  font-size: var(--app-font-size-caption);
+}
+
+.stat-card--primary {
+  color: var(--app-text-on-brand);
+  background: var(--app-primary);
+  border-color: var(--app-primary);
+}
+
+.stat-card--primary .stat-card__label,
+.stat-card--primary .stat-card__value,
+.stat-card--primary .stat-card__footer {
+  color: var(--app-text-on-brand);
+}
+
+.stat-card--primary .stat-card__icon {
+  color: var(--app-text-on-brand);
+  background: rgb(255 255 255 / 18%);
+}
+
+.stat-card--orange .stat-card__icon {
+  color: var(--app-warning);
+  background: var(--app-warning-light);
+}
+
+.stat-card--green .stat-card__icon {
+  color: var(--app-success);
+  background: var(--app-success-light);
+}
+
+.stat-card--red .stat-card__icon {
+  color: var(--app-danger);
+  background: var(--app-danger-light);
+}
+
+.dashboard-grid,
+.bottom-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
+  gap: var(--app-spacing-4);
+  margin-bottom: var(--app-spacing-4);
+}
+
+.bottom-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 0;
+}
+
+.dashboard-card :deep(.t-card__header) {
+  padding: var(--app-spacing-4) var(--app-spacing-6) var(--app-spacing-2);
+  border-bottom: 0;
+}
+
+.dashboard-card :deep(.t-card__body) {
+  padding: var(--app-spacing-3) var(--app-spacing-6) var(--app-spacing-6);
+}
+
+.card-heading {
+  width: 100%;
+  min-width: 0;
+  gap: var(--app-spacing-3);
+}
+
+.card-heading > div:first-child {
+  min-width: 0;
+}
+
+.card-heading > :last-child {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.card-heading h2 {
+  font-size: var(--app-font-size-subtitle);
+  font-weight: 600;
+}
+
+.trend-chart {
+  width: 100%;
+  padding-top: var(--app-spacing-2);
+}
+
+.trend-chart svg {
+  display: block;
+  width: 100%;
+  height: 230px;
+  overflow: visible;
+}
+
+.chart-grid-line {
+  stroke: var(--app-border);
+  stroke-width: 1;
+}
+
+.chart-area {
+  fill: var(--app-primary-light);
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--app-primary);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.chart-point {
+  fill: var(--app-surface);
+  stroke: var(--app-primary);
+  stroke-width: 3;
+}
+
+.chart-labels {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 var(--app-spacing-2);
+  color: var(--app-text-placeholder);
+  font-size: 0.6875rem;
+}
+
+.status-overview {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: var(--app-spacing-6);
+  min-height: 250px;
+}
+
+.status-donut {
+  position: relative;
+  display: flex;
+  width: 176px;
+  height: 176px;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-donut::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--app-surface);
+  border-radius: 50%;
+  content: '';
+}
+
+.status-donut__content {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  color: var(--app-text-secondary);
+}
+
+.status-donut__content strong {
+  color: var(--app-text-primary);
+  font-size: 1.75rem;
+  line-height: 1.2;
+}
+
+.status-donut__content span {
+  font-size: var(--app-font-size-caption);
+}
+
+.status-legend {
+  display: flex;
+  min-width: 120px;
+  flex-direction: column;
+  gap: var(--app-spacing-3);
+}
+
+.status-legend__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-spacing-4);
+  color: var(--app-text-secondary);
+  font-size: var(--app-font-size-body-small);
+}
+
+.status-legend__name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--app-spacing-2);
+}
+
+.status-legend__name i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-legend__item strong {
+  color: var(--app-text-primary);
+}
+
+.job-list,
+.alert-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.job-row,
+.alert-row {
+  width: 100%;
+  min-width: 0;
+  min-height: 58px;
+  padding: var(--app-spacing-2) 0;
+  color: var(--app-text-secondary);
+  text-align: left;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.job-row:last-child,
+.alert-row:last-child {
+  border-bottom: 0;
+}
+
+.job-row__main {
+  min-width: 0;
+  gap: var(--app-spacing-3);
+}
+
+.job-row__icon,
+.alert-row__icon {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  color: var(--app-primary);
+  background: var(--app-primary-light);
+  border-radius: var(--app-radius-round);
+  flex-shrink: 0;
+}
+
+.job-row__content,
+.alert-row__content {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--app-spacing-1);
+}
+
+.job-row strong,
+.alert-row strong {
+  overflow: hidden;
+  color: var(--app-text-primary);
+  font-size: var(--app-font-size-body-small);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-row small,
+.alert-row span {
+  color: var(--app-text-secondary);
+  font-size: var(--app-font-size-caption);
+}
+
+.alert-row__icon {
+  color: var(--app-danger);
+  background: var(--app-danger-light);
+}
+
+.quick-links {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-spacing-4);
+  padding: var(--app-spacing-4);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-medium);
+}
+
+.quick-links__title {
+  color: var(--app-text-primary);
+  font-weight: 600;
+}
+
+@media (max-width: 1100px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-grid,
+  .bottom-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 800px) {
+  .dashboard-heading,
+  .dashboard-meta,
+  .quick-links {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dashboard-heading__actions,
+  .quick-links :deep(.t-space) {
+    width: 100%;
+  }
+
+  .dashboard-heading__actions :deep(.t-button) {
+    flex: 1;
+  }
+}
+
+@media (max-width: 520px) {
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-card :deep(.t-card__header),
+  .dashboard-card :deep(.t-card__body) {
+    padding-right: var(--app-spacing-4);
+    padding-left: var(--app-spacing-4);
+  }
+
+  .status-overview {
+    gap: var(--app-spacing-4);
+    flex-direction: column;
+    padding: var(--app-spacing-2) 0;
+  }
+}
 </style>

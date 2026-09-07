@@ -624,36 +624,36 @@ onUnmounted(() => {
 /* 编辑模式：工程网格背景 */
 .is-edit-mode :deep(.workshop-canvas) {
   background-image:
-    linear-gradient(to right, #e5e7eb 1px, transparent 1px),
-    linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
+    linear-gradient(to right, var(--app-border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--app-border) 1px, transparent 1px);
   background-size: 20px 20px;
   background-position: center center;
   border-radius: 6px;
-  background-color: #f3f4f6;
+  background-color: var(--app-page-background);
 }
 
 /* 编辑模式：行标签和列标题高亮 */
 .is-edit-mode :deep(.row-label) {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--app-primary-light-hover);
+  color: var(--app-primary-active);
   font-weight: 700;
 }
 
 .is-edit-mode :deep(.col-header) {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--app-primary-light-hover);
+  color: var(--app-primary-active);
   font-weight: 700;
 }
 
 .is-edit-mode :deep(.col-header.aisle-header) {
-  background: #e8e0d0;
-  color: #7a6545;
+  background: var(--app-warning-light);
+  color: var(--app-warning);
 }
 
 /* 编辑模式：过道区域淡化 */
 .is-edit-mode :deep(.aisle-cell) {
-  background: #e8e0d0;
-  border: 2px dashed #c4b8a0;
+  background: var(--app-warning-light);
+  border: 2px dashed var(--app-warning);
   opacity: 0.8;
 }
 

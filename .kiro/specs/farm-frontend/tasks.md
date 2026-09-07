@@ -1,5 +1,31 @@
 # 前端 Kiro 任务清单
 
+## Kiro Task UI-001.27：以美化方案重构总览界面
+
+状态：已完成
+
+范围：
+- `src/views/Dashboard.vue`
+- `src/components/FarmDashboard.vue`
+- `tests/dashboardOverview.test.js`
+
+目标：
+- 以 `/前端美化` 分支的总览卡片、趋势图、状态分布、最近任务和设备提醒布局为主。
+- 将 Electron 分支的真实 REST、Store、WebSocket、加载错误、空数据和跳转逻辑接回美化界面。
+- 保留车间看板的设备控制、布局编辑和滚动能力，并统一使用项目 TDesign 主题变量。
+
+验收标准：
+- 总览界面以美化分支的视觉结构为主，不因接入真实数据而退回旧版布局。
+- 统计、趋势、最近任务和异常设备均使用现有真实数据链路，刷新和页面跳转行为正常。
+- 加载中、部分失败、全部失败、空数据、WebSocket 断开和移动端布局均有可见处理。
+- 专项测试、`npm run lint`、`npm run build` 和 `git diff --check` 全部通过。
+
+提交建议：refactor: 以美化方案重构总览界面
+
+完成记录：以 `/前端美化` 的四张统计卡、趋势图、环形状态分布、最近任务和设备提醒布局重构总览展示层；保留 Electron 的真实 REST/Store/WebSocket 数据链路、失败统计、刷新、错误和空数据处理，并将车间看板硬编码颜色统一为项目 TDesign 主题变量。
+
+验证说明：看板专项测试 10/10 通过；相关 `npm test` 已启动但现有 `batchDispatch` 测试进程未在终端超时窗口内退出；`npm run lint` 通过；`npm run build` 通过；`git diff --check` 通过。构建仅保留项目原有动态导入和大 chunk 提示。
+
 ## Kiro Task UI-001.26：整合个人中心账户信息
 
 状态：已完成
