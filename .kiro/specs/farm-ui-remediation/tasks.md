@@ -1308,7 +1308,7 @@ Git 检查与提交：提交前执行 `git status --short`、`git diff --check`�
 
 ### 8.6 UI-004 执行顺序与统一约束
 
-`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6 → UI-004.7 → UI-004.8 → UI-004.9 → UI-004.10 → UI-004.11 → UI-004.12 → UI-004.13 → UI-004.14 → UI-004.15`
+`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6 → UI-004.7 → UI-004.8 → UI-004.9 → UI-004.10 → UI-004.11 → UI-004.12 → UI-004.13 → UI-004.14 → UI-004.15 → UI-004.16`
 
 - UI-004 是独立文件库 UI/UX 重写任务，不属于 `farm-ui-v2`，不回写 UI-001、UI-002、UI-003 的历史状态。
 - 所有文件数据必须来自 API_HANDOFF、运行时 OpenAPI 和现有数据适配器；运行时泛型 schema 与正式文档冲突时记录并暂停相关猜测。
@@ -1370,3 +1370,32 @@ Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅�
 验证：`npm test`（155/155）、`npm run test:e2e`（9/9）、`npm run test:electron`（3/3）、`npm run lint`、`npm run build`、`npm run build:desktop` 全部通过；构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。一次并行回归曾因两个 Playwright 项目抢占 5177 端口失败，改为串行后全部通过。
 
 Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅提交本子任务涉及的 4 个文件；提交哈希：`92d2c51`。未执行 `git push`。
+
+### [x] UI-004.16 文件库 TDesign 容器重构
+
+优先级：P1
+
+目标：移除旧版文件库外层大卡片和自定义表面拼接，使用 TDesign Card、Layout 和 Table 的默认设计语言组织文件夹树、操作栏和文件结果区。
+
+范围：`src/views/FileLibrary.vue`、`src/components/file/FileFolderTree.vue`、`tests/fileLibrary.test.js`、`tests/e2e/electron.spec.js` 和本任务记录；不修改后端接口、数据适配器、文件操作逻辑或 `src/stores/printerStore.js.backup`。
+
+工作内容：
+
+- 移除包裹左右区域的旧 `file-library-workspace` 外层 Card。
+- 左侧文件夹树使用独立 TDesign Card，右侧工具栏和网格/表格结果分别使用独立 TDesign Card，页面灰底承担区域间留白。
+- 让 TDesign Table 通过 `hover` 使用官方悬停语义，移除强制覆盖表格行背景的自定义 CSS。
+- 保留单一表格内容滚动、分页、选择、右键菜单、加载/空态/错误态和现有 API 行为。
+- 增加源码及 Electron DOM 层级断言，验证独立卡片和主内容区层级关系。
+
+验收：
+
+- 工作区不再以一个白色大 Card 包裹左右内容；左树、右工具栏、右结果区分别具有 TDesign Card 边界。
+- 操作栏不再与表格首行共享背景，表格使用 TDesign 默认表头、行边界和 hover 语义。
+- 列表和网格均可正常切换，表格仅保留一个内容滚动区，分页不被卡片内容遮挡。
+- 完成 `npm test`（155/155）、`npm run test:e2e`（9/9）、`npm run test:electron`（3/3）、`npm run lint`、`npm run build`、`npm run build:desktop`。
+
+完成记录：文件库改为页面灰底上的 TDesign 多卡片布局，移除旧版工作区大卡片和表格行背景覆盖，左侧文件夹树、右侧工具栏及结果区各自独立；表格启用 TDesign hover，保留原有查询、操作和单一滚动模型。
+
+验证：`npm test`（155/155）、`npm run test:e2e`（9/9）、`npm run test:electron`（3/3）、`npm run lint`、`npm run build`、`npm run build:desktop` 全部通过；构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
+
+Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅提交本子任务涉及的 5 个文件；提交哈希：`41f85be`。未执行 `git push`。

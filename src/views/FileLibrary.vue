@@ -4,19 +4,21 @@
       title="文件库"
     />
 
-    <t-card bordered class="file-library-workspace app-page-card" aria-label="文件工作台">
-      <t-layout class="file-library-layout">
-        <t-aside width="208px" class="file-library-sidebar">
+    <t-layout class="file-library-layout">
+      <t-aside width="208px" class="file-library-sidebar">
+        <t-card bordered class="file-library-sidebar-card" aria-label="文件夹导航">
           <FileFolderTree
             ref="folderTreeRef"
             :current-parent-id="currentParentId"
             @select="handleFolderSelect"
             @create="openCreateFolderDialog"
           />
-        </t-aside>
+        </t-card>
+      </t-aside>
           <t-content class="file-library-content">
             <section class="file-library-main" aria-label="当前目录文件列表">
-              <div class="file-library-filter-form" aria-label="文件筛选条件">
+              <t-card bordered class="file-library-toolbar-card" aria-label="文件操作工具栏">
+                <div class="file-library-filter-form" aria-label="文件筛选条件">
                 <t-space class="file-library-toolbar-actions" size="small" align="center" break-line>
                   <t-button variant="outline" theme="default" size="medium" :icon="renderIcon(FolderOpened)" @click="openCreateFolderDialog">
                     新建文件夹
@@ -54,7 +56,8 @@
                     重置
                   </t-button>
                 </t-space>
-              </div>
+                </div>
+              </t-card>
 
           <div v-if="loading || (loadError && !fileList.length)" class="file-library-status-region" aria-live="polite">
             <AsyncState
@@ -79,7 +82,8 @@
           </t-alert>
 
           <!-- 网格视图 -->
-          <div v-if="fileList.length && viewMode === 'grid'" class="file-grid-view app-scroll-region">
+          <t-card v-if="fileList.length && viewMode === 'grid'" bordered class="file-library-results-card file-library-grid-card" aria-label="文件网格列表">
+            <div class="file-grid-view app-scroll-region">
         <!-- 文件夹 -->
         <div
           v-for="file in folderList"
@@ -225,11 +229,13 @@
             </t-card>
           </t-dropdown>
         </div>
-      </div>
+            </div>
+          </t-card>
 
       <!-- 列表视图 -->
-          <div v-if="fileList.length && viewMode === 'list'" class="file-table-view">
-        <TdTable :data="fileRows" row-key="id" :loading="loading" height="100%" @selection-change="handleSelectionChange"
+          <t-card v-if="fileList.length && viewMode === 'list'" bordered class="file-library-results-card file-library-table-card" aria-label="文件表格列表">
+            <div class="file-table-view">
+        <TdTable :data="fileRows" row-key="id" :loading="loading" height="100%" hover @selection-change="handleSelectionChange"
           @row-click="handleTableRowClick" border style="width: 100%">
           <TdTableColumn type="selection" width="50" align="center" :check-props="getRowCheckProps" />
 
@@ -319,7 +325,8 @@
             </template>
           </TdTableColumn>
         </TdTable>
-          </div>
+            </div>
+          </t-card>
 
           <div v-if="fileList.length > 0" class="file-library-pagination">
             <t-pagination v-model:current="pagination.pageNum" v-model:pageSize="pagination.pageSize"
@@ -329,7 +336,6 @@
           </section>
         </t-content>
       </t-layout>
-    </t-card>
 
     <!-- 文件上传对话框 -->
     <t-dialog v-model:visible="uploadDialogVisible" header="批量上传切片文件" width="600px" :footer="false">
@@ -1313,13 +1319,6 @@ onMounted(() => {
   gap: var(--app-spacing-4);
 }
 
-.file-library-workspace {
-  width: 100%;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
 .file-library-layout {
   display: flex;
   flex: 1 1 auto;
@@ -1327,6 +1326,7 @@ onMounted(() => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  gap: var(--app-spacing-4);
 }
 
 .file-library-sidebar {
@@ -1345,20 +1345,60 @@ onMounted(() => {
   overflow: hidden;
 }
 
-.file-library-workspace :deep(.t-card__body) {
+.file-library-sidebar-card {
+  display: flex;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.file-library-sidebar-card :deep(.t-card__body) {
   display: flex;
   flex-direction: column;
   width: 100%;
   min-width: 0;
   min-height: 0;
   flex: 1 1 auto;
+  padding: 0;
 }
 
-.file-library-workspace :deep(.t-empty) {
+.file-library-toolbar-card {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.file-library-toolbar-card :deep(.t-card__body) {
+  padding: var(--app-spacing-3) var(--app-spacing-4);
+}
+
+.file-library-results-card {
+  display: flex;
+  flex: 1 1 0%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.file-library-results-card :deep(.t-card__body) {
+  display: flex;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+}
+
+.file-library-grid-card :deep(.t-card__body) {
+  padding: var(--app-spacing-4);
+}
+
+.file-library-main :deep(.t-empty) {
   padding: var(--app-spacing-8) var(--app-spacing-4);
 }
 
-.file-library-workspace :deep(.t-alert) {
+.file-library-main :deep(.t-alert) {
   flex: 0 0 auto;
 }
 
@@ -1371,6 +1411,7 @@ onMounted(() => {
   min-height: 0;
   padding: 0;
   overflow: hidden;
+  gap: var(--app-spacing-4);
 }
 
 .file-library-filter-form {
@@ -1380,11 +1421,8 @@ onMounted(() => {
   justify-content: space-between;
   flex-wrap: nowrap;
   gap: var(--app-spacing-4);
-  margin-bottom: var(--app-spacing-4);
-  padding: var(--app-spacing-3) var(--app-spacing-4);
-  background: var(--td-bg-color-container-hover);
-  border: 1px solid var(--td-component-border);
-  border-radius: var(--td-radius-medium);
+  margin: 0;
+  padding: 0;
 }
 
 .file-library-toolbar-actions,
@@ -1456,9 +1494,6 @@ onMounted(() => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--td-bg-color-container);
-  border: 1px solid var(--td-component-border);
-  border-radius: var(--td-radius-medium);
 }
 
 .file-table-view :deep(.t-table__content) {
@@ -1481,15 +1516,6 @@ onMounted(() => {
 .file-table-view :deep(.t-table__content::-webkit-scrollbar-thumb:hover) {
   background: var(--app-scrollbar-thumb-hover);
   background-clip: padding-box;
-}
-
-.file-table-view :deep(.t-table__body tr > td) {
-  background: var(--td-bg-color-container);
-  transition: background-color 0.2s ease;
-}
-
-.file-table-view :deep(.t-table__body tr:hover > td) {
-  background: var(--td-bg-color-container-hover);
 }
 
 .file-table-view :deep(.td-table-adapter),
@@ -1689,7 +1715,7 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   flex: 0 0 auto;
-  padding-top: var(--app-spacing-4);
+  padding-top: 0;
 }
 
 .file-table__name-cell {
@@ -1780,13 +1806,13 @@ onMounted(() => {
 
 @media (max-width: 1024px) {
   .file-library-main {
-    padding: var(--app-spacing-3);
+    padding: 0;
   }
 
   .file-library-filter-form {
     gap: var(--app-spacing-2);
-    margin-bottom: var(--app-spacing-2);
-    padding-bottom: var(--app-spacing-2);
+    margin: 0;
+    padding: 0;
   }
 
 }

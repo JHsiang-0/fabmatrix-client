@@ -231,8 +231,6 @@ defineExpose({ refresh })
   min-height: 0;
   padding: var(--app-spacing-4);
   overflow: hidden;
-  background: var(--td-bg-color-container);
-  border-right: 1px solid var(--app-border);
 }
 
 .file-folder-tree__header {

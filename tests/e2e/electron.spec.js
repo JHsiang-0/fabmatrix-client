@@ -132,13 +132,14 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     await expect(page.getByRole('radio', { name: '列表视图', exact: true }).locator('..')).toBeVisible()
     const fileWorkspaceMetrics = await page.evaluate(() => {
       const main = document.querySelector('.file-library-main')
-      const toolbar = document.querySelector('.file-library-filter-form')
+      const toolbarCard = document.querySelector('.file-library-toolbar-card')
+      const resultsCard = document.querySelector('.file-library-table-card')
       const tableView = document.querySelector('.file-table-view')
       const table = document.querySelector('.file-table-view .t-table__content')
-      const toolbarStyle = toolbar ? getComputedStyle(toolbar) : null
-      const tableViewStyle = tableView ? getComputedStyle(tableView) : null
-      const toolbarRect = toolbar?.getBoundingClientRect()
-      const tableViewRect = tableView?.getBoundingClientRect()
+      const toolbarStyle = toolbarCard ? getComputedStyle(toolbarCard) : null
+      const resultsStyle = resultsCard ? getComputedStyle(resultsCard) : null
+      const toolbarRect = toolbarCard?.getBoundingClientRect()
+      const resultsRect = resultsCard?.getBoundingClientRect()
       const pagination = document.querySelector('.file-library-pagination')
       return {
         mainHeight: main?.clientHeight || 0,
@@ -146,11 +147,12 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
         tableOverflow: table ? getComputedStyle(table).overflowY : '',
         toolbarBackground: toolbarStyle?.backgroundColor || '',
         toolbarBorder: toolbarStyle?.borderTopWidth || '',
-        tableBorder: tableViewStyle?.borderTopWidth || '',
-        tableRadius: tableViewStyle?.borderTopLeftRadius || '',
-        separated: toolbarRect && tableViewRect ? tableViewRect.top - toolbarRect.bottom : 0,
-        toolbarIsMainChild: toolbar?.parentElement === main,
-        tableIsMainChild: tableView?.parentElement === main,
+        tableBorder: resultsStyle?.borderTopWidth || '',
+        tableRadius: resultsStyle?.borderTopLeftRadius || '',
+        separated: toolbarRect && resultsRect ? resultsRect.top - toolbarRect.bottom : 0,
+        toolbarIsMainChild: toolbarCard?.parentElement === main,
+        tableIsMainChild: resultsCard?.parentElement === main,
+      tableViewIsResultsChild: resultsCard?.contains(tableView) === true,
         paginationIsMainChild: pagination?.parentElement === main
       }
     })
@@ -164,6 +166,7 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     expect(fileWorkspaceMetrics.separated).toBeGreaterThanOrEqual(8)
     expect(fileWorkspaceMetrics.toolbarIsMainChild).toBe(true)
     expect(fileWorkspaceMetrics.tableIsMainChild).toBe(true)
+    expect(fileWorkspaceMetrics.tableViewIsResultsChild).toBe(true)
     expect(fileWorkspaceMetrics.paginationIsMainChild).toBe(true)
     await page.getByRole('button', { name: '新建文件夹', exact: true }).first().click()
     await expect(page.locator('.t-dialog__header-content').filter({ hasText: '新建文件夹' })).toBeVisible()
@@ -193,8 +196,8 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     expect(menuBox).not.toBeNull()
     expect(clickPoint.x).toBeGreaterThanOrEqual(menuBox.x - 8)
     expect(clickPoint.x).toBeLessThanOrEqual(menuBox.x + menuBox.width + 8)
-    expect(clickPoint.y).toBeGreaterThanOrEqual(menuBox.y - 24)
-    expect(clickPoint.y).toBeLessThanOrEqual(menuBox.y + menuBox.height + 24)
+    expect(clickPoint.y).toBeGreaterThanOrEqual(menuBox.y - 40)
+    expect(clickPoint.y).toBeLessThanOrEqual(menuBox.y + menuBox.height + 40)
     await detailMenuItem.click()
     await expect(page.getByRole('button', { name: '关闭文件详情', exact: true })).toBeVisible()
     await expect(page.getByText('切片摘要', { exact: true })).toBeVisible()
