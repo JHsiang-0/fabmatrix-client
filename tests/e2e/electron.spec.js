@@ -139,6 +139,7 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
       const tableViewStyle = tableView ? getComputedStyle(tableView) : null
       const toolbarRect = toolbar?.getBoundingClientRect()
       const tableViewRect = tableView?.getBoundingClientRect()
+      const pagination = document.querySelector('.file-library-pagination')
       return {
         mainHeight: main?.clientHeight || 0,
         tableHeight: table?.clientHeight || 0,
@@ -147,7 +148,10 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
         toolbarBorder: toolbarStyle?.borderTopWidth || '',
         tableBorder: tableViewStyle?.borderTopWidth || '',
         tableRadius: tableViewStyle?.borderTopLeftRadius || '',
-        separated: toolbarRect && tableViewRect ? tableViewRect.top - toolbarRect.bottom : 0
+        separated: toolbarRect && tableViewRect ? tableViewRect.top - toolbarRect.bottom : 0,
+        toolbarIsMainChild: toolbar?.parentElement === main,
+        tableIsMainChild: tableView?.parentElement === main,
+        paginationIsMainChild: pagination?.parentElement === main
       }
     })
     expect(fileWorkspaceMetrics.mainHeight).toBeGreaterThan(0)
@@ -158,6 +162,9 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     expect(fileWorkspaceMetrics.tableBorder).toBe('1px')
     expect(fileWorkspaceMetrics.tableRadius).not.toBe('0px')
     expect(fileWorkspaceMetrics.separated).toBeGreaterThanOrEqual(8)
+    expect(fileWorkspaceMetrics.toolbarIsMainChild).toBe(true)
+    expect(fileWorkspaceMetrics.tableIsMainChild).toBe(true)
+    expect(fileWorkspaceMetrics.paginationIsMainChild).toBe(true)
     await page.getByRole('button', { name: '新建文件夹', exact: true }).first().click()
     await expect(page.locator('.t-dialog__header-content').filter({ hasText: '新建文件夹' })).toBeVisible()
     await page.getByRole('button', { name: '取消', exact: true }).last().click()
@@ -180,8 +187,14 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     const detailMenuItem = page.getByText('查看详情', { exact: true })
     await expect(detailMenuItem).toBeVisible()
     const detailMenuBox = await detailMenuItem.boundingBox()
+    const clickPoint = { x: gearboxBox.x + contextClick.x, y: gearboxBox.y + contextClick.y }
+    const menuBox = await page.locator('.t-dropdown__menu:visible').last().boundingBox()
     expect(Math.abs(detailMenuBox.x - (gearboxBox.x + contextClick.x))).toBeLessThan(120)
-    expect(Math.abs(detailMenuBox.y - (gearboxBox.y + contextClick.y))).toBeLessThan(120)
+    expect(menuBox).not.toBeNull()
+    expect(clickPoint.x).toBeGreaterThanOrEqual(menuBox.x - 8)
+    expect(clickPoint.x).toBeLessThanOrEqual(menuBox.x + menuBox.width + 8)
+    expect(clickPoint.y).toBeGreaterThanOrEqual(menuBox.y - 24)
+    expect(clickPoint.y).toBeLessThanOrEqual(menuBox.y + menuBox.height + 24)
     await detailMenuItem.click()
     await expect(page.getByRole('button', { name: '关闭文件详情', exact: true })).toBeVisible()
     await expect(page.getByText('切片摘要', { exact: true })).toBeVisible()

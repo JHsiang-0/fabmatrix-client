@@ -15,7 +15,8 @@ test('文件中心使用正式分页契约并提供文件夹树与单一主工�
   assert.match(source, /<TdTable :data="fileRows" row-key="id"/)
   assert.match(source, /<t-card bordered class="file-library-workspace app-page-card"/)
   assert.doesNotMatch(source, /<t-form layout="inline" class="file-library-filter-form"/)
-  assert.match(source, /class="file-library-results"/)
+  assert.match(source, /class="file-library-status-region"/)
+  assert.doesNotMatch(source, /class="file-library-results"/)
   assert.doesNotMatch(source, /class="file-library-content-card"/)
   assert.match(source, /const refreshLibrary = \(\) => fetchData\(\)/)
 })
@@ -100,6 +101,7 @@ test('文件库使用 TDesign 视图分段并永久显示选择列', () => {
   assert.match(source, /farm-context-menu-position/)
   assert.doesNotMatch(source, /viewMode = ref\('grid'\)/)
   assert.doesNotMatch(source, /value: 'open'/)
+  assert.match(source, /class="file-library-filter-form"[\s\S]*class="file-grid-view app-scroll-region"[\s\S]*class="file-table-view"[\s\S]*class="file-library-pagination"/)
 })
 
 test('文件库批量上传读取批量响应 data 并识别后端成功状态', () => {

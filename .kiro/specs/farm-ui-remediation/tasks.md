@@ -1308,7 +1308,7 @@ Git 检查与提交：提交前执行 `git status --short`、`git diff --check`�
 
 ### 8.6 UI-004 执行顺序与统一约束
 
-`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6 → UI-004.7 → UI-004.8 → UI-004.9 → UI-004.10 → UI-004.11 → UI-004.12 → UI-004.13 → UI-004.14`
+`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6 → UI-004.7 → UI-004.8 → UI-004.9 → UI-004.10 → UI-004.11 → UI-004.12 → UI-004.13 → UI-004.14 → UI-004.15`
 
 - UI-004 是独立文件库 UI/UX 重写任务，不属于 `farm-ui-v2`，不回写 UI-001、UI-002、UI-003 的历史状态。
 - 所有文件数据必须来自 API_HANDOFF、运行时 OpenAPI 和现有数据适配器；运行时泛型 schema 与正式文档冲突时记录并暂停相关猜测。
@@ -1342,3 +1342,31 @@ Git 检查与提交：提交前执行 `git status --short`、`git diff --check`�
 验证：`npm test`（155/155）、`npm run test:e2e`（9/9）、`npm run test:electron`（3/3）、`npm run lint`、`npm run build`、`npm run build:desktop` 全部通过；构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
 
 Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅提交本子任务涉及的 4 个文件；提交哈希：`bcbf7da`。未执行 `git push`。
+
+### [x] UI-004.15 文件库右侧内容区平级结构整理
+
+优先级：P1
+
+目标：让文件库右侧操作栏、结果视图和分页在内容区保持清晰的平级结构，避免操作栏被误认为表格的一部分。
+
+范围：`src/views/FileLibrary.vue`、`tests/fileLibrary.test.js`、`tests/e2e/electron.spec.js` 和本任务记录；不修改后端接口、数据适配器、文件操作逻辑或 `src/stores/printerStore.js.backup`。
+
+工作内容：
+
+- 移除包裹操作栏、状态、文件视图和分页的 `.file-library-results` 容器。
+- 让操作栏、加载/错误/空状态、网格/表格视图和分页成为 `.file-library-main` 的直接子级，并继续保持表格单一滚动容器。
+- 保留 TDesign Table、TDesign Empty、TDesign Alert 的原有交互和视觉语义；加载失败且已有数据时只显示错误提示并保留已有列表。
+- 补充源码和 Electron DOM 层级断言，覆盖列表、分页、滚动和右键菜单视口避让行为。
+
+验收：
+
+- 操作栏、结果表格/网格和分页不再共享结果包裹层，视觉上分属独立区域。
+- 列表模式仍可滚动，网格模式仍可展示，加载、空数据和已有数据错误状态不互相覆盖。
+- 右键菜单在窗口底部触发时允许按视口边界向上避让，但仍保持在鼠标附近可见区域。
+- 完成 `npm test`（155/155）、`npm run test:e2e`（9/9）、`npm run test:electron`（3/3）、`npm run lint`、`npm run build`、`npm run build:desktop`。
+
+完成记录：文件库右侧移除结果包裹层，操作栏、结果视图与分页改为主内容区平级节点；加载/空态/错误态按结果状态独立呈现，保留 TDesign Table 单一滚动模型，并修正 Electron 右键菜单在底部视口的断言方式。
+
+验证：`npm test`（155/155）、`npm run test:e2e`（9/9）、`npm run test:electron`（3/3）、`npm run lint`、`npm run build`、`npm run build:desktop` 全部通过；构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。一次并行回归曾因两个 Playwright 项目抢占 5177 端口失败，改为串行后全部通过。
+
+Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅提交本子任务涉及的 4 个文件；提交哈希：`92d2c51`。未执行 `git push`。

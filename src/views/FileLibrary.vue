@@ -56,30 +56,30 @@
                 </t-space>
               </div>
 
-          <div class="file-library-results">
+          <div v-if="loading || (loadError && !fileList.length)" class="file-library-status-region" aria-live="polite">
             <AsyncState
-              v-if="loading || loadError"
               :loading="loading"
               :error="loadError"
               @retry="fetchData"
             />
-            <t-empty v-else-if="fileList.length === 0" description="当前目录暂无文件或文件夹">
-              <template #operation>
-                <t-space>
-                  <t-button size="small" variant="outline" @click="openCreateFolderDialog">新建文件夹</t-button>
-                  <t-button size="small" theme="primary" @click="handleUpload">上传 G-Code 文件</t-button>
-                </t-space>
-              </template>
-            </t-empty>
-            <t-alert v-if="loadError && fileList.length" theme="error" :close-btn="false" class="mb-3">
-              <template #default>{{ loadError }}</template>
-              <template #operation>
-                <t-button size="small" variant="outline" @click="fetchData">重试</t-button>
-              </template>
-            </t-alert>
-            <div v-if="fileList.length" class="file-library-list">
-      <!-- 网格视图 -->
-      <div v-if="viewMode === 'grid'" class="file-grid-view app-scroll-region">
+          </div>
+          <t-empty v-else-if="fileList.length === 0" class="file-library-empty" description="当前目录暂无文件或文件夹">
+            <template #operation>
+              <t-space>
+                <t-button size="small" variant="outline" @click="openCreateFolderDialog">新建文件夹</t-button>
+                <t-button size="small" theme="primary" @click="handleUpload">上传 G-Code 文件</t-button>
+              </t-space>
+            </template>
+          </t-empty>
+          <t-alert v-if="loadError && fileList.length" theme="error" :close-btn="false" class="mb-3">
+            <template #default>{{ loadError }}</template>
+            <template #operation>
+              <t-button size="small" variant="outline" @click="fetchData">重试</t-button>
+            </template>
+          </t-alert>
+
+          <!-- 网格视图 -->
+          <div v-if="fileList.length && viewMode === 'grid'" class="file-grid-view app-scroll-region">
         <!-- 文件夹 -->
         <div
           v-for="file in folderList"
@@ -228,7 +228,7 @@
       </div>
 
       <!-- 列表视图 -->
-      <div v-else class="file-table-view">
+          <div v-if="fileList.length && viewMode === 'list'" class="file-table-view">
         <TdTable :data="fileRows" row-key="id" :loading="loading" height="100%" @selection-change="handleSelectionChange"
           @row-click="handleTableRowClick" border style="width: 100%">
           <TdTableColumn type="selection" width="50" align="center" :check-props="getRowCheckProps" />
@@ -319,14 +319,12 @@
             </template>
           </TdTableColumn>
         </TdTable>
-            </div>
           </div>
 
           <div v-if="fileList.length > 0" class="file-library-pagination">
             <t-pagination v-model:current="pagination.pageNum" v-model:pageSize="pagination.pageSize"
               :total="pagination.total" :show-page-size="false"
               @change="handlePageChange" />
-          </div>
           </div>
           </section>
         </t-content>
@@ -1440,15 +1438,17 @@ onMounted(() => {
   min-width: 0;
 }
 
-.file-library-results {
+.file-library-status-region,
+.file-library-empty {
   display: flex;
   flex: 1 1 0%;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   min-width: 0;
   min-height: 0;
 }
 
-.file-library-list,
 .file-table-view {
   display: flex;
   flex: 1 1 0%;
@@ -1456,9 +1456,6 @@ onMounted(() => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-}
-
-.file-table-view {
   background: var(--td-bg-color-container);
   border: 1px solid var(--td-component-border);
   border-radius: var(--td-radius-medium);
@@ -1503,6 +1500,7 @@ onMounted(() => {
 
 .file-grid-view {
   display: grid;
+  flex: 1 1 0%;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
   gap: var(--app-spacing-3);
   align-content: start;
@@ -1789,10 +1787,6 @@ onMounted(() => {
     gap: var(--app-spacing-2);
     margin-bottom: var(--app-spacing-2);
     padding-bottom: var(--app-spacing-2);
-  }
-
-  .file-library-list {
-    min-height: 64px;
   }
 
 }
