@@ -1,6 +1,6 @@
 # FabMatrix 独立前端 UI 整改设计
 
-版本：v1.1
+版本：v1.2
 对应需求：.kiro/specs/farm-ui-remediation/requirements.md  
 视觉基线：FRONTEND_UI_SPECIFICATION.md
 
@@ -20,7 +20,7 @@ Electron 窗口不改变业务页面的信息架构。统一结构仍为：
 
 - `Content View` 是页面纵向滚动 owner。
 - `Table` 只有内容区横向/局部纵向滚动，分页位于滚动内容之外。
-- 文件库结果区、Drawer Body 可以独立滚动，但每个区域只能有一个实际滚动容器；文件库不再设置常驻目录树滚动容器。
+- 文件库目录树、结果区和 Drawer Body 可以独立滚动，但每个区域只能有一个实际滚动容器；目录树滚动只存在于固定高度的 `TAside` 内，不能再叠加页面级或工作区级滚动。
 - 800px 宽度下隐藏低优先级表格列或允许明确横向滚动，不压缩核心操作到不可点击。
 - Drawer Header/Footer 不随 Body 内容滚动；关闭后恢复触发按钮焦点。
 
@@ -106,7 +106,7 @@ App Layout → Sidebar → Main Layout → Header → Content → Breadcrumb（�
 
 - App Shell 负责布局高度。
 - 页面内容默认自然增长。
-- 文件库 Table/Grid 结果区和 Drawer Body 是允许局部滚动的区域；不新增目录树滚动区域。
+- 文件库 `TTree`、Table/Grid 结果区和 Drawer Body 是允许局部滚动的区域；目录树和结果区各自只能有一个滚动容器。
 - 每个局部区域只有一个滚动容器。
 - 分页位于表格滚动区域之外。
 
@@ -146,7 +146,13 @@ App Layout → Sidebar → Main Layout → Header → Content → Breadcrumb（�
 
 ### 5.3 文件库
 
-页面结构：Page Header、TDesign Card 工作区、inline Form 筛选栏、面包屑、文件 Table 或 Grid、分页和文件详情 Drawer。页面不保留常驻左侧目录树，避免目录树和当前目录结果重复。
+页面结构：Page Header、TDesign Card 工作区、`TLayout`、`TAside` 文件夹树、`TContent` 当前目录工作区、inline Form 筛选栏、面包屑、文件 Table 或 Grid、分页和文件详情 Drawer。
+
+左侧文件夹树是目录导航，不是第二份文件结果列表。树数据来自完整的 `GET /api/v1/print-files/tree`，只渲染 `folder=true` 的节点；文件节点及其文件元数据不在树中展示。根节点“我的文件夹”是前端导航名称，选中根节点时向后端传 `parentId=null`。
+
+右侧结果区只请求当前目录的直接子节点，使用 `POST /api/v1/print-files/page` 的 `parentId`、`fileName`、`materialType` 和分页字段。不得把完整树中的文件节点再次渲染为右侧结果。若当前目录接口返回直接子文件夹，必须保留其正式返回语义；前端不得在分页完成后自行过滤并伪造 `total`。严格的“仅文件”结果需要后端提供正式筛选契约。
+
+TDesign 组合使用 `TLayout`、`TAside`、`TContent`、`TTree`、`TInput`、`TButton`、`TBreadcrumb`、`TTable`、`TPagination`、`TEmpty`、`TAlert` 和 `TLoading`。文件夹树支持 `activable`、`hover`、`expanded` 和 `keys`，不启用 `checkable` 或 `draggable`；当前后端没有重命名、移动、复制和分享接口，树节点不得显示这些操作。
 
 默认以 TDesign Table 处理大量文件，Grid 作为用户选择。Table 第一列统一承载文件夹/文件图标、名称和类型；文件夹显示目录专属操作，文件显示打印、下载、删除等正式操作，详情通过行或卡片点击进入 Drawer。Grid 使用紧凑 TDesign Card，文件夹不复用文件的耗时、耗材和成功率字段，不为缺失字段填充默认值。
 

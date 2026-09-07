@@ -1201,9 +1201,60 @@ Git 检查：提交前执行 `git status --short`、`git diff --check`，仅暂�
 
 提交：完成最终检查后创建独立本地提交 `style: 修复文件库控制栏默认间距`，不执行 `git push`。
 
+### [ ] UI-004.12 文件夹树与当前目录联动重构
+
+优先级：P0
+
+目标：按照最新文件管理工作流恢复左侧文件夹树，使用真实目录树作为导航，右侧只承载当前 `parentId` 对应的直接目录结果；解决文件夹导航缺失、完整树与分页结果职责混淆以及文件库布局不符合参考工作台的问题。
+
+说明：UI-004.6 中“移除常驻目录树”的完成记录属于此前设计基线。本任务作为最新需求的显式覆盖，只恢复文件夹导航，不恢复第二份文件结果列表；不得回写或删除 UI-004.6 的历史记录。
+
+范围：
+
+- `src/views/FileLibrary.vue`
+- 新增必要的文件夹树组件，例如 `src/components/file/FileFolderTree.vue`
+- `src/api/printFile.js`（仅在需要补充已有正式接口适配时修改，不新增后端接口）
+- `tests/fileLibrary.test.js`
+- `tests/e2e/browser.spec.js`、`tests/e2e/electron.spec.js` 中的文件库场景
+- 本任务记录
+
+工作内容：
+
+- 使用 TDesign `TLayout`、`TAside`、`TContent` 构建文件库左右工作区；左侧宽度使用项目语义尺寸，目标约 208px，不通过自绘卡片模拟另一套布局。
+- 使用真实 `GET /api/v1/print-files/tree` 加载完整 `FileNodeVO[]`；文件夹树只保留 `folder=true` 的节点，保留真实 `id/name/parentId/children` 层级，不把文件节点或内部存储字段渲染到树中。
+- 根目录使用前端导航名称“我的文件夹”，不作为后端字段发送；根节点对应 `parentId=null`，文件夹节点对应其真实 ID。
+- 使用 TDesign `TTree` 的 `activable`、`hover`、`expanded`、`keys` 和必要的 `maxHeight`；不启用 `checkable`、`draggable`，不展示后端未提供的重命名、移动、复制、分享操作。
+- 使用 TDesign `TInput` 完成文件夹树本地搜索；搜索只作用于已加载的树数据，并保留匹配节点的父级路径，不调用未定义的树搜索接口。
+- 点击树节点、根目录或面包屑时，统一更新 `currentParentId`、路径状态、分页状态和右侧查询；右侧通过正式 `POST /api/v1/print-files/page` 携带 `parentId` 读取当前目录结果。
+- 完整目录树只作为左侧导航来源，不能将树中的文件节点再次渲染到右侧。右侧若收到当前目录的直接子文件夹，必须遵从分页接口正式结果，不在前端过滤后伪造分页总数；若产品要求严格“仅文件”，记录为后端筛选契约缺口，不猜测接口。
+- 新建文件夹成功后刷新目录树和当前目录结果；刷新失败保留已有结果并在对应区域展示 TDesign `TAlert` 与重试入口。
+- 左侧树覆盖加载中、空树、加载失败和当前节点不存在状态；右侧覆盖列表加载、空目录、无搜索结果、刷新失败、分页和详情 Drawer 状态。
+- 将文件库页面中与目录树强耦合的状态和展示逻辑拆分到独立组件，主页面保留 API 调用协调、当前目录状态、上传、删除、详情和创建任务流程。
+- 保留现有 Table 默认、Grid 可选、文件详情 Drawer、上传、删除、右键菜单和创建任务能力，不能因为恢复目录树而改变已有正式接口字段或业务动作。
+
+真实契约依据：
+
+- `GET /api/v1/print-files/tree` 返回完整树，节点字段为 `id`、`parentId`、`folder`、`name`、`fileSize`、`materialType`、`createdAt`、`children`。
+- `POST /api/v1/print-files/page` 支持 `pageNum`、`pageSize`、`fileName`、`materialType`、`parentId`。
+- `POST /api/v1/print-files/folder/create` 支持 `parentId` 和 `folderName`。
+- 当前真实开发数据已验证根目录存在 2 个文件夹和 9 个文件，两个文件夹分别可通过 `parentId` 查询到 4 个文件。
+
+验收：
+
+- 登录后文件库左侧显示真实文件夹树、搜索框和新建文件夹入口；树不显示文件节点，不产生第二份文件列表。
+- 选中根目录、一级文件夹和二级文件夹时，右侧请求的 `parentId` 分别为 `null` 或对应真实 ID；面包屑、树高亮、分页和右侧结果保持同步。
+- 根目录及各文件夹的右侧结果来自真实分页接口，不读取完整树中的文件数据冒充列表；文件字段、数量和分页不被前端伪造。
+- 树和右侧结果分别有清晰的局部滚动边界；外层页面不出现第三层滚动，分页不随表格内容滚动。
+- 覆盖树加载、树为空、树失败重试、当前目录为空、搜索无结果、目录创建后刷新、目录切换竞态和详情 Drawer 关闭焦点恢复。
+- Electron 使用实际窗口内容尺寸 `800×560`、`1024×640`、`1200×760` 验证；浏览器覆盖 `375×812`、`768×1024`、`1440×900`、`1920×855`。
+- 不新增重命名、移动、复制、分享等未在当前后端契约中存在的操作，不修改后端代码。
+- 完成 `npm test`、相关浏览器/Electron Playwright、`npm run lint`、`npm run build`、`npm run build:desktop`，并执行 `git status --short`、`git diff --check` 和暂存后的 `git diff --cached --check`。
+
+完成后提交：`refactor: 重构文件夹树与当前目录联动`。
+
 ### 8.6 UI-004 执行顺序与统一约束
 
-`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6 → UI-004.7 → UI-004.8 → UI-004.9 → UI-004.10 → UI-004.11`
+`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6 → UI-004.7 → UI-004.8 → UI-004.9 → UI-004.10 → UI-004.11 → UI-004.12`
 
 - UI-004 是独立文件库 UI/UX 重写任务，不属于 `farm-ui-v2`，不回写 UI-001、UI-002、UI-003 的历史状态。
 - 所有文件数据必须来自 API_HANDOFF、运行时 OpenAPI 和现有数据适配器；运行时泛型 schema 与正式文档冲突时记录并暂停相关猜测。
