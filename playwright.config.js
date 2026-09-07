@@ -1,5 +1,8 @@
 import { defineConfig } from '@playwright/test'
 
+const browserPort = process.env.PW_BROWSER_PORT || '5183'
+const browserBaseURL = 'http://127.0.0.1:' + browserPort
+
 export default defineConfig({
   testDir: './tests/e2e',
   outputDir: './test-results/playwright',
@@ -21,7 +24,7 @@ export default defineConfig({
     {
       name: 'browser',
       testMatch: '**/browser.spec.js',
-      use: { browserName: 'chromium' }
+      use: { browserName: 'chromium', baseURL: browserBaseURL }
     },
     {
       name: 'electron',
@@ -34,9 +37,9 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'npm.cmd run dev:mock -- --host 127.0.0.1 --port 5173',
-      url: 'http://127.0.0.1:5173/login',
-      reuseExistingServer: true,
+      command: 'npm.cmd run dev:mock -- --host 127.0.0.1 --port ' + browserPort,
+      url: browserBaseURL + '/login',
+      reuseExistingServer: false,
       timeout: 120000
     },
     {

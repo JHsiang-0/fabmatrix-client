@@ -4,9 +4,12 @@ import fs from 'node:fs'
 
 const source = fs.readFileSync(new URL('../src/views/FileLibrary.vue', import.meta.url), 'utf8')
 const detailSource = fs.readFileSync(new URL('../src/components/file/FileDetailDrawer.vue', import.meta.url), 'utf8')
+const folderTreeSource = fs.readFileSync(new URL('../src/components/file/FileFolderTree.vue', import.meta.url), 'utf8')
 
-test('文件中心使用正式分页契约并提供单一主工作区导航', () => {
-  assert.doesNotMatch(source, /getFileTree|<t-tree|handleTreeClick|file-library-sidebar|file-library-tree/)
+test('文件中心使用正式分页契约并提供文件夹树与单一主工作区', () => {
+  assert.match(source, /<FileFolderTree[\s\S]*:current-parent-id="currentParentId"[\s\S]*@select="handleFolderSelect"[\s\S]*@create="openCreateFolderDialog"/)
+  assert.match(source, /<t-aside width="208px" class="file-library-sidebar">/)
+  assert.match(source, /<t-content class="file-library-content">/)
   assert.match(source, /parentId: currentParentId\.value/)
   assert.match(source, /const navigateToRoot = \(\)/)
   assert.match(source, /const navigateToFolder = \(folder\)/)
@@ -17,6 +20,23 @@ test('文件中心使用正式分页契约并提供单一主工作区导航', ()
   assert.match(source, /class="file-library-results"/)
   assert.doesNotMatch(source, /class="file-library-content-card"/)
   assert.match(source, /const refreshLibrary = \(\) => fetchData\(\)/)
+})
+
+test('文件夹树只使用正式树接口并保留根目录、父级路径和错误恢复', () => {
+  assert.match(source, /import FileFolderTree from '@\/components\/file\/FileFolderTree\.vue'/)
+  assert.match(folderTreeSource, /import \{ getFileTree \} from '@\/api\/printFile'/)
+  assert.match(folderTreeSource, /await getFileTree\(\)/)
+  assert.match(folderTreeSource, /const ROOT_VALUE = '__root__'/)
+  assert.match(folderTreeSource, /label: '我的文件夹'/)
+  assert.match(folderTreeSource, /aria-label="新建文件夹"/)
+  assert.match(folderTreeSource, /@click="emit\('create'\)"/)
+  assert.match(folderTreeSource, /Array\.isArray\(folder\.children\)[\s\S]*folder\.children\.filter\(isFolder\)/)
+  assert.match(folderTreeSource, /activable[\s\S]*hover[\s\S]*expand-on-click-node/)
+  assert.match(folderTreeSource, /@click="handleTreeClick"/)
+  assert.match(folderTreeSource, /emit\('select', \{ id: null, path: \[\] \}\)/)
+  assert.match(folderTreeSource, /<t-alert v-if="error" theme="error"/)
+  assert.match(folderTreeSource, /@click="refresh">重试<\/t-button>/)
+  assert.doesNotMatch(folderTreeSource, /checkable|draggable|allow-drop|onDrop/)
 })
 
 test('文件中心不伪造材料和统计值，并覆盖上传删除结果态', () => {

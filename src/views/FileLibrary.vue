@@ -24,7 +24,17 @@
     </PageHeader>
 
     <t-card bordered class="file-library-workspace app-page-card" aria-label="文件工作台">
-      <section class="file-library-main" aria-label="当前目录文件列表">
+      <t-layout class="file-library-layout">
+        <t-aside width="208px" class="file-library-sidebar">
+          <FileFolderTree
+            ref="folderTreeRef"
+            :current-parent-id="currentParentId"
+            @select="handleFolderSelect"
+            @create="openCreateFolderDialog"
+          />
+        </t-aside>
+        <t-content class="file-library-content">
+          <section class="file-library-main" aria-label="当前目录文件列表">
           <t-form layout="inline" class="file-library-filter-form" aria-label="文件筛选条件">
             <t-form-item class="file-library-filter-form__path">
               <t-breadcrumb separator="/">
@@ -355,7 +365,9 @@
               @change="handlePageChange" />
           </div>
           </div>
-      </section>
+          </section>
+        </t-content>
+      </t-layout>
     </t-card>
 
     <!-- 文件上传对话框 -->
@@ -574,6 +586,7 @@ import { createPrintJob } from '@/api/job'
 import { getPrinterList } from '@/api/printer'
 import { formatDuration, formatFileSize } from '@/utils/formatters'
 import FileDetailDrawer from '@/components/file/FileDetailDrawer.vue'
+import FileFolderTree from '@/components/file/FileFolderTree.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import IconFolder from '@/components/icons/IconFolder.vue'
 import AsyncState from '@/components/AsyncState.vue'
@@ -638,6 +651,7 @@ watch(isBatchMode, enabled => {
 // 文件夹导航状态
 const currentParentId = ref(null)
 const breadcrumbs = ref([])
+const folderTreeRef = ref(null)
 
 // 新建文件夹表单
 const folderForm = reactive({
@@ -790,17 +804,33 @@ const navigateToRoot = () => {
   fetchData()
 }
 
+const handleFolderSelect = selection => {
+  currentParentId.value = selection?.id ?? null
+  breadcrumbs.value = Array.isArray(selection?.path)
+    ? selection.path.map(folder => ({ ...folder }))
+    : []
+  pagination.pageNum = 1
+  fetchData()
+}
+
 /**
  * 导航到指定文件夹
  */
 const navigateToFolder = (folder) => {
-  currentParentId.value = folder.id
-  breadcrumbs.value.push({
-    id: folder.id,
-    name: folder.originalName
+  const folderId = folder?.id
+  if (folderId === undefined || folderId === null) return
+
+  const breadcrumb = {
+    id: String(folderId),
+    name: folder.originalName || folder.name || `文件夹 ${folderId}`
+  }
+  const currentIndex = breadcrumbs.value.findIndex(item => String(item.id) === String(folderId))
+  handleFolderSelect({
+    id: folderId,
+    path: currentIndex >= 0
+      ? breadcrumbs.value.slice(0, currentIndex + 1)
+      : [...breadcrumbs.value, breadcrumb]
   })
-  pagination.pageNum = 1
-  fetchData()
 }
 
 /**
@@ -835,6 +865,7 @@ const handleCreateFolder = async () => {
     })
     message.success('文件夹创建成功')
     createFolderDialogVisible.value = false
+    await folderTreeRef.value?.refresh()
     await refreshLibrary()
   } catch (error) {
     console.error('创建文件夹失败:', error)
@@ -1403,6 +1434,31 @@ onMounted(() => {
   overflow: hidden;
 }
 
+.file-library-layout {
+  display: flex;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.file-library-sidebar {
+  display: flex;
+  flex: 0 0 208px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.file-library-content {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .file-library-workspace :deep(.t-card__body) {
   display: flex;
   flex-direction: column;
@@ -1883,6 +1939,21 @@ onMounted(() => {
 }
 
 @media (max-width: 640px) {
+  .file-library-layout {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .file-library-sidebar {
+    flex: 0 0 240px;
+    width: 100%;
+  }
+
+  .file-library-content {
+    flex: 1 1 auto;
+    min-height: 420px;
+  }
+
   .file-library-page-toolbar {
     align-items: stretch;
   }

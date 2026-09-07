@@ -101,7 +101,7 @@ for (const viewport of viewports) {
       for (const item of pages) {
         await openSidebarItem(page, viewport.width, item.label)
         await expect(page).toHaveURL(new RegExp(`${item.path.replaceAll('/', '\\/')}$`))
-        await expect(page.getByRole('main')).toContainText(item.text)
+        await expect(page.locator('.app-content')).toContainText(item.text)
         await expect(page.getByRole('button', { name: '消息通知', exact: true })).toBeVisible()
         await assertNoViewportOverflow(page)
         await page.screenshot({ path: testInfo.outputPath(`${item.path.slice(1).replaceAll('/', '-')}-${viewport.width}.png`) })

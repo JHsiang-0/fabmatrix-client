@@ -1201,7 +1201,7 @@ Git 检查：提交前执行 `git status --short`、`git diff --check`，仅暂�
 
 提交：完成最终检查后创建独立本地提交 `style: 修复文件库控制栏默认间距`，不执行 `git push`。
 
-### [ ] UI-004.12 文件夹树与当前目录联动重构
+### [x] UI-004.12 文件夹树与当前目录联动重构
 
 优先级：P0
 
@@ -1251,6 +1251,30 @@ Git 检查：提交前执行 `git status --short`、`git diff --check`，仅暂�
 - 完成 `npm test`、相关浏览器/Electron Playwright、`npm run lint`、`npm run build`、`npm run build:desktop`，并执行 `git status --short`、`git diff --check` 和暂存后的 `git diff --cached --check`。
 
 完成后提交：`refactor: 重构文件夹树与当前目录联动`。
+
+完成记录：新增 FileFolderTree，通过正式 GET /api/v1/print-files/tree 加载当前用户可见的目录树，仅保留文件夹节点；使用 TDesign TLayout、TAside、TContent、TTree、TInput、TAlert、TEmpty 和 TLoading 建立左侧目录导航。根节点使用前端标签“我的文件夹”并映射 parentId=null，目录树支持本地搜索、父级路径保留、激活态、展开态、刷新、创建入口、空态和失败重试。右侧继续只通过正式 POST /api/v1/print-files/page 携带当前 parentId 查询目录结果，未从完整树复制文件数据或伪造分页；面包屑、目录树、分页和列表/网格切换保持同步。新建目录成功后同时刷新目录树和当前目录，保留文件上传、删除、下载、详情、打印、右键菜单和创建任务流程，并明确不展示后端未提供的重命名、移动、复制、分享动作。
+
+修改文件：src/components/file/FileFolderTree.vue、src/views/FileLibrary.vue、tests/fileLibrary.test.js、tests/e2e/browser.spec.js、tests/e2e/electron.spec.js、playwright.config.js、本任务记录。
+
+用户流程影响：文件库现在以左侧真实目录树作为导航，右侧只呈现当前目录的正式分页结果；用户可从根目录、树节点、面包屑或右侧目录行进入目录，也可在左侧搜索文件夹和直接创建文件夹。桌面端和窄屏端分别使用左右布局与上下布局，目录树和结果区各自拥有明确滚动边界。
+
+API/OpenAPI 核对：未新增或修改后端接口；目录树使用 /api/v1/print-files/tree 的 id、parentId、folder、name、children，当前目录使用 /api/v1/print-files/page 的 parentId、fileName、分页字段，创建目录继续使用 /api/v1/print-files/folder/create 的 parentId、folderName。真实开发数据已验证根目录 2 个文件夹、9 个文件，两个目录各有 4 个文件。
+
+Loading/Empty/Error：目录树独立提供加载、空树和失败重试；右侧保留列表加载、空目录、查询错误、刷新重试和详情 Drawer 状态。目录切换继续以当前请求结果为准，失败时不伪造结果或总数。
+
+响应式视口：Electron Playwright 覆盖实际窗口内容尺寸 800×560、1024×640、1200×760；浏览器 Playwright 覆盖 375×812、768×1024、1440×900、1920×855。最终浏览器验收使用独立 Mock 端口 PW_BROWSER_PORT=5185，避免复用旧的非 Mock 5173 服务。
+
+测试：npm test（155/155）、PW_BROWSER_PORT=5185 npm run test:e2e（9/9）、npm run test:electron（3/3）。
+
+lint：npm run lint 通过，Oxlint 和 ESLint 均无错误。
+
+build：npm run build、npm run build:desktop 通过；保留既有 realtimeStore 动静态导入提示和大 chunk 警告。
+
+git status --short：提交前仅包含本子任务的目录树组件、文件库页面、Playwright/文件库测试和本任务记录。
+
+git diff --check：通过。
+
+提交：完成最终检查后创建独立本地提交 refactor: 重构文件夹树与当前目录联动，不执行 git push。
 
 ### 8.6 UI-004 执行顺序与统一约束
 
