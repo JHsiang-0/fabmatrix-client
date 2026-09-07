@@ -71,6 +71,7 @@ test('文件库默认使用可滚动 TDesign 列表并通过行或卡片打开�
   assert.match(source, /class="file-library-search-actions"/)
   assert.match(source, /class="file-library-search-input"/)
   assert.match(source, /\.file-library-search-input :deep\(\.t-input\)[\s\S]*background: var\(--app-surface-muted\)[\s\S]*border-color: transparent/)
+  assert.match(source, /\.file-library-filter-form :deep\(\.t-form__item\)[\s\S]*min-width: 0[\s\S]*margin-right: 0/)
   assert.match(source, /height="100%"[\s\S]*@selection-change/)
   assert.doesNotMatch(source, /calc\(100vh - 244px\)/)
   assert.match(source, /\.file-library-main[\s\S]*width: 100%/)

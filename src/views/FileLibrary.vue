@@ -1444,7 +1444,9 @@ onMounted(() => {
 
 .file-library-filter-form :deep(.t-form__item) {
   flex: 0 0 auto;
+  min-width: 0;
   margin-bottom: 0;
+  margin-right: 0;
 }
 
 .file-library-filter-form :deep(.t-form__controls) {

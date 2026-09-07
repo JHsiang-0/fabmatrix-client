@@ -1173,9 +1173,37 @@ Git 检查：提交前执行 `git status --short`、`git diff --check`，仅暂�
 
 提交：完成最终检查后创建独立本地提交 `style: 统一文件库控制栏与搜索布局`，不执行 `git push`。
 
+### [x] UI-004.11 文件库 inline Form 默认间距修复
+
+优先级：P1
+
+目标：修复 TDesign inline Form 默认 `min-width` 和右外边距造成的文件库控制栏空白及搜索操作组被裁剪问题。
+
+范围：`src/views/FileLibrary.vue`、文件库静态测试和本任务记录；不得新增后端接口、字段或伪造业务数据。
+
+工作内容：
+
+- 显式覆盖文件库控制栏表单项的 `min-width` 和 `margin-right`，使路径、模式、视图和搜索操作按页面自定义间距参与布局。
+- 保留搜索操作组相邻、搜索框灰底无边框和窄窗口响应式换行行为。
+- 增加静态契约断言，防止 TDesign 默认 inline Form 尺寸规则回归。
+
+验收：
+
+- 桌面端控制栏从路径项开始，左侧不再保留额外 200px 空白。
+- 搜索框、查询、重置均在控制栏可视范围内，搜索框紧邻查询按钮左侧。
+- 完成 `npm test`、`npm run test:e2e`、`npm run test:electron`、`npm run test:electron:dist`、`npm run lint`、`npm run build` 和提交前 Git 检查。
+
+完成记录：显式覆盖 TDesign inline Form 表单项的 `min-width` 和右外边距，解决路径项左侧空白以及搜索操作组被推到可视区域外的问题；保留分段选择器、搜索相邻操作和响应式换行，未修改后端接口/字段/业务数据。
+
+测试：`npm test`（145/145）、`npm run test:e2e`（9/9，覆盖 375px、768px、1440px、1920px）、`npm run test:electron`（3/3）、`npm run test:electron:dist`（1/1，含 `npm run build:desktop`）、`npm run lint`、`npm run build` 全部通过。构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
+
+Git 检查：提交前执行 `git status --short`、`git diff --check`，仅暂存本子任务涉及的文件。
+
+提交：完成最终检查后创建独立本地提交 `style: 修复文件库控制栏默认间距`，不执行 `git push`。
+
 ### 8.6 UI-004 执行顺序与统一约束
 
-`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6 → UI-004.7 → UI-004.8 → UI-004.9 → UI-004.10`
+`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6 → UI-004.7 → UI-004.8 → UI-004.9 → UI-004.10 → UI-004.11`
 
 - UI-004 是独立文件库 UI/UX 重写任务，不属于 `farm-ui-v2`，不回写 UI-001、UI-002、UI-003 的历史状态。
 - 所有文件数据必须来自 API_HANDOFF、运行时 OpenAPI 和现有数据适配器；运行时泛型 schema 与正式文档冲突时记录并暂停相关猜测。
