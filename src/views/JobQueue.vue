@@ -96,6 +96,7 @@
             :data="pagedQueueData"
             :loading="queueLoading"
             style="width: 100%"
+            hover
             @selection-change="handleSelectionChange"
             @row-click="openTaskDetail"
           >
@@ -199,7 +200,7 @@
           <template #default>{{ activeError.message || activeError }}</template>
           <template #operation><t-button size="small" variant="outline" @click="fetchActive">重试</t-button></template>
         </t-alert>
-        <TdTable v-if="activePageData.length" :data="activePageData" :loading="activeLoading" class="job-queue-table" style="width: 100%" @row-click="openTaskDetail">
+        <TdTable v-if="activePageData.length" :data="activePageData" :loading="activeLoading" class="job-queue-table" style="width: 100%" hover @row-click="openTaskDetail">
           <TdTableColumn prop="id" label="任务单号" width="110" align="center"><template #default="scope"><span class="job-mono">#{{ scope.row.id }}</span></template></TdTableColumn>
           <TdTableColumn prop="fileId" label="切片文件ID" width="120" align="center" />
           <TdTableColumn prop="printerId" label="打印机ID" width="120" align="center"><template #default="scope">{{ scope.row.printerId || '未分配' }}</template></TdTableColumn>
@@ -1238,7 +1239,17 @@ onMounted(() => {
   scrollbar-width: thin;
 }
 
-.job-queue-table :deep(.t-table__body tr:hover td) { background: var(--app-primary-light); }
+.job-queue-table :deep(.t-table__body tr) {
+  transition: background-color 0.18s ease;
+}
+
+.job-queue-table :deep(.t-table__body tr:hover > td) {
+  background: var(--app-surface-hover);
+}
+
+.job-queue-table :deep(.t-table__body tr:hover > td:first-child) {
+  box-shadow: inset 3px 0 var(--app-primary);
+}
 
 .job-queue-state {
   display: flex;
@@ -1345,6 +1356,13 @@ onMounted(() => {
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius);
   background: var(--app-surface);
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.job-card:hover {
+  background: var(--app-surface-hover);
+  border-color: var(--app-primary);
+  box-shadow: var(--app-shadow);
 }
 
 .job-card--selected { border-color: var(--app-primary); background: var(--app-primary-light); }

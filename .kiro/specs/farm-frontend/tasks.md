@@ -1,5 +1,50 @@
 # 前端 Kiro 任务清单
 
+## Kiro Task UI-001.40：统一任务队列与打印历史表格悬停反馈
+
+状态：已完成（专项测试 3/3；lint/build 通过；全量任务测试保留 2 项既有失败）
+
+范围：
+
+- `src/views/JobQueue.vue`
+- `src/views/JobHistory.vue`
+- `tests/taskTableHover.test.js`
+- `.kiro/specs/farm-frontend/tasks.md`
+
+目标：
+
+- 将打印机管理界面的悬停反馈应用到待派发队列、活动打印队列和打印历史。
+- 复用 TDesign Table 的 `hover` 属性和项目语义颜色，保持任务表格视觉一致。
+- 保留任务详情、批量选择、分配、重试、重新排队、取消和优先级操作。
+- 让任务队列卡片视图同步使用相同的悬停语言。
+
+实施方案：
+
+- 为 JobQueue 的待派发表格和活动任务表格传入 `hover`。
+- 为 JobHistory 表格传入 `hover`。
+- 三处表格统一使用浅色背景、首列品牌色内侧强调线和短暂过渡，避免布局抖动。
+- 为任务队列卡片增加同源背景、边框和阴影 hover 效果。
+- 增加静态回归测试，锁定三个表格的模板属性和样式契约。
+
+验收标准：
+
+- 鼠标移入待派发队列、活动打印队列或打印历史任意行时，整行出现清晰高亮。
+- 高亮不会改变表格宽度或行高，固定操作列和现有操作按钮仍可使用。
+- 任务队列卡片视图的 hover 效果与表格视图保持一致。
+- 相关专项测试、lint、build 和 `git diff --check` 通过。
+
+完成记录：
+
+- 已为待派发队列和活动打印队列表格启用 TDesign `hover`。
+- 已为打印历史表格启用 TDesign `hover`。
+- 三类表格统一使用浅色背景、首列品牌色强调线和短暂过渡，避免布局抖动。
+- 已为任务队列卡片增加同源 hover 的背景、边框和阴影效果。
+- `node --test tests/taskTableHover.test.js` 通过（3/3）。
+- `npm run lint`、`npm run build` 和 `git diff --check` 通过。
+- 任务中心既有测试仍有 2 项静态断言失败（`job-panel`、`queueTableHeight`），与本任务无关。
+
+提交建议：`feat: 统一任务列表悬停反馈`
+
 ## Kiro Task UI-001.39：增加打印机管理表格悬停反馈
 
 状态：已完成（专项测试 8/8；lint/build 通过）

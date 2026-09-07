@@ -97,6 +97,7 @@
             :loading="loading"
             style="width: 100%"
             class="history-table"
+            hover
           >
         <TdTableColumn prop="id" label="任务ID" width="100" align="center">
           <template #default="scope">
@@ -550,6 +551,18 @@ fetchData()
 
 .history-table :deep(.t-table__content) {
   overflow: visible !important;
+}
+
+.history-table :deep(.t-table__body tr) {
+  transition: background-color 0.18s ease;
+}
+
+.history-table :deep(.t-table__body tr:hover > td) {
+  background: var(--app-surface-hover);
+}
+
+.history-table :deep(.t-table__body tr:hover > td:first-child) {
+  box-shadow: inset 3px 0 var(--app-primary);
 }
 
 .history-pagination-footer {
