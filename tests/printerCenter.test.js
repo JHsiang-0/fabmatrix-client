@@ -17,6 +17,10 @@ test('打印机中心使用正式名称和状态筛选契约', () => {
 test('打印机中心覆盖未分配设备、详情分析和正式控制入口', () => {
   assert.match(source, /getUnallocatedPrinters/)
   assert.match(source, /未分配设备抽屉/)
+  assert.match(source, /const response = await getUnallocatedPrinters\(\)/)
+  assert.match(source, /unallocatedPrinters\.value = Array\.isArray\(response\?\.data\) \? response\.data : \[\]/)
+  assert.match(source, /@close="closeUnallocatedDialog"/)
+  assert.match(source, /@click="closeUnallocatedDialog"/)
   assert.match(source, /getPrinterStatusHistory/)
   assert.match(source, /getPrinterStatistics/)
   assert.match(source, /<DeviceDetailDrawer/)

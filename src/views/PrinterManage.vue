@@ -369,7 +369,13 @@
     </t-dialog>
 
     <!-- 未分配设备抽屉 -->
-    <t-drawer v-model:visible="unallocatedDialogVisible" header="未分配设备" size="720px" destroy-on-close>
+    <t-drawer
+      v-model:visible="unallocatedDialogVisible"
+      header="未分配设备"
+      size="720px"
+      destroy-on-close
+      @close="closeUnallocatedDialog"
+    >
       <AsyncState
         v-if="unallocatedLoading || unallocatedError || unallocatedPrinters.length === 0"
         :loading="unallocatedLoading"
@@ -394,7 +400,7 @@
         </template>
       </t-table>
       <template #footer>
-        <t-button @click="unallocatedDialogVisible = false">关闭</t-button>
+        <t-button @click="closeUnallocatedDialog">关闭</t-button>
       </template>
     </t-drawer>
 
@@ -1134,13 +1140,21 @@ const openUnallocatedDialog = () => {
 const loadUnallocatedPrinters = async () => {
   unallocatedLoading.value = true
   unallocatedError.value = ''
+  unallocatedPrinters.value = []
   try {
-    unallocatedPrinters.value = await getUnallocatedPrinters()
+    const response = await getUnallocatedPrinters()
+    unallocatedPrinters.value = Array.isArray(response?.data) ? response.data : []
   } catch (error) {
     unallocatedError.value = error?.message || '未分配设备加载失败，请重试'
   } finally {
     unallocatedLoading.value = false
   }
+}
+
+const closeUnallocatedDialog = () => {
+  unallocatedDialogVisible.value = false
+  unallocatedPrinters.value = []
+  unallocatedError.value = ''
 }
 
 const goToDashboard = () => {

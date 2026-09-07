@@ -1,5 +1,47 @@
 # 前端 Kiro 任务清单
 
+## Kiro Task UI-001.38：修复打印机管理未分配设备抽屉数据与关闭交互
+
+状态：已完成（专项测试 6/6；lint/build 通过；全量测试保留 3 项既有失败）
+
+范围：
+
+- `src/views/PrinterManage.vue`
+- `tests/printerCenter.test.js`
+- `.kiro/specs/farm-frontend/tasks.md`
+
+目标：
+
+- 修复未分配设备接口响应对象未读取 `data` 数组，导致抽屉表格无数据的问题。
+- 统一未分配设备抽屉的加载、空数据、错误、重试和关闭状态。
+- 确保底部“关闭”按钮、抽屉自身关闭事件和重新打开流程可用。
+- 增加回归断言，防止接口响应层级和关闭事件再次退化。
+
+实施方案：
+
+- 在加载方法中读取 `response.data`，并通过数组校验后传给 TDesign Table。
+- 请求开始时清空旧数据，保留 `AsyncState` 的 Loading、Empty、Error 和 Retry 展示。
+- 将关闭逻辑提取为 `closeUnallocatedDialog`，统一清理可见状态、列表和错误信息。
+- 通过 `@close` 和底部按钮共同调用关闭方法。
+
+验收标准：
+
+- 点击“未分配设备”后，接口返回设备时显示 TDesign 表格。
+- 无设备时显示“暂无未分配设备”，请求失败时可点击“重试”。
+- 点击底部“关闭”或抽屉关闭入口后，抽屉能够关闭且下次打开重新请求。
+- 专项测试、lint、build 和 `git diff --check` 通过。
+
+完成记录：
+
+- 已将未分配设备响应解析为 `response.data` 数组，并增加数组兜底。
+- 已统一抽屉关闭方法，接入 TDesign Drawer 的 `close` 事件和底部关闭按钮。
+- 已在加载时清理旧列表，保持加载、空态、错误和重试状态正确切换。
+- `node --test tests/printerCenter.test.js` 通过（6/6）。
+- `npm run lint`、`npm run build` 和 `git diff --check` 通过。
+- `npm test` 通过 164 项，保留 3 项与本任务无关的任务中心/UI 既有静态断言失败。
+
+提交建议：`fix: 修复未分配设备抽屉数据与关闭交互`
+
 ## Kiro Task UI-001.37：优化看板区域切换状态与头部操作区
 
 状态：已完成（专项验证通过；全量测试保留 3 项既有失败）
