@@ -1308,10 +1308,37 @@ Git 检查与提交：提交前执行 `git status --short`、`git diff --check`�
 
 ### 8.6 UI-004 执行顺序与统一约束
 
-`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6 → UI-004.7 → UI-004.8 → UI-004.9 → UI-004.10 → UI-004.11 → UI-004.12 → UI-004.13`
+`UI-004.0 → UI-004.1 → UI-004.2 → UI-004.3 → UI-004.4 → UI-004.5 → UI-004.6 → UI-004.7 → UI-004.8 → UI-004.9 → UI-004.10 → UI-004.11 → UI-004.12 → UI-004.13 → UI-004.14`
 
 - UI-004 是独立文件库 UI/UX 重写任务，不属于 `farm-ui-v2`，不回写 UI-001、UI-002、UI-003 的历史状态。
 - 所有文件数据必须来自 API_HANDOFF、运行时 OpenAPI 和现有数据适配器；运行时泛型 schema 与正式文档冲突时记录并暂停相关猜测。
 - TDesign 官方组件优先；页面 CSS 只负责必要的布局和数据密度，不重新创造按钮、标签、表格、弹窗和状态视觉体系。
 - 任何 `height`、`overflow`、滚动容器或 Drawer Body 修改，都必须在 Electron 三种窗口尺寸下实际验证。
 - 每个子任务完成后单独提交，不执行 `git push`；所有完成记录必须包含测试、lint、build、Git 检查、提交哈希和环境限制。
+
+### [x] UI-004.14 文件库工具栏与结果表格视觉分层修复
+
+优先级：P1
+
+目标：修复文件库右侧工具栏与表格首行视觉粘连的问题，让操作区、结果区和表格滚动区形成清晰且稳定的 TDesign 信息层级。
+
+范围：`src/views/FileLibrary.vue`、`tests/fileLibrary.test.js`、`tests/e2e/electron.spec.js` 和本任务记录；不修改后端接口、数据适配器、滚动业务逻辑或 `src/stores/printerStore.js.backup`。
+
+工作内容：
+
+- 将文件操作、视图切换和搜索工具栏改为 TDesign 语义色和边框 token 定义的独立浅色表面，保留窄窗口换行能力。
+- 为列表结果区增加独立白色表面、边框和圆角，使表头/首行不再直接连接工具栏；保留 TDesign Table 原生表格结构和单一内容滚动容器。
+- 增加源码与 Electron 布局断言，验证两个区域实际存在边界和最小间距，同时确保表格仍可滚动。
+
+验收：
+
+- 工具栏和结果表格之间至少保留 8px 视觉间距，二者具有可辨识的独立边界，首行不与工具栏粘连。
+- 不引入第二个表格滚动容器，不改变文件夹树导航、选择、右键菜单、搜索、分页及 API 查询行为。
+- 在 Electron 端文件库页面验证工具栏背景/边框、表格边框/圆角和滚动属性；窄窗口不产生异常横向溢出。
+- 完成 `npm test`、浏览器/Electron Playwright、`npm run lint`、`npm run build`、`npm run build:desktop`，并执行提交前 Git 检查。
+
+完成记录：文件库工具栏改为独立 TDesign 语义浅色表面，结果表格增加独立白色边界与圆角，并保留单一表格内容滚动；补充源码和 Electron 间距/边界断言，避免工具栏与首行再次视觉粘连。
+
+验证：`npm test`（155/155）、`npm run test:e2e`（9/9）、`npm run test:electron`（3/3）、`npm run lint`、`npm run build`、`npm run build:desktop` 全部通过；构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
+
+Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅提交本子任务涉及的 4 个文件；提交哈希：`bcbf7da`。未执行 `git push`。

@@ -132,16 +132,32 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     await expect(page.getByRole('radio', { name: '列表视图', exact: true }).locator('..')).toBeVisible()
     const fileWorkspaceMetrics = await page.evaluate(() => {
       const main = document.querySelector('.file-library-main')
+      const toolbar = document.querySelector('.file-library-filter-form')
+      const tableView = document.querySelector('.file-table-view')
       const table = document.querySelector('.file-table-view .t-table__content')
+      const toolbarStyle = toolbar ? getComputedStyle(toolbar) : null
+      const tableViewStyle = tableView ? getComputedStyle(tableView) : null
+      const toolbarRect = toolbar?.getBoundingClientRect()
+      const tableViewRect = tableView?.getBoundingClientRect()
       return {
         mainHeight: main?.clientHeight || 0,
         tableHeight: table?.clientHeight || 0,
-        tableOverflow: table ? getComputedStyle(table).overflowY : ''
+        tableOverflow: table ? getComputedStyle(table).overflowY : '',
+        toolbarBackground: toolbarStyle?.backgroundColor || '',
+        toolbarBorder: toolbarStyle?.borderTopWidth || '',
+        tableBorder: tableViewStyle?.borderTopWidth || '',
+        tableRadius: tableViewStyle?.borderTopLeftRadius || '',
+        separated: toolbarRect && tableViewRect ? tableViewRect.top - toolbarRect.bottom : 0
       }
     })
     expect(fileWorkspaceMetrics.mainHeight).toBeGreaterThan(0)
     expect(fileWorkspaceMetrics.tableHeight).toBeGreaterThan(0)
     expect(['auto', 'scroll']).toContain(fileWorkspaceMetrics.tableOverflow)
+    expect(fileWorkspaceMetrics.toolbarBackground).not.toBe('rgba(0, 0, 0, 0)')
+    expect(fileWorkspaceMetrics.toolbarBorder).toBe('1px')
+    expect(fileWorkspaceMetrics.tableBorder).toBe('1px')
+    expect(fileWorkspaceMetrics.tableRadius).not.toBe('0px')
+    expect(fileWorkspaceMetrics.separated).toBeGreaterThanOrEqual(8)
     await page.getByRole('button', { name: '新建文件夹', exact: true }).first().click()
     await expect(page.locator('.t-dialog__header-content').filter({ hasText: '新建文件夹' })).toBeVisible()
     await page.getByRole('button', { name: '取消', exact: true }).last().click()

@@ -1383,8 +1383,10 @@ onMounted(() => {
   flex-wrap: nowrap;
   gap: var(--app-spacing-4);
   margin-bottom: var(--app-spacing-4);
-  padding: 0 0 var(--app-spacing-4);
-  border-bottom: 1px solid var(--app-border);
+  padding: var(--app-spacing-3) var(--app-spacing-4);
+  background: var(--td-bg-color-container-hover);
+  border: 1px solid var(--td-component-border);
+  border-radius: var(--td-radius-medium);
 }
 
 .file-library-toolbar-actions,
@@ -1454,6 +1456,12 @@ onMounted(() => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+.file-table-view {
+  background: var(--td-bg-color-container);
+  border: 1px solid var(--td-component-border);
+  border-radius: var(--td-radius-medium);
 }
 
 .file-table-view :deep(.t-table__content) {

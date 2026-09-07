@@ -89,6 +89,8 @@ test('文件库使用 TDesign 视图分段并永久显示选择列', () => {
   assert.match(source, /class="file-library-search-actions"/)
   assert.match(source, /class="file-library-search-input"/)
   assert.match(source, /\.file-library-search-input :deep\(\.t-input\)[\s\S]*background: var\(--app-surface-muted\)[\s\S]*border-color: transparent/)
+  assert.match(source, /\.file-library-filter-form[\s\S]*background: var\(--td-bg-color-container-hover\)[\s\S]*border: 1px solid var\(--td-component-border\)[\s\S]*border-radius: var\(--td-radius-medium\)/)
+  assert.match(source, /\.file-table-view \{[\s\S]*background: var\(--td-bg-color-container\)[\s\S]*border: 1px solid var\(--td-component-border\)[\s\S]*border-radius: var\(--td-radius-medium\)/)
   assert.match(source, /<TdTableColumn type="selection" width="50" align="center" :check-props="getRowCheckProps" \/>/)
   assert.match(source, /height="100%"[\s\S]*@selection-change/)
   assert.doesNotMatch(source, /calc\(100vh - 244px\)/)
