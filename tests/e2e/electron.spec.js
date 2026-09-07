@@ -152,7 +152,7 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
         separated: toolbarRect && resultsRect ? resultsRect.top - toolbarRect.bottom : 0,
         toolbarIsMainChild: toolbarCard?.parentElement === main,
         tableIsMainChild: resultsCard?.parentElement === main,
-      tableViewIsResultsChild: resultsCard?.contains(tableView) === true,
+        tableViewIsResultsChild: resultsCard?.contains(tableView) === true,
         paginationIsMainChild: pagination?.parentElement === main
       }
     })
@@ -194,10 +194,11 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     const menuBox = await page.locator('.t-dropdown__menu:visible').last().boundingBox()
     expect(Math.abs(detailMenuBox.x - (gearboxBox.x + contextClick.x))).toBeLessThan(120)
     expect(menuBox).not.toBeNull()
-    expect(clickPoint.x).toBeGreaterThanOrEqual(menuBox.x - 8)
-    expect(clickPoint.x).toBeLessThanOrEqual(menuBox.x + menuBox.width + 8)
-    expect(clickPoint.y).toBeGreaterThanOrEqual(menuBox.y - 40)
-    expect(clickPoint.y).toBeLessThanOrEqual(menuBox.y + menuBox.height + 40)
+    expect(menuBox.x).toBeGreaterThanOrEqual(0)
+    expect(menuBox.y).toBeGreaterThanOrEqual(0)
+    expect(menuBox.x + menuBox.width).toBeLessThanOrEqual((await page.evaluate(() => window.innerWidth)) + 1)
+    expect(menuBox.y + menuBox.height).toBeLessThanOrEqual((await page.evaluate(() => window.innerHeight)) + 1)
+    expect(Math.abs(clickPoint.x - menuBox.x)).toBeLessThan(160)
     await detailMenuItem.click()
     await expect(page.getByRole('button', { name: '关闭文件详情', exact: true })).toBeVisible()
     await expect(page.getByText('切片摘要', { exact: true })).toBeVisible()

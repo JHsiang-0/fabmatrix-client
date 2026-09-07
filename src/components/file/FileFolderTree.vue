@@ -7,10 +7,12 @@
       </div>
       <t-space size="small">
         <t-button
-          variant="text"
+          theme="primary"
+          variant="outline"
           shape="square"
-          size="small"
+          size="medium"
           aria-label="新建文件夹"
+          title="新建文件夹"
           @click="emit('create')"
         >
           <AddIcon />

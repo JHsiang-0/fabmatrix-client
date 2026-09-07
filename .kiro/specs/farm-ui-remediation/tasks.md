@@ -1399,3 +1399,34 @@ Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅�
 验证：`npm test`（155/155）、`npm run test:e2e`（9/9）、`npm run test:electron`（3/3）、`npm run lint`、`npm run build`、`npm run build:desktop` 全部通过；构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
 
 Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅提交本子任务涉及的 5 个文件；提交哈希：`41f85be`。未执行 `git push`。
+
+### [x] UI-004.17 文件库滚动、网格与实时搜索修复
+
+优先级：P1
+
+目标：修复 UI-004.16 后文件库结果区高度约束、网格铺开、操作入口和搜索交互回归，确保列表/图标模式在 Electron 桌面窗口中可用。
+
+范围：`src/views/FileLibrary.vue`、`src/components/file/FileFolderTree.vue`、`tests/fileLibrary.test.js`、`tests/e2e/browser.spec.js`、`tests/e2e/electron.spec.js` 和本任务记录；不修改后端接口、文件数据适配器或 `src/stores/printerStore.js.backup`。
+
+工作内容：
+
+- 将新建文件夹入口从右侧工具栏移除，保留在文件树标题区，并使用带主题的 TDesign 按钮。
+- 为结果 Card、Card body、表格视图和网格视图补齐可收缩宽高约束，恢复列表滚动并让网格按可用宽度平铺。
+- 将列表/图标切换器统一为与搜索框相同的 medium 高度，保证图标在按钮内水平垂直居中且尺寸一致。
+- 为文件名搜索增加防抖实时查询，保留回车、查询和重置操作的兼容行为，并在组件卸载时清理定时器。
+- 补充源码断言，覆盖新增按钮位置、控件尺寸、结果区高度和网格尺寸约束。
+
+验收：
+
+- 列表模式的表格内容区可独立上下滚动，页面不会被结果内容撑开。
+- 图标模式的文件卡片在结果区内按多列平铺，窗口缩放后仍能自适应。
+- 新建文件夹按钮只出现在左侧文件树区域，并具有明确的 TDesign 按钮样式。
+- 列表/图标切换按钮与搜索框等高，两个图标均在按钮内部居中。
+- 输入文件名后约 300ms 自动刷新当前目录结果；切换目录、重置和卸载不会留下重复请求或定时器。
+- 完成 `npm test`、`npm run test:e2e`、`npm run test:electron`、`npm run lint`、`npm run build` 和 `npm run build:desktop`。
+
+完成记录：新建文件夹入口移至左侧文件树并使用主色描边按钮；结果 Card 及其 body 增加可收缩高度，恢复列表单一滚动区；网格固定占满结果区并按 220px 最小宽度自适应平铺；视图切换器统一 medium 高度并将图标居中；文件名搜索增加 300ms 防抖实时查询，卸载时清理定时器。
+
+验证：`npm test`（155/155）、`npm run test:e2e`（9/9）、`npm run test:electron`（3/3）、`npm run lint`、`npm run build`、`npm run build:desktop` 全部通过；额外验证网格实际多列铺开；构建保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
+
+Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅提交本子任务涉及的 6 个文件；提交哈希：`5991b16`。未执行 `git push`。

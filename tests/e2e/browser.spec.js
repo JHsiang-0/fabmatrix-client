@@ -251,11 +251,18 @@ test('打印机和文件结果区拥有明确的滚动容器', async ({ browser 
       const style = getComputedStyle(element)
       return {
         overflowY: style.overflowY,
-        clientHeight: element.clientHeight
+        clientHeight: element.clientHeight,
+        clientWidth: element.clientWidth,
+        parentWidth: element.parentElement?.clientWidth,
+        cardWidth: element.querySelector('.file-card')?.getBoundingClientRect().width
       }
     })
     expect(['auto', 'scroll']).toContain(fileScrollMetrics.overflowY)
     expect(fileScrollMetrics.clientHeight).toBeGreaterThan(0)
+    const gridColumns = await page.locator('.file-grid-view .file-card').evaluateAll(cards => new Set(
+      cards.map(card => Math.round(card.getBoundingClientRect().left))
+    ).size)
+    expect(gridColumns).toBeGreaterThan(1)
     await assertNoViewportOverflow(page)
   } finally {
     await context.close()

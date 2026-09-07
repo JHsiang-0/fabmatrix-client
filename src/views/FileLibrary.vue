@@ -20,9 +20,6 @@
               <t-card bordered class="file-library-toolbar-card" aria-label="文件操作工具栏">
                 <div class="file-library-filter-form" aria-label="文件筛选条件">
                 <t-space class="file-library-toolbar-actions" size="small" align="center" break-line>
-                  <t-button variant="outline" theme="default" size="medium" :icon="renderIcon(FolderOpened)" @click="openCreateFolderDialog">
-                    新建文件夹
-                  </t-button>
                   <t-button theme="primary" size="medium" :icon="renderIcon(Upload)" @click="handleUpload">
                     上传 G-Code 文件
                   </t-button>
@@ -35,7 +32,7 @@
                   </t-button>
                 </t-space>
                 <t-space class="file-library-search-actions" size="small" align="center" break-line>
-                  <t-radio-group class="file-library-view-mode" v-model="viewMode" variant="default-filled" size="small" aria-label="文件视图">
+                  <t-radio-group class="file-library-view-mode" v-model="viewMode" variant="default-filled" size="medium" aria-label="文件视图">
                     <t-radio-button value="grid" aria-label="网格视图">
                       <Grid />
                     </t-radio-button>
@@ -517,7 +514,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { message, confirmMessage } from '@/utils/message'
 import { renderIcon } from '@/utils/tdesign'
 import {
@@ -530,7 +527,6 @@ import {
   ZoomInIcon as ScaleToOriginal,
   FullscreenIcon as FullScreen,
   TimeIcon as Clock,
-  FolderOpenIcon as FolderOpened,
   GridViewIcon as Grid,
   ViewListIcon as List,
   PrintIcon as Printer,
@@ -587,6 +583,7 @@ const uploadProgress = ref(0)
 const uploadError = ref('')
 const UPLOAD_BATCH_SIZE = 5
 let uploadController = null
+let searchTimer = null
 // 打印任务对话框状态
 const createJobDialogVisible = ref(false)
 const submittingJob = ref(false)
@@ -796,15 +793,28 @@ const handleCreateFolder = async () => {
  * 搜索处理
  */
 const handleSearch = () => {
+  if (searchTimer) clearTimeout(searchTimer)
   pagination.pageNum = 1
   fetchData()
 }
 
+watch(searchKeyword, () => {
+  if (searchTimer) clearTimeout(searchTimer)
+  pagination.pageNum = 1
+  searchTimer = setTimeout(() => {
+    searchTimer = null
+    fetchData()
+  }, 300)
+})
+
 const resetSearch = () => {
-  searchKeyword.value = ''
   selectedIds.value = []
   pagination.pageNum = 1
-  fetchData()
+  if (searchKeyword.value) {
+    searchKeyword.value = ''
+  } else {
+    fetchData()
+  }
 }
 
 /**
@@ -1311,6 +1321,10 @@ const handleTableRowClick = (row) => {
 onMounted(() => {
   refreshLibrary()
 })
+
+onBeforeUnmount(() => {
+  if (searchTimer) clearTimeout(searchTimer)
+})
 </script>
 
 <style scoped>
@@ -1376,6 +1390,7 @@ onMounted(() => {
 .file-library-results-card {
   display: flex;
   flex: 1 1 0%;
+  height: 0;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -1387,7 +1402,18 @@ onMounted(() => {
   width: 100%;
   min-width: 0;
   min-height: 0;
+  height: 100%;
   padding: 0;
+  overflow: hidden;
+}
+
+.file-library-results-card :deep(.t-loading__parent) {
+  display: flex;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .file-library-grid-card :deep(.t-card__body) {
@@ -1444,6 +1470,35 @@ onMounted(() => {
   width: 220px;
 }
 
+.file-library-view-mode {
+  display: inline-flex;
+  align-items: center;
+  height: var(--td-comp-size-m);
+}
+
+.file-library-view-mode :deep(.t-radio-button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: var(--td-comp-size-m);
+  padding: 0;
+}
+
+.file-library-view-mode :deep(.t-radio-button__label) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  line-height: 1;
+}
+
+.file-library-view-mode :deep(.t-radio-button__label > *) {
+  margin: 0;
+}
+
 .file-library-search-input :deep(.t-input) {
   border-color: transparent;
   background: var(--app-surface-muted);
@@ -1491,6 +1546,8 @@ onMounted(() => {
   display: flex;
   flex: 1 1 0%;
   flex-direction: column;
+  width: 100%;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -1527,7 +1584,9 @@ onMounted(() => {
 .file-grid-view {
   display: grid;
   flex: 1 1 0%;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  width: 100%;
+  height: 100%;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
   gap: var(--app-spacing-3);
   align-content: start;
   min-height: 0;
