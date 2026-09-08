@@ -5,6 +5,7 @@ import fs from 'node:fs'
 const source = fs.readFileSync(new URL('../src/views/FileLibrary.vue', import.meta.url), 'utf8')
 const detailSource = fs.readFileSync(new URL('../src/components/file/FileDetailDrawer.vue', import.meta.url), 'utf8')
 const folderTreeSource = fs.readFileSync(new URL('../src/components/file/FileFolderTree.vue', import.meta.url), 'utf8')
+const uploadDialogSource = source.match(/<t-dialog[\s\S]*?header="批量上传切片文件"[\s\S]*?<\/t-dialog>/)?.[0] || ''
 
 test('文件中心使用正式分页契约并提供文件夹树与单一主工作区', () => {
   assert.match(source, /<FileFolderTree[\s\S]*:current-parent-id="currentParentId"[\s\S]*@select="handleFolderSelect"[\s\S]*@create="openCreateFolderDialog"/)
@@ -121,6 +122,23 @@ test('文件库使用 TDesign 视图分段并永久显示选择列', () => {
 test('文件库批量上传读取批量响应 data 并识别后端成功状态', () => {
   assert.match(source, /normalizeBatchUploadResult\(queueResult\.value\.data\)/)
   assert.match(source, /isBatchUploadSuccess/)
+})
+
+test('文件库批量上传弹窗使用 TDesign 居中配置并固定视口内滚动', () => {
+  assert.match(uploadDialogSource, /placement="center"/)
+  assert.match(uploadDialogSource, /dialog-class-name="file-upload-dialog"/)
+  assert.match(uploadDialogSource, /:prevent-scroll-through="true"/)
+  assert.match(uploadDialogSource, /class="file-upload-dialog__file-list"[\s\S]*pendingUploadFiles/)
+  assert.match(uploadDialogSource, /<template #footer>[\s\S]*file-upload-dialog__footer[\s\S]*取消上传[\s\S]*开始上传/)
+  assert.match(source, /max-height: min\(320px, calc\(100vh - 300px\)\)/)
+  assert.match(source, /\.file-upload-dialog__file-list[\s\S]*overflow-y: auto/)
+})
+
+test('文件库批量上传保留横向拖拽区和精确提示文案', () => {
+  assert.match(uploadDialogSource, /class="farm-upload__content"[\s\S]*<UploadFilled \/>[\s\S]*拖拽多个切片文件到此处 或 <em>点击上传<\/em>/)
+  assert.match(uploadDialogSource, /支持 \.gcode、\.g、\.3mf、\.stl 格式，最多 100 个文件；单个文件不超过 1GB。/)
+  assert.doesNotMatch(uploadDialogSource, /批量会按单请求约 1GB 自动分组/)
+  assert.match(source, /\.farm-upload__content[\s\S]*display: flex[\s\S]*align-items: center[\s\S]*width: 100%/)
 })
 
 test('文件库网格和列表均提供 TDesign 右键辅助菜单且只映射正式动作', () => {

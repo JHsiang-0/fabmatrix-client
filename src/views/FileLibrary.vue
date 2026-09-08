@@ -271,55 +271,76 @@
       </t-layout>
 
     <!-- 文件上传对话框 -->
-    <t-dialog v-model:visible="uploadDialogVisible" header="批量上传切片文件" width="600px" :footer="false">
-      <t-upload theme="custom" draggable multiple :auto-upload="false" accept=".gcode,.g,.3mf,.stl"
-        @select-change="handleFileSelect" class="p-4">
-        <span class="farm-icon--upload">
-          <UploadFilled />
-        </span>
-        <div class="farm-upload__text">
-          拖拽多个切片文件到此处 或 <em>点击上传</em>
-        </div>
-        <template #tips>
-          <div class="farm-upload__tip">
-            支持 .gcode、.g、.3mf、.stl 格式，最多 100 个文件；单个文件不超过 1GB，批量会按单请求约 1GB 自动分组
+    <t-dialog v-model:visible="uploadDialogVisible" header="批量上传切片文件"
+      width="min(600px, calc(100vw - 32px))"
+      placement="center"
+      dialog-class-name="file-upload-dialog"
+      :prevent-scroll-through="true"
+      :footer="true"
+    >
+      <div class="file-upload-dialog__content">
+        <t-upload theme="custom" draggable multiple :auto-upload="false" accept=".gcode,.g,.3mf,.stl"
+          @select-change="handleFileSelect" class="file-upload-dialog__upload">
+          <div class="farm-upload__content">
+            <span class="farm-icon--upload">
+              <UploadFilled />
+            </span>
+            <div class="farm-upload__text">
+              拖拽多个切片文件到此处 或 <em>点击上传</em>
+            </div>
           </div>
-        </template>
-      </t-upload>
-      <div v-if="pendingUploadFiles.length" class="px-4 pb-4 space-y-3">
-        <div class="text-sm text-gray-600">待上传文件（{{ pendingUploadFiles.length }}）</div>
-        <div v-for="file in pendingUploadFiles" :key="`${file.name}-${file.lastModified}`"
-          class="flex items-center justify-between gap-3 text-sm">
-          <span class="min-w-0 truncate" :title="file.name">{{ file.name }}</span>
-          <span class="shrink-0 text-gray-500">{{ batchUploading ? `${uploadProgress}%` : '待上传' }}</span>
+          <template #tips>
+            <div class="farm-upload__tip">
+              支持 .gcode、.g、.3mf、.stl 格式，最多 100 个文件；单个文件不超过 1GB。
+            </div>
+          </template>
+        </t-upload>
+
+        <div v-if="pendingUploadFiles.length || batchUploadResults.length" class="file-upload-dialog__file-list">
+          <section v-if="pendingUploadFiles.length" class="file-upload-dialog__section" aria-label="待上传文件列表">
+            <div class="file-upload-dialog__section-title">待上传文件（{{ pendingUploadFiles.length }}）</div>
+            <div v-for="file in pendingUploadFiles" :key="`${file.name}-${file.lastModified}`"
+              class="file-upload-dialog__item">
+              <span class="file-upload-dialog__item-name" :title="file.name">{{ file.name }}</span>
+              <span class="file-upload-dialog__item-status">{{ batchUploading ? `${uploadProgress}%` : '待上传' }}</span>
+            </div>
+            <t-progress v-if="batchUploading" :percentage="uploadProgress" />
+          </section>
+
+          <section v-if="batchUploadResults.length" class="file-upload-dialog__section" aria-label="上传结果列表">
+            <t-alert
+              :theme="batchUploadResults.every(isBatchUploadSuccess) ? 'success' : 'warning'"
+              :title="batchUploadResults.every(isBatchUploadSuccess) ? '全部文件上传成功' : '部分文件未上传成功'"
+              :close-btn="false"
+            />
+            <div v-for="result in batchUploadResults" :key="`${result.index}-${result.fileName}`"
+              class="file-upload-dialog__item">
+              <span class="file-upload-dialog__item-name" :title="result.fileName">{{ result.fileName || `第 ${result.index + 1} 项` }}</span>
+              <span class="file-upload-dialog__item-status"
+                :class="isBatchUploadSuccess(result) ? 'text-green-600' : 'text-red-600'">
+                {{ isBatchUploadSuccess(result) ? '成功' : (result.message || '失败') }}
+              </span>
+            </div>
+          </section>
         </div>
-        <t-progress v-if="batchUploading" :percentage="uploadProgress" />
-        <div class="flex justify-end gap-2">
+
+        <div v-if="uploadError" class="file-upload-dialog__error">
+          <t-alert theme="error" :title="uploadError" :close-btn="false" />
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="file-upload-dialog__footer">
           <t-button variant="outline" :disabled="batchUploading" @click="handleUpload">重新选择</t-button>
           <t-button variant="outline" :disabled="!batchUploading" @click="cancelUpload">取消上传</t-button>
-          <t-button theme="primary" :loading="batchUploading" @click="submitBatchUpload">开始上传</t-button>
+          <t-button theme="primary" :loading="batchUploading"
+            :disabled="!pendingUploadFiles.length || batchUploading" @click="submitBatchUpload">
+            {{ batchUploadResults.length && pendingUploadFiles.length
+              ? `重试可重试失败项（${pendingUploadFiles.length}）`
+              : '开始上传' }}
+          </t-button>
         </div>
-      </div>
-      <div v-if="batchUploadResults.length" class="px-4 pb-4 space-y-2">
-        <t-alert
-          :theme="batchUploadResults.every(isBatchUploadSuccess) ? 'success' : 'warning'"
-          :title="batchUploadResults.every(isBatchUploadSuccess) ? '全部文件上传成功' : '部分文件未上传成功'"
-          :close-btn="false"
-        />
-        <div v-for="result in batchUploadResults" :key="`${result.index}-${result.fileName}`"
-          class="flex items-center justify-between gap-3 text-sm">
-          <span class="min-w-0 truncate" :title="result.fileName">{{ result.fileName || `第 ${result.index + 1} 项` }}</span>
-          <span :class="isBatchUploadSuccess(result) ? 'text-green-600' : 'text-red-600'">
-            {{ isBatchUploadSuccess(result) ? '成功' : (result.message || '失败') }}
-          </span>
-        </div>
-        <t-button v-if="pendingUploadFiles.length" size="small" theme="primary" @click="submitBatchUpload">
-          重试可重试失败项（{{ pendingUploadFiles.length }}）
-        </t-button>
-      </div>
-      <div v-if="uploadError" class="px-4 pb-4">
-        <t-alert theme="error" :title="uploadError" :close-btn="false" />
-      </div>
+      </template>
     </t-dialog>
 
     <!-- 新建文件夹对话框 -->
@@ -1577,6 +1598,148 @@ onBeforeUnmount(() => {
 .file-table-view :deep(.t-table) {
   min-height: 0;
   height: 100%;
+}
+
+:deep(.file-upload-dialog) {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 96px);
+  overflow: hidden;
+}
+
+:deep(.file-upload-dialog .t-dialog__body) {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+:deep(.file-upload-dialog .t-dialog__footer) {
+  flex: 0 0 auto;
+}
+
+.file-upload-dialog__content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+}
+
+:deep(.file-upload-dialog__upload) {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+:deep(.file-upload-dialog__upload .t-upload__dragger) {
+  width: 100%;
+  min-height: 112px;
+  height: auto;
+  box-sizing: border-box;
+  padding: var(--app-spacing-5) var(--app-spacing-6);
+}
+
+.farm-upload__content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  gap: var(--app-spacing-3);
+}
+
+.farm-icon--upload {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: var(--td-brand-color);
+  font-size: 32px;
+}
+
+.farm-upload__text {
+  min-width: 0;
+  margin: 0;
+  color: var(--td-text-color-primary);
+  text-align: left;
+}
+
+.farm-upload__tip {
+  margin-top: var(--app-spacing-2);
+  color: var(--td-text-color-secondary);
+  text-align: center;
+}
+
+.file-upload-dialog__file-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(320px, calc(100vh - 300px));
+  margin-top: var(--app-spacing-4);
+  overflow-y: auto;
+  padding: 0 var(--app-spacing-1) var(--app-spacing-1) 0;
+  scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
+  scrollbar-width: thin;
+}
+
+.file-upload-dialog__file-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.file-upload-dialog__file-list::-webkit-scrollbar-track {
+  background: var(--app-scrollbar-track);
+}
+
+.file-upload-dialog__file-list::-webkit-scrollbar-thumb {
+  background: var(--app-scrollbar-thumb);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.file-upload-dialog__section + .file-upload-dialog__section {
+  margin-top: var(--app-spacing-4);
+}
+
+.file-upload-dialog__section-title {
+  margin-bottom: var(--app-spacing-2);
+  color: var(--td-text-color-secondary);
+  font: var(--td-font-body-small);
+}
+
+.file-upload-dialog__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  gap: var(--app-spacing-3);
+  padding: var(--app-spacing-1) 0;
+  color: var(--td-text-color-primary);
+  font: var(--td-font-body-small);
+}
+
+.file-upload-dialog__item-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-upload-dialog__item-status {
+  flex: 0 0 auto;
+  color: var(--td-text-color-secondary);
+  white-space: nowrap;
+}
+
+.file-upload-dialog__error {
+  flex: 0 0 auto;
+  margin-top: var(--app-spacing-3);
+}
+
+.file-upload-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--app-spacing-2);
 }
 
 .file-grid-view {
