@@ -193,6 +193,11 @@ test('文件库使用 TDesign 视图分段并永久显示选择列', () => {
   assert.match(source, /@row-click="handleTableRowClick"/)
   assert.match(source, /@click="handleFileClick\(file\)"/)
   assert.match(source, /<t-card[\s\S]*class="file-card"/)
+  assert.match(source, /<t-card :bordered="false" hover-shadow class="file-card"/)
+  assert.doesNotMatch(source, /<t-card bordered hover-shadow class="file-card"/)
+  const fileCardStyle = source.match(/\.file-card \{[\s\S]*?\n\}/)?.[0] || ''
+  assert.doesNotMatch(fileCardStyle, /border/)
+  assert.doesNotMatch(source, /\.file-card:hover/)
   assert.doesNotMatch(source, /<t-button[^>]*>\s*详情\s*<\/t-button>/)
   assert.doesNotMatch(source, /<t-form layout="inline" class="file-library-filter-form"/)
   assert.doesNotMatch(source, /description="管理可见的切片文件与目录/)
@@ -217,7 +222,10 @@ test('文件库使用 TDesign 视图分段并永久显示选择列', () => {
   assert.match(source, /\.file-library-main[\s\S]*width: 100%/)
   assert.match(source, /\.file-table-view :deep\(\.t-table__content\)[\s\S]*overflow-y: auto/)
   assert.match(source, /\.file-grid-view[\s\S]*width: 100%[\s\S]*height: 100%/)
-  assert.match(source, /<Grid :size="16" \/>[\s\S]*<List :size="16" \/>/)
+  const viewModeSource = source.match(/<t-radio-group class="file-library-view-mode"[\s\S]*?<\/t-radio-group>/)?.[0] || ''
+  assert.ok(viewModeSource.indexOf('value="list"') < viewModeSource.indexOf('value="grid"'))
+  assert.match(viewModeSource, /value="list"[\s\S]*aria-label="列表视图"[\s\S]*<List :size="16" \/>/)
+  assert.match(viewModeSource, /value="grid"[\s\S]*aria-label="网格视图"[\s\S]*<Grid :size="16" \/>/)
   assert.match(source, /<TdTable :data="fileRows"[\s\S]*height="100%" hover/)
   assert.match(source, /farm-context-menu-position/)
   assert.doesNotMatch(source, /viewMode = ref\('grid'\)/)
@@ -309,6 +317,8 @@ test('文件详情抽屉使用 TDesign 关闭同步并避免旧版卡片拼装',
 
 test('文件库成功率统一使用分档 TDesign 标签，不再混入进度条', () => {
   const gridRate = source.match(/<div class="file-card__success-rate">[\s\S]*?<\/div>/)?.[0] || ''
+  const gridStats = source.match(/\.file-card__stats \{[\s\S]*?\n\}/)?.[0] || ''
+  const gridStatItems = source.match(/\.file-card__stats > div \{[\s\S]*?\n\}/)?.[0] || ''
   const tableRate = source.match(/<TdTableColumn prop="successRate"[\s\S]*?<\/TdTableColumn>/)?.[0] || ''
 
   assert.match(gridRate, /<t-tag[\s\S]*:theme="getSuccessRateTheme\(file\.successRate\)"/)
@@ -319,7 +329,14 @@ test('文件库成功率统一使用分档 TDesign 标签，不再混入进度�
   assert.match(source, /if \(rate < 50\) return 'danger'/)
   assert.match(source, /if \(rate < 80\) return 'warning'/)
   assert.match(source, /return 'success'/)
-  assert.match(source, /file-card__success-rate-tag[\s\S]*text-overflow: ellipsis/)
+  assert.match(gridStats, /display: grid/)
+  assert.match(gridStats, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
+  assert.match(gridStatItems, /align-items: center/)
+  assert.match(gridStatItems, /overflow: hidden/)
+  assert.match(gridStatItems, /white-space: nowrap/)
+  assert.match(source, /\.file-card__stat-label[\s\S]*white-space: nowrap/)
+  assert.match(source, /\.file-card__stat-value[\s\S]*white-space: nowrap/)
+  assert.match(source, /file-card__success-rate-tag[\s\S]*min-width: max-content[\s\S]*overflow: hidden[\s\S]*white-space: nowrap/)
   assert.match(source, /file-table__rate-tag[\s\S]*text-overflow: ellipsis/)
 })
 
@@ -440,7 +457,7 @@ test('新建文件夹和创建打印任务弹窗使用响应式语义布局', ()
   assert.match(createFolderDialogSource, /width="min\(400px, calc\(100vw - 32px\)\)"/)
   assert.match(createFolderDialogSource, /placement="center"/)
   assert.match(createFolderDialogSource, /dialog-class-name="create-folder-dialog"/)
-  assert.match(createFolderDialogSource, /<t-form[^>]*layout="vertical"[^>]*class="create-folder-form"/)
+  assert.match(createFolderDialogSource, /<t-form[^>]*layout="vertical"[^>]*label-align="left"[^>]*label-width="96px"[^>]*class="create-folder-form"/)
   assert.match(createFolderDialogSource, /create-folder-form__control/)
   assert.match(createFolderDialogSource, /create-folder-dialog__footer/)
   assert.match(createFolderDialogSource, /v-if="folderForm\.level === 2"[\s\S]*create-folder-form__item/)
@@ -449,7 +466,7 @@ test('新建文件夹和创建打印任务弹窗使用响应式语义布局', ()
   assert.match(createJobDialogSource, /placement="center"/)
   assert.match(createJobDialogSource, /dialog-class-name="create-job-dialog"/)
   assert.match(createJobDialogSource, /create-job-form__file-summary/)
-  assert.match(createJobDialogSource, /<t-form[^>]*layout="vertical"[^>]*class="create-job-form__fields"/)
+  assert.match(createJobDialogSource, /<t-form[^>]*layout="vertical"[^>]*label-align="left"[^>]*label-width="96px"[^>]*class="create-job-form__fields"/)
   assert.match(createJobDialogSource, /create-job-form__control--priority/)
   assert.match(createJobDialogSource, /create-job-form__tip[\s\S]*指定打印机只记录分配目标，不会跳过安全确认流程/)
   assert.match(createJobDialogSource, /create-job-form__tip[\s\S]*将为同一文件创建多个排队任务/)
@@ -458,6 +475,11 @@ test('新建文件夹和创建打印任务弹窗使用响应式语义布局', ()
 
   assert.match(source, /:deep\(\.create-folder-dialog\)[\s\S]*max-width: calc\(100vw - 32px\)/)
   assert.match(source, /\.create-folder-form[\s\S]*width: min\(100%, 320px\)[\s\S]*margin: 0 auto/)
+  assert.match(source, /label-align="left"[\s\S]*label-width="96px"/)
+  assert.equal(((createFolderDialogSource + createJobDialogSource).match(/label-width="96px"/g) || []).length, 2)
+  assert.match(source, /\.create-folder-form__control,[\s\S]*\.create-job-form__control[\s\S]*min-width: 0/)
+  assert.match(source, /\.create-folder-form__control--level,[\s\S]*justify-content: flex-start/)
+  assert.match(source, /\.create-job-form__control--priority \{[\s\S]*justify-content: flex-start/)
   assert.match(source, /\.create-job-form__file-summary[\s\S]*min-width: 0[\s\S]*box-sizing: border-box/)
   assert.match(source, /\.create-job-form__fields[\s\S]*width: min\(100%, 360px\)[\s\S]*margin: 0 auto/)
   assert.match(source, /\.create-job-form__tip[\s\S]*display: block[\s\S]*width: 100%[\s\S]*white-space: normal/)

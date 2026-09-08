@@ -39,11 +39,11 @@
                 </t-space>
                 <t-space class="file-library-search-actions" size="small" align="center" break-line>
                   <t-radio-group class="file-library-view-mode" v-model="viewMode" variant="default-filled" size="medium" aria-label="文件视图">
-                    <t-radio-button value="grid" aria-label="网格视图">
-                      <Grid :size="16" />
-                    </t-radio-button>
                     <t-radio-button value="list" aria-label="列表视图">
                       <List :size="16" />
+                    </t-radio-button>
+                    <t-radio-button value="grid" aria-label="网格视图">
+                      <Grid :size="16" />
                     </t-radio-button>
                   </t-radio-group>
                   <t-input class="file-library-search-input" v-model="searchKeyword" placeholder="搜索文件名..." clearable size="medium"
@@ -93,7 +93,7 @@
         >
           <t-dropdown :options="getContextMenuOptions(file)" trigger="context-menu" :popup-props="contextMenuPopupProps"
             @click="handleContextMenuClick($event, file)">
-            <t-card bordered hover-shadow class="file-card"
+            <t-card :bordered="false" hover-shadow class="file-card"
               :class="{ 'file-card--selected': selectedIds.includes(file.id) }"
               @click="handleFileClick(file)">
               <!-- 文件选择框始终可见，避免浏览/选择模式切换造成布局跳动。 -->
@@ -404,7 +404,7 @@
       dialog-class-name="create-folder-dialog"
       :prevent-scroll-through="true"
     >
-      <t-form :data="folderForm" :rules="folderRules" ref="folderFormRef" layout="vertical" class="create-folder-form">
+      <t-form :data="folderForm" :rules="folderRules" ref="folderFormRef" layout="vertical" label-align="left" label-width="96px" class="create-folder-form">
         <t-form-item label="文件夹名称" name="name" class="create-folder-form__item">
           <div class="create-folder-form__control">
             <t-input v-model="folderForm.name" placeholder="请输入文件夹名称" />
@@ -596,7 +596,7 @@
         </section>
 
         <!-- 表单区域 -->
-        <t-form :data="jobForm" layout="vertical" size="medium" class="create-job-form__fields">
+        <t-form :data="jobForm" layout="vertical" label-align="left" label-width="96px" size="medium" class="create-job-form__fields">
           <!-- 任务优先级 -->
           <t-form-item label="任务优先级" class="create-job-form__item">
             <div class="create-job-form__control create-job-form__control--priority">
@@ -2423,14 +2423,14 @@ onBeforeUnmount(() => {
 .create-folder-form__control--level,
 .create-job-form__control--priority {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   min-width: 0;
 }
 
 .create-folder-form__control--level :deep(.t-radio-group),
 .create-job-form__control--priority :deep(.t-radio-group) {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
   gap: var(--app-spacing-2);
   max-width: 100%;
@@ -2568,12 +2568,6 @@ onBeforeUnmount(() => {
   position: relative;
   min-width: 0;
   overflow: hidden;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.file-card:hover {
-  border-color: var(--td-brand-color-5);
-  box-shadow: var(--app-shadow);
 }
 
 .file-card :deep(.t-card__body) {
@@ -2685,9 +2679,9 @@ onBeforeUnmount(() => {
 }
 
 .file-card__stats {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
-  justify-content: space-between;
   gap: var(--app-spacing-3);
   padding: 6px;
   color: var(--app-text-secondary);
@@ -2697,32 +2691,43 @@ onBeforeUnmount(() => {
 
 .file-card__stats > div {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .file-card__stat-label {
+  flex: 0 0 auto;
   color: var(--app-text-secondary);
   font-size: 11px;
+  white-space: nowrap;
 }
 
 .file-card__stat-value {
+  flex: 0 0 auto;
   color: var(--app-text-primary);
   font-size: 13px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .file-card__success-rate {
-  display: flex !important;
-  flex: 1 1 auto;
-  align-items: center;
-  flex-direction: row !important;
-  gap: 8px !important;
+  min-width: 0;
+}
+
+.file-card__success-rate-tooltip {
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .file-card__success-rate-tag {
-  min-width: 0;
+  display: block;
+  flex: 0 1 auto;
+  min-width: max-content;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
