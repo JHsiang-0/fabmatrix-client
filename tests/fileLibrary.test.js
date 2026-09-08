@@ -330,8 +330,12 @@ test('文件详情使用紧凑无边框水平描述、底部大按钮并保护�
   assert.equal((detailSource.match(/<t-divider/g) || []).length, 3)
   assert.match(detailSource, /<t-divider class="file-detail-drawer__summary-divider"\s*\/>/)
   assert.equal((detailSource.match(/<section class="file-detail-drawer__section file-detail-drawer__info-card"/g) || []).length, 2)
-  assert.match(detailSource, /\.file-detail-drawer__info-card[\s\S]*padding: var\(--app-spacing-2\)[\s\S]*background: var\(--td-bg-color-secondarycontainer\)/)
+  assert.match(detailSource, /\.file-detail-drawer__body[\s\S]*gap: var\(--app-spacing-1\)/)
+  assert.match(detailSource, /\.file-detail-drawer :deep\(\.t-divider\)[\s\S]*height: 1px[\s\S]*min-height: 1px[\s\S]*margin: -2px 0/)
+  assert.match(detailSource, /\.file-detail-drawer__info-card[\s\S]*padding: var\(--app-spacing-1\) var\(--app-spacing-2\)[\s\S]*background: var\(--td-bg-color-secondarycontainer\)/)
   assert.match(detailSource, /\.file-detail-drawer__info-card[\s\S]*border: 1px solid var\(--td-component-border\)/)
+  assert.match(detailSource, /\.file-detail-drawer__section[\s\S]*gap: var\(--app-spacing-1\)/)
+  assert.match(detailSource, /\.file-detail-drawer__section h3[\s\S]*line-height: 1\.2/)
   for (const description of descriptions) {
     assert.match(description, /class="file-detail-drawer__descriptions"/)
     assert.match(description, /:column="3"/)
@@ -343,7 +347,9 @@ test('文件详情使用紧凑无边框水平描述、底部大按钮并保护�
     assert.match(description, /:bordered="false"/)
     assert.doesNotMatch(description, /\sbordered(?:\s|>)/)
   }
-  assert.match(detailSource, /\.file-detail-drawer__descriptions :deep\(\.t-descriptions__label\),[\s\S]*\.file-detail-drawer__descriptions :deep\(\.t-descriptions__content\)[\s\S]*min-width: 0[\s\S]*width: auto[\s\S]*max-width: 100%/)
+  assert.match(detailSource, /\.file-detail-drawer__descriptions :deep\(\.t-descriptions__body > tbody > tr > td\)[\s\S]*padding: var\(--app-spacing-1\) 0[\s\S]*line-height: 1\.25/)
+  assert.match(detailSource, /\.file-detail-drawer__descriptions :deep\(\.t-descriptions__label\)[\s\S]*min-width: 0[\s\S]*width: 1%[\s\S]*max-width: 100%[\s\S]*white-space: nowrap[\s\S]*word-break: keep-all/)
+  assert.match(detailSource, /\.file-detail-drawer__descriptions :deep\(\.t-descriptions__content\)[\s\S]*min-width: 0[\s\S]*width: auto[\s\S]*max-width: 100%/)
   assert.doesNotMatch(detailSource, /\.t-descriptions__(?:label|content)[\s\S]*max-width: 0/)
   for (const label of [
     '预计耗时', '文件大小', '耗材重量', '所需线长', '喷嘴要求', '上传时间',

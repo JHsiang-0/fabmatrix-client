@@ -253,7 +253,7 @@ const getJobStatusTagType = status => ({
   display: flex;
   min-height: 100%;
   flex-direction: column;
-  gap: var(--app-spacing-2);
+  gap: var(--app-spacing-1);
 }
 
 .file-detail-drawer__loading {
@@ -346,7 +346,7 @@ const getJobStatusTagType = status => ({
 }
 
 .file-detail-drawer__info-card {
-  padding: var(--app-spacing-2);
+  padding: var(--app-spacing-1) var(--app-spacing-2);
   background: var(--td-bg-color-secondarycontainer);
   border: 1px solid var(--td-component-border);
   border-radius: var(--td-radius-medium);
@@ -354,18 +354,21 @@ const getJobStatusTagType = status => ({
 
 .file-detail-drawer__section h3 {
   font-size: var(--td-font-size-title-small);
-  line-height: 1.3;
+  line-height: 1.2;
 }
 
 .file-detail-drawer__section-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--app-spacing-3);
+  gap: var(--app-spacing-2);
 }
 
 .file-detail-drawer :deep(.t-divider) {
-  margin: 0;
+  flex: 0 0 1px;
+  height: 1px;
+  min-height: 1px;
+  margin: -2px 0;
 }
 
 .file-detail-drawer__descriptions {
@@ -379,7 +382,20 @@ const getJobStatusTagType = status => ({
   max-width: 100%;
 }
 
-.file-detail-drawer__descriptions :deep(.t-descriptions__label),
+.file-detail-drawer__descriptions :deep(.t-descriptions__body > tbody > tr > td) {
+  padding: var(--app-spacing-1) 0;
+  line-height: 1.25;
+}
+
+.file-detail-drawer__descriptions :deep(.t-descriptions__label) {
+  min-width: 0;
+  width: 1%;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
 .file-detail-drawer__descriptions :deep(.t-descriptions__content) {
   min-width: 0;
   width: auto;
@@ -388,13 +404,18 @@ const getJobStatusTagType = status => ({
   word-break: break-word;
 }
 
+.file-detail-drawer__descriptions :deep(.t-descriptions__content > *) {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .file-detail-drawer__value {
   display: block;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.35;
+  line-height: 1.25;
   white-space: nowrap;
 }
 
