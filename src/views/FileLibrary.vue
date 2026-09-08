@@ -10,9 +10,11 @@
           <FileFolderTree
             ref="folderTreeRef"
             :current-parent-id="currentParentId"
+            :deleting-folder-id="deletingFolderId"
             @select="handleFolderSelect"
             @loaded="handleFolderTreeLoaded"
             @create="openCreateFolderDialog"
+            @delete="handleFolderDelete"
           />
         </t-card>
       </t-aside>
@@ -517,6 +519,7 @@ import {
   deleteBatchFiles,
   downloadFile,
   createFolder,
+  deleteFolder,
   getFilePreview,
   getThumbnailUrl,
   getFileJobs
@@ -587,6 +590,7 @@ const currentParentId = ref(null)
 const directoryReady = ref(false)
 const folderTreeRef = ref(null)
 const folderTreeFolders = ref([])
+const deletingFolderId = ref(null)
 const userStore = useUserStore()
 let fileRequestSequence = 0
 
@@ -808,6 +812,53 @@ const handleCreateFolder = async () => {
     message.error(error?.message || '创建文件夹失败')
   } finally {
     creatingFolder.value = false
+  }
+}
+
+/**
+ * 删除文件夹：确认、专用接口调用和目录/文件列表同步均由文件库统一处理。
+ */
+const handleFolderDelete = async folder => {
+  const id = folder?.id
+  if (id === null || id === undefined || deletingFolderId.value !== null
+    || batchDeleting.value || deletingIds.value.length > 0) return
+  if (folder.isDefault) {
+    message.warning('默认目录不可删除')
+    return
+  }
+
+  try {
+    await confirmMessage(
+      `确定删除文件夹“${folder.name || folder.originalName || id}”吗？仅删除空文件夹，不会删除其中的文件；非空目录会被拒绝。`,
+      '删除文件夹',
+      {
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+  } catch (error) {
+    if (error !== 'cancel') console.error('确认删除文件夹失败:', error)
+    return
+  }
+
+  deletingFolderId.value = id
+  const isCurrentFolder = String(currentParentId.value) === String(id)
+  try {
+    await deleteFolder(id)
+    if (isCurrentFolder) {
+      currentParentId.value = folder.parentId ?? null
+      pagination.pageNum = 1
+      selectedIds.value = []
+    }
+    await folderTreeRef.value?.refresh()
+    await refreshLibrary()
+    message.success('文件夹删除成功')
+  } catch (error) {
+    console.error('删除文件夹失败:', error)
+    message.error(error?.message || '删除文件夹失败')
+  } finally {
+    deletingFolderId.value = null
   }
 }
 

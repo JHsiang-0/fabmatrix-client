@@ -104,6 +104,17 @@ export function createFolder(data) {
 }
 
 /**
+ * 删除空文件夹；后端会拒绝默认目录和包含文件/子目录的目录。
+ * @param {number|string} id - 文件夹 ID
+ */
+export function deleteFolder(id) {
+  return request({
+    url: `/api/v1/print-files/folder/${id}`,
+    method: 'delete'
+  })
+}
+
+/**
  * 上传切片文件
  * @param {FormData} formData - 包含文件的 FormData 对象
  * @returns {Promise<{code: number, message: string, data: PrintFile}>} 上传结果

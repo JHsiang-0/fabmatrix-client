@@ -929,6 +929,18 @@ const handleCreateFolder = config => {
   return toPublicFile(folder)
 }
 
+const handleDeleteFolder = config => {
+  const id = getPath(config.url).split('/').pop()
+  const folder = getFileForSession(config, id)
+  if (!folder.folder) fail(422, 422, '目标资源不是文件夹')
+  if (folder.isDefault) fail(422, 422, '默认目录不可删除')
+  if (mockState.files.some(file => String(file.parentId) === String(folder.id))) {
+    fail(409, 409, '文件夹非空，包含文件或子目录，无法删除')
+  }
+  mockState.files.splice(mockState.files.indexOf(folder), 1)
+  return null
+}
+
 const getFileForSession = (config, id) => {
   const session = requireSession(config, ['ADMIN', 'OPERATOR'])
   const file = findFile(id)
@@ -1637,6 +1649,7 @@ const route = async config => {
   if (key === 'POST /api/v1/print-files/upload') return handleUpload(config)
   if (key === 'POST /api/v1/print-files/batch-upload') return handleBatchUpload(config)
   if (key === 'POST /api/v1/print-files/folder/create') return handleCreateFolder(config)
+  if (/^DELETE \/api\/v1\/print-files\/folder\/[^/]+$/.test(key)) return handleDeleteFolder(config)
   if (key === 'GET /api/v1/print-files/tree') return handleFileTree(config)
   if (/^GET \/api\/v1\/print-files\/[^/]+\/preview$/.test(key)) return handleFilePreview(config)
   if (/^GET \/api\/v1\/print-files\/[^/]+\/thumbnail$/.test(key)) return handleThumbnail(config)

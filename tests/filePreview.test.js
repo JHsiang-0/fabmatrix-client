@@ -102,6 +102,39 @@ test('allows the real default folder as a second-level parent but still caps dep
   )
 })
 
+test('deletes only empty non-default folders through the dedicated endpoint', async () => {
+  setupSession()
+
+  await request('DELETE', '/api/v1/print-files/folder/2', undefined, adminHeaders)
+  assert.equal(mockState.files.some(file => file.id === 2), false)
+  assert.equal(mockState.files.some(file => file.id === 20), true)
+
+  await assert.rejects(
+    request('DELETE', '/api/v1/print-files/folder/3', undefined, adminHeaders),
+    error => error.response.status === 422 && error.message === '默认目录不可删除'
+  )
+  await assert.rejects(
+    request('DELETE', '/api/v1/print-files/folder/4', undefined, operatorHeaders),
+    error => error.response.status === 422 && error.message === '默认目录不可删除'
+  )
+
+  await assert.rejects(
+    request('DELETE', '/api/v1/print-files/folder/4', undefined, adminHeaders),
+    error => error.response.status === 422 && error.message === '默认目录不可删除'
+  )
+})
+
+test('rejects non-empty folder deletion without removing its children', async () => {
+  setupSession()
+
+  await assert.rejects(
+    request('DELETE', '/api/v1/print-files/folder/1', undefined, adminHeaders),
+    error => error.response.status === 409
+  )
+  assert.equal(mockState.files.some(file => file.id === 1), true)
+  assert.equal(mockState.files.some(file => file.id === 20), true)
+})
+
 test('resolves omitted upload parents to the real default folder and validates page parents', async () => {
   setupSession()
 

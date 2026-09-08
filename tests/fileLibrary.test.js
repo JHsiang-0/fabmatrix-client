@@ -35,6 +35,11 @@ test('文件夹树只消费后端真实目录节点并保留路径和错误恢�
   assert.match(folderTreeSource, /theme="primary"[\s\S]*variant="outline"[\s\S]*size="small"[\s\S]*aria-label="新建文件夹"/)
   assert.doesNotMatch(folderTreeSource, /刷新文件夹列表|RefreshIcon|按目录查看文件/)
   assert.match(folderTreeSource, /@click="emit\('create'\)"/)
+  assert.match(folderTreeSource, /#operations="\{ node \}"/)
+  assert.match(folderTreeSource, /v-if="!node\.data\?\.isDefault"/)
+  assert.match(folderTreeSource, /aria-label="删除文件夹"/)
+  assert.match(folderTreeSource, /emit\('delete', node\.data\)/)
+  assert.match(folderTreeSource, /deletingFolderId/)
   assert.match(folderTreeSource, /Array\.isArray\(folder\.children\)[\s\S]*folder\.children\.filter\(isFolder\)/)
   assert.match(folderTreeSource, /activable[\s\S]*hover[\s\S]*expand-on-click-node/)
   assert.match(folderTreeSource, /@click="handleTreeClick"/)
@@ -58,6 +63,10 @@ test('文件中心不伪造材料和统计值，并覆盖上传删除结果态',
   assert.match(source, /retryableFiles/)
   assert.match(source, /items.length !== ids.length/)
   assert.match(source, /message\.error\(error\?\.message \|\| '删除失败'\)/)
+  assert.match(source, /deleteFolder\(id\)/)
+  assert.match(source, /仅删除空文件夹，不会删除其中的文件/)
+  assert.match(source, /currentParentId\.value = folder\.parentId \?\? null/)
+  assert.match(source, /@delete="handleFolderDelete"/)
 })
 
 test('文件库工具栏将操作、视图和搜索合并为一行', () => {

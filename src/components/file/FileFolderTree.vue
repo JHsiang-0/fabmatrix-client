@@ -52,22 +52,41 @@
       expand-on-click-node
       @click="handleTreeClick"
       @expand="handleExpand"
-    />
+    >
+      <template #operations="{ node }">
+        <t-button
+          v-if="!node.data?.isDefault"
+          class="file-folder-tree__delete"
+          theme="danger"
+          variant="text"
+          shape="square"
+          size="small"
+          :loading="String(deletingFolderId) === String(node.value)"
+          :disabled="deletingFolderId !== null && deletingFolderId !== undefined"
+          aria-label="删除文件夹"
+          :title="`删除文件夹 ${node.label}`"
+          @click.stop="emit('delete', node.data)"
+        >
+          <DeleteIcon />
+        </t-button>
+      </template>
+    </t-tree>
   </aside>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { AddIcon, SearchIcon } from 'tdesign-icons-vue-next'
+import { AddIcon, DeleteIcon, SearchIcon } from 'tdesign-icons-vue-next'
 import { getFileTree } from '@/api/printFile'
 
 defineOptions({ name: 'FileFolderTree' })
 
 const props = defineProps({
-  currentParentId: { type: [String, Number], default: null }
+  currentParentId: { type: [String, Number], default: null },
+  deletingFolderId: { type: [String, Number], default: null }
 })
 
-const emit = defineEmits(['select', 'loaded'])
+const emit = defineEmits(['select', 'loaded', 'delete'])
 
 const loading = ref(false)
 const error = ref('')
