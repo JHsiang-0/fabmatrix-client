@@ -67,7 +67,9 @@
           </div>
         </section>
 
-        <section class="file-detail-drawer__section" aria-labelledby="file-detail-metrics">
+        <t-divider class="file-detail-drawer__summary-divider" />
+
+        <section class="file-detail-drawer__section file-detail-drawer__info-card" aria-labelledby="file-detail-metrics">
           <h3 id="file-detail-metrics">切片摘要</h3>
           <t-descriptions
             class="file-detail-drawer__descriptions"
@@ -79,18 +81,18 @@
             size="small"
             :bordered="false"
           >
-            <t-descriptions-item label="预计耗时"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDuration(file.estTime)"><span class="file-detail-drawer__value">{{ formatDuration(file.estTime) }}</span></t-tooltip></t-descriptions-item>
-            <t-descriptions-item label="文件大小"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatFileSize(file.fileSize)"><span class="file-detail-drawer__value">{{ formatFileSize(file.fileSize) }}</span></t-tooltip></t-descriptions-item>
+            <t-descriptions-item label="预计耗时"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDurationValue(file.estTime)"><span class="file-detail-drawer__value">{{ formatDurationValue(file.estTime) }}</span></t-tooltip></t-descriptions-item>
+            <t-descriptions-item label="文件大小"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatFileSizeValue(file.fileSize)"><span class="file-detail-drawer__value">{{ formatFileSizeValue(file.fileSize) }}</span></t-tooltip></t-descriptions-item>
             <t-descriptions-item label="耗材重量"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatWeight(file.filamentWeight)"><span class="file-detail-drawer__value">{{ formatWeight(file.filamentWeight) }}</span></t-tooltip></t-descriptions-item>
             <t-descriptions-item label="所需线长"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatLength(file.filamentLength)"><span class="file-detail-drawer__value">{{ formatLength(file.filamentLength) }}</span></t-tooltip></t-descriptions-item>
             <t-descriptions-item label="喷嘴要求"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatNozzle(file.nozzleSize)"><span class="file-detail-drawer__value">{{ formatNozzle(file.nozzleSize) }}</span></t-tooltip></t-descriptions-item>
-            <t-descriptions-item label="上传时间"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDateTime(file.createdAt)"><span class="file-detail-drawer__value">{{ formatDateTime(file.createdAt) }}</span></t-tooltip></t-descriptions-item>
+            <t-descriptions-item label="上传时间"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDateTimeValue(file.createdAt)"><span class="file-detail-drawer__value">{{ formatDateTimeValue(file.createdAt) }}</span></t-tooltip></t-descriptions-item>
           </t-descriptions>
         </section>
 
         <t-divider />
 
-        <section class="file-detail-drawer__section" aria-labelledby="file-detail-parameters">
+        <section class="file-detail-drawer__section file-detail-drawer__info-card" aria-labelledby="file-detail-parameters">
           <h3 id="file-detail-parameters">切片参数</h3>
           <t-descriptions
             class="file-detail-drawer__descriptions"
@@ -137,7 +139,7 @@
               </t-tooltip>
             </template>
             <template #createdAt="slotProps">
-              <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDateTime(slotProps.row.createdAt)"><span class="file-detail-drawer__value">{{ formatDateTime(slotProps.row.createdAt) }}</span></t-tooltip>
+              <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDateTimeValue(slotProps.row.createdAt)"><span class="file-detail-drawer__value">{{ formatDateTimeValue(slotProps.row.createdAt) }}</span></t-tooltip>
             </template>
             </t-table>
           </div>
@@ -204,6 +206,10 @@ const handleClose = () => {
 
 const handlePrint = () => emit('print', props.file)
 const handleDownload = () => emit('download', props.file)
+const isEmptyValue = value => value === undefined || value === null
+const formatDurationValue = value => isEmptyValue(value) ? '-' : formatDuration(value)
+const formatFileSizeValue = value => isEmptyValue(value) ? '-' : formatFileSize(value)
+const formatDateTimeValue = value => isEmptyValue(value) ? '-' : formatDateTime(value)
 const formatWeight = value => value === undefined || value === null ? '-' : `${Number(value).toFixed(1)}g`
 const formatLength = value => value === undefined || value === null ? '-' : `${Number(value).toFixed(2)}m`
 const formatNozzle = value => value === undefined || value === null ? '-' : `${Number(value).toFixed(1)}mm`
@@ -339,8 +345,16 @@ const getJobStatusTagType = status => ({
   gap: var(--app-spacing-1);
 }
 
+.file-detail-drawer__info-card {
+  padding: var(--app-spacing-2);
+  background: var(--td-bg-color-secondarycontainer);
+  border: 1px solid var(--td-component-border);
+  border-radius: var(--td-radius-medium);
+}
+
 .file-detail-drawer__section h3 {
   font-size: var(--td-font-size-title-small);
+  line-height: 1.3;
 }
 
 .file-detail-drawer__section-heading {
@@ -362,12 +376,14 @@ const getJobStatusTagType = status => ({
 .file-detail-drawer__descriptions :deep(.t-descriptions__body) {
   width: 100%;
   min-width: 0;
+  max-width: 100%;
 }
 
 .file-detail-drawer__descriptions :deep(.t-descriptions__label),
 .file-detail-drawer__descriptions :deep(.t-descriptions__content) {
   min-width: 0;
-  max-width: 0;
+  width: auto;
+  max-width: 100%;
   overflow: hidden;
   word-break: break-word;
 }
@@ -378,6 +394,7 @@ const getJobStatusTagType = status => ({
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.35;
   white-space: nowrap;
 }
 

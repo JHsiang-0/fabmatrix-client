@@ -327,6 +327,11 @@ test('文件详情使用紧凑无边框水平描述、底部大按钮并保护�
   const descriptions = detailSource.match(/<t-descriptions[\s\S]*?\/t-descriptions>/g) || []
 
   assert.equal(descriptions.length, 2)
+  assert.equal((detailSource.match(/<t-divider/g) || []).length, 3)
+  assert.match(detailSource, /<t-divider class="file-detail-drawer__summary-divider"\s*\/>/)
+  assert.equal((detailSource.match(/<section class="file-detail-drawer__section file-detail-drawer__info-card"/g) || []).length, 2)
+  assert.match(detailSource, /\.file-detail-drawer__info-card[\s\S]*padding: var\(--app-spacing-2\)[\s\S]*background: var\(--td-bg-color-secondarycontainer\)/)
+  assert.match(detailSource, /\.file-detail-drawer__info-card[\s\S]*border: 1px solid var\(--td-component-border\)/)
   for (const description of descriptions) {
     assert.match(description, /class="file-detail-drawer__descriptions"/)
     assert.match(description, /:column="3"/)
@@ -338,6 +343,8 @@ test('文件详情使用紧凑无边框水平描述、底部大按钮并保护�
     assert.match(description, /:bordered="false"/)
     assert.doesNotMatch(description, /\sbordered(?:\s|>)/)
   }
+  assert.match(detailSource, /\.file-detail-drawer__descriptions :deep\(\.t-descriptions__label\),[\s\S]*\.file-detail-drawer__descriptions :deep\(\.t-descriptions__content\)[\s\S]*min-width: 0[\s\S]*width: auto[\s\S]*max-width: 100%/)
+  assert.doesNotMatch(detailSource, /\.t-descriptions__(?:label|content)[\s\S]*max-width: 0/)
   for (const label of [
     '预计耗时', '文件大小', '耗材重量', '所需线长', '喷嘴要求', '上传时间',
     '常规层高', '首层层高', '喷嘴温度', '首层喷嘴温度', '热床温度', '首层热床温度'
@@ -354,14 +361,19 @@ test('文件详情使用紧凑无边框水平描述、底部大按钮并保护�
   assert.match(detailSource, /<t-tooltip[\s\S]*class="file-detail-drawer__material-tooltip"[\s\S]*:content="String\(file\.materialType \|\| '未指定'\)"/)
   assert.doesNotMatch(detailSource, /file-detail-drawer__name[^>]*:title=/)
   assert.doesNotMatch(detailSource, /file-detail-drawer__material-tag[^>]*:title=/)
-  assert.match(detailSource, /<t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDuration\(file\.estTime\)"/)
+  assert.match(detailSource, /<t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDurationValue\(file\.estTime\)"/)
+  assert.match(detailSource, /<t-tooltip class="file-detail-drawer__value-tooltip" :content="formatFileSizeValue\(file\.fileSize\)"/)
+  assert.match(detailSource, /<t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDateTimeValue\(file\.createdAt\)"/)
+  assert.match(detailSource, /const formatDurationValue = value => isEmptyValue\(value\) \? '-' : formatDuration\(value\)/)
+  assert.match(detailSource, /const formatFileSizeValue = value => isEmptyValue\(value\) \? '-' : formatFileSize\(value\)/)
+  assert.match(detailSource, /const formatDateTimeValue = value => isEmptyValue\(value\) \? '-' : formatDateTime\(value\)/)
   assert.match(detailSource, /file-detail-drawer__material-tag[\s\S]*max-width: 100%[\s\S]*text-overflow: ellipsis/)
   assert.match(detailSource, /<div v-else-if="jobs.length > 0" class="file-detail-drawer__jobs-table">/)
   assert.match(detailSource, /table-layout="fixed"[\s\S]*class="file-detail-drawer__jobs-table"|class="file-detail-drawer__jobs-table"[\s\S]*table-layout="fixed"/)
   assert.match(detailSource, /file-detail-drawer__jobs-table :deep\(\.t-table__content\)[\s\S]*overflow-x: hidden/)
   assert.match(detailSource, /<t-tooltip class="file-detail-drawer__value-tooltip" :content="String\(slotProps\.row\.id \?\? '-'\)"/)
   assert.match(detailSource, /<t-tooltip class="file-detail-drawer__job-status-tooltip" :content="String\(slotProps\.row\.status \|\| '-'\)"/)
-  assert.match(detailSource, /<t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDateTime\(slotProps\.row\.createdAt\)"/)
+  assert.match(detailSource, /<t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDateTimeValue\(slotProps\.row\.createdAt\)"/)
   assert.match(detailSource, /file-detail-drawer__footer-actions :deep\(\.t-button\)[\s\S]*width: 100%/)
   assert.doesNotMatch(detailSource, /file-detail-drawer__actions/)
 })
