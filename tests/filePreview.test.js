@@ -146,6 +146,25 @@ test('renames and moves folders through the real endpoints and records mock audi
   assert.deepEqual(mockState.auditLogs.slice(0, 2).map(log => log.action), ['FOLDER_MOVE', 'FOLDER_RENAME'])
 })
 
+test('批量移动文件返回逐项结果，不会移动文件夹或触碰对象存储', async () => {
+  setupSession()
+
+  const target = await request('POST', '/api/v1/print-files/folder/create', {
+    folderName: '批量目标'
+  }, operatorHeaders)
+  const response = await request('PUT', '/api/v1/print-files/batch/move', {
+    ids: [23, target.data.id],
+    parentId: target.data.id
+  }, operatorHeaders)
+
+  assert.equal(response.data.totalCount, 2)
+  assert.equal(response.data.movedCount, 1)
+  assert.equal(response.data.failedCount, 1)
+  assert.deepEqual(response.data.items.map(item => item.success), [true, false])
+  assert.equal(mockState.files.find(file => file.id === 23).parentId, target.data.id)
+  assert.equal(mockState.files.find(file => file.id === target.data.id).parentId, null)
+})
+
 test('protects default folders and rejects illegal names, duplicate names, cross-user and third-level moves', async () => {
   setupSession()
 

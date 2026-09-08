@@ -1201,6 +1201,49 @@ const handleBatchDeleteFiles = config => {
   return { items }
 }
 
+const handleBatchMoveFiles = config => {
+  const session = requireSession(config, ['ADMIN', 'OPERATOR'])
+  const body = getBody(config)
+  const rawIds = body.ids || []
+  if (!Array.isArray(rawIds) || rawIds.length === 0 || rawIds.length > 100) {
+    fail(400, 400, '批量移动文件数量必须为 1-100 个')
+  }
+  const ids = [...new Set(rawIds)]
+  const rawParentId = body.parentId
+  const parentId = rawParentId == null || rawParentId === '' ? null : Number(rawParentId)
+  if (parentId !== null && (!Number.isInteger(parentId) || parentId <= 0)) {
+    fail(400, 400, '目标目录 ID 必须为正数')
+  }
+  const target = parentId === null ? null : findFile(parentId)
+  if (parentId !== null && !target) fail(404, 404, '目标文件夹不存在')
+  if (target && !target.folder) fail(422, 422, '目标资源不是文件夹')
+
+  const items = ids.map(id => {
+    const file = findFile(id)
+    if (!file || !canReadResource(session, file.userId)) {
+      return { id, success: false, reason: '文件不存在' }
+    }
+    if (file.folder) return { id, success: false, reason: '文件夹不能通过文件移动接口移动' }
+    if (target && String(target.userId) !== String(file.userId)) {
+      return { id, success: false, reason: '目标文件夹必须属于文件所属用户' }
+    }
+    if ((file.parentId ?? null) === parentId) {
+      return { id, success: false, reason: '文件已经位于目标目录' }
+    }
+    file.parentId = parentId
+    return { id, success: true, reason: '移动成功' }
+  })
+  const movedCount = items.filter(item => item.success).length
+  const failedCount = items.length - movedCount
+  return {
+    totalCount: items.length,
+    movedCount,
+    failedCount,
+    items,
+    message: `批量移动完成：成功 ${movedCount} 个，失败 ${failedCount} 个`
+  }
+}
+
 const handleJobPage = config => {
   const session = requireSession(config, ['ADMIN', 'OPERATOR'])
   const params = getBody(config)
@@ -1785,6 +1828,7 @@ const route = async config => {
   if (/^GET \/api\/v1\/print-files\/[^/]+\/thumbnail$/.test(key)) return handleThumbnail(config)
   if (/^GET \/api\/v1\/print-files\/[^/]+\/jobs$/.test(key)) return handleFileJobs(config)
   if (key === 'DELETE /api/v1/print-files/batch') return handleBatchDeleteFiles(config)
+  if (key === 'PUT /api/v1/print-files/batch/move') return handleBatchMoveFiles(config)
   if (key === 'GET /api/v1/print-jobs/queue') return handleJobQueue(config)
   if (key === 'POST /api/v1/print-jobs/page') return handleJobPage(config)
   if (key === 'POST /api/v1/print-jobs/batch/preview') return handleBatchPreview(config)

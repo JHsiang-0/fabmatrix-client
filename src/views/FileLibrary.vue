@@ -28,8 +28,13 @@
                     上传
                   </t-button>
                   <t-button v-if="selectedIds.length > 0" theme="danger" size="medium" :icon="renderIcon(Delete)"
-                    :loading="batchDeleting" :disabled="batchDeleting || deletingIds.length > 0" @click="handleBatchDelete">
+                    :loading="batchDeleting" :disabled="batchDeleting || batchMoving || deletingIds.length > 0" @click="handleBatchDelete">
                     批量删除 ({{ selectedIds.length }})
+                  </t-button>
+                  <t-button v-if="selectedIds.length > 0" theme="primary" variant="outline" size="medium"
+                    :icon="renderIcon(Move)" :loading="batchMoving"
+                    :disabled="batchMoving || batchDeleting || deletingIds.length > 0" @click="openBatchMoveDialog">
+                    批量移动 ({{ selectedIds.length }})
                   </t-button>
                 </t-space>
                 <t-space class="file-library-search-actions" size="small" align="center" break-line>
@@ -208,31 +213,31 @@
 
           <TdTableColumn prop="fileSize" label="文件大小" width="100">
             <template #default="{ row }">
-              <span>{{ formatFileSize(row.fileSize) }}</span>
+              <span class="file-table__metric" :title="formatFileSize(row.fileSize)">{{ formatFileSize(row.fileSize) }}</span>
             </template>
           </TdTableColumn>
 
           <TdTableColumn prop="estTime" label="预计耗时" width="85">
             <template #default="{ row }">
-              <span>{{ formatDuration(row.estTime) }}</span>
+              <span class="file-table__metric" :title="formatDuration(row.estTime)">{{ formatDuration(row.estTime) }}</span>
             </template>
           </TdTableColumn>
 
           <TdTableColumn prop="filamentWeight" label="耗材重量" width="85">
             <template #default="{ row }">
-              <span>{{ formatMetric(row.filamentWeight, 'g') }}</span>
+              <span class="file-table__metric" :title="formatMetric(row.filamentWeight, 'g')">{{ formatMetric(row.filamentWeight, 'g') }}</span>
             </template>
           </TdTableColumn>
 
           <TdTableColumn prop="filamentLength" label="所需线长" width="85">
             <template #default="{ row }">
-              <span>{{ formatMetric(row.filamentLength, 'm') }}</span>
+              <span class="file-table__metric" :title="formatMetric(row.filamentLength, 'm')">{{ formatMetric(row.filamentLength, 'm') }}</span>
             </template>
           </TdTableColumn>
 
           <TdTableColumn prop="printCount" label="打印次数" width="80">
             <template #default="{ row }">
-              <span>{{ formatMetric(row.printCount, '次') }}</span>
+              <span class="file-table__metric" :title="formatMetric(row.printCount, '次')">{{ formatMetric(row.printCount, '次') }}</span>
             </template>
           </TdTableColumn>
 
@@ -241,7 +246,7 @@
               <div class="file-table__rate" v-if="hasValue(row.successRate)">
                 <t-progress :percentage="row.successRate" :stroke-width="6" :label="false"
                   :class="getSuccessRateClass(row.successRate)" />
-                <span>{{ formatMetric(row.successRate, '%') }}</span>
+                    <span class="file-table__metric" :title="formatMetric(row.successRate, '%')">{{ formatMetric(row.successRate, '%') }}</span>
               </div>
               <span v-else>-</span>
             </template>
@@ -254,7 +259,7 @@
                   打印
                 </t-button>
                 <t-button theme="danger" size="small" :icon="renderIcon(Delete)" :loading="deletingIds.includes(row.id)"
-                  :disabled="batchDeleting || deletingIds.length > 0" @click.stop="handleDelete(row.id)">
+                  :disabled="batchDeleting || batchMoving || deletingIds.length > 0" @click.stop="handleDelete(row.id)">
                   删除
                 </t-button>
               </div>
@@ -429,6 +434,55 @@
       </template>
     </t-dialog>
 
+    <!-- 批量移动文件对话框 -->
+    <t-dialog v-model:visible="batchMoveDialogVisible" header="批量移动文件"
+      width="min(480px, calc(100vw - 32px))"
+      placement="center"
+      :close-on-overlay-click="false"
+      :close-on-esc-keydown="!batchMoving"
+    >
+      <t-form ref="batchMoveFormRef" :data="batchMoveForm" label-width="96px">
+        <t-form-item label="目标文件夹" name="parentId">
+          <t-select v-model="batchMoveForm.parentId" placeholder="请选择目标文件夹" :disabled="batchMoving">
+            <t-option
+              v-for="target in batchMoveTargets"
+              :key="target.value ?? 'root'"
+              :value="target.value"
+              :label="target.label"
+              :disabled="target.disabled"
+            />
+          </t-select>
+        </t-form-item>
+      </t-form>
+      <t-alert theme="warning" :close-btn="false" class="mt-3">
+        仅移动选中的文件，不会移动文件夹；单次最多100个文件。
+      </t-alert>
+
+      <section v-if="batchMoveResults.length" class="file-move-dialog__results" aria-label="批量移动结果">
+        <t-alert
+          :theme="batchMoveResults.every(item => item.success) ? 'success' : 'warning'"
+          :title="batchMoveResults.every(item => item.success) ? '全部文件移动成功' : '部分文件移动失败'"
+          :close-btn="false"
+        />
+        <div v-for="result in batchMoveResults" :key="String(result.id)" class="file-move-dialog__result">
+          <span class="file-move-dialog__result-id">文件 {{ result.id }}</span>
+          <span :class="result.success ? 'text-green-600' : 'text-red-600'">
+            {{ result.success ? '移动成功' : (result.reason || '移动失败') }}
+          </span>
+        </div>
+      </section>
+      <t-alert v-if="batchMoveError" theme="error" :title="batchMoveError" :close-btn="false" class="mt-3" />
+
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <t-button :disabled="batchMoving" @click="batchMoveDialogVisible = false">取消</t-button>
+          <t-button theme="primary" :loading="batchMoving" :disabled="batchMoving" @click="handleBatchMove">
+            移动
+          </t-button>
+        </div>
+      </template>
+    </t-dialog>
+
     <!-- 文件详情抽屉 -->
     <FileDetailDrawer
       v-model="detailDrawerVisible"
@@ -555,13 +609,15 @@ import {
   ViewListIcon as List,
   PrintIcon as Printer,
   UploadIcon as Upload,
-  DownloadIcon as Download
+  DownloadIcon as Download,
+  FolderMoveIcon as Move
 } from 'tdesign-icons-vue-next'
 import {
   getFileList,
   uploadFile as uploadPrintFile,
   deleteFile,
   deleteBatchFiles,
+  moveBatchFiles,
   downloadFile,
   createFolder,
   renameFolder,
@@ -606,6 +662,10 @@ const uploadFileStates = ref([])
 const batchUploadResults = ref([])
 const batchUploading = ref(false)
 const batchDeleting = ref(false)
+const batchMoving = ref(false)
+const batchMoveDialogVisible = ref(false)
+const batchMoveResults = ref([])
+const batchMoveError = ref('')
 const deletingIds = ref([])
 const uploadProgress = ref(0)
 const uploadError = ref('')
@@ -646,6 +706,7 @@ const renameFolderForm = reactive({ name: '' })
 const moveFolderForm = reactive({ parentId: null })
 const renameFolderFormRef = ref(null)
 const moveFolderFormRef = ref(null)
+const batchMoveFormRef = ref(null)
 const userStore = useUserStore()
 let fileRequestSequence = 0
 
@@ -683,6 +744,9 @@ const renameFolderRules = {
 }
 
 const moveFolderRules = {}
+
+const BATCH_MOVE_ROOT_VALUE = '__root__'
+const batchMoveForm = reactive({ parentId: '' })
 
 const folderFormRef = ref(null)
 
@@ -742,7 +806,30 @@ const moveFolderTargets = computed(() => {
   return targets.concat(firstLevelTargets)
 })
 
-const getRowCheckProps = () => ({})
+const batchMoveTargets = computed(() => {
+  const currentId = currentParentId.value
+  const isSameDirectory = targetId => {
+    const resolvedTargetId = targetId === BATCH_MOVE_ROOT_VALUE ? null : targetId
+    return String(resolvedTargetId ?? '') === String(currentId ?? '')
+  }
+  const targets = [{
+    value: BATCH_MOVE_ROOT_VALUE,
+    label: '根目录',
+    disabled: currentId === null || currentId === undefined
+  }]
+  const folderTargets = flattenFolders(folderTreeFolders.value)
+    .filter(folder => folder?.folder !== false)
+    .map(folder => ({
+      value: folder.id,
+      label: `${folder.level === 2 ? '　└ ' : ''}${folder.name || folder.originalName || `文件夹 ${folder.id}`}`,
+      disabled: isSameDirectory(folder.id)
+    }))
+  return targets.concat(folderTargets)
+})
+
+const getRowCheckProps = () => ({
+  disabled: batchMoving.value || batchDeleting.value || deletingIds.value.length > 0
+})
 
 const contextMenuPosition = reactive({ left: 0, top: 0 })
 
@@ -821,7 +908,7 @@ const restoreFileDetailContext = () => {
 /**
  * 获取文件列表
  */
-const fetchData = async () => {
+const fetchData = async ({ preserveSelectedIds = [] } = {}) => {
   const requestSequence = ++fileRequestSequence
   loading.value = true
   loadError.value = ''
@@ -838,8 +925,11 @@ const fetchData = async () => {
     fileList.value = res.data?.records || []
     pagination.total = res.data?.total || 0
 
-    // 清空选中状态（如果当前页数据变化）
-    selectedIds.value = []
+    const selectedSet = new Set((Array.isArray(preserveSelectedIds) ? preserveSelectedIds : [])
+      .map(id => String(id)))
+    selectedIds.value = fileList.value
+      .map(item => item.id)
+      .filter(id => selectedSet.has(String(id)))
     restoreFileDetailContext()
   } catch (error) {
     if (requestSequence !== fileRequestSequence) return
@@ -852,6 +942,7 @@ const fetchData = async () => {
 }
 
 const refreshLibrary = () => fetchData()
+const refreshLibraryPreservingSelection = ids => fetchData({ preserveSelectedIds: ids })
 
 const handleFolderSelect = selection => {
   const nextParentId = selection?.id ?? null
@@ -1329,6 +1420,77 @@ const handleDelete = async (id) => {
   }
 }
 
+/** 打开批量移动文件对话框，仅使用当前页已选文件。 */
+const openBatchMoveDialog = () => {
+  if (batchMoving.value || batchDeleting.value || deletingIds.value.length > 0) return
+  if (selectedIds.value.length === 0) {
+    message.warning('请先选择要移动的文件')
+    return
+  }
+  batchMoveForm.parentId = ''
+  batchMoveResults.value = []
+  batchMoveError.value = ''
+  batchMoveDialogVisible.value = true
+}
+
+/** 批量移动文件，部分失败时保留失败项选择并在对话框中展示逐项原因。 */
+const handleBatchMove = async () => {
+  if (batchMoving.value || batchDeleting.value || deletingIds.value.length > 0) return
+  if (selectedIds.value.length === 0) {
+    message.warning('请先选择要移动的文件')
+    return
+  }
+
+  const ids = selectedIds.value.slice()
+  if (batchMoveForm.parentId === '' || batchMoveForm.parentId === null || batchMoveForm.parentId === undefined) {
+    message.warning('请选择目标目录')
+    return
+  }
+
+  const targetParentId = batchMoveForm.parentId === BATCH_MOVE_ROOT_VALUE
+    ? null
+    : batchMoveForm.parentId
+  if (String(targetParentId ?? '') === String(currentParentId.value ?? '')) {
+    message.warning('目标目录与当前目录相同，无需移动')
+    return
+  }
+
+  batchMoving.value = true
+  batchMoveError.value = ''
+  try {
+    const response = await moveBatchFiles(ids, targetParentId)
+    const items = Array.isArray(response.data?.items) ? response.data.items : []
+    if (items.length !== ids.length) {
+      batchMoveError.value = '批量移动结果不完整，请刷新后重试未确认的项目'
+      message.warning(batchMoveError.value)
+      await folderTreeRef.value?.refresh()
+      await refreshLibraryPreservingSelection(ids)
+      return
+    }
+
+    batchMoveResults.value = items
+    const failedItems = items.filter(item => !item.success)
+    const successItems = items.filter(item => item.success)
+    const failedIds = failedItems.map(item => item.id)
+    selectedIds.value = failedIds
+
+    await folderTreeRef.value?.refresh()
+    await refreshLibraryPreservingSelection(failedIds)
+    if (failedItems.length > 0) {
+      const reasons = failedItems.map(item => `${item.id}: ${item.reason || '移动失败'}`).join('；')
+      message.warning(`已移动 ${successItems.length} 项，${failedItems.length} 项失败：${reasons}`)
+    } else {
+      message.success(`批量移动成功，共 ${successItems.length} 项`)
+      batchMoveDialogVisible.value = false
+    }
+  } catch (error) {
+    console.error('批量移动失败:', error)
+    message.error(error?.message || '批量移动失败')
+  } finally {
+    batchMoving.value = false
+  }
+}
+
 /**
  * 批量删除
  */
@@ -1352,7 +1514,7 @@ const handleBatchDelete = async () => {
     const items = Array.isArray(response.data?.items) ? response.data.items : []
     if (items.length !== ids.length) {
       message.warning('批量删除结果不完整，请刷新后重试未确认的项目')
-      await refreshLibrary()
+      await refreshLibraryPreservingSelection(ids)
       return
     }
     const failedItems = items.filter(item => !item.success)
@@ -1364,7 +1526,7 @@ const handleBatchDelete = async () => {
     } else {
       message.success(`批量删除成功，共 ${successItems.length} 项`)
     }
-    await refreshLibrary()
+    await refreshLibraryPreservingSelection(failedItems.map(item => item.id))
   } catch (error) {
     if (error !== 'cancel') {
       console.error('批量删除失败:', error)
@@ -1898,6 +2060,39 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 
+.file-table-view :deep(.t-table) {
+  min-width: 1000px;
+  table-layout: fixed;
+}
+
+.file-table-view :deep(.t-table__header > tr > th) {
+  height: 40px;
+  padding: 0 10px;
+  color: var(--td-text-color-primary);
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  background: var(--td-bg-color-secondarycontainer);
+  border-bottom: 1px solid var(--td-component-border);
+}
+
+.file-table-view :deep(.t-table__body > tr > td) {
+  height: 48px;
+  padding: 6px 10px;
+  color: var(--td-text-color-primary);
+  line-height: 1.3;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--td-component-border);
+}
+
+.file-table-view :deep(.t-table__body > tr:last-child > td) {
+  border-bottom: 1px solid var(--td-component-border);
+}
+
+.file-table-view :deep(.t-table__body > tr:hover > td) {
+  background: var(--td-bg-color-container-hover);
+}
+
 :deep(.file-upload-dialog) {
   display: flex;
   flex-direction: column;
@@ -2300,6 +2495,14 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
+.file-table__metric {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .file-table__type-tag {
   flex: 0 0 auto;
 }
@@ -2309,6 +2512,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: var(--app-spacing-2);
+  white-space: nowrap;
 }
 
 .file-table__rate {
@@ -2319,6 +2523,32 @@ onBeforeUnmount(() => {
 
 .file-table__rate :deep(.t-progress) {
   width: 64px;
+}
+
+.file-move-dialog__results {
+  max-height: min(240px, calc(100vh - 420px));
+  margin-top: var(--app-spacing-4);
+  overflow-y: auto;
+  scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
+  scrollbar-width: thin;
+}
+
+.file-move-dialog__result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-spacing-3);
+  min-width: 0;
+  padding: var(--app-spacing-2) 0;
+  border-bottom: 1px solid var(--td-component-border);
+  font: var(--td-font-body-small);
+}
+
+.file-move-dialog__result-id {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 900px) {

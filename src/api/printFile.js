@@ -4,7 +4,8 @@ import {
   normalizePrintFilePageParams,
   normalizePageResponse,
   normalizePrintFile,
-  normalizePrintJob
+  normalizePrintJob,
+  normalizeBatchMoveResult
 } from '@/utils/dataAdapters'
 import { REQUEST_TIMEOUT } from '@/utils/constants'
 import { shouldRefreshPresignedUrl } from '@/utils/fileDownload'
@@ -197,6 +198,18 @@ export function deleteBatchFiles(ids) {
     method: 'delete',
     data: { ids }
   })
+}
+
+/**
+ * 批量移动文件；parentId 为 null 表示根目录，单次最多100个文件。
+ * 后端逐项返回成功/失败结果，不移动文件夹，也不触碰对象存储。
+ */
+export function moveBatchFiles(ids, parentId = null) {
+  return request({
+    url: '/api/v1/print-files/batch/move',
+    method: 'put',
+    data: { ids, parentId }
+  }).then(response => mapResponseData(response, normalizeBatchMoveResult))
 }
 
 export class DownloadFileError extends Error {

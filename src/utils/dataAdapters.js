@@ -226,6 +226,34 @@ export function normalizePrintFile(record) {
   return normalized
 }
 
+/** 规范化文件批量移动结果，兼容旧字段并统一为 movedCount/failedCount。 */
+export function normalizeBatchMoveResult(data) {
+  const source = data && typeof data === 'object' ? data : {}
+  const items = Array.isArray(source.items) ? source.items.map(item => ({
+    id: normalizeId(item?.id),
+    success: item?.success === true,
+    reason: item?.reason ?? null
+  })) : []
+  const movedCount = Number.isInteger(Number(source.movedCount))
+    ? Number(source.movedCount)
+    : Number.isInteger(Number(source.successCount))
+      ? Number(source.successCount)
+      : items.filter(item => item.success).length
+  const failedCount = Number.isInteger(Number(source.failedCount))
+    ? Number(source.failedCount)
+    : Number.isInteger(Number(source.failureCount))
+      ? Number(source.failureCount)
+      : items.filter(item => !item.success).length
+
+  return {
+    totalCount: Number.isInteger(Number(source.totalCount)) ? Number(source.totalCount) : items.length,
+    movedCount,
+    failedCount,
+    items,
+    message: source.message ?? null
+  }
+}
+
 export function normalizePrintJob(record) {
   if (record !== null && typeof record !== 'object') return normalizeId(record)
 

@@ -8,9 +8,11 @@ import {
 } from '../src/utils/fileFolderActions.js'
 
 const source = fs.readFileSync(new URL('../src/views/FileLibrary.vue', import.meta.url), 'utf8')
+const apiSource = fs.readFileSync(new URL('../src/api/printFile.js', import.meta.url), 'utf8')
 const detailSource = fs.readFileSync(new URL('../src/components/file/FileDetailDrawer.vue', import.meta.url), 'utf8')
 const folderTreeSource = fs.readFileSync(new URL('../src/components/file/FileFolderTree.vue', import.meta.url), 'utf8')
 const uploadDialogSource = source.match(/<t-dialog[\s\S]*?header="批量上传切片文件"[\s\S]*?<\/t-dialog>/)?.[0] || ''
+const moveDialogSource = source.match(/<t-dialog[^>]*header="批量移动文件"[\s\S]*?<\/t-dialog>/)?.[0] || ''
 
 test('文件中心使用正式分页契约并提供文件夹树与单一主工作区', () => {
   assert.match(source, /<FileFolderTree[\s\S]*:current-parent-id="currentParentId"[\s\S]*@select="handleFolderSelect"[\s\S]*@create="openCreateFolderDialog"/)
@@ -221,6 +223,34 @@ test('文件库使用 TDesign 视图分段并永久显示选择列', () => {
   assert.doesNotMatch(source, /viewMode = ref\('grid'\)/)
   assert.doesNotMatch(source, /value: 'open'/)
   assert.match(source, /class="file-library-filter-form"[\s\S]*class="file-grid-view app-scroll-region"[\s\S]*class="file-table-view"[\s\S]*class="file-library-pagination"/)
+})
+
+test('文件库列表表头单行、数据行紧凑且保留横向滚动', () => {
+  assert.match(source, /file-table-view :deep\(\.t-table__header[\s\S]*white-space: nowrap/)
+  assert.match(source, /file-table-view :deep\(\.t-table__body[\s\S]*border-bottom: 1px solid var\(--td-component-border\)/)
+  assert.match(source, /file-table-view :deep\(\.t-table__body > tr:hover > td\)/)
+  assert.match(source, /min-width: 1000px/)
+  assert.match(source, /white-space: nowrap/)
+  assert.match(source, /text-overflow: ellipsis/)
+  assert.match(source, /<TdTableColumn prop="filamentWeight" label="耗材重量" width="85">/)
+})
+
+test('文件库提供批量移动 API、目标校验、操作锁定和部分失败保留', () => {
+  assert.match(apiSource, /url: '\/api\/v1\/print-files\/batch\/move'/)
+  assert.match(apiSource, /method: 'put'/)
+  assert.match(apiSource, /data: \{ ids, parentId \}/)
+  assert.match(source, /moveBatchFiles\(ids, targetParentId\)/)
+  assert.match(source, /批量移动 \(\{\{ selectedIds\.length \}\}\)/)
+  assert.match(source, /header="批量移动文件"/)
+  assert.match(moveDialogSource, /<t-form[\s\S]*目标文件夹[\s\S]*<t-select/)
+  assert.match(moveDialogSource, /batchMoveResults/)
+  assert.match(source, /批量移动结果不完整，请刷新后重试未确认的项目/)
+  assert.match(source, /目标目录与当前目录相同，无需移动/)
+  assert.match(source, /请选择目标目录/)
+  assert.match(source, /BATCH_MOVE_ROOT_VALUE/)
+  assert.match(source, /selectedIds\.value = failedItems\.map\(item => item\.id\)/)
+  assert.match(source, /await folderTreeRef\.value\?\.refresh\(\)/)
+  assert.match(source, /batchMoving/)
 })
 
 test('文件库批量上传逐文件请求并维护独立进度', () => {

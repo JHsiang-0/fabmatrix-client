@@ -11,7 +11,8 @@ import {
   normalizePrinterDetail,
   normalizePrinterStatus,
   normalizePrintJob,
-  normalizePrintFile
+  normalizePrintFile,
+  normalizeBatchMoveResult
 } from '../src/utils/dataAdapters.js'
 import { formatFileSize, normalizeProgress } from '../src/utils/formatters.js'
 import { shouldRefreshPresignedUrl } from '../src/utils/fileDownload.js'
@@ -164,6 +165,29 @@ test('normalizes the unified folder flag and removes the legacy field', () => {
     estTime: 90,
     filamentLength: 1.25
   })
+})
+
+test('normalizes batch move counts to the canonical contract and accepts legacy count names', () => {
+  assert.deepEqual(normalizeBatchMoveResult({
+    totalCount: 2,
+    movedCount: 1,
+    failedCount: 1,
+    items: [{ id: '20', success: true }, { id: '21', success: false, reason: '已在目标目录' }]
+  }), {
+    totalCount: 2,
+    movedCount: 1,
+    failedCount: 1,
+    items: [{ id: '20', success: true, reason: null }, { id: '21', success: false, reason: '已在目标目录' }],
+    message: null
+  })
+
+  const legacy = normalizeBatchMoveResult({
+    successCount: 2,
+    failureCount: 0,
+    items: [{ id: 20, success: true }, { id: 21, success: true }]
+  })
+  assert.equal(legacy.movedCount, 2)
+  assert.equal(legacy.failedCount, 0)
 })
 
 test('maps legacy endedAt to completedAt and keeps job units canonical', () => {
