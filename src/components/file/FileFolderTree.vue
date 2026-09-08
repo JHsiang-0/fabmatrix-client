@@ -82,6 +82,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { AddIcon, DeleteIcon, EditIcon, FolderMoveIcon, MoreIcon, SearchIcon } from 'tdesign-icons-vue-next'
 import { getFileTree } from '@/api/printFile'
+import { resolveFolderActionValue } from '@/utils/fileFolderActions'
 import { renderIcon } from '@/utils/tdesign'
 
 defineOptions({ name: 'FileFolderTree' })
@@ -220,7 +221,8 @@ const handleTreeClick = context => {
 }
 
 const handleFolderAction = (action, folder) => {
-  if (folder && action) emit('folder-action', folder, action)
+  const actionValue = resolveFolderActionValue(action)
+  if (folder && actionValue) emit('folder-action', folder, actionValue)
 }
 
 const handleExpand = keys => {

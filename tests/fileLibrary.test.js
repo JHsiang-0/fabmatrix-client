@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import fs from 'node:fs'
+import { resolveFolderActionValue } from '../src/utils/fileFolderActions.js'
 
 const source = fs.readFileSync(new URL('../src/views/FileLibrary.vue', import.meta.url), 'utf8')
 const detailSource = fs.readFileSync(new URL('../src/components/file/FileDetailDrawer.vue', import.meta.url), 'utf8')
@@ -42,7 +43,7 @@ test('文件夹树只消费后端真实目录节点并保留路径和错误恢�
   assert.match(folderTreeSource, /folderActionOptions/)
   assert.match(folderTreeSource, /@click="dropdownAction => handleFolderAction\(dropdownAction, node\.data\)"/)
   assert.match(folderTreeSource, /@click\.stop\n\s*>/)
-  assert.match(folderTreeSource, /emit\('folder-action', folder, action\)/)
+  assert.match(folderTreeSource, /emit\('folder-action', folder, actionValue\)/)
   assert.doesNotMatch(folderTreeSource, /emit\('delete', node\.data\)/)
   assert.match(folderTreeSource, /EditIcon/)
   assert.match(folderTreeSource, /FolderMoveIcon/)
@@ -72,6 +73,19 @@ test('文件夹 More 面板按 TDesign Dropdown click 签名传递三类动作',
   assert.match(folderTreeSource, /\.t-tree__item:hover\)[\s\S]*\.t-tree__item:focus-within/)
   assert.match(folderTreeSource, /opacity: 0[\s\S]*pointer-events: none/)
   assert.match(folderTreeSource, /\.t-tree__item:focus-within\) \.file-folder-tree__more[\s\S]*pointer-events: auto/)
+})
+
+test('文件夹操作解析完整下拉选项的 value 并兼容字符串动作', () => {
+  for (const action of ['rename', 'move', 'delete']) {
+    assert.equal(
+      resolveFolderActionValue({ content: action, value: action }),
+      action
+    )
+    assert.equal(resolveFolderActionValue(action), action)
+  }
+
+  assert.equal(resolveFolderActionValue(null), null)
+  assert.equal(resolveFolderActionValue(undefined), undefined)
 })
 
 test('文件中心不伪造材料和统计值，并覆盖上传删除结果态', () => {
