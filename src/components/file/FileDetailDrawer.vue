@@ -46,27 +46,45 @@
           </div>
 
           <div class="file-detail-drawer__identity">
-            <h2 id="file-detail-name" :title="file.originalName">{{ file.originalName }}</h2>
-            <t-tag
-              :theme="getMaterialTagType(file.materialType)"
-              size="small"
-              class="file-detail-drawer__material-tag"
-              :title="file.materialType || '未指定'"
+            <t-tooltip
+              class="file-detail-drawer__name-tooltip"
+              :content="String(file.originalName || '未命名文件')"
             >
-              {{ file.materialType || '未指定' }}
-            </t-tag>
+              <h2 id="file-detail-name">{{ file.originalName || '未命名文件' }}</h2>
+            </t-tooltip>
+            <t-tooltip
+              class="file-detail-drawer__material-tooltip"
+              :content="String(file.materialType || '未指定')"
+            >
+              <t-tag
+                :theme="getMaterialTagType(file.materialType)"
+                size="small"
+                class="file-detail-drawer__material-tag"
+              >
+                {{ file.materialType || '未指定' }}
+              </t-tag>
+            </t-tooltip>
           </div>
         </section>
 
         <section class="file-detail-drawer__section" aria-labelledby="file-detail-metrics">
           <h3 id="file-detail-metrics">切片摘要</h3>
-          <t-descriptions class="file-detail-drawer__descriptions" :column="3" table-layout="fixed" size="small" bordered>
-            <t-descriptions-item label="预计耗时"><span class="file-detail-drawer__value" :title="formatDuration(file.estTime)">{{ formatDuration(file.estTime) }}</span></t-descriptions-item>
-            <t-descriptions-item label="文件大小"><span class="file-detail-drawer__value" :title="formatFileSize(file.fileSize)">{{ formatFileSize(file.fileSize) }}</span></t-descriptions-item>
-            <t-descriptions-item label="耗材重量"><span class="file-detail-drawer__value" :title="formatWeight(file.filamentWeight)">{{ formatWeight(file.filamentWeight) }}</span></t-descriptions-item>
-            <t-descriptions-item label="所需线长"><span class="file-detail-drawer__value" :title="formatLength(file.filamentLength)">{{ formatLength(file.filamentLength) }}</span></t-descriptions-item>
-            <t-descriptions-item label="喷嘴要求"><span class="file-detail-drawer__value" :title="formatNozzle(file.nozzleSize)">{{ formatNozzle(file.nozzleSize) }}</span></t-descriptions-item>
-            <t-descriptions-item label="上传时间"><span class="file-detail-drawer__value" :title="formatDateTime(file.createdAt)">{{ formatDateTime(file.createdAt) }}</span></t-descriptions-item>
+          <t-descriptions
+            class="file-detail-drawer__descriptions"
+            :column="3"
+            colon
+            layout="horizontal"
+            item-layout="horizontal"
+            table-layout="auto"
+            size="small"
+            :bordered="false"
+          >
+            <t-descriptions-item label="预计耗时"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDuration(file.estTime)"><span class="file-detail-drawer__value">{{ formatDuration(file.estTime) }}</span></t-tooltip></t-descriptions-item>
+            <t-descriptions-item label="文件大小"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatFileSize(file.fileSize)"><span class="file-detail-drawer__value">{{ formatFileSize(file.fileSize) }}</span></t-tooltip></t-descriptions-item>
+            <t-descriptions-item label="耗材重量"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatWeight(file.filamentWeight)"><span class="file-detail-drawer__value">{{ formatWeight(file.filamentWeight) }}</span></t-tooltip></t-descriptions-item>
+            <t-descriptions-item label="所需线长"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatLength(file.filamentLength)"><span class="file-detail-drawer__value">{{ formatLength(file.filamentLength) }}</span></t-tooltip></t-descriptions-item>
+            <t-descriptions-item label="喷嘴要求"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatNozzle(file.nozzleSize)"><span class="file-detail-drawer__value">{{ formatNozzle(file.nozzleSize) }}</span></t-tooltip></t-descriptions-item>
+            <t-descriptions-item label="上传时间"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDateTime(file.createdAt)"><span class="file-detail-drawer__value">{{ formatDateTime(file.createdAt) }}</span></t-tooltip></t-descriptions-item>
           </t-descriptions>
         </section>
 
@@ -74,13 +92,22 @@
 
         <section class="file-detail-drawer__section" aria-labelledby="file-detail-parameters">
           <h3 id="file-detail-parameters">切片参数</h3>
-          <t-descriptions class="file-detail-drawer__descriptions" :column="3" table-layout="fixed" size="small" bordered>
-            <t-descriptions-item label="常规层高"><span class="file-detail-drawer__value" :title="formatHeight(file.layerHeight)">{{ formatHeight(file.layerHeight) }}</span></t-descriptions-item>
-            <t-descriptions-item label="首层层高"><span class="file-detail-drawer__value" :title="formatHeight(file.firstLayerHeight)">{{ formatHeight(file.firstLayerHeight) }}</span></t-descriptions-item>
-            <t-descriptions-item label="喷嘴温度"><span class="file-detail-drawer__value" :title="formatTemperature(file.nozzleTemp)">{{ formatTemperature(file.nozzleTemp) }}</span></t-descriptions-item>
-            <t-descriptions-item label="首层喷嘴温度"><span class="file-detail-drawer__value" :title="formatTemperature(file.firstLayerNozzleTemp)">{{ formatTemperature(file.firstLayerNozzleTemp) }}</span></t-descriptions-item>
-            <t-descriptions-item label="热床温度"><span class="file-detail-drawer__value" :title="formatTemperature(file.bedTemp)">{{ formatTemperature(file.bedTemp) }}</span></t-descriptions-item>
-            <t-descriptions-item label="首层热床温度"><span class="file-detail-drawer__value" :title="formatTemperature(file.firstLayerBedTemp)">{{ formatTemperature(file.firstLayerBedTemp) }}</span></t-descriptions-item>
+          <t-descriptions
+            class="file-detail-drawer__descriptions"
+            :column="3"
+            colon
+            layout="horizontal"
+            item-layout="horizontal"
+            table-layout="auto"
+            size="small"
+            :bordered="false"
+          >
+            <t-descriptions-item label="常规层高"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatHeight(file.layerHeight)"><span class="file-detail-drawer__value">{{ formatHeight(file.layerHeight) }}</span></t-tooltip></t-descriptions-item>
+            <t-descriptions-item label="首层层高"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatHeight(file.firstLayerHeight)"><span class="file-detail-drawer__value">{{ formatHeight(file.firstLayerHeight) }}</span></t-tooltip></t-descriptions-item>
+            <t-descriptions-item label="喷嘴温度"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatTemperature(file.nozzleTemp)"><span class="file-detail-drawer__value">{{ formatTemperature(file.nozzleTemp) }}</span></t-tooltip></t-descriptions-item>
+            <t-descriptions-item label="首层喷嘴温度"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatTemperature(file.firstLayerNozzleTemp)"><span class="file-detail-drawer__value">{{ formatTemperature(file.firstLayerNozzleTemp) }}</span></t-tooltip></t-descriptions-item>
+            <t-descriptions-item label="热床温度"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatTemperature(file.bedTemp)"><span class="file-detail-drawer__value">{{ formatTemperature(file.bedTemp) }}</span></t-tooltip></t-descriptions-item>
+            <t-descriptions-item label="首层热床温度"><t-tooltip class="file-detail-drawer__value-tooltip" :content="formatTemperature(file.firstLayerBedTemp)"><span class="file-detail-drawer__value">{{ formatTemperature(file.firstLayerBedTemp) }}</span></t-tooltip></t-descriptions-item>
           </t-descriptions>
         </section>
 
@@ -100,15 +127,17 @@
           <div v-else-if="jobs.length > 0" class="file-detail-drawer__jobs-table">
             <t-table :data="jobs" :columns="jobColumns" row-key="id" table-layout="fixed" size="small" bordered>
             <template #id="slotProps">
-              <span class="file-detail-drawer__value" :title="String(slotProps.row.id ?? '-')">{{ slotProps.row.id ?? '-' }}</span>
+              <t-tooltip class="file-detail-drawer__value-tooltip" :content="String(slotProps.row.id ?? '-')"><span class="file-detail-drawer__value">{{ slotProps.row.id ?? '-' }}</span></t-tooltip>
             </template>
             <template #status="slotProps">
-              <t-tag :theme="getJobStatusTagType(slotProps.row.status)" size="small" :title="slotProps.row.status || '-'">
-                {{ slotProps.row.status || '-' }}
-              </t-tag>
+              <t-tooltip class="file-detail-drawer__job-status-tooltip" :content="String(slotProps.row.status || '-')">
+                <t-tag :theme="getJobStatusTagType(slotProps.row.status)" size="small" class="file-detail-drawer__job-status-tag">
+                  {{ slotProps.row.status || '-' }}
+                </t-tag>
+              </t-tooltip>
             </template>
             <template #createdAt="slotProps">
-              <span class="file-detail-drawer__value" :title="formatDateTime(slotProps.row.createdAt)">{{ formatDateTime(slotProps.row.createdAt) }}</span>
+              <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDateTime(slotProps.row.createdAt)"><span class="file-detail-drawer__value">{{ formatDateTime(slotProps.row.createdAt) }}</span></t-tooltip>
             </template>
             </t-table>
           </div>
@@ -116,11 +145,11 @@
         </section>
 
         <div class="file-detail-drawer__footer-actions" aria-label="文件操作">
-          <t-button theme="primary" size="large" :icon="renderIcon(Printer)" @click="handlePrint">
-            打印
-          </t-button>
           <t-button variant="outline" size="large" :icon="renderIcon(Download)" @click="handleDownload">
             下载
+          </t-button>
+          <t-button theme="primary" size="large" :icon="renderIcon(Printer)" @click="handlePrint">
+            打印
           </t-button>
         </div>
       </template>
@@ -218,7 +247,7 @@ const getJobStatusTagType = status => ({
   display: flex;
   min-height: 100%;
   flex-direction: column;
-  gap: var(--app-spacing-3);
+  gap: var(--app-spacing-2);
 }
 
 .file-detail-drawer__loading {
@@ -257,6 +286,23 @@ const getJobStatusTagType = status => ({
   min-width: 0;
 }
 
+.file-detail-drawer__name-tooltip,
+.file-detail-drawer__value-tooltip {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.file-detail-drawer__material-tooltip,
+.file-detail-drawer__job-status-tooltip {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
 .file-detail-drawer__identity h2,
 .file-detail-drawer__section h3 {
   margin: 0;
@@ -280,10 +326,17 @@ const getJobStatusTagType = status => ({
   white-space: nowrap;
 }
 
+.file-detail-drawer__job-status-tag {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .file-detail-drawer__section {
   display: flex;
   flex-direction: column;
-  gap: var(--app-spacing-2);
+  gap: var(--app-spacing-1);
 }
 
 .file-detail-drawer__section h3 {
@@ -350,11 +403,16 @@ const getJobStatusTagType = status => ({
 .file-detail-drawer__footer-actions {
   display: flex;
   align-items: stretch;
-  justify-content: flex-end;
+  justify-content: stretch;
   flex-wrap: wrap;
   gap: var(--app-spacing-2);
   margin-top: auto;
   padding-top: var(--app-spacing-2);
+}
+
+.file-detail-drawer__footer-actions :deep(.t-button) {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 @media (max-width: 460px) {

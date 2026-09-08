@@ -323,27 +323,74 @@ test('文件库成功率统一使用分档 TDesign 标签，不再混入进度�
   assert.match(source, /file-table__rate-tag[\s\S]*text-overflow: ellipsis/)
 })
 
-test('文件详情使用紧凑摘要参数、底部大按钮并保护长文本布局', () => {
+test('文件详情使用紧凑无边框水平描述、底部大按钮并保护长文本布局', () => {
   const descriptions = detailSource.match(/<t-descriptions[\s\S]*?\/t-descriptions>/g) || []
 
   assert.equal(descriptions.length, 2)
   for (const description of descriptions) {
     assert.match(description, /class="file-detail-drawer__descriptions"/)
     assert.match(description, /:column="3"/)
-    assert.match(description, /table-layout="fixed"/)
+    assert.match(description, /\bcolon\b/)
+    assert.match(description, /layout="horizontal"/)
+    assert.match(description, /item-layout="horizontal"/)
+    assert.match(description, /table-layout="auto"/)
     assert.match(description, /size="small"/)
+    assert.match(description, /:bordered="false"/)
+    assert.doesNotMatch(description, /\sbordered(?:\s|>)/)
+  }
+  for (const label of [
+    '预计耗时', '文件大小', '耗材重量', '所需线长', '喷嘴要求', '上传时间',
+    '常规层高', '首层层高', '喷嘴温度', '首层喷嘴温度', '热床温度', '首层热床温度'
+  ]) {
+    assert.match(detailSource, new RegExp(`label="${label}"`))
   }
   assert.doesNotMatch(detailSource.match(/<section class="file-detail-drawer__summary"[\s\S]*?<\/section>/)?.[0] || '', /<t-button/)
-  assert.match(detailSource, /class="file-detail-drawer__footer-actions"[\s\S]*size="large"[\s\S]*>[\s\S]*打印[\s\S]*size="large"[\s\S]*>[\s\S]*下载/)
+  const footerActions = detailSource.match(/<div class="file-detail-drawer__footer-actions"[\s\S]*?<\/div>/)?.[0] || ''
+  assert.ok(footerActions.indexOf('下载') < footerActions.indexOf('打印'))
+  assert.match(footerActions, /下载[\s\S]*打印/)
+  assert.match(detailSource, /file-detail-drawer__footer-actions[\s\S]*\.t-button[\s\S]*flex: 1 1 0/)
   assert.match(detailSource, /file-detail-drawer__value[\s\S]*text-overflow: ellipsis[\s\S]*white-space: nowrap/)
-  assert.match(detailSource, /class="file-detail-drawer__material-tag"[\s\S]*:title="file\.materialType \|\| '未指定'"/)
+  assert.match(detailSource, /<t-tooltip[\s\S]*class="file-detail-drawer__name-tooltip"[\s\S]*:content="String\(file\.originalName \|\| '未命名文件'\)"/)
+  assert.match(detailSource, /<t-tooltip[\s\S]*class="file-detail-drawer__material-tooltip"[\s\S]*:content="String\(file\.materialType \|\| '未指定'\)"/)
+  assert.doesNotMatch(detailSource, /file-detail-drawer__name[^>]*:title=/)
+  assert.doesNotMatch(detailSource, /file-detail-drawer__material-tag[^>]*:title=/)
+  assert.match(detailSource, /<t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDuration\(file\.estTime\)"/)
   assert.match(detailSource, /file-detail-drawer__material-tag[\s\S]*max-width: 100%[\s\S]*text-overflow: ellipsis/)
-  assert.match(detailSource, /:title="formatDateTime\(file\.createdAt\)"/)
   assert.match(detailSource, /<div v-else-if="jobs.length > 0" class="file-detail-drawer__jobs-table">/)
   assert.match(detailSource, /table-layout="fixed"[\s\S]*class="file-detail-drawer__jobs-table"|class="file-detail-drawer__jobs-table"[\s\S]*table-layout="fixed"/)
   assert.match(detailSource, /file-detail-drawer__jobs-table :deep\(\.t-table__content\)[\s\S]*overflow-x: hidden/)
-  assert.match(detailSource, /:title="String\(slotProps\.row\.id \?\? '-'\)"/)
-  assert.match(detailSource, /:title="formatDateTime\(slotProps\.row\.createdAt\)"/)
+  assert.match(detailSource, /<t-tooltip class="file-detail-drawer__value-tooltip" :content="String\(slotProps\.row\.id \?\? '-'\)"/)
+  assert.match(detailSource, /<t-tooltip class="file-detail-drawer__job-status-tooltip" :content="String\(slotProps\.row\.status \|\| '-'\)"/)
+  assert.match(detailSource, /<t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDateTime\(slotProps\.row\.createdAt\)"/)
   assert.match(detailSource, /file-detail-drawer__footer-actions :deep\(\.t-button\)[\s\S]*width: 100%/)
   assert.doesNotMatch(detailSource, /file-detail-drawer__actions/)
+})
+
+test('文件库长文本使用 TDesign Tooltip 并保留省略和容器保护', () => {
+  for (const className of [
+    'file-card__name',
+    'file-card__material-tag',
+    'file-table__name',
+    'file-table__type-tag',
+    'file-table__metric',
+    'file-table__rate-tag',
+    'file-upload-dialog__item-name'
+  ]) {
+    assert.match(source, new RegExp(`<t-tooltip[\\s\\S]*${className}`))
+  }
+
+  assert.match(source, /:content="getFileNameLabel\(file\.originalName\)"/)
+  assert.match(source, /:content="getFileNameLabel\(row\.originalName\)"/)
+  assert.match(source, /:content="String\(file\.materialType \|\| '未指定'\)"/)
+  assert.match(source, /:content="String\(row\.materialType \|\| '未指定'\)"/)
+  assert.match(source, /:content="String\(state\.file\.name \|\| '未命名文件'\)"/)
+  assert.match(source, /const getFileNameLabel = value => String\(value \|\| '未命名文件'\)/)
+  assert.doesNotMatch(source, /file-card__name[^>]*:title=/)
+  assert.doesNotMatch(source, /file-table__name[^>]*:title=/)
+  assert.doesNotMatch(source, /file-table__metric[^>]*:title=/)
+  assert.doesNotMatch(source, /file-upload-dialog__item-name[^>]*:title=/)
+  assert.match(source, /file-card__name-tooltip[\s\S]*min-width: 0[\s\S]*overflow: hidden/)
+  assert.match(source, /file-table__name-tooltip[\s\S]*text-overflow: ellipsis|file-table__name[\s\S]*text-overflow: ellipsis/)
+  assert.match(source, /file-table-view :deep\(\.t-table\)[\s\S]*table-layout: fixed/)
+  assert.match(source, /file-table-view :deep\(\.t-table__content\)[\s\S]*overflow-y: auto/)
 })

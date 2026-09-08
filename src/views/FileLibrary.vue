@@ -118,17 +118,26 @@
                   <span>NO IMAGE</span>
                 </div>
                 <!-- 材质标签 -->
-                <t-tag :theme="getMaterialTagType(file.materialType)" class="file-card__material-tag" size="small">
-                  {{ file.materialType || '未指定' }}
-                </t-tag>
+                <t-tooltip
+                  class="file-card__material-tooltip"
+                  :content="String(file.materialType || '未指定')"
+                >
+                  <t-tag :theme="getMaterialTagType(file.materialType)" class="file-card__material-tag" size="small">
+                    {{ file.materialType || '未指定' }}
+                  </t-tag>
+                </t-tooltip>
               </div>
 
               <!-- 卡片内容 -->
               <div class="file-card__body">
-                <h3 class="file-card__name"
-                  :title="file.originalName">
-                  {{ file.originalName }}
-                </h3>
+                <t-tooltip
+                  class="file-card__name-tooltip"
+                  :content="getFileNameLabel(file.originalName)"
+                >
+                  <h3 class="file-card__name">
+                    {{ getFileNameLabel(file.originalName) }}
+                  </h3>
+                </t-tooltip>
 
                 <!-- 核心数据指标 -->
                 <div class="file-card__metrics">
@@ -157,14 +166,18 @@
                   </div>
                   <div class="file-card__success-rate">
                     <span class="file-card__stat-label">成功率</span>
-                    <t-tag
-                      :theme="getSuccessRateTheme(file.successRate)"
-                      size="small"
-                      class="file-card__success-rate-tag"
-                      :title="formatMetric(file.successRate, '%')"
+                    <t-tooltip
+                      class="file-card__success-rate-tooltip"
+                      :content="formatMetric(file.successRate, '%')"
                     >
-                      {{ formatMetric(file.successRate, '%') }}
-                    </t-tag>
+                      <t-tag
+                        :theme="getSuccessRateTheme(file.successRate)"
+                        size="small"
+                        class="file-card__success-rate-tag"
+                      >
+                        {{ formatMetric(file.successRate, '%') }}
+                      </t-tag>
+                    </t-tooltip>
                   </div>
                 </div>
 
@@ -204,13 +217,20 @@
                       <Document />
                     </span>
                   </div>
-                  <span class="file-table__name"
-                    :title="row.originalName">{{
-                      row.originalName
-                    }}</span>
-                  <t-tag :theme="getMaterialTagType(row.materialType)" size="small" class="file-table__type-tag">
-                    {{ row.materialType || '未指定' }}
-                  </t-tag>
+                  <t-tooltip
+                    class="file-table__name-tooltip"
+                    :content="getFileNameLabel(row.originalName)"
+                  >
+                    <span class="file-table__name">{{ getFileNameLabel(row.originalName) }}</span>
+                  </t-tooltip>
+                  <t-tooltip
+                    class="file-table__type-tooltip"
+                    :content="String(row.materialType || '未指定')"
+                  >
+                    <t-tag :theme="getMaterialTagType(row.materialType)" size="small" class="file-table__type-tag">
+                      {{ row.materialType || '未指定' }}
+                    </t-tag>
+                  </t-tooltip>
                 </div>
               </t-dropdown>
             </template>
@@ -218,44 +238,45 @@
 
           <TdTableColumn prop="fileSize" label="文件大小" width="100">
             <template #default="{ row }">
-              <span class="file-table__metric" :title="formatFileSize(row.fileSize)">{{ formatFileSize(row.fileSize) }}</span>
+              <t-tooltip class="file-table__metric-tooltip" :content="formatFileSize(row.fileSize)"><span class="file-table__metric">{{ formatFileSize(row.fileSize) }}</span></t-tooltip>
             </template>
           </TdTableColumn>
 
           <TdTableColumn prop="estTime" label="预计耗时" width="85">
             <template #default="{ row }">
-              <span class="file-table__metric" :title="formatDuration(row.estTime)">{{ formatDuration(row.estTime) }}</span>
+              <t-tooltip class="file-table__metric-tooltip" :content="formatDuration(row.estTime)"><span class="file-table__metric">{{ formatDuration(row.estTime) }}</span></t-tooltip>
             </template>
           </TdTableColumn>
 
           <TdTableColumn prop="filamentWeight" label="耗材重量" width="85">
             <template #default="{ row }">
-              <span class="file-table__metric" :title="formatMetric(row.filamentWeight, 'g')">{{ formatMetric(row.filamentWeight, 'g') }}</span>
+              <t-tooltip class="file-table__metric-tooltip" :content="formatMetric(row.filamentWeight, 'g')"><span class="file-table__metric">{{ formatMetric(row.filamentWeight, 'g') }}</span></t-tooltip>
             </template>
           </TdTableColumn>
 
           <TdTableColumn prop="filamentLength" label="所需线长" width="85">
             <template #default="{ row }">
-              <span class="file-table__metric" :title="formatMetric(row.filamentLength, 'm')">{{ formatMetric(row.filamentLength, 'm') }}</span>
+              <t-tooltip class="file-table__metric-tooltip" :content="formatMetric(row.filamentLength, 'm')"><span class="file-table__metric">{{ formatMetric(row.filamentLength, 'm') }}</span></t-tooltip>
             </template>
           </TdTableColumn>
 
           <TdTableColumn prop="printCount" label="打印次数" width="80">
             <template #default="{ row }">
-              <span class="file-table__metric" :title="formatMetric(row.printCount, '次')">{{ formatMetric(row.printCount, '次') }}</span>
+              <t-tooltip class="file-table__metric-tooltip" :content="formatMetric(row.printCount, '次')"><span class="file-table__metric">{{ formatMetric(row.printCount, '次') }}</span></t-tooltip>
             </template>
           </TdTableColumn>
 
           <TdTableColumn prop="successRate" label="成功率" width="100">
             <template #default="{ row }">
-              <t-tag
-                :theme="getSuccessRateTheme(row.successRate)"
-                size="small"
-                class="file-table__rate-tag"
-                :title="formatMetric(row.successRate, '%')"
-              >
-                {{ formatMetric(row.successRate, '%') }}
-              </t-tag>
+              <t-tooltip class="file-table__rate-tooltip" :content="formatMetric(row.successRate, '%')">
+                <t-tag
+                  :theme="getSuccessRateTheme(row.successRate)"
+                  size="small"
+                  class="file-table__rate-tag"
+                >
+                  {{ formatMetric(row.successRate, '%') }}
+                </t-tag>
+              </t-tooltip>
             </template>
           </TdTableColumn>
 
@@ -316,7 +337,9 @@
             <div class="file-upload-dialog__section-title">待上传文件（{{ pendingUploadFiles.length }}）</div>
             <div v-for="state in uploadFileStates" :key="`${state.file.name}-${state.file.lastModified}`"
               class="file-upload-dialog__item">
-              <span class="file-upload-dialog__item-name" :title="state.file.name">{{ state.file.name }}</span>
+              <t-tooltip class="file-upload-dialog__item-name-tooltip" :content="String(state.file.name || '未命名文件')">
+                <span class="file-upload-dialog__item-name">{{ state.file.name || '未命名文件' }}</span>
+              </t-tooltip>
               <span class="file-upload-dialog__item-progress">
                 <t-progress v-if="state.status === 'uploading'" :percentage="state.progress" :show-info="false" :stroke-width="4" />
                 <span class="file-upload-dialog__item-status" :class="state.status === 'success' ? 'text-green-600' : state.status === 'failed' ? 'text-red-600' : ''">
@@ -335,7 +358,12 @@
             />
             <div v-for="result in batchUploadResults" :key="`${result.index}-${result.fileName}`"
               class="file-upload-dialog__item">
-              <span class="file-upload-dialog__item-name" :title="result.fileName">{{ result.fileName || `第 ${result.index + 1} 项` }}</span>
+              <t-tooltip
+                class="file-upload-dialog__item-name-tooltip"
+                :content="String(result.fileName || `第 ${result.index + 1} 项`)"
+              >
+                <span class="file-upload-dialog__item-name">{{ result.fileName || `第 ${result.index + 1} 项` }}</span>
+              </t-tooltip>
               <span class="file-upload-dialog__item-status"
                 :class="isBatchUploadSuccess(result) ? 'text-green-600' : 'text-red-600'">
                 {{ isBatchUploadSuccess(result) ? '成功' : (result.message || '失败') }}
@@ -535,9 +563,14 @@
             </div>
             <div class="flex-1 min-w-0">
               <div class="text-sm text-gray-500 mb-1">当前选中文件</div>
-              <div class="text-base font-semibold text-gray-900 truncate" :title="jobForm.file?.originalName">
-                {{ jobForm.file?.originalName }}
-              </div>
+              <t-tooltip
+                class="create-job-file-name-tooltip"
+                :content="getFileNameLabel(jobForm.file?.originalName)"
+              >
+                <div class="text-base font-semibold text-gray-900 truncate">
+                  {{ getFileNameLabel(jobForm.file?.originalName) }}
+                </div>
+              </t-tooltip>
             </div>
           </div>
         </div>
@@ -899,6 +932,8 @@ const getContextMenuOptions = file => {
 }
 
 const hasValue = value => value !== undefined && value !== null && value !== ''
+
+const getFileNameLabel = value => String(value || '未命名文件')
 
 const formatMetric = (value, suffix = '') => hasValue(value) ? `${value}${suffix}` : '-'
 
@@ -2221,10 +2256,27 @@ onBeforeUnmount(() => {
 }
 
 .file-upload-dialog__item-name {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.file-upload-dialog__item-name-tooltip,
+.create-job-file-name-tooltip {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.file-upload-dialog__item-name-tooltip {
+  flex: 1 1 auto;
+}
+
+.create-job-file-name-tooltip {
+  display: block;
+  width: 100%;
 }
 
 .file-upload-dialog__item-progress {
@@ -2326,6 +2378,10 @@ onBeforeUnmount(() => {
   top: 8px;
   right: 8px;
   z-index: 1;
+  max-width: calc(100% - 16px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .file-card__media--folder {
@@ -2367,6 +2423,13 @@ onBeforeUnmount(() => {
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.file-card__name-tooltip {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .file-card__metrics {
@@ -2508,6 +2571,14 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
+.file-table__name-tooltip {
+  display: block;
+  min-width: 0;
+  flex: 1 1 auto;
+  max-width: 100%;
+  overflow: hidden;
+}
+
 .file-table__metric {
   display: block;
   max-width: 100%;
@@ -2516,8 +2587,28 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
+.file-table__metric-tooltip {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
 .file-table__type-tag {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-table__type-tooltip,
+.file-table__rate-tooltip {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .file-table__actions {
