@@ -119,8 +119,13 @@ test('文件库使用 TDesign 视图分段并永久显示选择列', () => {
   assert.match(source, /class="file-library-filter-form"[\s\S]*class="file-grid-view app-scroll-region"[\s\S]*class="file-table-view"[\s\S]*class="file-library-pagination"/)
 })
 
-test('文件库批量上传读取批量响应 data 并识别后端成功状态', () => {
-  assert.match(source, /normalizeBatchUploadResult\(queueResult\.value\.data\)/)
+test('文件库批量上传逐文件请求并维护独立进度', () => {
+  assert.match(source, /runUploadQueue\(files, async \(file, index\)/)
+  assert.match(source, /formData\.append\('file', file\)/)
+  assert.match(source, /uploadFileStates/)
+  assert.match(source, /state\.progress/)
+  assert.match(source, /concurrency: 3/)
+  assert.doesNotMatch(source, /batchUploadFiles\(/)
   assert.match(source, /isBatchUploadSuccess/)
 })
 

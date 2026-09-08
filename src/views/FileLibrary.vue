@@ -296,13 +296,18 @@
           </template>
         </t-upload>
 
-        <div v-if="pendingUploadFiles.length || batchUploadResults.length" class="file-upload-dialog__file-list">
-          <section v-if="pendingUploadFiles.length" class="file-upload-dialog__section" aria-label="待上传文件列表">
+        <div v-if="uploadFileStates.length || batchUploadResults.length" class="file-upload-dialog__file-list">
+          <section v-if="uploadFileStates.length" class="file-upload-dialog__section" aria-label="待上传文件列表">
             <div class="file-upload-dialog__section-title">待上传文件（{{ pendingUploadFiles.length }}）</div>
-            <div v-for="file in pendingUploadFiles" :key="`${file.name}-${file.lastModified}`"
+            <div v-for="state in uploadFileStates" :key="`${state.file.name}-${state.file.lastModified}`"
               class="file-upload-dialog__item">
-              <span class="file-upload-dialog__item-name" :title="file.name">{{ file.name }}</span>
-              <span class="file-upload-dialog__item-status">{{ batchUploading ? `${uploadProgress}%` : '待上传' }}</span>
+              <span class="file-upload-dialog__item-name" :title="state.file.name">{{ state.file.name }}</span>
+              <span class="file-upload-dialog__item-progress">
+                <t-progress v-if="state.status === 'uploading'" :percentage="state.progress" :show-info="false" :stroke-width="4" />
+                <span class="file-upload-dialog__item-status" :class="state.status === 'success' ? 'text-green-600' : state.status === 'failed' ? 'text-red-600' : ''">
+                  {{ state.status === 'uploading' ? `${state.progress}%` : state.status === 'success' ? '成功' : state.status === 'failed' ? (state.message || '失败') : state.status === 'unknown' ? '结果未知' : '待上传' }}
+                </span>
+              </span>
             </div>
             <t-progress v-if="batchUploading" :percentage="uploadProgress" />
           </section>
@@ -514,8 +519,7 @@ import {
   createFolder,
   getFilePreview,
   getThumbnailUrl,
-  getFileJobs,
-  batchUploadFiles
+  getFileJobs
 } from '@/api/printFile'
 import { createPrintJob } from '@/api/job'
 import { getPrinterList } from '@/api/printer'
@@ -529,11 +533,10 @@ import TdTableColumn from '@/components/TdTableColumn.vue'
 import {
   getUploadFailureState,
   isBatchUploadSuccess,
-  MAX_UPLOAD_REQUEST_BYTES,
   normalizeBatchUploadResult,
   validateBatchUploadSelection
 } from '@/utils/batchUpload'
-import { chunkItemsByBytes, runUploadQueue } from '@/utils/uploadQueue'
+import { runUploadQueue } from '@/utils/uploadQueue'
 import { useUserStore } from '@/stores/user'
 
 defineOptions({ name: 'FileLibrary' })
@@ -549,6 +552,7 @@ const uploadDialogVisible = ref(false)
 const createFolderDialogVisible = ref(false)
 const creatingFolder = ref(false)
 const pendingUploadFiles = ref([])
+const uploadFileStates = ref([])
 const batchUploadResults = ref([])
 const batchUploading = ref(false)
 const batchDeleting = ref(false)
@@ -853,6 +857,39 @@ const handleSelectionChange = (selection) => {
   selectedIds.value = selection.map(item => item.id)
 }
 
+const createUploadFileState = file => ({
+  file,
+  progress: 0,
+  loaded: 0,
+  status: 'pending',
+  message: '',
+  result: null
+})
+
+const isUploadCanceled = error => (
+  error?.name === 'CanceledError' || error?.name === 'AbortError' || error?.code === 'ERR_CANCELED'
+)
+
+const updateUploadOverallProgress = () => {
+  const states = uploadFileStates.value
+  if (states.length > 0 && states.every(state => state.status === 'success')) {
+    uploadProgress.value = 100
+    return
+  }
+  const totalBytes = states.reduce((total, state) => total + (Number(state.file?.size) || 0), 0)
+  if (totalBytes === 0) {
+    uploadProgress.value = states.length
+      ? Math.round(states.reduce((total, state) => total + state.progress, 0) / states.length)
+      : 0
+    return
+  }
+
+  const loadedBytes = states.reduce((total, state) => (
+    total + (Number(state.file?.size) || 0) * (Math.max(0, Math.min(100, state.progress)) / 100)
+  ), 0)
+  uploadProgress.value = Math.min(Math.round((loadedBytes / totalBytes) * 100), 99)
+}
+
 /**
  * 选择批量上传文件
  */
@@ -864,6 +901,7 @@ const handleFileSelect = (files) => {
   const existingNames = fileList.value.map(item => item.originalName)
   const validation = validateBatchUploadSelection(selectedFiles, existingNames)
   pendingUploadFiles.value = validation.files
+  uploadFileStates.value = validation.files.map(createUploadFileState)
   batchUploadResults.value = []
   uploadError.value = validation.rejected.map(item => item.reason).join('；')
   uploadProgress.value = 0
@@ -880,72 +918,87 @@ const submitBatchUpload = async () => {
   }
 
   const files = pendingUploadFiles.value.slice()
+  uploadFileStates.value = files.map(file => {
+    const previousState = uploadFileStates.value.find(state => state.file === file)
+    return previousState
+      ? { ...previousState, progress: 0, loaded: 0, status: 'pending', message: '', result: null }
+      : createUploadFileState(file)
+  })
   batchUploading.value = true
   uploadError.value = ''
   uploadProgress.value = 0
   uploadController = new AbortController()
   try {
-    let result
-    const onUploadProgress = event => {
-      if (event?.total) uploadProgress.value = Math.min(Math.round((event.loaded / event.total) * 100), 99)
-    }
-    if (files.length === 1) {
+    const queueResults = await runUploadQueue(files, async (file, index) => {
+      const state = uploadFileStates.value[index]
+      state.status = 'uploading'
       const formData = new FormData()
-      formData.append('file', files[0])
+      formData.append('file', file)
       if (currentParentId.value !== null) formData.append('parentId', String(currentParentId.value))
-      const response = await uploadPrintFile(formData, onUploadProgress, { signal: uploadController.signal })
-      result = {
-        items: [{
-          index: 0,
+      try {
+        const response = await uploadPrintFile(formData, event => {
+          const total = Number(event?.total) || Number(file.size) || 0
+          state.loaded = Number(event?.loaded) || 0
+          if (total > 0) state.progress = Math.min(Math.round((state.loaded / total) * 100), 99)
+          updateUploadOverallProgress()
+        }, { signal: uploadController.signal })
+        const item = {
+          index,
           fileId: response.data?.id ?? null,
-          fileName: response.data?.originalName || files[0].name,
+          fileName: response.data?.originalName || file.name,
           status: 'SUCCESS',
           errorCode: null,
           message: '上传成功',
-          retryable: false
-        }]
-      }
-    } else {
-      const chunks = chunkItemsByBytes(files, MAX_UPLOAD_REQUEST_BYTES)
-      const chunkLoaded = new Map()
-      const totalBytes = files.reduce((total, file) => total + (Number(file.size) || 0), 0)
-      const queueResults = await runUploadQueue(chunks, async (chunk, chunkIndex) => {
-        const chunkProgress = event => {
-          chunkLoaded.set(chunkIndex, event?.loaded || 0)
-          const loaded = [...chunkLoaded.values()].reduce((total, value) => total + value, 0)
-          onUploadProgress({ loaded, total: totalBytes })
+          retryable: false,
+          requiresRefresh: false
         }
-        return batchUploadFiles(chunk, currentParentId.value, chunkProgress, {
-          signal: uploadController.signal
-        })
-      }, {
-        concurrency: 3,
-        signal: uploadController.signal
-      })
-      const items = []
-      queueResults.forEach((queueResult, chunkIndex) => {
-        const chunk = chunks[chunkIndex]
-        const offset = chunks.slice(0, chunkIndex).reduce((total, currentChunk) => total + currentChunk.length, 0)
-        if (queueResult.status === 'fulfilled') {
-          normalizeBatchUploadResult(queueResult.value.data).items.forEach(item => {
-            const file = chunk[item.index]
-            items.push({ ...item, index: offset + item.index, fileName: item.fileName || file?.name || '' })
-          })
-        } else {
-          const failure = getUploadFailureState(queueResult.reason)
-          chunk.forEach((file, itemIndex) => items.push({
-            index: offset + itemIndex,
+        state.progress = 100
+        state.loaded = Number(file.size) || state.loaded
+        state.status = 'success'
+        state.message = item.message
+        state.result = item
+        uploadProgress.value = files.every(currentFile => (
+          uploadFileStates.value.find(currentState => currentState.file === currentFile)?.status === 'success'
+        )) ? 100 : uploadProgress.value
+        updateUploadOverallProgress()
+        return item
+      } catch (error) {
+        if (!isUploadCanceled(error)) {
+          const failure = getUploadFailureState(error)
+          state.status = failure.requiresRefresh ? 'unknown' : 'failed'
+          state.message = failure.message
+          state.result = {
+            index,
             fileId: null,
             fileName: file.name,
             status: 'FAILED',
-            errorCode: failure.errorCode,
-            message: failure.message,
-            retryable: failure.retryable,
-            requiresRefresh: failure.requiresRefresh
-          }))
+            ...failure
+          }
         }
+        throw error
+      }
+    }, {
+      concurrency: 3,
+      signal: uploadController.signal
+    })
+
+    const result = {
+      items: queueResults.map((queueResult, index) => {
+        if (queueResult.status === 'fulfilled') return queueResult.value
+        const file = files[index]
+        const failure = getUploadFailureState(queueResult.reason)
+        const state = uploadFileStates.value[index]
+        state.status = failure.requiresRefresh ? 'unknown' : 'failed'
+        state.message = failure.message
+        state.result = {
+          index,
+          fileId: null,
+          fileName: file.name,
+          status: 'FAILED',
+          ...failure
+        }
+        return state.result
       })
-      result = { items: items.sort((left, right) => left.index - right.index) }
     }
 
     const items = normalizeBatchUploadResult(result).items
@@ -957,11 +1010,18 @@ const submitBatchUpload = async () => {
       .filter(Boolean)
     const unknownResultCount = items.filter(item => item.requiresRefresh).length
     pendingUploadFiles.value = retryableFiles
+    const allUploadFileStates = uploadFileStates.value.slice()
+    uploadFileStates.value = retryableFiles.map(file => {
+      const state = allUploadFileStates.find(item => item.file === file)
+      return state
+        ? { ...state, progress: 0, loaded: 0, status: 'pending', message: '', result: null }
+        : createUploadFileState(file)
+    })
     if (unknownResultCount) {
       uploadError.value = '部分上传结果未知，请刷新文件列表确认后再重试，避免重复入库'
     }
 
-    if (successfulItems.length > 0) await refreshLibrary()
+    if (successfulItems.length > 0 || unknownResultCount) await refreshLibrary()
     if (retryableFiles.length === 0 && successfulItems.length === files.length) {
       message.success(`已上传 ${successfulItems.length} 个文件`)
       uploadDialogVisible.value = false
@@ -974,7 +1034,18 @@ const submitBatchUpload = async () => {
     }
   } catch (error) {
     console.error('批量上传失败:', error)
-    if (error?.name === 'CanceledError' || error?.name === 'AbortError' || error?.code === 'ERR_CANCELED') {
+    if (isUploadCanceled(error)) {
+      const completedItems = uploadFileStates.value
+        .filter(state => state.status === 'success' && state.result)
+        .map(state => state.result)
+      const completedFiles = new Set(uploadFileStates.value
+        .filter(state => state.status === 'success')
+        .map(state => state.file))
+      batchUploadResults.value = completedItems
+      pendingUploadFiles.value = files.filter(file => !completedFiles.has(file))
+      uploadFileStates.value = uploadFileStates.value
+        .filter(state => !completedFiles.has(state.file))
+        .map(state => ({ ...state, progress: 0, loaded: 0, status: 'pending', message: '', result: null }))
       message.info('上传已取消')
     } else {
       const failure = getUploadFailureState(error)
@@ -1165,6 +1236,7 @@ const handleUpload = () => {
     return
   }
   pendingUploadFiles.value = []
+  uploadFileStates.value = []
   batchUploadResults.value = []
   uploadProgress.value = 0
   uploadError.value = ''
@@ -1722,6 +1794,18 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.file-upload-dialog__item-progress {
+  display: inline-flex;
+  flex: 0 0 180px;
+  align-items: center;
+  gap: var(--app-spacing-2);
+}
+
+.file-upload-dialog__item-progress :deep(.t-progress) {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .file-upload-dialog__item-status {
