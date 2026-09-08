@@ -58,7 +58,7 @@
           v-if="!node.data?.isDefault"
           :options="folderActionOptions"
           trigger="click"
-          @click.stop="handleFolderAction($event, node.data)"
+          @click="dropdownAction => handleFolderAction(dropdownAction, node.data)"
         >
           <t-button
             class="file-folder-tree__more"
@@ -68,6 +68,7 @@
             :disabled="folderActionLoading || deletingFolderId !== null && deletingFolderId !== undefined"
             :aria-label="`打开文件夹 ${node.label} 操作面板`"
             :title="`打开文件夹 ${node.label} 操作面板`"
+            @click.stop
           >
             <MoreIcon />
           </t-button>
@@ -218,8 +219,7 @@ const handleTreeClick = context => {
   })
 }
 
-const handleFolderAction = (value, folder) => {
-  const action = typeof value === 'object' ? value.value : value
+const handleFolderAction = (action, folder) => {
   if (folder && action) emit('folder-action', folder, action)
 }
 
@@ -311,16 +311,42 @@ defineExpose({ refresh })
   white-space: nowrap;
 }
 
+.file-folder-tree :deep(.t-tree__item) {
+  border-radius: var(--td-radius-default);
+}
+
+.file-folder-tree :deep(.t-tree__item:hover),
+.file-folder-tree :deep(.t-tree__item:focus-within) {
+  background-color: var(--td-bg-color-container-hover);
+}
+
+.file-folder-tree :deep(.t-tree__item:hover .t-tree__label),
+.file-folder-tree :deep(.t-tree__item:focus-within .t-tree__label),
+.file-folder-tree :deep(.t-tree__item.t-is-active .t-tree__label) {
+  background-color: transparent;
+}
+
+.file-folder-tree :deep(.t-tree__item.t-is-active) {
+  background-color: var(--td-brand-color-light);
+}
+
 .file-folder-tree__more {
-  display: none;
+  display: inline-flex;
   flex: 0 0 auto;
+  width: var(--td-comp-size-m);
+  height: var(--td-comp-size-m);
+  padding: 0;
   color: var(--app-text-secondary);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease;
 }
 
 .file-folder-tree :deep(.t-tree__item:hover) .file-folder-tree__more,
 .file-folder-tree :deep(.t-tree__item:focus-within) .file-folder-tree__more,
 .file-folder-tree__more:focus-visible {
-  display: inline-flex;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .file-folder-tree__more:hover {

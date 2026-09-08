@@ -40,7 +40,8 @@ test('文件夹树只消费后端真实目录节点并保留路径和错误恢�
   assert.match(folderTreeSource, /<MoreIcon \/>/)
   assert.match(folderTreeSource, /trigger="click"/)
   assert.match(folderTreeSource, /folderActionOptions/)
-  assert.match(folderTreeSource, /handleFolderAction\(\$event, node\.data\)/)
+  assert.match(folderTreeSource, /@click="dropdownAction => handleFolderAction\(dropdownAction, node\.data\)"/)
+  assert.match(folderTreeSource, /@click\.stop\n\s*>/)
   assert.match(folderTreeSource, /emit\('folder-action', folder, action\)/)
   assert.doesNotMatch(folderTreeSource, /emit\('delete', node\.data\)/)
   assert.match(folderTreeSource, /EditIcon/)
@@ -59,6 +60,18 @@ test('文件夹树只消费后端真实目录节点并保留路径和错误恢�
   assert.doesNotMatch(folderTreeSource, /:max-height="treeMaxHeight"/)
   assert.match(folderTreeSource, /\.file-folder-tree__nodes[\s\S]*overflow: visible/)
   assert.doesNotMatch(folderTreeSource, /checkable|draggable|allow-drop|onDrop/)
+})
+
+test('文件夹 More 面板按 TDesign Dropdown click 签名传递三类动作', () => {
+  const actionOptions = folderTreeSource.match(/const folderActionOptions = \[[\s\S]*?\n\]/)?.[0] || ''
+  assert.match(actionOptions, /content: '重命名'[\s\S]*value: 'rename'[\s\S]*EditIcon/)
+  assert.match(actionOptions, /content: '移动到'[\s\S]*value: 'move'[\s\S]*FolderMoveIcon/)
+  assert.match(actionOptions, /content: '删除'[\s\S]*value: 'delete'[\s\S]*theme: 'error'[\s\S]*DeleteIcon/)
+  assert.match(folderTreeSource, /const handleFolderAction = \(action, folder\) =>/)
+  assert.doesNotMatch(folderTreeSource, /handleFolderAction\(\$event/)
+  assert.match(folderTreeSource, /\.t-tree__item:hover\)[\s\S]*\.t-tree__item:focus-within/)
+  assert.match(folderTreeSource, /opacity: 0[\s\S]*pointer-events: none/)
+  assert.match(folderTreeSource, /\.t-tree__item:focus-within\) \.file-folder-tree__more[\s\S]*pointer-events: auto/)
 })
 
 test('文件中心不伪造材料和统计值，并覆盖上传删除结果态', () => {
