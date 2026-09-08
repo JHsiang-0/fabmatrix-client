@@ -99,6 +99,37 @@ const getFolderLevel = folder => {
   return level
 }
 
+const getFolderLevelForMove = (folder, foldersById, movedFolderId, movedParentId) => {
+  let level = 1
+  let current = folder
+  const visited = new Set()
+  while (current) {
+    if (visited.has(String(current.id))) return -1
+    visited.add(String(current.id))
+    const parentId = String(current.id) === String(movedFolderId)
+      ? movedParentId
+      : current.parentId
+    if (parentId === null || parentId === undefined) return level
+    const parent = foldersById.get(String(parentId))
+    if (!parent?.folder || String(parent.userId) !== String(folder.userId)) return -1
+    level += 1
+    current = parent
+    if (level > 2) return level
+  }
+  return level
+}
+
+const isFolderSameOrDescendant = (candidate, ancestor, foldersById) => {
+  let current = candidate
+  const visited = new Set()
+  while (current && !visited.has(String(current.id))) {
+    if (String(current.id) === String(ancestor.id)) return true
+    visited.add(String(current.id))
+    current = foldersById.get(String(current.parentId))
+  }
+  return false
+}
+
 const requireFolderParent = (session, parentId, options = {}) => {
   if (parentId === null || parentId === undefined || parentId === '') return null
   const normalizedId = Number(parentId)
@@ -929,6 +960,103 @@ const handleCreateFolder = config => {
   return toPublicFile(folder)
 }
 
+const recordFolderAudit = (session, action, folder) => {
+  mockState.auditLogs.unshift({
+    id: nextMockId('auditLog'),
+    actorId: session.userId,
+    actorUsername: session.username,
+    actorRole: session.role,
+    action,
+    targetType: 'FOLDER',
+    targetId: String(folder.id),
+    targetLabel: folder.originalName,
+    result: 'SUCCESS',
+    errorCode: null,
+    occurredAt: now(),
+    traceId: `mock-trace-folder-${folder.id}`
+  })
+}
+
+const normalizeMockFolderName = value => {
+  const folderName = String(value || '').trim()
+  const hasControlCharacter = [...folderName].some(character => character.charCodeAt(0) < 32)
+  if (!folderName) fail(400, 400, '文件夹名称不能为空')
+  if (folderName.length > 100 || hasControlCharacter || /[\\/:*?"<>|]/.test(folderName)) {
+    fail(400, 400, '文件夹名称不合法')
+  }
+  return folderName
+}
+
+const handleRenameFolder = config => {
+  const session = requireSession(config, ['ADMIN', 'OPERATOR'])
+  const id = getPath(config.url).split('/').at(-2)
+  const folder = getFileForSession(config, id)
+  if (!folder.folder) fail(422, 422, '目标资源不是文件夹')
+  if (folder.isDefault) fail(422, 422, '默认目录不可重命名')
+  const folderName = normalizeMockFolderName(getBody(config).folderName)
+  if (mockState.files.some(file => (
+    file.folder && String(file.id) !== String(folder.id)
+      && String(file.userId) === String(folder.userId)
+      && (file.parentId ?? null) === (folder.parentId ?? null)
+      && file.originalName === folderName
+  ))) {
+    fail(409, 'PRINT_FOLDER_NAME_CONFLICT', '该目录下已存在同名文件夹')
+  }
+  folder.originalName = folderName
+  recordFolderAudit(session, 'FOLDER_RENAME', folder)
+  return toPublicFile(folder)
+}
+
+const handleMoveFolder = config => {
+  const session = requireSession(config, ['ADMIN', 'OPERATOR'])
+  const id = getPath(config.url).split('/').at(-2)
+  const folder = getFileForSession(config, id)
+  if (!folder.folder) fail(422, 422, '目标资源不是文件夹')
+  if (folder.isDefault) fail(422, 422, '默认目录不可移动')
+
+  const rawParentId = getBody(config).parentId
+  const parentId = rawParentId == null || rawParentId === '' ? null : Number(rawParentId)
+  if (parentId !== null && (!Number.isInteger(parentId) || parentId <= 0)) {
+    fail(400, 400, '目标目录 ID 必须为正数')
+  }
+
+  const userFolders = mockState.files.filter(file => (
+    file.folder && String(file.userId) === String(folder.userId)
+  ))
+  const foldersById = new Map(userFolders.map(item => [String(item.id), item]))
+  const target = parentId === null ? null : getFileForSession(config, parentId)
+  if (target && !target.folder) fail(422, 422, '移动目标不是文件夹')
+  if (target && String(target.userId) !== String(folder.userId)) {
+    fail(403, 403, '目标文件夹必须属于源文件夹用户')
+  }
+  if (target && (target.parentId !== null && target.parentId !== undefined
+    || getFolderLevel(target) !== 1)) {
+    fail(422, 422, '移动目标必须是一级文件夹')
+  }
+  if (target && isFolderSameOrDescendant(target, folder, foldersById)) {
+    fail(422, 422, '不能移动到自身或子孙目录')
+  }
+
+  userFolders.forEach(candidate => {
+    if (isFolderSameOrDescendant(candidate, folder, foldersById)
+      && getFolderLevelForMove(candidate, foldersById, folder.id, parentId) > 2) {
+      fail(422, 422, '移动后文件夹最多支持两级目录')
+    }
+  })
+  if (mockState.files.some(file => (
+    file.folder && String(file.id) !== String(folder.id)
+      && String(file.userId) === String(folder.userId)
+      && (file.parentId ?? null) === parentId
+      && file.originalName === folder.originalName
+  ))) {
+    fail(409, 'PRINT_FOLDER_NAME_CONFLICT', '目标目录下已存在同名文件夹')
+  }
+  folder.parentId = parentId
+  folder.level = getFolderLevel(folder)
+  recordFolderAudit(session, 'FOLDER_MOVE', folder)
+  return toPublicFile(folder)
+}
+
 const handleDeleteFolder = config => {
   const id = getPath(config.url).split('/').pop()
   const folder = getFileForSession(config, id)
@@ -1649,6 +1777,8 @@ const route = async config => {
   if (key === 'POST /api/v1/print-files/upload') return handleUpload(config)
   if (key === 'POST /api/v1/print-files/batch-upload') return handleBatchUpload(config)
   if (key === 'POST /api/v1/print-files/folder/create') return handleCreateFolder(config)
+  if (/^PUT \/api\/v1\/print-files\/folder\/[^/]+\/rename$/.test(key)) return handleRenameFolder(config)
+  if (/^PUT \/api\/v1\/print-files\/folder\/[^/]+\/move$/.test(key)) return handleMoveFolder(config)
   if (/^DELETE \/api\/v1\/print-files\/folder\/[^/]+$/.test(key)) return handleDeleteFolder(config)
   if (key === 'GET /api/v1/print-files/tree') return handleFileTree(config)
   if (/^GET \/api\/v1\/print-files\/[^/]+\/preview$/.test(key)) return handleFilePreview(config)

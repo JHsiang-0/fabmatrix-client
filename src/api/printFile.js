@@ -103,6 +103,24 @@ export function createFolder(data) {
   }).then(response => mapResponseData(response, normalizePrintFile))
 }
 
+/** 重命名非默认文件夹。 */
+export function renameFolder(id, data) {
+  return request({
+    url: `/api/v1/print-files/folder/${id}/rename`,
+    method: 'put',
+    data
+  }).then(response => mapResponseData(response, normalizePrintFile))
+}
+
+/** 移动非默认文件夹；parentId 为 null 表示根目录。 */
+export function moveFolder(id, data) {
+  return request({
+    url: `/api/v1/print-files/folder/${id}/move`,
+    method: 'put',
+    data
+  }).then(response => mapResponseData(response, normalizePrintFile))
+}
+
 /**
  * 删除空文件夹；后端会拒绝默认目录和包含文件/子目录的目录。
  * @param {number|string} id - 文件夹 ID

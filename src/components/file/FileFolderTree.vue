@@ -54,21 +54,24 @@
       @expand="handleExpand"
     >
       <template #operations="{ node }">
-        <t-button
+        <t-dropdown
           v-if="!node.data?.isDefault"
-          class="file-folder-tree__delete"
-          theme="danger"
-          variant="text"
-          shape="square"
-          size="small"
-          :loading="String(deletingFolderId) === String(node.value)"
-          :disabled="deletingFolderId !== null && deletingFolderId !== undefined"
-          aria-label="删除文件夹"
-          :title="`删除文件夹 ${node.label}`"
-          @click.stop="emit('delete', node.data)"
+          :options="folderActionOptions"
+          trigger="click"
+          @click.stop="handleFolderAction($event, node.data)"
         >
-          <DeleteIcon />
-        </t-button>
+          <t-button
+            class="file-folder-tree__more"
+            variant="text"
+            shape="square"
+            size="small"
+            :disabled="folderActionLoading || deletingFolderId !== null && deletingFolderId !== undefined"
+            :aria-label="`打开文件夹 ${node.label} 操作面板`"
+            :title="`打开文件夹 ${node.label} 操作面板`"
+          >
+            <MoreIcon />
+          </t-button>
+        </t-dropdown>
       </template>
     </t-tree>
   </aside>
@@ -76,17 +79,25 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { AddIcon, DeleteIcon, SearchIcon } from 'tdesign-icons-vue-next'
+import { AddIcon, DeleteIcon, EditIcon, FolderMoveIcon, MoreIcon, SearchIcon } from 'tdesign-icons-vue-next'
 import { getFileTree } from '@/api/printFile'
+import { renderIcon } from '@/utils/tdesign'
 
 defineOptions({ name: 'FileFolderTree' })
 
 const props = defineProps({
   currentParentId: { type: [String, Number], default: null },
-  deletingFolderId: { type: [String, Number], default: null }
+  deletingFolderId: { type: [String, Number], default: null },
+  folderActionLoading: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['select', 'loaded', 'delete'])
+const emit = defineEmits(['select', 'loaded', 'create', 'folder-action'])
+
+const folderActionOptions = [
+  { content: '重命名', value: 'rename', prefixIcon: renderIcon(EditIcon) },
+  { content: '移动到', value: 'move', prefixIcon: renderIcon(FolderMoveIcon) },
+  { content: '删除', value: 'delete', theme: 'error', prefixIcon: renderIcon(DeleteIcon) }
+]
 
 const loading = ref(false)
 const error = ref('')
@@ -207,6 +218,11 @@ const handleTreeClick = context => {
   })
 }
 
+const handleFolderAction = (value, folder) => {
+  const action = typeof value === 'object' ? value.value : value
+  if (folder && action) emit('folder-action', folder, action)
+}
+
 const handleExpand = keys => {
   expandedKeys.value = keys
 }
@@ -293,6 +309,23 @@ defineExpose({ refresh })
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.file-folder-tree__more {
+  display: none;
+  flex: 0 0 auto;
+  color: var(--app-text-secondary);
+}
+
+.file-folder-tree :deep(.t-tree__item:hover) .file-folder-tree__more,
+.file-folder-tree :deep(.t-tree__item:focus-within) .file-folder-tree__more,
+.file-folder-tree__more:focus-visible {
+  display: inline-flex;
+}
+
+.file-folder-tree__more:hover {
+  color: var(--app-text-primary);
+  background: var(--app-surface-muted);
 }
 
 @media (max-width: 768px) {

@@ -124,6 +124,69 @@ test('deletes only empty non-default folders through the dedicated endpoint', as
   )
 })
 
+test('renames and moves folders through the real endpoints and records mock audit entries', async () => {
+  setupSession()
+
+  const source = await request('POST', '/api/v1/print-files/folder/create', {
+    folderName: '待整理'
+  }, operatorHeaders)
+  const target = await request('POST', '/api/v1/print-files/folder/create', {
+    folderName: '归档'
+  }, operatorHeaders)
+  const renamed = await request('PUT', `/api/v1/print-files/folder/${source.data.id}/rename`, {
+    folderName: '已整理'
+  }, operatorHeaders)
+  assert.equal(renamed.data.originalName, '已整理')
+
+  const moved = await request('PUT', `/api/v1/print-files/folder/${source.data.id}/move`, {
+    parentId: target.data.id
+  }, operatorHeaders)
+  assert.equal(moved.data.parentId, target.data.id)
+  assert.equal(mockState.files.find(file => file.id === source.data.id).parentId, target.data.id)
+  assert.deepEqual(mockState.auditLogs.slice(0, 2).map(log => log.action), ['FOLDER_MOVE', 'FOLDER_RENAME'])
+})
+
+test('protects default folders and rejects illegal names, duplicate names, cross-user and third-level moves', async () => {
+  setupSession()
+
+  await assert.rejects(
+    request('PUT', '/api/v1/print-files/folder/4/rename', { folderName: '不应修改' }, operatorHeaders),
+    error => error.response.status === 422 && error.message === '默认目录不可重命名'
+  )
+  await assert.rejects(
+    request('PUT', '/api/v1/print-files/folder/4/move', { parentId: null }, operatorHeaders),
+    error => error.response.status === 422 && error.message === '默认目录不可移动'
+  )
+
+  const source = await request('POST', '/api/v1/print-files/folder/create', {
+    folderName: '源目录'
+  }, operatorHeaders)
+  const target = await request('POST', '/api/v1/print-files/folder/create', {
+    folderName: '目标目录'
+  }, operatorHeaders)
+  await assert.rejects(
+    request('PUT', `/api/v1/print-files/folder/${source.data.id}/rename`, { folderName: 'bad/name' }, operatorHeaders),
+    error => error.response.status === 400
+  )
+  await assert.rejects(
+    request('PUT', `/api/v1/print-files/folder/${source.data.id}/rename`, { folderName: '目标目录' }, operatorHeaders),
+    error => error.response.status === 409
+  )
+  await assert.rejects(
+    request('PUT', '/api/v1/print-files/folder/1/move', { parentId: 2 }, adminHeaders),
+    error => error.response.status === 403
+  )
+
+  await request('POST', '/api/v1/print-files/folder/create', {
+    parentId: source.data.id,
+    folderName: '子目录'
+  }, operatorHeaders)
+  await assert.rejects(
+    request('PUT', `/api/v1/print-files/folder/${source.data.id}/move`, { parentId: target.data.id }, operatorHeaders),
+    error => error.response.status === 422 && error.message === '移动后文件夹最多支持两级目录'
+  )
+})
+
 test('rejects non-empty folder deletion without removing its children', async () => {
   setupSession()
 

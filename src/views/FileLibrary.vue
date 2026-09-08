@@ -11,10 +11,11 @@
             ref="folderTreeRef"
             :current-parent-id="currentParentId"
             :deleting-folder-id="deletingFolderId"
+            :folder-action-loading="folderActionLoading"
             @select="handleFolderSelect"
             @loaded="handleFolderTreeLoaded"
             @create="openCreateFolderDialog"
-            @delete="handleFolderDelete"
+            @folder-action="handleFolderAction"
           />
         </t-card>
       </t-aside>
@@ -384,6 +385,50 @@
       </template>
     </t-dialog>
 
+    <!-- 重命名文件夹对话框 -->
+    <t-dialog v-model:visible="renameFolderDialogVisible" header="重命名文件夹" width="400px"
+      :close-on-overlay-click="false">
+      <t-form ref="renameFolderFormRef" :data="renameFolderForm" :rules="renameFolderRules" label-width="80px">
+        <t-form-item label="文件夹名称" name="name">
+          <t-input v-model="renameFolderForm.name" placeholder="请输入文件夹名称" :maxlength="100" />
+        </t-form-item>
+      </t-form>
+
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <t-button :disabled="folderActionLoading" @click="renameFolderDialogVisible = false">取消</t-button>
+          <t-button theme="primary" :loading="folderActionLoading" @click="handleRenameFolder">保存</t-button>
+        </div>
+      </template>
+    </t-dialog>
+
+    <!-- 移动文件夹对话框 -->
+    <t-dialog v-model:visible="moveFolderDialogVisible" header="移动到" width="400px"
+      :close-on-overlay-click="false">
+      <t-form ref="moveFolderFormRef" :data="moveFolderForm" :rules="moveFolderRules" label-width="80px">
+        <t-form-item label="目标目录" name="parentId">
+          <t-select v-model="moveFolderForm.parentId" placeholder="请选择目标目录">
+            <t-option
+              v-for="target in moveFolderTargets"
+              :key="target.value ?? 'root'"
+              :value="target.value"
+              :label="target.label"
+            />
+          </t-select>
+        </t-form-item>
+      </t-form>
+      <t-alert theme="warning" :close-btn="false" class="mt-3">
+        仅移动文件夹目录记录，不会移动其中的文件；目标目录必须与源目录属于同一用户。
+      </t-alert>
+
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <t-button :disabled="folderActionLoading" @click="moveFolderDialogVisible = false">取消</t-button>
+          <t-button theme="primary" :loading="folderActionLoading" @click="handleMoveFolder">移动</t-button>
+        </div>
+      </template>
+    </t-dialog>
+
     <!-- 文件详情抽屉 -->
     <FileDetailDrawer
       v-model="detailDrawerVisible"
@@ -519,6 +564,8 @@ import {
   deleteBatchFiles,
   downloadFile,
   createFolder,
+  renameFolder,
+  moveFolder,
   deleteFolder,
   getFilePreview,
   getThumbnailUrl,
@@ -591,6 +638,14 @@ const directoryReady = ref(false)
 const folderTreeRef = ref(null)
 const folderTreeFolders = ref([])
 const deletingFolderId = ref(null)
+const folderActionLoading = ref(false)
+const renameFolderDialogVisible = ref(false)
+const moveFolderDialogVisible = ref(false)
+const actionFolder = ref(null)
+const renameFolderForm = reactive({ name: '' })
+const moveFolderForm = reactive({ parentId: null })
+const renameFolderFormRef = ref(null)
+const moveFolderFormRef = ref(null)
 const userStore = useUserStore()
 let fileRequestSequence = 0
 
@@ -604,11 +659,30 @@ const folderForm = reactive({
 const folderRules = {
   name: [
     { required: true, message: '请输入文件夹名称', trigger: 'blur' },
-    { min: 1, max: 50, message: '文件夹名称长度在 1 到 50 个字符之间', trigger: 'blur' }
+    { min: 1, max: 100, message: '文件夹名称长度在 1 到 100 个字符之间', trigger: 'blur' }
   ],
   level: [{ required: true, message: '请选择目录级别', trigger: 'change' }],
   parentId: [{ required: true, message: '请选择一级父目录', trigger: 'change' }]
 }
+
+const folderNameValidationRule = {
+  validator: value => {
+    const name = String(value || '').trim()
+    const hasControlCharacter = [...name].some(character => character.charCodeAt(0) < 32)
+    return name.length > 0 && name.length <= 100 && !hasControlCharacter && !/[\\/:*?"<>|]/.test(name)
+  },
+  message: '名称不能为空、不能超过100个字符且不能包含非法字符',
+  trigger: 'blur'
+}
+
+const renameFolderRules = {
+  name: [
+    { required: true, message: '请输入文件夹名称', trigger: 'blur' },
+    folderNameValidationRule
+  ]
+}
+
+const moveFolderRules = {}
 
 const folderFormRef = ref(null)
 
@@ -634,6 +708,39 @@ const flattenFolders = (nodes, result = []) => {
 const firstLevelFolders = computed(() => flattenFolders(folderTreeFolders.value)
   .filter(folder => Number(folder.level || 1) === 1 && (folder.parentId === null || folder.parentId === undefined))
   .map(folder => ({ value: folder.id, label: folder.name || folder.originalName || `文件夹 ${folder.id}` })))
+
+const isDescendantFolder = (candidateId, ancestorId) => {
+  let current = flattenFolders(folderTreeFolders.value)
+    .find(folder => String(folder.id) === String(candidateId))
+  const visited = new Set()
+  while (current && current.parentId !== null && current.parentId !== undefined) {
+    if (visited.has(String(current.id))) return false
+    visited.add(String(current.id))
+    if (String(current.parentId) === String(ancestorId)) return true
+    current = flattenFolders(folderTreeFolders.value)
+      .find(folder => String(folder.id) === String(current.parentId))
+  }
+  return false
+}
+
+const moveFolderTargets = computed(() => {
+  const source = actionFolder.value
+  const targets = [{ value: null, label: '根目录' }]
+  if (!source) return targets
+
+  const firstLevelTargets = flattenFolders(folderTreeFolders.value)
+    .filter(folder => Number(folder.level || 1) === 1)
+    .filter(folder => folder.parentId === null || folder.parentId === undefined)
+    .filter(folder => !folder.isDefault)
+    .filter(folder => String(folder.id) !== String(source.id))
+    .filter(folder => !isDescendantFolder(folder.id, source.id))
+    .filter(folder => folder.userId === undefined || String(folder.userId) === String(source.userId))
+    .map(folder => ({
+      value: folder.id,
+      label: folder.name || folder.originalName || `文件夹 ${folder.id}`
+    }))
+  return targets.concat(firstLevelTargets)
+})
 
 const getRowCheckProps = () => ({})
 
@@ -756,9 +863,10 @@ const handleFolderSelect = selection => {
 }
 
 const handleFolderTreeLoaded = folders => {
+  const wasDirectoryReady = directoryReady.value
   folderTreeFolders.value = Array.isArray(folders) ? folders : []
   directoryReady.value = true
-  if (currentParentId.value !== null && currentParentId.value !== undefined) return
+  if (wasDirectoryReady || (currentParentId.value !== null && currentParentId.value !== undefined)) return
 
   const currentUserId = userStore.userInfo?.id ?? null
   const defaultFolder = currentUserId === null || currentUserId === undefined
@@ -815,13 +923,78 @@ const handleCreateFolder = async () => {
   }
 }
 
+const handleFolderAction = (folder, action) => {
+  if (!folder || folder.isDefault || folderActionLoading.value) return
+  actionFolder.value = folder
+  if (action === 'rename') {
+    renameFolderForm.name = folder.name || folder.originalName || ''
+    renameFolderDialogVisible.value = true
+  } else if (action === 'move') {
+    moveFolderForm.parentId = null
+    moveFolderDialogVisible.value = true
+  } else if (action === 'delete') {
+    handleFolderDelete(folder)
+  }
+}
+
+const handleRenameFolder = async () => {
+  const folder = actionFolder.value
+  if (!folder || folderActionLoading.value) return
+  const validation = await renameFolderFormRef.value?.validate()
+  if (validation !== true && validation !== undefined) return
+
+  folderActionLoading.value = true
+  try {
+    await renameFolder(folder.id, { folderName: renameFolderForm.name })
+    renameFolderDialogVisible.value = false
+    await folderTreeRef.value?.refresh()
+    await refreshLibrary()
+    message.success('文件夹重命名成功')
+  } catch (error) {
+    console.error('重命名文件夹失败:', error)
+    message.error(error?.message || '文件夹重命名失败')
+  } finally {
+    folderActionLoading.value = false
+  }
+}
+
+const handleMoveFolder = async () => {
+  const folder = actionFolder.value
+  if (!folder || folderActionLoading.value) return
+  if (String(moveFolderForm.parentId ?? '') === String(folder.parentId ?? '')) {
+    message.warning('文件夹已经位于该目录')
+    return
+  }
+
+  folderActionLoading.value = true
+  const isCurrentFolder = String(currentParentId.value) === String(folder.id)
+  const targetParentId = moveFolderForm.parentId ?? null
+  try {
+    await moveFolder(folder.id, { parentId: targetParentId })
+    moveFolderDialogVisible.value = false
+    if (isCurrentFolder) {
+      currentParentId.value = targetParentId
+      pagination.pageNum = 1
+      selectedIds.value = []
+    }
+    await folderTreeRef.value?.refresh()
+    await refreshLibrary()
+    message.success('文件夹移动成功')
+  } catch (error) {
+    console.error('移动文件夹失败:', error)
+    message.error(error?.message || '文件夹移动失败')
+  } finally {
+    folderActionLoading.value = false
+  }
+}
+
 /**
  * 删除文件夹：确认、专用接口调用和目录/文件列表同步均由文件库统一处理。
  */
 const handleFolderDelete = async folder => {
   const id = folder?.id
   if (id === null || id === undefined || deletingFolderId.value !== null
-    || batchDeleting.value || deletingIds.value.length > 0) return
+    || batchDeleting.value || deletingIds.value.length > 0 || folderActionLoading.value) return
   if (folder.isDefault) {
     message.warning('默认目录不可删除')
     return
@@ -843,6 +1016,7 @@ const handleFolderDelete = async folder => {
   }
 
   deletingFolderId.value = id
+  folderActionLoading.value = true
   const isCurrentFolder = String(currentParentId.value) === String(id)
   try {
     await deleteFolder(id)
@@ -859,6 +1033,7 @@ const handleFolderDelete = async folder => {
     message.error(error?.message || '删除文件夹失败')
   } finally {
     deletingFolderId.value = null
+    folderActionLoading.value = false
   }
 }
 
