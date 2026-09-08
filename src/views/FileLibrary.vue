@@ -212,7 +212,13 @@
                 @click="handleContextMenuClick($event, row)">
                 <div class="file-table__name-cell" @contextmenu="captureContextMenu">
                   <div class="file-table__icon">
-                    <t-image v-if="row.thumbnailUrl" :src="row.thumbnailUrl" fit="cover" class="file-table__thumbnail" />
+                    <t-image v-if="row.thumbnailUrl" :src="row.thumbnailUrl" fit="cover" class="file-table__thumbnail">
+                      <template #error>
+                        <span class="file-table__file-icon">
+                          <Document />
+                        </span>
+                      </template>
+                    </t-image>
                     <span v-else class="file-table__file-icon">
                       <Document />
                     </span>
@@ -392,31 +398,42 @@
     </t-dialog>
 
     <!-- 新建文件夹对话框 -->
-    <t-dialog v-model:visible="createFolderDialogVisible" header="新建文件夹" width="400px">
-      <t-form :data="folderForm" :rules="folderRules" ref="folderFormRef" label-width="80px">
-        <t-form-item label="文件夹名称" name="name">
-          <t-input v-model="folderForm.name" placeholder="请输入文件夹名称" />
+    <t-dialog v-model:visible="createFolderDialogVisible" header="新建文件夹"
+      width="min(400px, calc(100vw - 32px))"
+      placement="center"
+      dialog-class-name="create-folder-dialog"
+      :prevent-scroll-through="true"
+    >
+      <t-form :data="folderForm" :rules="folderRules" ref="folderFormRef" layout="vertical" class="create-folder-form">
+        <t-form-item label="文件夹名称" name="name" class="create-folder-form__item">
+          <div class="create-folder-form__control">
+            <t-input v-model="folderForm.name" placeholder="请输入文件夹名称" />
+          </div>
         </t-form-item>
-        <t-form-item label="目录级别" name="level">
-          <t-radio-group v-model="folderForm.level">
-            <t-radio-button :value="1">一级目录</t-radio-button>
-            <t-radio-button :value="2">二级目录</t-radio-button>
-          </t-radio-group>
+        <t-form-item label="目录级别" name="level" class="create-folder-form__item">
+          <div class="create-folder-form__control create-folder-form__control--level">
+            <t-radio-group v-model="folderForm.level">
+              <t-radio-button :value="1">一级目录</t-radio-button>
+              <t-radio-button :value="2">二级目录</t-radio-button>
+            </t-radio-group>
+          </div>
         </t-form-item>
-        <t-form-item v-if="folderForm.level === 2" label="一级父目录" name="parentId">
-          <t-select v-model="folderForm.parentId" placeholder="请选择一级父目录" clearable>
-            <t-option
-              v-for="folder in firstLevelFolders"
-              :key="folder.value"
-              :value="folder.value"
-              :label="folder.label"
-            />
-          </t-select>
+        <t-form-item v-if="folderForm.level === 2" label="一级父目录" name="parentId" class="create-folder-form__item">
+          <div class="create-folder-form__control">
+            <t-select v-model="folderForm.parentId" placeholder="请选择一级父目录" clearable>
+              <t-option
+                v-for="folder in firstLevelFolders"
+                :key="folder.value"
+                :value="folder.value"
+                :label="folder.label"
+              />
+            </t-select>
+          </div>
         </t-form-item>
       </t-form>
 
       <template #footer>
-        <div class="flex justify-end gap-3">
+        <div class="create-folder-dialog__footer">
           <t-button @click="createFolderDialogVisible = false">取消</t-button>
           <t-button theme="primary" @click="handleCreateFolder" :loading="creatingFolder">
             创建
@@ -536,50 +553,54 @@
 
     <!-- 创建打印任务对话框 -->
     <t-dialog v-model:visible="createJobDialogVisible" header="创建打印任务"
-      width="480px"
+      width="min(480px, calc(100vw - 32px))"
+      placement="center"
+      dialog-class-name="create-job-dialog"
+      :prevent-scroll-through="true"
       :close-on-overlay-click="false"
       :close-on-esc-keydown="true"
     >
       <div class="create-job-form">
         <!-- 文件信息展示 -->
-        <div class="bg-gray-50 rounded-lg p-4 mb-5">
-          <div class="flex items-start gap-3">
-            <div class="w-12 h-12 rounded border border-gray-200 overflow-hidden bg-white flex-shrink-0">
+        <section class="create-job-form__file-summary" aria-label="待创建任务的文件信息">
+          <div class="create-job-form__file-summary-row">
+            <div class="create-job-form__file-thumbnail">
               <t-image
                 v-if="jobForm.file?.thumbnailUrl"
                 :src="jobForm.file?.thumbnailUrl"
                 fit="cover"
-                class="w-full h-full"
+                class="create-job-form__file-thumbnail-image"
               >
                 <template #error>
-                  <div class="w-full h-full flex items-center justify-center text-gray-400">
+                  <div class="create-job-form__file-thumbnail-placeholder">
                     <span><Document /></span>
                   </div>
                 </template>
               </t-image>
-              <div v-else class="w-full h-full flex items-center justify-center text-gray-400">
+              <div v-else class="create-job-form__file-thumbnail-placeholder">
                 <span><Document /></span>
               </div>
             </div>
-            <div class="flex-1 min-w-0">
-              <div class="text-sm text-gray-500 mb-1">当前选中文件</div>
+            <div class="create-job-form__file-meta">
+              <div class="create-job-form__file-label">当前选中文件</div>
               <t-tooltip
                 class="create-job-file-name-tooltip"
                 :content="getFileNameLabel(jobForm.file?.originalName)"
               >
-                <div class="text-base font-semibold text-gray-900 truncate">
+                <div class="create-job-form__file-name">
                   {{ getFileNameLabel(jobForm.file?.originalName) }}
                 </div>
               </t-tooltip>
             </div>
           </div>
-        </div>
+        </section>
 
         <!-- 表单区域 -->
-        <t-form :data="jobForm" label-width="90px" size="medium">
+        <t-form :data="jobForm" layout="vertical" size="medium" class="create-job-form__fields">
           <!-- 任务优先级 -->
-          <t-form-item label="任务优先级">
-            <t-radio-group v-model="jobForm.priority">
+          <t-form-item label="任务优先级" class="create-job-form__item">
+            <div class="create-job-form__control create-job-form__control--priority">
+              <t-radio-group v-model="jobForm.priority">
               <t-radio :value="0">
                 <span class="text-gray-700">普通</span>
               </t-radio>
@@ -589,39 +610,44 @@
               <t-radio :value="100">
                 <span class="text-red-600">加急</span>
               </t-radio>
-            </t-radio-group>
+              </t-radio-group>
+            </div>
           </t-form-item>
 
-          <t-form-item label="打印机">
-            <t-select v-model="jobForm.printerId" placeholder="不指定，创建后进入队列" clearable :loading="loadingPrinters">
+          <t-form-item label="打印机" class="create-job-form__item">
+            <div class="create-job-form__control">
+              <t-select v-model="jobForm.printerId" class="create-job-form__select" placeholder="不指定，创建后进入队列" clearable :loading="loadingPrinters">
               <t-option label="不指定（进入队列）" value="" />
               <t-option
                 v-for="printer in availablePrinters"
                 :key="printer.id"
                 :label="`${printer.name}（${printer.machineNumber || `#${printer.id}`}）`"
+                :title="`${printer.name}（${printer.machineNumber || `#${printer.id}`}）`"
                 :value="printer.id"
               />
-            </t-select>
-            <div class="text-xs text-gray-500 mt-1">指定打印机只记录分配目标，不会跳过安全确认流程</div>
+              </t-select>
+              <div class="create-job-form__tip">指定打印机只记录分配目标，不会跳过安全确认流程</div>
+            </div>
           </t-form-item>
 
           <!-- 打印份数 -->
-          <t-form-item label="打印份数">
-            <t-input-number
-              v-model="jobForm.copies"
-              :min="1"
-              :max="99"
-              :step="1"
-
-              class="w-full"
-            />
-            <div class="text-xs text-gray-500 mt-1">将为同一文件创建多个排队任务</div>
+          <t-form-item label="打印份数" class="create-job-form__item">
+            <div class="create-job-form__control">
+              <t-input-number
+                v-model="jobForm.copies"
+                :min="1"
+                :max="99"
+                :step="1"
+                class="create-job-form__copies"
+              />
+              <div class="create-job-form__tip">将为同一文件创建多个排队任务</div>
+            </div>
           </t-form-item>
         </t-form>
       </div>
 
       <template #footer>
-        <div class="flex justify-end gap-3">
+        <div class="create-job-dialog__footer">
           <t-button @click="createJobDialogVisible = false">取消</t-button>
           <t-button theme="primary" @click="handleSubmitCreateJob" :loading="submittingJob">
             确认提交
@@ -948,6 +974,33 @@ const restoreFileDetailContext = () => {
 // ============ 方法定义 ============
 
 /**
+ * 为当前文件页补齐短期缩略图 URL。列表请求和缩略图请求共用序列号，
+ * 避免翻页或搜索后旧页的异步结果回写到新页。
+ */
+const loadListThumbnails = async (records, requestSequence) => {
+  const thumbnailRecords = records.filter(file => file?.id !== undefined && file?.id !== null)
+  if (!thumbnailRecords.length) return
+
+  const thumbnailResults = await Promise.allSettled(
+    thumbnailRecords.map(file => Promise.resolve().then(() => getThumbnailUrl(file.id)))
+  )
+  if (requestSequence !== fileRequestSequence) return
+
+  const thumbnailById = new Map(thumbnailRecords.map((file, index) => [
+    String(file.id),
+    thumbnailResults[index]
+  ]))
+  fileList.value = fileList.value.map(file => {
+    const result = thumbnailById.get(String(file.id))
+    if (!result) return file
+    return {
+      ...file,
+      thumbnailUrl: result.status === 'fulfilled' ? result.value?.data || null : null
+    }
+  })
+}
+
+/**
  * 获取文件列表
  */
 const fetchData = async ({ preserveSelectedIds = [] } = {}) => {
@@ -964,7 +1017,11 @@ const fetchData = async ({ preserveSelectedIds = [] } = {}) => {
     }
     const res = await getFileList(params)
     if (requestSequence !== fileRequestSequence) return
-    fileList.value = res.data?.records || []
+    const records = res.data?.records || []
+    fileList.value = records.map(file => ({
+      ...file,
+      thumbnailUrl: file.thumbnailUrl || null
+    }))
     pagination.total = res.data?.total || 0
 
     const selectedSet = new Set((Array.isArray(preserveSelectedIds) ? preserveSelectedIds : [])
@@ -973,6 +1030,10 @@ const fetchData = async ({ preserveSelectedIds = [] } = {}) => {
       .map(item => item.id)
       .filter(id => selectedSet.has(String(id)))
     restoreFileDetailContext()
+    void loadListThumbnails(fileList.value, requestSequence).catch(error => {
+      // 单项缩略图失败由 Promise.allSettled 转为占位图；这里只保护意外的整体异常。
+      console.error('获取文件列表缩略图失败:', error)
+    })
   } catch (error) {
     if (requestSequence !== fileRequestSequence) return
     console.error('获取文件列表失败:', error)
@@ -1845,6 +1906,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  fileRequestSequence += 1
   if (searchTimer) clearTimeout(searchTimer)
 })
 </script>
@@ -2309,6 +2371,177 @@ onBeforeUnmount(() => {
   gap: var(--app-spacing-2);
 }
 
+:deep(.create-folder-dialog),
+:deep(.create-job-dialog) {
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+}
+
+:deep(.create-folder-dialog .t-dialog__body),
+:deep(.create-job-dialog .t-dialog__body) {
+  min-width: 0;
+  max-width: 100%;
+  overflow-y: auto;
+}
+
+.create-folder-form,
+.create-job-form {
+  width: 100%;
+  min-width: 0;
+}
+
+.create-folder-form {
+  width: min(100%, 320px);
+  margin: 0 auto;
+}
+
+.create-folder-form__control,
+.create-job-form__control {
+  width: 100%;
+  min-width: 0;
+}
+
+.create-folder-form :deep(.t-form__item),
+.create-job-form__fields :deep(.t-form__item) {
+  margin-bottom: var(--app-spacing-4);
+}
+
+.create-folder-form :deep(.t-form__item:last-child),
+.create-job-form__fields :deep(.t-form__item:last-child) {
+  margin-bottom: 0;
+}
+
+.create-folder-form :deep(.t-input),
+.create-folder-form :deep(.t-select),
+.create-job-form__control :deep(.t-input),
+.create-job-form__control :deep(.t-select) {
+  width: 100%;
+  min-width: 0;
+}
+
+.create-folder-form__control--level,
+.create-job-form__control--priority {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+.create-folder-form__control--level :deep(.t-radio-group),
+.create-job-form__control--priority :deep(.t-radio-group) {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--app-spacing-2);
+  max-width: 100%;
+}
+
+.create-folder-dialog__footer,
+.create-job-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--app-spacing-3);
+}
+
+.create-job-form__file-summary {
+  width: 100%;
+  min-width: 0;
+  margin-bottom: var(--app-spacing-5);
+  padding: var(--app-spacing-4);
+  box-sizing: border-box;
+  background: var(--td-bg-color-secondarycontainer);
+  border: 1px solid var(--td-component-border);
+  border-radius: var(--td-radius-medium);
+}
+
+.create-job-form__file-summary-row {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+  gap: var(--app-spacing-3);
+}
+
+.create-job-form__file-thumbnail {
+  display: flex;
+  flex: 0 0 48px;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--td-text-color-secondary);
+  background: var(--td-bg-color-container);
+  border: 1px solid var(--td-component-border);
+  border-radius: var(--td-radius-small);
+}
+
+.create-job-form__file-thumbnail-image,
+.create-job-form__file-thumbnail-placeholder {
+  width: 100%;
+  height: 100%;
+}
+
+.create-job-form__file-thumbnail-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.create-job-form__file-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.create-job-form__file-label {
+  margin-bottom: var(--app-spacing-1);
+  color: var(--td-text-color-secondary);
+  font: var(--td-font-body-small);
+}
+
+.create-job-form__file-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--td-text-color-primary);
+  font: var(--td-font-title-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.create-job-form__fields {
+  width: min(100%, 360px);
+  margin: 0 auto;
+}
+
+.create-job-form__copies {
+  width: 100%;
+}
+
+.create-job-form__tip {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin-top: var(--app-spacing-2);
+  color: var(--td-text-color-secondary);
+  font: var(--td-font-body-small);
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.create-job-form__select :deep(.t-select-input),
+.create-job-form__select :deep(.t-input),
+.create-job-form__select :deep(.t-input__inner),
+.create-job-form__select :deep(.t-select-option),
+.create-job-form__select :deep(.t-select-option > span) {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .file-grid-view {
   display: grid;
   flex: 1 1 0%;
@@ -2556,8 +2789,16 @@ onBeforeUnmount(() => {
 }
 
 .file-table__thumbnail {
+  display: block;
   width: 100%;
   height: 100%;
+}
+
+.file-table__thumbnail :deep(.t-image__img) {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .file-table__name {

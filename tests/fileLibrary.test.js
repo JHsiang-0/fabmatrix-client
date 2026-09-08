@@ -417,3 +417,50 @@ test('文件库长文本使用 TDesign Tooltip 并保留省略和容器保护', 
   assert.match(source, /file-table-view :deep\(\.t-table\)[\s\S]*table-layout: fixed/)
   assert.match(source, /file-table-view :deep\(\.t-table__content\)[\s\S]*overflow-y: auto/)
 })
+
+test('文件列表异步补齐缩略图并保护旧页结果与失败占位', () => {
+  const fetchDataSource = source.match(/const fetchData = async \(\{ preserveSelectedIds = \[\] \} = \{\}\) =>[\s\S]*?\n}\n\nconst refreshLibrary/)?.[0] || ''
+
+  assert.match(source, /const loadListThumbnails = async \(records, requestSequence\) =>/)
+  assert.match(source, /Promise\.allSettled\([\s\S]*getThumbnailUrl\(file\.id\)/)
+  assert.match(source, /if \(requestSequence !== fileRequestSequence\) return/)
+  assert.match(source, /thumbnailUrl: result\.status === 'fulfilled' \? result\.value\?\.data \|\| null : null/)
+  assert.match(fetchDataSource, /fileList\.value = records\.map\(file => \(\{/)
+  assert.match(fetchDataSource, /void loadListThumbnails\(fileList\.value, requestSequence\)\.catch/)
+  assert.match(source, /<t-image v-if="row\.thumbnailUrl"[\s\S]*fit="cover"[\s\S]*file-table__thumbnail/)
+  assert.match(source, /<template #error>[\s\S]*file-table__file-icon/)
+  assert.match(source, /\.file-table__icon[\s\S]*width: 32px[\s\S]*height: 32px/)
+  assert.match(source, /\.file-table__thumbnail :deep\(\.t-image__img\)[\s\S]*object-fit: cover/)
+})
+
+test('新建文件夹和创建打印任务弹窗使用响应式语义布局', () => {
+  const createFolderDialogSource = source.match(/<t-dialog v-model:visible="createFolderDialogVisible"[\s\S]*?<\/t-dialog>/)?.[0] || ''
+  const createJobDialogSource = source.match(/<t-dialog v-model:visible="createJobDialogVisible"[\s\S]*?<\/t-dialog>/)?.[0] || ''
+
+  assert.match(createFolderDialogSource, /width="min\(400px, calc\(100vw - 32px\)\)"/)
+  assert.match(createFolderDialogSource, /placement="center"/)
+  assert.match(createFolderDialogSource, /dialog-class-name="create-folder-dialog"/)
+  assert.match(createFolderDialogSource, /<t-form[^>]*layout="vertical"[^>]*class="create-folder-form"/)
+  assert.match(createFolderDialogSource, /create-folder-form__control/)
+  assert.match(createFolderDialogSource, /create-folder-dialog__footer/)
+  assert.match(createFolderDialogSource, /v-if="folderForm\.level === 2"[\s\S]*create-folder-form__item/)
+
+  assert.match(createJobDialogSource, /width="min\(480px, calc\(100vw - 32px\)\)"/)
+  assert.match(createJobDialogSource, /placement="center"/)
+  assert.match(createJobDialogSource, /dialog-class-name="create-job-dialog"/)
+  assert.match(createJobDialogSource, /create-job-form__file-summary/)
+  assert.match(createJobDialogSource, /<t-form[^>]*layout="vertical"[^>]*class="create-job-form__fields"/)
+  assert.match(createJobDialogSource, /create-job-form__control--priority/)
+  assert.match(createJobDialogSource, /create-job-form__tip[\s\S]*指定打印机只记录分配目标，不会跳过安全确认流程/)
+  assert.match(createJobDialogSource, /create-job-form__tip[\s\S]*将为同一文件创建多个排队任务/)
+  assert.match(createJobDialogSource, /create-job-dialog__footer/)
+  assert.match(createJobDialogSource, /:title="`\$\{printer\.name\}/)
+
+  assert.match(source, /:deep\(\.create-folder-dialog\)[\s\S]*max-width: calc\(100vw - 32px\)/)
+  assert.match(source, /\.create-folder-form[\s\S]*width: min\(100%, 320px\)[\s\S]*margin: 0 auto/)
+  assert.match(source, /\.create-job-form__file-summary[\s\S]*min-width: 0[\s\S]*box-sizing: border-box/)
+  assert.match(source, /\.create-job-form__fields[\s\S]*width: min\(100%, 360px\)[\s\S]*margin: 0 auto/)
+  assert.match(source, /\.create-job-form__tip[\s\S]*display: block[\s\S]*width: 100%[\s\S]*white-space: normal/)
+  assert.match(source, /\.create-folder-dialog__footer,[\s\S]*\.create-job-dialog__footer[\s\S]*flex-wrap: wrap[\s\S]*gap: var\(--app-spacing-3\)/)
+  assert.match(source, /\.create-job-form__select :deep\(\.t-input__inner\)[\s\S]*text-overflow: ellipsis/)
+})
