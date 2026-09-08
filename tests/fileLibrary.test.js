@@ -329,7 +329,9 @@ test('文件详情使用紧凑无边框水平描述、底部大按钮并保护�
   assert.equal(descriptions.length, 2)
   assert.equal((detailSource.match(/<t-divider/g) || []).length, 3)
   assert.match(detailSource, /<t-divider class="file-detail-drawer__summary-divider"\s*\/>/)
-  assert.equal((detailSource.match(/<section class="file-detail-drawer__section file-detail-drawer__info-card"/g) || []).length, 2)
+  assert.equal((detailSource.match(/class="file-detail-drawer__section file-detail-drawer__info-card"/g) || []).length, 1)
+  assert.equal((detailSource.match(/<div class="file-detail-drawer__info-section"/g) || []).length, 2)
+  assert.match(detailSource, /<t-divider class="file-detail-drawer__info-divider"\s*\/>/)
   assert.match(detailSource, /\.file-detail-drawer__body[\s\S]*gap: var\(--app-spacing-1\)/)
   assert.match(detailSource, /\.file-detail-drawer :deep\(\.t-divider\)[\s\S]*height: 1px[\s\S]*min-height: 1px[\s\S]*margin: -2px 0/)
   assert.match(detailSource, /\.file-detail-drawer__info-card[\s\S]*padding: var\(--app-spacing-1\) var\(--app-spacing-2\)[\s\S]*background: var\(--td-bg-color-secondarycontainer\)/)
@@ -351,11 +353,13 @@ test('文件详情使用紧凑无边框水平描述、底部大按钮并保护�
   assert.match(detailSource, /\.file-detail-drawer__descriptions :deep\(\.t-descriptions__label\)[\s\S]*min-width: 0[\s\S]*width: 1%[\s\S]*max-width: 100%[\s\S]*white-space: nowrap[\s\S]*word-break: keep-all/)
   assert.match(detailSource, /\.file-detail-drawer__descriptions :deep\(\.t-descriptions__content\)[\s\S]*min-width: 0[\s\S]*width: auto[\s\S]*max-width: 100%/)
   assert.doesNotMatch(detailSource, /\.t-descriptions__(?:label|content)[\s\S]*max-width: 0/)
+  assert.equal((detailSource.match(/<t-tag theme="primary" variant="light-outline"[\s\S]*?<\/t-tag>/g) || []).length, 12)
+  assert.match(detailSource, /\.file-detail-drawer__descriptions :deep\(\.file-detail-drawer__label-tag\)[\s\S]*height: 20px[\s\S]*padding: 0 6px[\s\S]*white-space: nowrap/)
   for (const label of [
     '预计耗时', '文件大小', '耗材重量', '所需线长', '喷嘴要求', '上传时间',
     '常规层高', '首层层高', '喷嘴温度', '首层喷嘴温度', '热床温度', '首层热床温度'
   ]) {
-    assert.match(detailSource, new RegExp(`label="${label}"`))
+    assert.match(detailSource, new RegExp(`<t-tag theme="primary" variant="light-outline"[^>]*>\\s*${label}\\s*<\\/t-tag>`))
   }
   assert.doesNotMatch(detailSource.match(/<section class="file-detail-drawer__summary"[\s\S]*?<\/section>/)?.[0] || '', /<t-button/)
   const footerActions = detailSource.match(/<div class="file-detail-drawer__footer-actions"[\s\S]*?<\/div>/)?.[0] || ''
