@@ -85,28 +85,22 @@
               size="small"
               :bordered="false"
             >
-              <t-descriptions-item>
-                <template #label><t-tag theme="primary" variant="light-outline" size="small" class="file-detail-drawer__label-tag">预计耗时</t-tag></template>
+              <t-descriptions-item label="预计耗时">
                 <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDurationValue(file.estTime)"><span class="file-detail-drawer__value">{{ formatDurationValue(file.estTime) }}</span></t-tooltip>
               </t-descriptions-item>
-              <t-descriptions-item>
-                <template #label><t-tag theme="primary" variant="light-outline" size="small" class="file-detail-drawer__label-tag">文件大小</t-tag></template>
+              <t-descriptions-item label="文件大小">
                 <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatFileSizeValue(file.fileSize)"><span class="file-detail-drawer__value">{{ formatFileSizeValue(file.fileSize) }}</span></t-tooltip>
               </t-descriptions-item>
-              <t-descriptions-item>
-                <template #label><t-tag theme="primary" variant="light-outline" size="small" class="file-detail-drawer__label-tag">耗材重量</t-tag></template>
+              <t-descriptions-item label="耗材重量">
                 <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatWeight(file.filamentWeight)"><span class="file-detail-drawer__value">{{ formatWeight(file.filamentWeight) }}</span></t-tooltip>
               </t-descriptions-item>
-              <t-descriptions-item>
-                <template #label><t-tag theme="primary" variant="light-outline" size="small" class="file-detail-drawer__label-tag">所需线长</t-tag></template>
+              <t-descriptions-item label="所需线长">
                 <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatLength(file.filamentLength)"><span class="file-detail-drawer__value">{{ formatLength(file.filamentLength) }}</span></t-tooltip>
               </t-descriptions-item>
-              <t-descriptions-item>
-                <template #label><t-tag theme="primary" variant="light-outline" size="small" class="file-detail-drawer__label-tag">喷嘴要求</t-tag></template>
+              <t-descriptions-item label="喷嘴要求">
                 <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatNozzle(file.nozzleSize)"><span class="file-detail-drawer__value">{{ formatNozzle(file.nozzleSize) }}</span></t-tooltip>
               </t-descriptions-item>
-              <t-descriptions-item>
-                <template #label><t-tag theme="primary" variant="light-outline" size="small" class="file-detail-drawer__label-tag">上传时间</t-tag></template>
+              <t-descriptions-item label="上传时间">
                 <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDateTimeValue(file.createdAt)"><span class="file-detail-drawer__value">{{ formatDateTimeValue(file.createdAt) }}</span></t-tooltip>
               </t-descriptions-item>
             </t-descriptions>
@@ -126,28 +120,22 @@
               size="small"
               :bordered="false"
             >
-              <t-descriptions-item>
-                <template #label><t-tag theme="primary" variant="light-outline" size="small" class="file-detail-drawer__label-tag">常规层高</t-tag></template>
+              <t-descriptions-item label="常规层高">
                 <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatHeight(file.layerHeight)"><span class="file-detail-drawer__value">{{ formatHeight(file.layerHeight) }}</span></t-tooltip>
               </t-descriptions-item>
-              <t-descriptions-item>
-                <template #label><t-tag theme="primary" variant="light-outline" size="small" class="file-detail-drawer__label-tag">首层层高</t-tag></template>
+              <t-descriptions-item label="首层层高">
                 <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatHeight(file.firstLayerHeight)"><span class="file-detail-drawer__value">{{ formatHeight(file.firstLayerHeight) }}</span></t-tooltip>
               </t-descriptions-item>
-              <t-descriptions-item>
-                <template #label><t-tag theme="primary" variant="light-outline" size="small" class="file-detail-drawer__label-tag">喷嘴温度</t-tag></template>
+              <t-descriptions-item label="喷嘴温度">
                 <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatTemperature(file.nozzleTemp)"><span class="file-detail-drawer__value">{{ formatTemperature(file.nozzleTemp) }}</span></t-tooltip>
               </t-descriptions-item>
-              <t-descriptions-item>
-                <template #label><t-tag theme="primary" variant="light-outline" size="small" class="file-detail-drawer__label-tag">首层喷嘴温度</t-tag></template>
+              <t-descriptions-item label="首层喷嘴温度">
                 <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatTemperature(file.firstLayerNozzleTemp)"><span class="file-detail-drawer__value">{{ formatTemperature(file.firstLayerNozzleTemp) }}</span></t-tooltip>
               </t-descriptions-item>
-              <t-descriptions-item>
-                <template #label><t-tag theme="primary" variant="light-outline" size="small" class="file-detail-drawer__label-tag">热床温度</t-tag></template>
+              <t-descriptions-item label="热床温度">
                 <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatTemperature(file.bedTemp)"><span class="file-detail-drawer__value">{{ formatTemperature(file.bedTemp) }}</span></t-tooltip>
               </t-descriptions-item>
-              <t-descriptions-item>
-                <template #label><t-tag theme="primary" variant="light-outline" size="small" class="file-detail-drawer__label-tag">首层热床温度</t-tag></template>
+              <t-descriptions-item label="首层热床温度">
                 <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatTemperature(file.firstLayerBedTemp)"><span class="file-detail-drawer__value">{{ formatTemperature(file.firstLayerBedTemp) }}</span></t-tooltip>
               </t-descriptions-item>
             </t-descriptions>
@@ -446,18 +434,6 @@ const getJobStatusTagType = status => ({
   overflow: hidden;
   white-space: nowrap;
   word-break: keep-all;
-}
-
-.file-detail-drawer__descriptions :deep(.file-detail-drawer__label-tag) {
-  display: inline-flex;
-  max-width: 100%;
-  height: 20px;
-  padding: 0 6px;
-  overflow: hidden;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: middle;
 }
 
 .file-detail-drawer__descriptions :deep(.t-descriptions__content) {
