@@ -9,6 +9,27 @@ export function chunkItems(items, chunkSize) {
   return chunks
 }
 
+export function chunkItemsByBytes(items, maxBytes, getSize = item => item?.size) {
+  const chunks = []
+  const limit = Math.max(1, Number(maxBytes) || 1)
+  let currentChunk = []
+  let currentBytes = 0
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const itemBytes = Math.max(0, Number(getSize(item)) || 0)
+    if (currentChunk.length && currentBytes + itemBytes > limit) {
+      chunks.push(currentChunk)
+      currentChunk = []
+      currentBytes = 0
+    }
+    currentChunk.push(item)
+    currentBytes += itemBytes
+  }
+
+  if (currentChunk.length) chunks.push(currentChunk)
+  return chunks
+}
+
 function createAbortError() {
   const error = new Error('上传已取消')
   error.name = 'AbortError'

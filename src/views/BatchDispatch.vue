@@ -20,7 +20,7 @@
     <template v-if="currentStep === 0">
       <section class="dispatch-panel" aria-labelledby="batch-upload-title">
         <div class="dispatch-panel__heading"><h2 id="batch-upload-title">批量上传</h2></div>
-        <p class="hint">支持多个 .gcode、.g、.3mf、.stl 文件；上传结果按文件分别返回。</p>
+        <p class="hint">支持最多 100 个 .gcode、.g、.3mf、.stl 文件；单个文件不超过 1GB，批量会按单请求约 1GB 自动分组，结果按文件分别返回。</p>
         <t-upload theme="file" multiple :auto-upload="false" accept=".gcode,.g,.3mf,.stl"
           :files="uploadFiles" @select-change="handleFileChange" />
         <t-progress v-if="uploading" class="mt-3" :percentage="uploadProgress" />
@@ -33,6 +33,7 @@
         <t-alert v-if="uploadResult" class="mt-3" :theme="uploadFailureCount ? 'warning' : 'success'"
           :title="`上传完成：成功 ${uploadSuccessCount} 个，失败 ${uploadFailureCount} 个`"
           :close-btn="false">
+          <div v-if="uploadUnknownCount" class="mt-2">部分请求结果未知，请刷新文件列表确认后再重试，避免重复入库。</div>
           <template #operation>
             <t-button v-if="retryableUploadFiles.length" variant="text" size="small" @click="retryFailedUploads">
               重试失败项（{{ retryableUploadFiles.length }}）
@@ -185,7 +186,14 @@ import { batchUploadFiles, getFileList, getFileTree } from '@/api/printFile'
 import { getPrinterList } from '@/api/printer'
 import { previewBatchDispatch, confirmBatchDispatch, retryPreviewBatchDispatch } from '@/api/job'
 import { createBatchPreviewRequest, normalizeBatchConfirmResult } from '@/utils/batchDispatch'
-import { isBatchUploadSuccess, normalizeBatchUploadResult, validateBatchUploadSelection } from '@/utils/batchUpload'
+import {
+  getUploadFailureState,
+  isBatchUploadSuccess,
+  MAX_UPLOAD_REQUEST_BYTES,
+  normalizeBatchUploadResult,
+  validateBatchUploadSelection
+} from '@/utils/batchUpload'
+import { chunkItemsByBytes, runUploadQueue } from '@/utils/uploadQueue'
 import { useJobStore } from '@/stores/jobStore'
 import PageHeader from '@/components/layout/PageHeader.vue'
 
@@ -234,6 +242,7 @@ const retryableUploadFiles = computed(() => (uploadResult.value?.items || [])
 
 const uploadSuccessCount = computed(() => (uploadResult.value?.items || []).filter(isBatchUploadSuccess).length)
 const uploadFailureCount = computed(() => (uploadResult.value?.items || []).filter(item => !isBatchUploadSuccess(item)).length)
+const uploadUnknownCount = computed(() => (uploadResult.value?.items || []).filter(item => item.requiresRefresh).length)
 const confirmSuccessCount = computed(() => (confirmData.value?.items || []).filter(item => item.success).length)
 const confirmFailureCount = computed(() => (confirmData.value?.items || []).filter(item => !item.success).length)
 const visibleConfirmItems = computed(() => {
@@ -370,27 +379,62 @@ function handleFileChange(selectedUploadFiles) {
 async function uploadSelected() {
   uploading.value = true
   uploadProgress.value = 0
-  lastBatchUploadFiles.value = [...uploadFiles.value]
+  const files = [...uploadFiles.value]
+  lastBatchUploadFiles.value = files
   uploadController.value = new AbortController()
   try {
-    const response = await batchUploadFiles(
-      uploadFiles.value,
-      null,
-      event => {
-        if (event?.total) uploadProgress.value = Math.min(Math.round((event.loaded / event.total) * 100), 99)
-      },
-      { signal: uploadController.value.signal }
-    )
-    uploadResult.value = normalizeBatchUploadResult(response?.data)
-    message.success('批量上传处理完成')
+    const chunks = chunkItemsByBytes(files, MAX_UPLOAD_REQUEST_BYTES)
+    const chunkLoaded = new Map()
+    const totalBytes = files.reduce((total, file) => total + (Number(file.size) || 0), 0)
+    const queueResults = await runUploadQueue(chunks, async (chunk, chunkIndex) => {
+      const chunkProgress = event => {
+        chunkLoaded.set(chunkIndex, event?.loaded || 0)
+        const loaded = [...chunkLoaded.values()].reduce((total, value) => total + value, 0)
+        if (totalBytes) uploadProgress.value = Math.min(Math.round((loaded / totalBytes) * 100), 99)
+      }
+      return batchUploadFiles(chunk, null, chunkProgress, {
+        signal: uploadController.value.signal
+      })
+    }, {
+      concurrency: 3,
+      signal: uploadController.value.signal
+    })
+    const items = []
+    queueResults.forEach((queueResult, chunkIndex) => {
+      const chunk = chunks[chunkIndex]
+      const offset = chunks.slice(0, chunkIndex).reduce((total, currentChunk) => total + currentChunk.length, 0)
+      if (queueResult.status === 'fulfilled') {
+        normalizeBatchUploadResult(queueResult.value.data).items.forEach(item => {
+          const file = chunk[item.index]
+          items.push({ ...item, index: offset + item.index, fileName: item.fileName || file?.name || '' })
+        })
+      } else {
+        const failure = getUploadFailureState(queueResult.reason)
+        chunk.forEach((file, itemIndex) => items.push({
+          index: offset + itemIndex,
+          fileId: null,
+          fileName: file.name,
+          status: 'FAILED',
+          errorCode: failure.errorCode,
+          message: failure.message,
+          retryable: failure.retryable,
+          requiresRefresh: failure.requiresRefresh
+        }))
+      }
+    })
+    uploadResult.value = normalizeBatchUploadResult({ items: items.sort((left, right) => left.index - right.index) })
+    if (uploadUnknownCount.value) message.warning('批量上传部分结果未知，请刷新文件列表确认后再处理')
+    else message.success('批量上传处理完成')
     uploadFiles.value = []
     await loadResources()
   } catch (error) {
     console.error('批量上传失败:', error)
-    if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') {
+    if (error?.name === 'CanceledError' || error?.name === 'AbortError' || error?.code === 'ERR_CANCELED') {
       message.info('批量上传已取消')
     } else {
-      message.error(error?.message || '批量上传失败')
+      const failure = getUploadFailureState(error)
+      if (failure.requiresRefresh) message.warning(failure.message)
+      else message.error(failure.message)
     }
   } finally {
     uploadController.value = null

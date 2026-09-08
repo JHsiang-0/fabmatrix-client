@@ -288,7 +288,7 @@ export const PAGINATION = {
  */
 export const REQUEST_TIMEOUT = {
   DEFAULT: 10000,
-  UPLOAD: 60000, // 上传文件超时时间
+  UPLOAD: 30 * 60 * 1000, // 上传文件超时时间（30分钟）
   DOWNLOAD: 30000 // 下载文件超时时间
 }
 

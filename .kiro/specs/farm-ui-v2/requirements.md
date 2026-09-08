@@ -142,7 +142,7 @@
 
 ### R-FILE-03 批量上传
 
-- 前置条件：用户选择 1-100 个文件，总大小未超配置。
+- 前置条件：用户选择 1-100 个文件，每个文件不超过 1GB；客户端按单请求约 1GB 自动分组，不设置批量总量阻断。
 - 操作：以重复字段 `files` 和可选 `parentId` 调用 `/batch-upload`。
 - 预期结果：展示每个 `index/fileId/fileName/status/errorCode/message/retryable`；只重试 `retryable=true` 的失败项；部分失败不能显示为全部成功；Mock 行为相同。
 

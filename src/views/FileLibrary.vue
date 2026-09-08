@@ -282,7 +282,7 @@
         </div>
         <template #tips>
           <div class="farm-upload__tip">
-            支持 .gcode、.g、.3mf、.stl 格式，单次最多 100 个、总大小不超过 250MB
+            支持 .gcode、.g、.3mf、.stl 格式，最多 100 个文件；单个文件不超过 1GB，批量会按单请求约 1GB 自动分组
           </div>
         </template>
       </t-upload>
@@ -506,11 +506,13 @@ import AsyncState from '@/components/AsyncState.vue'
 import TdTable from '@/components/TdTable.vue'
 import TdTableColumn from '@/components/TdTableColumn.vue'
 import {
+  getUploadFailureState,
   isBatchUploadSuccess,
+  MAX_UPLOAD_REQUEST_BYTES,
   normalizeBatchUploadResult,
   validateBatchUploadSelection
 } from '@/utils/batchUpload'
-import { chunkItems, runUploadQueue } from '@/utils/uploadQueue'
+import { chunkItemsByBytes, runUploadQueue } from '@/utils/uploadQueue'
 import { useUserStore } from '@/stores/user'
 
 defineOptions({ name: 'FileLibrary' })
@@ -532,7 +534,6 @@ const batchDeleting = ref(false)
 const deletingIds = ref([])
 const uploadProgress = ref(0)
 const uploadError = ref('')
-const UPLOAD_BATCH_SIZE = 5
 let uploadController = null
 let searchTimer = null
 // 打印任务对话框状态
@@ -884,7 +885,7 @@ const submitBatchUpload = async () => {
         }]
       }
     } else {
-      const chunks = chunkItems(files, UPLOAD_BATCH_SIZE)
+      const chunks = chunkItemsByBytes(files, MAX_UPLOAD_REQUEST_BYTES)
       const chunkLoaded = new Map()
       const totalBytes = files.reduce((total, file) => total + (Number(file.size) || 0), 0)
       const queueResults = await runUploadQueue(chunks, async (chunk, chunkIndex) => {
@@ -902,22 +903,24 @@ const submitBatchUpload = async () => {
       })
       const items = []
       queueResults.forEach((queueResult, chunkIndex) => {
-        const offset = chunkIndex * UPLOAD_BATCH_SIZE
         const chunk = chunks[chunkIndex]
+        const offset = chunks.slice(0, chunkIndex).reduce((total, currentChunk) => total + currentChunk.length, 0)
         if (queueResult.status === 'fulfilled') {
           normalizeBatchUploadResult(queueResult.value.data).items.forEach(item => {
             const file = chunk[item.index]
             items.push({ ...item, index: offset + item.index, fileName: item.fileName || file?.name || '' })
           })
         } else {
+          const failure = getUploadFailureState(queueResult.reason)
           chunk.forEach((file, itemIndex) => items.push({
             index: offset + itemIndex,
             fileId: null,
             fileName: file.name,
             status: 'FAILED',
-            errorCode: queueResult.reason?.response?.status || null,
-            message: queueResult.reason?.message || '上传失败，可重试',
-            retryable: true
+            errorCode: failure.errorCode,
+            message: failure.message,
+            retryable: failure.retryable,
+            requiresRefresh: failure.requiresRefresh
           }))
         }
       })
@@ -931,7 +934,11 @@ const submitBatchUpload = async () => {
       .filter(item => !isBatchUploadSuccess(item) && item.retryable)
       .map(item => files[item.index])
       .filter(Boolean)
+    const unknownResultCount = items.filter(item => item.requiresRefresh).length
     pendingUploadFiles.value = retryableFiles
+    if (unknownResultCount) {
+      uploadError.value = '部分上传结果未知，请刷新文件列表确认后再重试，避免重复入库'
+    }
 
     if (successfulItems.length > 0) await refreshLibrary()
     if (retryableFiles.length === 0 && successfulItems.length === files.length) {
@@ -939,17 +946,20 @@ const submitBatchUpload = async () => {
       uploadDialogVisible.value = false
       pendingUploadFiles.value = []
     } else if (successfulItems.length > 0) {
-      message.warning(`已上传 ${successfulItems.length} 个文件，${files.length - successfulItems.length} 个失败`)
+      const suffix = unknownResultCount ? '，部分结果未知，请刷新确认' : ''
+      message.warning(`已上传 ${successfulItems.length} 个文件，${files.length - successfulItems.length} 个失败${suffix}`)
     } else {
-      message.error('文件上传失败，请检查失败项')
+      message.error(unknownResultCount ? '上传结果未知，请刷新文件列表确认' : '文件上传失败，请检查失败项')
     }
   } catch (error) {
     console.error('批量上传失败:', error)
-    if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') {
+    if (error?.name === 'CanceledError' || error?.name === 'AbortError' || error?.code === 'ERR_CANCELED') {
       message.info('上传已取消')
     } else {
-      uploadError.value = error?.message || '上传失败，可重试'
-      message.error('上传失败，可重试')
+      const failure = getUploadFailureState(error)
+      uploadError.value = failure.message
+      if (failure.requiresRefresh) message.warning(failure.message)
+      else message.error(failure.message)
     }
   } finally {
     batchUploading.value = false

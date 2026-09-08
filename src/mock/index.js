@@ -7,6 +7,7 @@ import { transitionMockJob } from './stateMachine.js'
 const runtimeEnv = import.meta.env || {}
 const MOCK_DELAY = 120
 const BATCH_PLAN_TTL_MS = 5 * 60 * 1000
+const MAX_UPLOAD_FILE_BYTES = 1024 * 1024 * 1024
 const BATCH_STRATEGIES = ['ONE_TO_ONE', 'ROUND_ROBIN', 'AUTO_MATCH']
 const BATCH_ACTIONS = ['UPLOAD_ONLY', 'QUEUE', 'START_AFTER_CONFIRM']
 const ATTENTION_PRINTER_STATUSES = ['ERROR', 'OFFLINE', 'PAUSED', 'UNKNOWN', 'FAULT', 'SYS_ERROR', 'PRINT_ERROR']
@@ -843,6 +844,7 @@ const handleUpload = config => {
   const file = body.file
   if (!file?.name) fail(400, 400, '请选择要上传的文件')
   if (!/\.(gcode|g|3mf|stl)$/i.test(file.name)) fail(400, 400, '仅支持 .gcode、.g、.3mf 或 .stl 文件')
+  if ((Number(file.size) || 0) > MAX_UPLOAD_FILE_BYTES) fail(400, 400, '单个文件大小不能超过 1GB')
   const parentId = resolveUploadParent(session, body.parentId)
   return createUploadedFile(session, file, parentId)
 }
@@ -854,8 +856,6 @@ const handleBatchUpload = config => {
     ? body.files
     : []
   if (files.length === 0 || files.length > 100) fail(400, 400, '批量上传文件数量必须为 1-100 个')
-  const totalBytes = files.reduce((total, file) => total + (Number(file?.size) || 0), 0)
-  if (totalBytes > 250 * 1024 * 1024) fail(400, 400, '批量上传文件总大小不能超过 250MB')
   const parentId = resolveUploadParent(session, body.parentId)
 
   return {
@@ -865,6 +865,9 @@ const handleBatchUpload = config => {
       }
       if (!/\.(gcode|g|3mf|stl)$/i.test(file.name)) {
         return { index, fileId: null, fileName: file.name, status: 'FAILED', errorCode: 400, message: '文件类型不支持', retryable: false }
+      }
+      if ((Number(file.size) || 0) > MAX_UPLOAD_FILE_BYTES) {
+        return { index, fileId: null, fileName: file.name, status: 'FAILED', errorCode: 400, message: '单个文件大小不能超过 1GB', retryable: false }
       }
       const created = createUploadedFile(session, file, parentId)
       return {

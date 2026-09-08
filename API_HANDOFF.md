@@ -236,7 +236,7 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 | 方法 | 地址 | 权限 | 参数 | 返回 |
 |---|---|---|---|---|
 | POST | `/print-files/upload` | ADMIN/OPERATOR | Multipart：`file`、`parentId?` | `PrintFileVO`，不含 `rustfsKey`/`safeName`/`fileUrl` |
-| POST | `/print-files/batch-upload` | ADMIN/OPERATOR | Multipart：可重复字段 `files`、`parentId?`，最多100个、总大小默认1GB | `BatchUploadResult`，逐项返回 fileId/status/errorCode/retryable；不自动创建设备任务 |
+| POST | `/print-files/batch-upload` | ADMIN/OPERATOR | Multipart：可重复字段 `files`、`parentId?`，最多100个；应用层无批量总量限制 | `BatchUploadResult`，逐项返回 fileId/status/errorCode/retryable；不自动创建设备任务 |
 | POST | `/print-files/page` | ADMIN/OPERATOR | JSON：分页、`fileName`、`materialType`、`parentId?` | `PageResult<PrintFileVO>` |
 | GET | `/print-files/tree` | ADMIN/OPERATOR | 无 | `FileNodeVO[]` |
 | GET | `/print-files/{id}/jobs` | ADMIN/OPERATOR | Query：`pageNum,pageSize` | `PageResult<PrintJobVO>` |
@@ -295,8 +295,8 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 - 文件夹名称最多100个字符，不允许 `/`、`\\`、控制字符及 `:*?\"<>|`；`parentId` 必须为正数或省略表示根目录。
 
 - 批量添加打印机、批量删除文件、批量更新位置单次最多100项。批量删除返回 `items`，每项包含 `id`、`success`、`reason`；批量添加返回 `items`，每项包含 `index`、地址、成功标志和原因。
-- 批量文件上传接口为 `POST /api/v1/print-files/batch-upload`，使用 `multipart/form-data` 的重复字段 `files`。默认最多100个文件、总大小1GB；开发环境总大小上限250MB。接口逐项返回 `index`、`fileId`、`fileName`、`status`、`errorCode`、`message`、`retryable`，单项失败不回滚其他已成功文件；空列表、数量或总大小超限返回 HTTP 400。
-- 文件上传扩展名从 `farm.file.allowed-types` 读取，默认允许 `gcode,g,3mf,stl`；开发环境上限200MB，生产环境上限1GB。空文件、非法文件名、超限和不支持类型统一返回 HTTP 400；RustFS 失败返回 HTTP 503、业务码 `5003`。
+- 批量文件上传接口为 `POST /api/v1/print-files/batch-upload`，使用 `multipart/form-data` 的重复字段 `files`。最多100个文件；应用层不限制批量总大小，单个 HTTP 请求仍受约1.2GB的 `spring.servlet.multipart.max-request-size` 限制，前端按单请求约1GB自动分组。接口逐项返回 `index`、`fileId`、`fileName`、`status`、`errorCode`、`message`、`retryable`，单项失败不回滚其他已成功文件；空列表或数量超限返回 HTTP 400。
+- 文件上传扩展名从 `farm.file.allowed-types` 读取，默认允许 `gcode,g,3mf,stl`；单文件上限为1GB，并与 `spring.servlet.multipart.max-file-size` 和 `farm.file.max-file-size` 一致。空文件、非法文件名、超限和不支持类型统一返回 HTTP 400；RustFS 失败返回 HTTP 503、业务码 `5003`。
 - 文件上传先写入 RustFS、再保存文件记录；若数据库保存失败，后端会尝试补偿删除已上传的主文件和缩略图对象。补偿删除失败只记录日志，接口仍返回原始保存错误。
 - 删除文件时先清理关联缩略图，再删除主文件对象；任一对象存储删除失败都会保留数据库记录并返回 `503/5003`，避免前端误判删除成功。
 
@@ -379,7 +379,7 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 
 | 场景 | HTTP/code | 前端处理 |
 |---|---:|---|
-| 参数校验失败 | 400/400 | 展示字段或表单错误，不自动重试 |
+| 参数校验失败 | 400/400、413 | 展示字段或表单错误，不自动重试 |
 | 未登录或 Token 失效 | 401/401 | 清理本地用户状态，断开 WebSocket，回到登录页 |
 | 无权限或账号被禁用 | 403/403 | 提示无权限；不要重复请求 |
 | 资源不存在 | 404/404 | 刷新列表或提示资源已不存在 |
@@ -387,6 +387,8 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 | 状态不允许 | 422/422 | 刷新任务/设备状态后再决定是否允许操作 |
 | 设备离线/忙/协议不支持 | 503/10001、409/10002、422/10003 | 提示设备状态，不显示为操作成功 |
 | MySQL/Redis/RustFS/网络不可用 | 503/5001、5002、5003、5004 | 按基础设施类型提示；仅幂等读请求可按退避策略重试 |
+
+上传请求额外约定：408、429 和 5xx 可标记为可重试；400、401、403、413 不可重试。无响应的网络错误或超时视为结果未知，必须先刷新文件列表确认是否已入库，再决定后续操作，避免重复上传。
 
 错误响应仍使用统一结构：`{ code, message, data: null, timestamp }`。前端不得把密码、JWT、设备 API Key、对象存储 URL 或完整请求体写入日志。
 
