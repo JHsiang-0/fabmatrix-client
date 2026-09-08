@@ -50,7 +50,6 @@
       activable
       hover
       expand-on-click-node
-      :max-height="treeMaxHeight"
       @click="handleTreeClick"
       @expand="handleExpand"
     />
@@ -65,8 +64,7 @@ import { getFileTree } from '@/api/printFile'
 defineOptions({ name: 'FileFolderTree' })
 
 const props = defineProps({
-  currentParentId: { type: [String, Number], default: null },
-  treeMaxHeight: { type: [String, Number], default: '100%' }
+  currentParentId: { type: [String, Number], default: null }
 })
 
 const emit = defineEmits(['select', 'loaded'])
@@ -268,7 +266,7 @@ defineExpose({ refresh })
 .file-folder-tree__nodes {
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
+  overflow: visible;
 }
 
 .file-folder-tree :deep(.t-tree__label) {

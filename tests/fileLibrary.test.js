@@ -44,6 +44,8 @@ test('文件夹树只消费后端真实目录节点并保留路径和错误恢�
   assert.match(folderTreeSource, /emit\('select', \{[\s\S]*id,[\s\S]*path\n {2}\}\)/)
   assert.match(folderTreeSource, /<t-alert v-if="error" theme="error"/)
   assert.match(folderTreeSource, /@click="refresh">重试<\/t-button>/)
+  assert.doesNotMatch(folderTreeSource, /:max-height="treeMaxHeight"/)
+  assert.match(folderTreeSource, /\.file-folder-tree__nodes[\s\S]*overflow: visible/)
   assert.doesNotMatch(folderTreeSource, /checkable|draggable|allow-drop|onDrop/)
 })
 
