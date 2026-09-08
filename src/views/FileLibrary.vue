@@ -93,7 +93,7 @@
         >
           <t-dropdown :options="getContextMenuOptions(file)" trigger="context-menu" :popup-props="contextMenuPopupProps"
             @click="handleContextMenuClick($event, file)">
-            <t-card :bordered="false" hover-shadow class="file-card"
+            <t-card bordered hover-shadow class="file-card"
               :class="{ 'file-card--selected': selectedIds.includes(file.id) }"
               @click="handleFileClick(file)">
               <!-- 文件选择框始终可见，避免浏览/选择模式切换造成布局跳动。 -->
@@ -412,7 +412,7 @@
         </t-form-item>
         <t-form-item label="目录级别" name="level" class="create-folder-form__item">
           <div class="create-folder-form__control create-folder-form__control--level">
-            <t-radio-group v-model="folderForm.level">
+            <t-radio-group v-model="folderForm.level" class="create-folder-form__level-radio-group">
               <t-radio-button :value="1">一级目录</t-radio-button>
               <t-radio-button :value="2">二级目录</t-radio-button>
             </t-radio-group>
@@ -2432,8 +2432,34 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-start;
   flex-wrap: wrap;
-  gap: var(--app-spacing-2);
   max-width: 100%;
+}
+
+.create-folder-form__level-radio-group {
+  gap: var(--app-spacing-2);
+  min-width: 0;
+}
+
+.create-folder-form__level-radio-group :deep(.t-radio-button) {
+  position: relative;
+  z-index: 0;
+  margin-left: 0;
+  border-left: 1px solid var(--td-border-level-2-color);
+  border-right: 1px solid var(--td-border-level-2-color);
+  border-radius: var(--td-radius-medium);
+}
+
+.create-folder-form__level-radio-group :deep(.t-radio-button:first-child),
+.create-folder-form__level-radio-group :deep(.t-radio-button:last-child) {
+  border-radius: var(--td-radius-medium);
+}
+
+.create-folder-form__level-radio-group :deep(.t-radio-button.t-is-checked) {
+  z-index: 1;
+}
+
+.create-folder-form__level-radio-group :deep(.t-radio-button.t-is-checked + .t-radio-button) {
+  border-left: 1px solid var(--td-border-level-2-color);
 }
 
 .create-folder-dialog__footer,
