@@ -53,6 +53,9 @@
       @click="handleTreeClick"
       @expand="handleExpand"
     >
+      <template #label="{ node }">
+        <span class="file-folder-tree__label" :title="node.label">{{ node.label }}</span>
+      </template>
       <template #operations="{ node }">
         <t-dropdown
           v-if="!unwrapFolderTreeNode(node)?.isDefault"
@@ -307,13 +310,25 @@ defineExpose({ refresh })
 }
 
 .file-folder-tree :deep(.t-tree__label) {
+  flex: 1 1 auto;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-folder-tree__label {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .file-folder-tree :deep(.t-tree__item) {
+  min-width: 0;
   border-radius: var(--td-radius-default);
 }
 
