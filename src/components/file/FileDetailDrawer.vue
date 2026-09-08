@@ -47,30 +47,26 @@
 
           <div class="file-detail-drawer__identity">
             <h2 id="file-detail-name" :title="file.originalName">{{ file.originalName }}</h2>
-            <t-tag :theme="getMaterialTagType(file.materialType)" size="small">
+            <t-tag
+              :theme="getMaterialTagType(file.materialType)"
+              size="small"
+              class="file-detail-drawer__material-tag"
+              :title="file.materialType || '未指定'"
+            >
               {{ file.materialType || '未指定' }}
             </t-tag>
-          </div>
-
-          <div class="file-detail-drawer__actions">
-            <t-button theme="primary" size="small" :icon="renderIcon(Printer)" @click="handlePrint">
-              打印
-            </t-button>
-            <t-button variant="outline" size="small" :icon="renderIcon(Download)" @click="handleDownload">
-              下载
-            </t-button>
           </div>
         </section>
 
         <section class="file-detail-drawer__section" aria-labelledby="file-detail-metrics">
           <h3 id="file-detail-metrics">切片摘要</h3>
-          <t-descriptions :column="2" size="small" bordered>
-            <t-descriptions-item label="预计耗时">{{ formatDuration(file.estTime) }}</t-descriptions-item>
-            <t-descriptions-item label="文件大小">{{ formatFileSize(file.fileSize) }}</t-descriptions-item>
-            <t-descriptions-item label="耗材重量">{{ formatWeight(file.filamentWeight) }}</t-descriptions-item>
-            <t-descriptions-item label="所需线长">{{ formatLength(file.filamentLength) }}</t-descriptions-item>
-            <t-descriptions-item label="喷嘴要求">{{ formatNozzle(file.nozzleSize) }}</t-descriptions-item>
-            <t-descriptions-item label="上传时间">{{ formatDateTime(file.createdAt) }}</t-descriptions-item>
+          <t-descriptions class="file-detail-drawer__descriptions" :column="3" table-layout="fixed" size="small" bordered>
+            <t-descriptions-item label="预计耗时"><span class="file-detail-drawer__value" :title="formatDuration(file.estTime)">{{ formatDuration(file.estTime) }}</span></t-descriptions-item>
+            <t-descriptions-item label="文件大小"><span class="file-detail-drawer__value" :title="formatFileSize(file.fileSize)">{{ formatFileSize(file.fileSize) }}</span></t-descriptions-item>
+            <t-descriptions-item label="耗材重量"><span class="file-detail-drawer__value" :title="formatWeight(file.filamentWeight)">{{ formatWeight(file.filamentWeight) }}</span></t-descriptions-item>
+            <t-descriptions-item label="所需线长"><span class="file-detail-drawer__value" :title="formatLength(file.filamentLength)">{{ formatLength(file.filamentLength) }}</span></t-descriptions-item>
+            <t-descriptions-item label="喷嘴要求"><span class="file-detail-drawer__value" :title="formatNozzle(file.nozzleSize)">{{ formatNozzle(file.nozzleSize) }}</span></t-descriptions-item>
+            <t-descriptions-item label="上传时间"><span class="file-detail-drawer__value" :title="formatDateTime(file.createdAt)">{{ formatDateTime(file.createdAt) }}</span></t-descriptions-item>
           </t-descriptions>
         </section>
 
@@ -78,13 +74,13 @@
 
         <section class="file-detail-drawer__section" aria-labelledby="file-detail-parameters">
           <h3 id="file-detail-parameters">切片参数</h3>
-          <t-descriptions :column="2" size="small" bordered>
-            <t-descriptions-item label="常规层高">{{ formatHeight(file.layerHeight) }}</t-descriptions-item>
-            <t-descriptions-item label="首层层高">{{ formatHeight(file.firstLayerHeight) }}</t-descriptions-item>
-            <t-descriptions-item label="喷嘴温度">{{ formatTemperature(file.nozzleTemp) }}</t-descriptions-item>
-            <t-descriptions-item label="首层喷嘴温度">{{ formatTemperature(file.firstLayerNozzleTemp) }}</t-descriptions-item>
-            <t-descriptions-item label="热床温度">{{ formatTemperature(file.bedTemp) }}</t-descriptions-item>
-            <t-descriptions-item label="首层热床温度">{{ formatTemperature(file.firstLayerBedTemp) }}</t-descriptions-item>
+          <t-descriptions class="file-detail-drawer__descriptions" :column="3" table-layout="fixed" size="small" bordered>
+            <t-descriptions-item label="常规层高"><span class="file-detail-drawer__value" :title="formatHeight(file.layerHeight)">{{ formatHeight(file.layerHeight) }}</span></t-descriptions-item>
+            <t-descriptions-item label="首层层高"><span class="file-detail-drawer__value" :title="formatHeight(file.firstLayerHeight)">{{ formatHeight(file.firstLayerHeight) }}</span></t-descriptions-item>
+            <t-descriptions-item label="喷嘴温度"><span class="file-detail-drawer__value" :title="formatTemperature(file.nozzleTemp)">{{ formatTemperature(file.nozzleTemp) }}</span></t-descriptions-item>
+            <t-descriptions-item label="首层喷嘴温度"><span class="file-detail-drawer__value" :title="formatTemperature(file.firstLayerNozzleTemp)">{{ formatTemperature(file.firstLayerNozzleTemp) }}</span></t-descriptions-item>
+            <t-descriptions-item label="热床温度"><span class="file-detail-drawer__value" :title="formatTemperature(file.bedTemp)">{{ formatTemperature(file.bedTemp) }}</span></t-descriptions-item>
+            <t-descriptions-item label="首层热床温度"><span class="file-detail-drawer__value" :title="formatTemperature(file.firstLayerBedTemp)">{{ formatTemperature(file.firstLayerBedTemp) }}</span></t-descriptions-item>
           </t-descriptions>
         </section>
 
@@ -101,18 +97,32 @@
             </template>
           </t-alert>
           <t-skeleton v-else-if="jobsLoading" :loading="true" theme="paragraph" />
-          <t-table v-else-if="jobs.length > 0" :data="jobs" :columns="jobColumns" row-key="id" size="small" bordered>
+          <div v-else-if="jobs.length > 0" class="file-detail-drawer__jobs-table">
+            <t-table :data="jobs" :columns="jobColumns" row-key="id" table-layout="fixed" size="small" bordered>
+            <template #id="slotProps">
+              <span class="file-detail-drawer__value" :title="String(slotProps.row.id ?? '-')">{{ slotProps.row.id ?? '-' }}</span>
+            </template>
             <template #status="slotProps">
-              <t-tag :theme="getJobStatusTagType(slotProps.row.status)" size="small">
+              <t-tag :theme="getJobStatusTagType(slotProps.row.status)" size="small" :title="slotProps.row.status || '-'">
                 {{ slotProps.row.status || '-' }}
               </t-tag>
             </template>
             <template #createdAt="slotProps">
-              {{ formatDateTime(slotProps.row.createdAt) }}
+              <span class="file-detail-drawer__value" :title="formatDateTime(slotProps.row.createdAt)">{{ formatDateTime(slotProps.row.createdAt) }}</span>
             </template>
-          </t-table>
+            </t-table>
+          </div>
           <t-empty v-else description="暂无关联任务" />
         </section>
+
+        <div class="file-detail-drawer__footer-actions" aria-label="文件操作">
+          <t-button theme="primary" size="large" :icon="renderIcon(Printer)" @click="handlePrint">
+            打印
+          </t-button>
+          <t-button variant="outline" size="large" :icon="renderIcon(Download)" @click="handleDownload">
+            下载
+          </t-button>
+        </div>
       </template>
 
       <t-empty v-else description="未选择文件" />
@@ -149,9 +159,9 @@ const drawerVisible = computed({
 })
 
 const jobColumns = [
-  { colKey: 'id', title: '任务 ID', width: 80 },
-  { colKey: 'status', title: '状态', width: 100 },
-  { colKey: 'createdAt', title: '创建时间', ellipsis: true }
+  { colKey: 'id', title: '任务 ID', width: '25%', ellipsis: true },
+  { colKey: 'status', title: '状态', width: '25%', ellipsis: true },
+  { colKey: 'createdAt', title: '创建时间', width: '50%', ellipsis: true }
 ]
 
 const handleVisibleChange = value => {
@@ -208,7 +218,7 @@ const getJobStatusTagType = status => ({
   display: flex;
   min-height: 100%;
   flex-direction: column;
-  gap: var(--app-spacing-4);
+  gap: var(--app-spacing-3);
 }
 
 .file-detail-drawer__loading {
@@ -217,9 +227,9 @@ const getJobStatusTagType = status => ({
 
 .file-detail-drawer__summary {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr) auto;
+  grid-template-columns: 88px minmax(0, 1fr);
   align-items: center;
-  gap: var(--app-spacing-3);
+  gap: var(--app-spacing-2);
 }
 
 .file-detail-drawer__thumbnail {
@@ -262,17 +272,18 @@ const getJobStatusTagType = status => ({
   white-space: nowrap;
 }
 
-.file-detail-drawer__actions {
-  display: flex;
-  align-items: flex-end;
-  flex-direction: column;
-  gap: var(--app-spacing-2);
+.file-detail-drawer__material-tag {
+  display: inline-flex;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .file-detail-drawer__section {
   display: flex;
   flex-direction: column;
-  gap: var(--app-spacing-3);
+  gap: var(--app-spacing-2);
 }
 
 .file-detail-drawer__section h3 {
@@ -290,6 +301,62 @@ const getJobStatusTagType = status => ({
   margin: 0;
 }
 
+.file-detail-drawer__descriptions {
+  width: 100%;
+  min-width: 0;
+}
+
+.file-detail-drawer__descriptions :deep(.t-descriptions__body) {
+  width: 100%;
+  min-width: 0;
+}
+
+.file-detail-drawer__descriptions :deep(.t-descriptions__label),
+.file-detail-drawer__descriptions :deep(.t-descriptions__content) {
+  min-width: 0;
+  max-width: 0;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.file-detail-drawer__value {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-detail-drawer__jobs-table {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.file-detail-drawer__jobs-table :deep(.t-table),
+.file-detail-drawer__jobs-table :deep(.t-table__content) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.file-detail-drawer__jobs-table :deep(.t-table__body),
+.file-detail-drawer__jobs-table :deep(.t-table__header) {
+  table-layout: fixed;
+}
+
+.file-detail-drawer__footer-actions {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--app-spacing-2);
+  margin-top: auto;
+  padding-top: var(--app-spacing-2);
+}
+
 @media (max-width: 460px) {
   .file-detail-drawer__summary {
     grid-template-columns: 72px minmax(0, 1fr);
@@ -300,10 +367,12 @@ const getJobStatusTagType = status => ({
     height: 72px;
   }
 
-  .file-detail-drawer__actions {
-    grid-column: 1 / -1;
-    align-items: stretch;
-    flex-direction: row;
+  .file-detail-drawer__footer-actions {
+    flex-direction: column;
+  }
+
+  .file-detail-drawer__footer-actions :deep(.t-button) {
+    width: 100%;
   }
 }
 </style>

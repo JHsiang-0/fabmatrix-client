@@ -157,9 +157,14 @@
                   </div>
                   <div class="file-card__success-rate">
                     <span class="file-card__stat-label">成功率</span>
-                    <t-progress v-if="hasValue(file.successRate)" :percentage="file.successRate" :stroke-width="4" :label="false"
-                      :class="['file-card__success-rate-progress', getSuccessRateClass(file.successRate)]" />
-                    <span class="file-card__stat-value">{{ formatMetric(file.successRate, '%') }}</span>
+                    <t-tag
+                      :theme="getSuccessRateTheme(file.successRate)"
+                      size="small"
+                      class="file-card__success-rate-tag"
+                      :title="formatMetric(file.successRate, '%')"
+                    >
+                      {{ formatMetric(file.successRate, '%') }}
+                    </t-tag>
                   </div>
                 </div>
 
@@ -243,12 +248,14 @@
 
           <TdTableColumn prop="successRate" label="成功率" width="100">
             <template #default="{ row }">
-              <div class="file-table__rate" v-if="hasValue(row.successRate)">
-                <t-progress :percentage="row.successRate" :stroke-width="6" :label="false"
-                  :class="getSuccessRateClass(row.successRate)" />
-                    <span class="file-table__metric" :title="formatMetric(row.successRate, '%')">{{ formatMetric(row.successRate, '%') }}</span>
-              </div>
-              <span v-else>-</span>
+              <t-tag
+                :theme="getSuccessRateTheme(row.successRate)"
+                size="small"
+                class="file-table__rate-tag"
+                :title="formatMetric(row.successRate, '%')"
+              >
+                {{ formatMetric(row.successRate, '%') }}
+              </t-tag>
             </template>
           </TdTableColumn>
 
@@ -1646,12 +1653,15 @@ const getMaterialTagType = (materialType) => {
 }
 
 /**
- * 获取成功率样式类
+ * 获取成功率标签主题：无数据或 0 为 default，低于 50% 为 danger，
+ * 50%（含）至 80%（不含）为 warning，80% 及以上为 success。
  */
-const getSuccessRateClass = (successRate) => {
-  if (!successRate || successRate === 0) return ''
-  if (successRate < 70) return 'success-rate-warning'
-  return 'success-rate-success'
+const getSuccessRateTheme = (successRate) => {
+  const rate = Number(successRate)
+  if (!Number.isFinite(rate) || rate <= 0) return 'default'
+  if (rate < 50) return 'danger'
+  if (rate < 80) return 'warning'
+  return 'success'
 }
 
 const loadFileDetail = async fileId => {
@@ -2415,9 +2425,12 @@ onBeforeUnmount(() => {
   gap: 8px !important;
 }
 
-.file-card__success-rate-progress {
-  min-width: 40px;
-  flex: 1 1 auto;
+.file-card__success-rate-tag {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .file-card__actions {
@@ -2515,14 +2528,12 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.file-table__rate {
-  display: flex;
-  align-items: center;
-  gap: var(--app-spacing-2);
-}
-
-.file-table__rate :deep(.t-progress) {
-  width: 64px;
+.file-table__rate-tag {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .file-move-dialog__results {

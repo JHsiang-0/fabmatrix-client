@@ -306,3 +306,44 @@ test('文件详情抽屉使用 TDesign 关闭同步并避免旧版卡片拼装',
   assert.match(source, /const retryFileJobs = \(\) =>/)
   assert.match(source, /await refreshLibrary\(\)/)
 })
+
+test('文件库成功率统一使用分档 TDesign 标签，不再混入进度条', () => {
+  const gridRate = source.match(/<div class="file-card__success-rate">[\s\S]*?<\/div>/)?.[0] || ''
+  const tableRate = source.match(/<TdTableColumn prop="successRate"[\s\S]*?<\/TdTableColumn>/)?.[0] || ''
+
+  assert.match(gridRate, /<t-tag[\s\S]*:theme="getSuccessRateTheme\(file\.successRate\)"/)
+  assert.doesNotMatch(gridRate, /t-progress/)
+  assert.match(tableRate, /<t-tag[\s\S]*:theme="getSuccessRateTheme\(row\.successRate\)"/)
+  assert.doesNotMatch(tableRate, /t-progress/)
+  assert.match(source, /if \(!Number\.isFinite\(rate\) \|\| rate <= 0\) return 'default'/)
+  assert.match(source, /if \(rate < 50\) return 'danger'/)
+  assert.match(source, /if \(rate < 80\) return 'warning'/)
+  assert.match(source, /return 'success'/)
+  assert.match(source, /file-card__success-rate-tag[\s\S]*text-overflow: ellipsis/)
+  assert.match(source, /file-table__rate-tag[\s\S]*text-overflow: ellipsis/)
+})
+
+test('文件详情使用紧凑摘要参数、底部大按钮并保护长文本布局', () => {
+  const descriptions = detailSource.match(/<t-descriptions[\s\S]*?\/t-descriptions>/g) || []
+
+  assert.equal(descriptions.length, 2)
+  for (const description of descriptions) {
+    assert.match(description, /class="file-detail-drawer__descriptions"/)
+    assert.match(description, /:column="3"/)
+    assert.match(description, /table-layout="fixed"/)
+    assert.match(description, /size="small"/)
+  }
+  assert.doesNotMatch(detailSource.match(/<section class="file-detail-drawer__summary"[\s\S]*?<\/section>/)?.[0] || '', /<t-button/)
+  assert.match(detailSource, /class="file-detail-drawer__footer-actions"[\s\S]*size="large"[\s\S]*>[\s\S]*打印[\s\S]*size="large"[\s\S]*>[\s\S]*下载/)
+  assert.match(detailSource, /file-detail-drawer__value[\s\S]*text-overflow: ellipsis[\s\S]*white-space: nowrap/)
+  assert.match(detailSource, /class="file-detail-drawer__material-tag"[\s\S]*:title="file\.materialType \|\| '未指定'"/)
+  assert.match(detailSource, /file-detail-drawer__material-tag[\s\S]*max-width: 100%[\s\S]*text-overflow: ellipsis/)
+  assert.match(detailSource, /:title="formatDateTime\(file\.createdAt\)"/)
+  assert.match(detailSource, /<div v-else-if="jobs.length > 0" class="file-detail-drawer__jobs-table">/)
+  assert.match(detailSource, /table-layout="fixed"[\s\S]*class="file-detail-drawer__jobs-table"|class="file-detail-drawer__jobs-table"[\s\S]*table-layout="fixed"/)
+  assert.match(detailSource, /file-detail-drawer__jobs-table :deep\(\.t-table__content\)[\s\S]*overflow-x: hidden/)
+  assert.match(detailSource, /:title="String\(slotProps\.row\.id \?\? '-'\)"/)
+  assert.match(detailSource, /:title="formatDateTime\(slotProps\.row\.createdAt\)"/)
+  assert.match(detailSource, /file-detail-drawer__footer-actions :deep\(\.t-button\)[\s\S]*width: 100%/)
+  assert.doesNotMatch(detailSource, /file-detail-drawer__actions/)
+})
