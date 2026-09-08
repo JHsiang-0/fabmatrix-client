@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import fs from 'node:fs'
-import { resolveFolderActionValue } from '../src/utils/fileFolderActions.js'
+import {
+  resolveFolderActionPayload,
+  resolveFolderActionValue,
+  unwrapFolderTreeNode
+} from '../src/utils/fileFolderActions.js'
 
 const source = fs.readFileSync(new URL('../src/views/FileLibrary.vue', import.meta.url), 'utf8')
 const detailSource = fs.readFileSync(new URL('../src/components/file/FileDetailDrawer.vue', import.meta.url), 'utf8')
@@ -37,13 +41,13 @@ test('文件夹树只消费后端真实目录节点并保留路径和错误恢�
   assert.doesNotMatch(folderTreeSource, /刷新文件夹列表|RefreshIcon|按目录查看文件/)
   assert.match(folderTreeSource, /@click="emit\('create'\)"/)
   assert.match(folderTreeSource, /#operations="\{ node \}"/)
-  assert.match(folderTreeSource, /v-if="!node\.data\?\.isDefault"/)
+  assert.match(folderTreeSource, /v-if="!unwrapFolderTreeNode\(node\)\?\.isDefault"/)
   assert.match(folderTreeSource, /<MoreIcon \/>/)
   assert.match(folderTreeSource, /trigger="click"/)
   assert.match(folderTreeSource, /folderActionOptions/)
-  assert.match(folderTreeSource, /@click="dropdownAction => handleFolderAction\(dropdownAction, node\.data\)"/)
+  assert.match(folderTreeSource, /@click="dropdownAction => handleFolderAction\(dropdownAction, node\)"/)
   assert.match(folderTreeSource, /@click\.stop\n\s*>/)
-  assert.match(folderTreeSource, /emit\('folder-action', folder, actionValue\)/)
+  assert.match(folderTreeSource, /emit\('folder-action', payload\.folder, payload\.action\)/)
   assert.doesNotMatch(folderTreeSource, /emit\('delete', node\.data\)/)
   assert.match(folderTreeSource, /EditIcon/)
   assert.match(folderTreeSource, /FolderMoveIcon/)
@@ -68,7 +72,7 @@ test('文件夹 More 面板按 TDesign Dropdown click 签名传递三类动作',
   assert.match(actionOptions, /content: '重命名'[\s\S]*value: 'rename'[\s\S]*EditIcon/)
   assert.match(actionOptions, /content: '移动到'[\s\S]*value: 'move'[\s\S]*FolderMoveIcon/)
   assert.match(actionOptions, /content: '删除'[\s\S]*value: 'delete'[\s\S]*theme: 'error'[\s\S]*DeleteIcon/)
-  assert.match(folderTreeSource, /const handleFolderAction = \(action, folder\) =>/)
+  assert.match(folderTreeSource, /const handleFolderAction = \(action, node\) =>/)
   assert.doesNotMatch(folderTreeSource, /handleFolderAction\(\$event/)
   assert.match(folderTreeSource, /\.t-tree__item:hover\)[\s\S]*\.t-tree__item:focus-within/)
   assert.match(folderTreeSource, /opacity: 0[\s\S]*pointer-events: none/)
@@ -86,6 +90,48 @@ test('文件夹操作解析完整下拉选项的 value 并兼容字符串动作'
 
   assert.equal(resolveFolderActionValue(null), null)
   assert.equal(resolveFolderActionValue(undefined), undefined)
+})
+
+test('文件夹操作从 TDesign 外层节点解包真实对象并传递三类动作载荷', () => {
+  const folder = {
+    id: 'folder-42',
+    parentId: 'folder-7',
+    isDefault: false,
+    name: '真实目录'
+  }
+  const treeNode = {
+    value: folder.id,
+    label: '展示标签',
+    data: {
+      value: folder.id,
+      label: '展示标签',
+      path: [{ id: folder.id, name: folder.name }],
+      data: folder,
+      children: []
+    },
+    children: []
+  }
+
+  const unwrappedFolder = unwrapFolderTreeNode(treeNode)
+  assert.equal(unwrappedFolder, folder)
+  assert.equal(unwrappedFolder.id, 'folder-42')
+  assert.equal(unwrappedFolder.parentId, 'folder-7')
+  assert.equal(unwrappedFolder.isDefault, false)
+  assert.equal(unwrappedFolder.name, '真实目录')
+  assert.notEqual(unwrappedFolder, treeNode.data)
+
+  for (const action of ['rename', 'move', 'delete']) {
+    const payload = resolveFolderActionPayload({ content: action, value: action }, treeNode)
+    assert.equal(payload.folder, folder)
+    assert.equal(payload.action, action)
+    assert.notEqual(payload.folder, treeNode.data)
+  }
+
+  const defaultTreeNode = {
+    ...treeNode,
+    data: { ...treeNode.data, data: { ...folder, isDefault: true } }
+  }
+  assert.equal(unwrapFolderTreeNode(defaultTreeNode).isDefault, true)
 })
 
 test('文件中心不伪造材料和统计值，并覆盖上传删除结果态', () => {

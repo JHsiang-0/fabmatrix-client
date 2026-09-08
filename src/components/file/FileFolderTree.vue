@@ -55,10 +55,10 @@
     >
       <template #operations="{ node }">
         <t-dropdown
-          v-if="!node.data?.isDefault"
+          v-if="!unwrapFolderTreeNode(node)?.isDefault"
           :options="folderActionOptions"
           trigger="click"
-          @click="dropdownAction => handleFolderAction(dropdownAction, node.data)"
+          @click="dropdownAction => handleFolderAction(dropdownAction, node)"
         >
           <t-button
             class="file-folder-tree__more"
@@ -82,7 +82,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { AddIcon, DeleteIcon, EditIcon, FolderMoveIcon, MoreIcon, SearchIcon } from 'tdesign-icons-vue-next'
 import { getFileTree } from '@/api/printFile'
-import { resolveFolderActionValue } from '@/utils/fileFolderActions'
+import { resolveFolderActionPayload, unwrapFolderTreeNode } from '@/utils/fileFolderActions'
 import { renderIcon } from '@/utils/tdesign'
 
 defineOptions({ name: 'FileFolderTree' })
@@ -220,9 +220,9 @@ const handleTreeClick = context => {
   })
 }
 
-const handleFolderAction = (action, folder) => {
-  const actionValue = resolveFolderActionValue(action)
-  if (folder && actionValue) emit('folder-action', folder, actionValue)
+const handleFolderAction = (action, node) => {
+  const payload = resolveFolderActionPayload(action, node)
+  if (payload && !payload.folder.isDefault) emit('folder-action', payload.folder, payload.action)
 }
 
 const handleExpand = keys => {
