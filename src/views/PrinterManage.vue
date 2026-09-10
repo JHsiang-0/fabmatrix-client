@@ -1534,6 +1534,51 @@ const handleBatchAdd = async () => {
   display: none;
 }
 
+@media (max-width: 1100px) {
+  .printer-manage-page :deep(.app-page-header__actions) {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
+    overflow: hidden;
+  }
+
+  .printer-page-actions {
+    flex-wrap: nowrap;
+    width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
+  .printer-page-actions :deep(.t-button) {
+    flex: 0 0 auto;
+  }
+
+  .printer-management-toolbar-card__top {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--app-spacing-2);
+  }
+
+  .printer-management-tabs {
+    flex: 0 0 40px;
+    flex-wrap: nowrap;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .printer-management-toolbar-card__controls {
+    width: 100%;
+  }
+
+  .printer-management-filter__search {
+    flex: 1 1 auto;
+    width: auto;
+  }
+}
+
 @media (max-width: 768px) {
   .printer-management-toolbar-card__top {
     align-items: stretch;
