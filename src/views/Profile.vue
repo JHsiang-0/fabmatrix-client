@@ -2,14 +2,14 @@
   <div class="profile-page app-page-shell app-page-background">
     <PageHeader title="个人中心" description="管理个人资料与登录安全设置" />
     <div class="profile-grid">
-      <t-card title="个人资料" class="profile-card">
+      <t-card bordered hover-shadow title="个人资料" class="profile-card profile-card--profile">
         <t-loading v-if="profileLoading && !profileLoaded" class="profile-loading" />
         <t-alert v-else-if="profileError" theme="error" :close-btn="false">
           {{ profileError }}
           <template #operation><t-button size="small" variant="outline" @click="loadProfile">重试</t-button></template>
         </t-alert>
-        <t-form v-else :data="profileForm" :rules="profileRules" label-align="top" @submit="saveProfile">
-          <t-alert v-if="profileSaveError" theme="error" :close-btn="false" class="mb-4">{{ profileSaveError }}</t-alert>
+        <t-form v-else :data="profileForm" :rules="profileRules" label-align="top" class="profile-form" @submit="saveProfile">
+          <t-alert v-if="profileSaveError" theme="error" :close-btn="false" class="profile-form-alert">{{ profileSaveError }}</t-alert>
           <t-form-item label="用户名">
             <t-input :value="userStore.userInfo.username" disabled />
           </t-form-item>
@@ -19,16 +19,16 @@
           <t-form-item name="phone" label="手机号">
             <t-input v-model="profileForm.phone" placeholder="请输入手机号（可选）" clearable />
           </t-form-item>
-          <t-space>
+          <t-space class="profile-form__actions">
             <t-button theme="primary" type="submit" :loading="profileLoading" :disabled="!profileDirty">保存资料</t-button>
             <t-button variant="outline" :disabled="!profileDirty || profileLoading" @click="cancelProfileChanges">取消修改</t-button>
           </t-space>
         </t-form>
       </t-card>
 
-      <t-card title="修改密码" class="profile-card">
-        <t-alert v-if="passwordError" theme="error" :close-btn="false" class="mb-4">{{ passwordError }}</t-alert>
-        <t-form :data="passwordForm" :rules="passwordRules" label-align="top" @submit="savePassword">
+      <t-card bordered hover-shadow title="修改密码" class="profile-card profile-card--security">
+        <t-alert v-if="passwordError" theme="error" :close-btn="false" class="profile-form-alert">{{ passwordError }}</t-alert>
+        <t-form :data="passwordForm" :rules="passwordRules" label-align="top" class="profile-form" @submit="savePassword">
           <t-form-item name="oldPassword" label="当前密码">
             <t-input v-model="passwordForm.oldPassword" type="password" autocomplete="current-password" />
           </t-form-item>
@@ -38,7 +38,7 @@
           <t-form-item name="confirmPassword" label="确认新密码">
             <t-input v-model="passwordForm.confirmPassword" type="password" autocomplete="new-password" />
           </t-form-item>
-          <p class="mb-4 text-xs text-[var(--app-text-secondary)]">密码长度 6-20 位，必须包含大写字母、小写字母和数字。</p>
+          <p class="profile-password-hint">密码长度 6-20 位，必须包含大写字母、小写字母和数字。</p>
           <t-button theme="primary" type="submit" :loading="passwordLoading">修改密码</t-button>
         </t-form>
       </t-card>
@@ -187,21 +187,81 @@ onUnmounted(() => window.removeEventListener('beforeunload', handleBeforeUnload)
 </script>
 
 <style scoped>
+.profile-page {
+  min-width: 0;
+}
+
 .profile-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--app-spacing-6);
   width: min(100%, 1080px);
   margin: 0 auto;
+  min-width: 0;
 }
 
 .profile-card {
   align-self: start;
+  min-width: 0;
+  border-color: var(--app-border);
+  background: var(--app-surface);
+}
+
+.profile-card :deep(.t-card__body) {
+  min-width: 0;
+}
+
+.profile-form {
+  min-width: 0;
+}
+
+.profile-form :deep(.t-form__item) {
+  margin-bottom: var(--app-spacing-4);
+}
+
+.profile-form :deep(.t-input),
+.profile-form :deep(.t-input-adornment) {
+  max-width: 100%;
+}
+
+.profile-form-alert {
+  margin-bottom: var(--app-spacing-4);
+}
+
+.profile-form__actions {
+  flex-wrap: wrap;
+}
+
+.profile-password-hint {
+  margin: 0 0 var(--app-spacing-4);
+  color: var(--app-text-secondary);
+  font-size: var(--app-font-size-caption);
+  line-height: 1.5;
 }
 
 @media (max-width: 900px) {
   .profile-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .profile-grid {
+    gap: var(--app-spacing-4);
+  }
+
+  .profile-card :deep(.t-card__header),
+  .profile-card :deep(.t-card__body) {
+    padding-left: var(--app-spacing-4);
+    padding-right: var(--app-spacing-4);
+  }
+
+  .profile-form__actions {
+    width: 100%;
+  }
+
+  .profile-form__actions :deep(.t-button) {
+    flex: 1 1 auto;
   }
 }
 </style>

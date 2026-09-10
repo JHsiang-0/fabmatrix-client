@@ -55,6 +55,20 @@ test('审计页面使用正式筛选并通过详情 Drawer 展示白名单字段
   assert.doesNotMatch(auditSource, /requestBody|responseBody|password|token|secret|stackTrace/)
 })
 
+test('个人中心和审计页面使用 TDesign 视觉容器并保护响应式长文本布局', () => {
+  assert.match(profileSource, /<t-card bordered hover-shadow title="个人资料"/)
+  assert.match(profileSource, /class="profile-form"/)
+  assert.match(profileSource, /profile-form__actions/)
+  assert.match(profileSource, /profile-password-hint/)
+  assert.match(profileSource, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
+  assert.match(auditSource, /<t-card bordered hover-shadow class="app-page-card management-card audit-log-card"/)
+  assert.match(auditSource, /audit-filter-form/)
+  assert.match(auditSource, /audit-log-table/)
+  assert.match(auditSource, /audit-cell__text/)
+  assert.match(auditSource, /audit-detail-drawer/)
+  assert.match(auditSource, /audit-log-pagination/)
+})
+
 test('全局 Header 显示真实实时连接状态并提供恢复入口', () => {
   assert.match(headerSource, /useRealtimeStore/)
   assert.match(headerSource, /实时已连接/)

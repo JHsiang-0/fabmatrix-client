@@ -1,5 +1,5 @@
 <template>
-  <div class="app-page-shell app-page-background">
+  <div class="audit-log-page app-page-shell app-page-background">
     <PageHeader title="操作日志">
       <template #actions>
       <div class="app-page-toolbar__actions">
@@ -8,38 +8,38 @@
       </template>
     </PageHeader>
 
-    <t-card class="app-page-card management-card">
-      <t-form :data="query" layout="inline" label-align="top" class="app-query-toolbar">
-        <t-form-item label="操作者 ID">
-          <t-input v-model="query.actorId" placeholder="操作者 ID" clearable style="width: 130px" @enter="handleQuery" />
+    <t-card bordered hover-shadow class="app-page-card management-card audit-log-card">
+      <t-form :data="query" layout="inline" label-align="top" class="app-query-toolbar audit-filter-form">
+        <t-form-item label="操作者 ID" class="audit-filter-form__field">
+          <t-input v-model="query.actorId" class="audit-filter-form__control" placeholder="操作者 ID" clearable @enter="handleQuery" />
         </t-form-item>
-        <t-form-item label="动作">
-          <t-input v-model="query.action" placeholder="如 JOB_CREATE" clearable style="width: 180px" @enter="handleQuery" />
+        <t-form-item label="动作" class="audit-filter-form__field">
+          <t-input v-model="query.action" class="audit-filter-form__control" placeholder="如 JOB_CREATE" clearable @enter="handleQuery" />
         </t-form-item>
-        <t-form-item label="目标类型">
-          <t-input v-model="query.targetType" placeholder="目标类型" clearable style="width: 140px" @enter="handleQuery" />
+        <t-form-item label="目标类型" class="audit-filter-form__field">
+          <t-input v-model="query.targetType" class="audit-filter-form__control" placeholder="目标类型" clearable @enter="handleQuery" />
         </t-form-item>
-        <t-form-item label="目标 ID">
-          <t-input v-model="query.targetId" placeholder="目标 ID" clearable style="width: 140px" @enter="handleQuery" />
+        <t-form-item label="目标 ID" class="audit-filter-form__field">
+          <t-input v-model="query.targetId" class="audit-filter-form__control" placeholder="目标 ID" clearable @enter="handleQuery" />
         </t-form-item>
-        <t-form-item label="结果">
-          <t-select v-model="query.result" placeholder="全部结果" clearable style="width: 120px" @change="handleQuery">
+        <t-form-item label="结果" class="audit-filter-form__field">
+          <t-select v-model="query.result" class="audit-filter-form__control" placeholder="全部结果" clearable @change="handleQuery">
             <t-option label="成功" value="SUCCESS" />
             <t-option label="失败" value="FAILURE" />
           </t-select>
         </t-form-item>
-        <t-form-item label="时间范围">
+        <t-form-item label="时间范围" class="audit-filter-form__field audit-filter-form__field--date">
           <t-date-range-picker
             v-model="query.dateRange"
+            class="audit-filter-form__control"
             value-type="YYYY-MM-DD HH:mm:ss"
             :default-time="['00:00:00', '23:59:59']"
             :placeholder="['开始时间', '结束时间']"
             separator="至"
-            style="width: 280px"
           />
         </t-form-item>
-        <t-form-item label="操作">
-          <div class="flex gap-2">
+        <t-form-item label="操作" class="audit-filter-form__field audit-filter-form__field--actions">
+          <div class="audit-filter-form__actions">
             <t-button theme="primary" :loading="loading" @click="handleQuery">查询</t-button>
             <t-button @click="handleReset">重置</t-button>
           </div>
@@ -58,10 +58,10 @@
         {{ loadError }}
         <template #operation><t-button size="small" variant="outline" @click="fetchData">重试</t-button></template>
       </t-alert>
-      <TdTable v-if="logs.length" :data="logs" :loading="loading" :height="logsTableHeight" class="management-table" @row-click="openDetail">
+      <TdTable v-if="logs.length" :data="logs" :loading="loading" :height="logsTableHeight" class="management-table audit-log-table" @row-click="openDetail">
         <TdTableColumn prop="actorUsername" label="操作者" min-width="140">
           <template #default="{ row }">
-            <span>{{ row.actorUsername || (row.actorId ? `用户 #${row.actorId}` : '未识别用户') }}</span>
+            <span class="audit-cell__text">{{ row.actorUsername || (row.actorId ? `用户 #${row.actorId}` : '未识别用户') }}</span>
           </template>
         </TdTableColumn>
         <TdTableColumn prop="actorRole" label="角色" width="110">
@@ -70,11 +70,11 @@
           </template>
         </TdTableColumn>
         <TdTableColumn prop="action" label="动作" min-width="180">
-          <template #default="{ row }"><span>{{ getAuditActionLabel(row.action) }}</span></template>
+          <template #default="{ row }"><span class="audit-cell__text">{{ getAuditActionLabel(row.action) }}</span></template>
         </TdTableColumn>
         <TdTableColumn prop="targetType" label="目标" min-width="180">
           <template #default="{ row }">
-            <span>{{ getAuditTargetLabel(row) }}</span>
+            <span class="audit-cell__text">{{ getAuditTargetLabel(row) }}</span>
           </template>
         </TdTableColumn>
         <TdTableColumn prop="occurredAt" label="发生时间" min-width="180">
@@ -92,19 +92,19 @@
         </TdTableColumn>
       </TdTable>
 
-      <t-pagination
+    <t-pagination
         v-model:current="pagination.pageNum"
         v-model:pageSize="pagination.pageSize"
         :total="pagination.total"
         :page-size-options="[10, 20, 50, 100]"
-        class="mt-4 justify-center"
+        class="audit-log-pagination mt-4 justify-center"
         @change="handlePaginationChange"
       />
     </t-card>
 
-    <t-drawer v-model:visible="detailVisible" header="审计日志详情" :footer="false" size="480px">
+    <t-drawer v-model:visible="detailVisible" header="审计日志详情" :footer="false" size="480px" class="audit-detail-drawer">
       <t-alert class="mb-4" theme="info" :close-btn="false">仅展示后端审计安全视图中的白名单字段。</t-alert>
-      <t-descriptions v-if="selectedLog" bordered :column="1">
+      <t-descriptions v-if="selectedLog" bordered size="small" :column="1" class="audit-detail-descriptions">
         <t-descriptions-item label="日志 ID">{{ selectedLog.id || '—' }}</t-descriptions-item>
         <t-descriptions-item label="操作者">{{ selectedLog.actorUsername || '—' }}（{{ selectedLog.actorId || '—' }}）</t-descriptions-item>
         <t-descriptions-item label="角色">{{ selectedLog.actorRole || '—' }}</t-descriptions-item>
@@ -201,3 +201,99 @@ const openDetail = row => {
 
 fetchData()
 </script>
+
+<style scoped>
+.audit-log-page,
+.audit-log-card {
+  min-width: 0;
+}
+
+.audit-log-card {
+  border-color: var(--app-border);
+  background: var(--app-surface);
+}
+
+.audit-filter-form {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.9fr) minmax(160px, 1.2fr) minmax(140px, 1fr) minmax(140px, 1fr) minmax(120px, 0.9fr) minmax(250px, 1.8fr) auto;
+  align-items: end;
+  column-gap: var(--app-spacing-4);
+  row-gap: var(--app-spacing-3);
+}
+
+.audit-filter-form :deep(.t-form__item) {
+  min-width: 0;
+  margin: 0;
+}
+
+.audit-filter-form__control,
+.audit-filter-form :deep(.audit-filter-form__control),
+.audit-filter-form :deep(.audit-filter-form__control .t-input),
+.audit-filter-form :deep(.audit-filter-form__control .t-select),
+.audit-filter-form :deep(.audit-filter-form__control .t-date-range-picker) {
+  width: 100%;
+  min-width: 0;
+}
+
+.audit-filter-form__actions {
+  display: flex;
+  gap: var(--app-spacing-2);
+  white-space: nowrap;
+}
+
+.audit-log-table {
+  min-width: 0;
+}
+
+.audit-log-table :deep(.t-table__content) {
+  min-width: 0;
+}
+
+.audit-cell__text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audit-log-pagination {
+  flex-wrap: wrap;
+}
+
+.audit-detail-drawer :deep(.t-drawer__body) {
+  overflow: auto;
+}
+
+.audit-detail-descriptions {
+  word-break: break-word;
+}
+
+@media (max-width: 1280px) {
+  .audit-filter-form {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .audit-filter-form__field--date {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 768px) {
+  .audit-filter-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .audit-filter-form__field--date {
+    grid-column: auto;
+  }
+
+  .audit-filter-form__actions {
+    width: 100%;
+  }
+
+  .audit-filter-form__actions :deep(.t-button) {
+    flex: 1 1 0;
+  }
+}
+</style>
