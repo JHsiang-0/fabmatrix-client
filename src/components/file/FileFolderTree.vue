@@ -56,7 +56,13 @@
     >
       <template #label="{ node }">
         <t-tooltip :content="node.label">
-          <span class="file-folder-tree__label" :title="node.label">{{ node.label }}</span>
+          <span
+            class="file-folder-tree__label"
+            :class="{ 'file-folder-tree__label--muted': unwrapFolderTreeNode(node)?.isForeignPrivateRoot === true }"
+            :title="node.label"
+          >
+            {{ node.label }}
+          </span>
         </t-tooltip>
       </template>
       <template #operations="{ node }">
@@ -89,6 +95,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { AddIcon, DeleteIcon, EditIcon, FolderMoveIcon, MoreIcon, SearchIcon } from 'tdesign-icons-vue-next'
 import { getFileTree } from '@/api/printFile'
+import { useUserStore } from '@/stores/user'
 import { resolveFolderActionPayload, unwrapFolderTreeNode } from '@/utils/fileFolderActions'
 import { renderIcon } from '@/utils/tdesign'
 
@@ -113,10 +120,24 @@ const error = ref('')
 const searchKeyword = ref('')
 const folders = ref([])
 const expandedKeys = ref([])
+const userStore = useUserStore()
+const currentUserId = computed(() => userStore.userInfo?.id)
 
 const normalizeFolderName = folder => folder?.name ?? folder?.originalName ?? `文件夹 ${folder?.id ?? ''}`
 
 const isFolder = node => node?.folder === true || node?.folder === 1 || node?.isFolder === true || node?.isFolder === 1
+
+const hasIdentifier = value => value !== null && value !== undefined && String(value).trim() !== ''
+
+const isRootFolder = folder => folder?.parentId === null
+  || folder?.parentId === undefined
+  || folder?.parentId === ''
+
+const isForeignPrivateRoot = folder => {
+  if (folder?.visibility === 'PUBLIC' || !isRootFolder(folder)) return false
+  if (!hasIdentifier(folder?.userId) || !hasIdentifier(currentUserId.value)) return false
+  return String(folder.userId) !== String(currentUserId.value)
+}
 
 const toTreeNode = (folder, ancestors = []) => {
   const id = String(folder.id)
@@ -135,7 +156,8 @@ const toTreeNode = (folder, ancestors = []) => {
       visibility: folder.visibility === 'PUBLIC' ? 'PUBLIC' : 'PRIVATE',
       id,
       parentId: folder.parentId ?? null,
-      isDefault: Boolean(folder.isDefault ?? folder.defaultFolder)
+      isDefault: Boolean(folder.isDefault ?? folder.defaultFolder),
+      isForeignPrivateRoot: isForeignPrivateRoot(folder)
     },
     children
   }
@@ -143,19 +165,7 @@ const toTreeNode = (folder, ancestors = []) => {
 
 const folderNodes = computed(() => folders.value.filter(isFolder).map(folder => toTreeNode(folder)))
 
-const treeData = computed(() => {
-  const groups = [
-    { value: '__private__', label: '我的文件', visibility: 'PRIVATE' },
-    { value: '__public__', label: '公共文件', visibility: 'PUBLIC' }
-  ]
-  return groups.map(group => ({
-    value: group.value,
-    label: group.label,
-    data: { isGroup: true, visibility: group.visibility },
-    disabled: true,
-    children: folderNodes.value.filter(node => node.data.visibility === group.visibility)
-  })).filter(group => group.children.length > 0)
-})
+const treeData = computed(() => folderNodes.value)
 
 const canCreateSelectedFolder = computed(() => {
   if (props.currentParentId === null || props.currentParentId === undefined) return true
@@ -430,6 +440,10 @@ defineExpose({ refresh })
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.file-folder-tree__label--muted {
+  color: var(--td-text-color-secondary);
 }
 
 .file-folder-tree :deep(.t-tree__item) {
