@@ -64,6 +64,12 @@
                 {{ file.materialType || '未指定' }}
               </t-tag>
             </t-tooltip>
+            <div class="file-detail-drawer__security-meta">
+              <t-tag size="small" :theme="file.visibility === 'PUBLIC' ? 'primary' : 'default'">
+                {{ file.visibility === 'PUBLIC' ? '公共文件' : '私有文件' }}
+              </t-tag>
+              <span>创建者：{{ file.userId || file.ownerId || '-' }}</span>
+            </div>
           </div>
         </section>
 
@@ -176,12 +182,13 @@
         </section>
 
         <div class="file-detail-drawer__footer-actions" aria-label="文件操作">
-          <t-button variant="outline" size="large" :icon="renderIcon(Download)" @click="handleDownload">
+          <t-button v-if="file.canDownload === true" variant="outline" size="large" :icon="renderIcon(Download)" @click="handleDownload">
             下载
           </t-button>
-          <t-button theme="primary" size="large" :icon="renderIcon(Printer)" @click="handlePrint">
+          <t-button v-if="file.canPrint === true" theme="primary" size="large" :icon="renderIcon(Printer)" @click="handlePrint">
             打印
           </t-button>
+          <t-empty v-if="file.canDownload !== true && file.canPrint !== true" description="当前无可用操作" />
         </div>
       </template>
 
@@ -359,6 +366,16 @@ const getJobStatusTagType = status => ({
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.file-detail-drawer__security-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--app-spacing-1);
+  margin-top: var(--app-spacing-1);
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
 }
 
 .file-detail-drawer__job-status-tag {

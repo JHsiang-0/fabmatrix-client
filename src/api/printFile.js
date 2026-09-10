@@ -35,6 +35,14 @@ import { normalizeBatchUploadResult } from '@/utils/batchUpload'
  * @property {number} printCount - 打印次数
  * @property {number} successRate - 成功率(%)
  * @property {number} estTime - 预计耗时(秒)
+ * @property {'PRIVATE'|'PUBLIC'} visibility - 显式文件可见性
+ * @property {string|number} userId - 创建者 ID
+ * @property {boolean} canManage - 是否可管理目录结构
+ * @property {boolean} canUpload - 是否可上传
+ * @property {boolean} canDelete - 是否可删除
+ * @property {boolean} canMove - 是否可移动
+ * @property {boolean} canPrint - 是否可创建打印任务
+ * @property {boolean} canDownload - 是否可下载
  * @property {number} nozzleSize - 喷嘴尺寸(mm)
  * @property {string} createdAt - 创建时间
  */
@@ -86,7 +94,13 @@ export function getFileTree() {
   return request({
     url: '/api/v1/print-files/tree',
     method: 'get'
-  }).then(response => mapResponseData(response, data => Array.isArray(data) ? data : []))
+  }).then(response => mapResponseData(response, data => {
+    const normalizeNode = node => ({
+      ...normalizePrintFile(node),
+      children: Array.isArray(node?.children) ? node.children.map(normalizeNode) : []
+    })
+    return Array.isArray(data) ? data.map(normalizeNode) : []
+  }))
 }
 
 /**

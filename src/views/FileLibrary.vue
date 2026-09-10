@@ -28,12 +28,12 @@
                     上传
                   </t-button>
                   <t-button v-if="selectedIds.length > 0" theme="danger" size="medium" :icon="renderIcon(Delete)"
-                    :loading="batchDeleting" :disabled="batchDeleting || batchMoving || deletingIds.length > 0" @click="handleBatchDelete">
+                    :loading="batchDeleting" :disabled="batchDeleting || batchMoving || deletingIds.length > 0 || !canBatchDelete" @click="handleBatchDelete">
                     批量删除 ({{ selectedIds.length }})
                   </t-button>
                   <t-button v-if="selectedIds.length > 0" theme="primary" variant="outline" size="medium"
                     :icon="renderIcon(Move)" :loading="batchMoving"
-                    :disabled="batchMoving || batchDeleting || deletingIds.length > 0" @click="openBatchMoveDialog">
+                    :disabled="batchMoving || batchDeleting || deletingIds.length > 0 || !canBatchMove" @click="openBatchMoveDialog">
                     批量移动 ({{ selectedIds.length }})
                   </t-button>
                 </t-space>
@@ -69,7 +69,7 @@
           <t-empty v-else-if="fileList.length === 0" class="file-library-empty" description="当前目录暂无文件">
             <template #operation>
               <t-space>
-                <t-button size="small" variant="outline" @click="openCreateFolderDialog">新建文件夹</t-button>
+                <t-button v-if="canCreateFolder" size="small" variant="outline" @click="openCreateFolderDialog">新建文件夹</t-button>
                 <t-button size="small" theme="primary" :disabled="!canUpload" @click="handleUpload">上传</t-button>
               </t-space>
             </template>
@@ -183,11 +183,11 @@
 
                 <!-- 悬浮操作按钮 -->
                 <div class="file-card__actions">
-                  <t-button theme="primary" size="small" :icon="renderIcon(Printer)" @click.stop="handlePrint(file)"
+                  <t-button v-if="file.canPrint === true" theme="primary" size="small" :icon="renderIcon(Printer)" @click.stop="handlePrint(file)"
                     class="file-card__action">
                     打印
                   </t-button>
-                  <t-button theme="danger" size="small" :icon="renderIcon(Delete)" @click.stop="handleDelete(file.id)"
+                  <t-button v-if="file.canDelete === true" theme="danger" size="small" :icon="renderIcon(Delete)" @click.stop="handleDelete(file.id)"
                     class="file-card__action">
                     删除
                   </t-button>
@@ -289,10 +289,10 @@
           <TdTableColumn label="操作" width="220" fixed="right">
             <template #default="{ row }">
               <div class="file-table__actions">
-                <t-button theme="primary" size="small" :icon="renderIcon(Printer)" @click.stop="handlePrint(row)">
+                <t-button v-if="row.canPrint === true" theme="primary" size="small" :icon="renderIcon(Printer)" @click.stop="handlePrint(row)">
                   打印
                 </t-button>
-                <t-button theme="danger" size="small" :icon="renderIcon(Delete)" :loading="deletingIds.includes(row.id)"
+                <t-button v-if="row.canDelete === true" theme="danger" size="small" :icon="renderIcon(Delete)" :loading="deletingIds.includes(row.id)"
                   :disabled="batchDeleting || batchMoving || deletingIds.length > 0" @click.stop="handleDelete(row.id)">
                   删除
                 </t-button>
@@ -428,6 +428,14 @@
                 :label="folder.label"
               />
             </t-select>
+          </div>
+        </t-form-item>
+        <t-form-item v-if="folderForm.level === 1 && userStore.userInfo?.role === 'ADMIN'" label="可见性" name="visibility" class="create-folder-form__item">
+          <div class="create-folder-form__control">
+            <t-radio-group v-model="folderForm.visibility">
+              <t-radio-button value="PRIVATE">个人目录</t-radio-button>
+              <t-radio-button value="PUBLIC">公共目录</t-radio-button>
+            </t-radio-group>
           </div>
         </t-form-item>
       </t-form>
@@ -780,7 +788,8 @@ let fileRequestSequence = 0
 const folderForm = reactive({
   name: '',
   level: 1,
-  parentId: null
+  parentId: null,
+  visibility: 'PRIVATE'
 })
 
 const folderRules = {
@@ -823,10 +832,6 @@ const pagination = reactive({
   total: 0
 })
 
-// 后端通过 folder=false 保证右侧只返回当前目录的直接文件。
-const fileRows = computed(() => fileList.value)
-const canUpload = computed(() => directoryReady.value && currentParentId.value !== null && currentParentId.value !== undefined)
-
 const flattenFolders = (nodes, result = []) => {
   nodes.forEach(node => {
     if (node?.folder !== false) result.push(node)
@@ -837,6 +842,7 @@ const flattenFolders = (nodes, result = []) => {
 
 const firstLevelFolders = computed(() => flattenFolders(folderTreeFolders.value)
   .filter(folder => Number(folder.level || 1) === 1 && (folder.parentId === null || folder.parentId === undefined))
+  .filter(folder => folder.canCreate === true)
   .map(folder => ({ value: folder.id, label: folder.name || folder.originalName || `文件夹 ${folder.id}` })))
 
 const isDescendantFolder = (candidateId, ancestorId) => {
@@ -861,7 +867,7 @@ const moveFolderTargets = computed(() => {
   const firstLevelTargets = flattenFolders(folderTreeFolders.value)
     .filter(folder => Number(folder.level || 1) === 1)
     .filter(folder => folder.parentId === null || folder.parentId === undefined)
-    .filter(folder => !folder.isDefault)
+    .filter(folder => folder.canManage === true)
     .filter(folder => String(folder.id) !== String(source.id))
     .filter(folder => !isDescendantFolder(folder.id, source.id))
     .filter(folder => folder.userId === undefined || String(folder.userId) === String(source.userId))
@@ -893,8 +899,9 @@ const batchMoveTargets = computed(() => {
   return targets.concat(folderTargets)
 })
 
-const getRowCheckProps = () => ({
+const getRowCheckProps = ({ row } = {}) => ({
   disabled: batchMoving.value || batchDeleting.value || deletingIds.value.length > 0
+    || (row?.canDelete !== true && row?.canMove !== true)
 })
 
 const contextMenuPosition = reactive({ left: 0, top: 0 })
@@ -938,14 +945,12 @@ const contextMenuPopupProps = {
 const getContextMenuOptions = file => {
   if (!file) return []
 
-  const options = [
-    { content: '查看详情', value: 'detail', prefixIcon: renderIcon(Document) },
-    { content: '打印', value: 'print', prefixIcon: renderIcon(Printer) },
-    { content: '下载', value: 'download', prefixIcon: renderIcon(Download) },
-    { content: '删除', value: 'delete', theme: 'error', prefixIcon: renderIcon(Delete) }
-  ]
+  const options = [{ content: '查看详情', value: 'detail', prefixIcon: renderIcon(Document) }]
+  if (file.canPrint === true) options.push({ content: '打印', value: 'print', prefixIcon: renderIcon(Printer) })
+  if (file.canDownload === true) options.push({ content: '下载', value: 'download', prefixIcon: renderIcon(Download) })
+  if (file.canDelete === true) options.push({ content: '删除', value: 'delete', theme: 'error', prefixIcon: renderIcon(Delete) })
 
-  if (selectedIds.value.includes(file.id) && selectedIds.value.length > 1) {
+  if (selectedIds.value.includes(file.id) && selectedIds.value.length > 1 && canBatchDelete.value) {
     options.push({
       content: `批量删除 (${selectedIds.value.length})`,
       value: 'batch-delete',
@@ -1000,6 +1005,19 @@ const loadListThumbnails = async (records, requestSequence) => {
   })
 }
 
+// 后端通过 folder=false 保证右侧只返回当前目录的直接文件。
+const fileRows = computed(() => fileList.value)
+const currentFolder = computed(() => flattenFolders(folderTreeFolders.value)
+  .find(folder => String(folder.id) === String(currentParentId.value)))
+const canUpload = computed(() => directoryReady.value && currentFolder.value?.canUpload === true)
+const canCreateFolder = computed(() => currentParentId.value === null || currentParentId.value === undefined
+  ? directoryReady.value
+  : currentFolder.value?.canCreate === true)
+const canBatchDelete = computed(() => selectedIds.value.length > 0
+  && fileList.value.filter(file => selectedIds.value.includes(file.id)).every(file => file.canDelete === true))
+const canBatchMove = computed(() => selectedIds.value.length > 0
+  && fileList.value.filter(file => selectedIds.value.includes(file.id)).every(file => file.canMove === true))
+
 /**
  * 获取文件列表
  */
@@ -1052,7 +1070,9 @@ const handleFolderSelect = selection => {
   if (String(currentParentId.value) === String(nextParentId)) return
   currentParentId.value = nextParentId
   pagination.pageNum = 1
+  searchKeyword.value = ''
   selectedIds.value = []
+  batchMoveResults.value = []
   fetchData()
 }
 
@@ -1066,7 +1086,7 @@ const handleFolderTreeLoaded = folders => {
   const defaultFolder = currentUserId === null || currentUserId === undefined
     ? null
     : flattenFolders(folderTreeFolders.value)
-      .find(folder => folder?.isDefault && String(folder.userId) === String(currentUserId))
+      .find(folder => folder?.isDefault && folder.visibility !== 'PUBLIC' && String(folder.userId) === String(currentUserId))
   if (defaultFolder) {
     currentParentId.value = defaultFolder.id
     pagination.pageNum = 1
@@ -1079,16 +1099,21 @@ const handleFolderTreeLoaded = folders => {
  * 打开新建文件夹对话框
  */
 const openCreateFolderDialog = () => {
+  if (!canCreateFolder.value) {
+    message.warning('当前目录不允许创建子目录')
+    return
+  }
   folderForm.name = ''
-  const currentFolder = flattenFolders(folderTreeFolders.value)
+  const selectedFolder = flattenFolders(folderTreeFolders.value)
     .find(folder => String(folder.id) === String(currentParentId.value))
-  if (currentFolder?.level === 1) {
+  if (selectedFolder?.level === 1) {
     folderForm.level = 2
-    folderForm.parentId = currentFolder.id
+    folderForm.parentId = selectedFolder.id
   } else {
     folderForm.level = 1
     folderForm.parentId = null
   }
+  folderForm.visibility = selectedFolder?.visibility === 'PUBLIC' ? 'PUBLIC' : 'PRIVATE'
   createFolderDialogVisible.value = true
 }
 
@@ -1103,7 +1128,8 @@ const handleCreateFolder = async () => {
   try {
     await createFolder({
       parentId: folderForm.level === 2 ? folderForm.parentId : null,
-      folderName: folderForm.name
+      folderName: folderForm.name,
+      visibility: folderForm.level === 1 ? folderForm.visibility : currentFolder.value?.visibility
     })
     message.success('文件夹创建成功')
     createFolderDialogVisible.value = false
@@ -1118,7 +1144,7 @@ const handleCreateFolder = async () => {
 }
 
 const handleFolderAction = (folder, action) => {
-  if (!folder || folder.isDefault || folderActionLoading.value) return
+  if (!folder || folder.canManage !== true || folderActionLoading.value) return
   actionFolder.value = folder
   if (action === 'rename') {
     renameFolderForm.name = folder.name || folder.originalName || ''
@@ -1494,6 +1520,10 @@ const handleDelete = async (id) => {
     message.warning('文件信息不存在')
     return
   }
+  if (file.canDelete !== true) {
+    message.warning('当前文件不允许删除')
+    return
+  }
 
   try {
     await confirmMessage('确定要删除吗？', '提示', {
@@ -1528,6 +1558,10 @@ const openBatchMoveDialog = () => {
   if (batchMoving.value || batchDeleting.value || deletingIds.value.length > 0) return
   if (selectedIds.value.length === 0) {
     message.warning('请先选择要移动的文件')
+    return
+  }
+  if (!canBatchMove.value) {
+    message.warning('所选文件包含不可移动的资源')
     return
   }
   batchMoveForm.parentId = ''
@@ -1599,6 +1633,10 @@ const handleBatchMove = async () => {
  */
 const handleBatchDelete = async () => {
   if (selectedIds.value.length === 0 || batchDeleting.value || deletingIds.value.length > 0) return
+  if (!canBatchDelete.value) {
+    message.warning('所选文件包含不可删除的资源')
+    return
+  }
   const ids = selectedIds.value.slice()
 
   try {
@@ -1644,6 +1682,10 @@ const handleBatchDelete = async () => {
  * 发送打印
  */
 const handlePrint = (file) => {
+  if (file?.canPrint !== true) {
+    message.warning('当前文件不允许创建打印任务')
+    return
+  }
   jobForm.file = file
   jobForm.priority = 0
   jobForm.copies = 1
@@ -1656,6 +1698,10 @@ const handlePrint = (file) => {
  * 从文件详情抽屉发送打印
  */
 const handlePrintFromDetail = (file) => {
+  if (file?.canPrint !== true) {
+    message.warning('当前文件不允许创建打印任务')
+    return
+  }
   jobForm.file = file
   jobForm.priority = 0
   jobForm.copies = 1
@@ -1848,6 +1894,10 @@ const closeFileDetail = () => {
 const handleFileDownload = async (file) => {
   if (!file?.id) {
     message.error('文件信息不完整')
+    return
+  }
+  if (file.canDownload !== true) {
+    message.warning('当前文件不允许下载')
     return
   }
   try {

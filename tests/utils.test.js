@@ -151,7 +151,9 @@ test('normalizes progress and formats file sizes safely', () => {
 test('normalizes the unified folder flag and removes the legacy field', () => {
   assert.deepEqual(normalizePrintFile({ id: 9, isFolder: 1 }), {
     id: '9',
-    folder: true
+    folder: true,
+    visibility: 'PRIVATE',
+    userId: null
   })
   assert.equal(normalizePrintFile({ id: 10, folder: false }).folder, false)
   assert.deepEqual(normalizePrintFile({
@@ -163,7 +165,9 @@ test('normalizes the unified folder flag and removes the legacy field', () => {
     id: '11',
     folder: false,
     estTime: 90,
-    filamentLength: 1.25
+    filamentLength: 1.25,
+    visibility: 'PRIVATE',
+    userId: null
   })
 })
 

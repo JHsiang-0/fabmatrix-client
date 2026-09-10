@@ -4,6 +4,7 @@
       <h2 class="file-folder-tree__title">文件夹列表</h2>
       <t-space size="small">
         <t-button
+          v-if="canCreateSelectedFolder"
           theme="primary"
           variant="outline"
           shape="square"
@@ -54,11 +55,13 @@
       @expand="handleExpand"
     >
       <template #label="{ node }">
-        <span class="file-folder-tree__label" :title="node.label">{{ node.label }}</span>
+        <t-tooltip :content="node.label">
+          <span class="file-folder-tree__label" :title="node.label">{{ node.label }}</span>
+        </t-tooltip>
       </template>
       <template #operations="{ node }">
         <t-dropdown
-          v-if="!unwrapFolderTreeNode(node)?.isDefault"
+          v-if="unwrapFolderTreeNode(node)?.canManage === true"
           :options="folderActionOptions"
           trigger="click"
           @click="dropdownAction => handleFolderAction(dropdownAction, node)"
@@ -128,6 +131,7 @@ const toTreeNode = (folder, ancestors = []) => {
     path,
     data: {
       ...folder,
+      visibility: folder.visibility === 'PUBLIC' ? 'PUBLIC' : 'PRIVATE',
       id,
       parentId: folder.parentId ?? null,
       isDefault: Boolean(folder.isDefault ?? folder.defaultFolder)
@@ -136,7 +140,26 @@ const toTreeNode = (folder, ancestors = []) => {
   }
 }
 
-const treeData = computed(() => folders.value.filter(isFolder).map(folder => toTreeNode(folder)))
+const folderNodes = computed(() => folders.value.filter(isFolder).map(folder => toTreeNode(folder)))
+
+const treeData = computed(() => {
+  const groups = [
+    { value: '__private__', label: '我的文件', visibility: 'PRIVATE' },
+    { value: '__public__', label: '公共文件', visibility: 'PUBLIC' }
+  ]
+  return groups.map(group => ({
+    value: group.value,
+    label: group.label,
+    data: { isGroup: true, visibility: group.visibility },
+    disabled: true,
+    children: folderNodes.value.filter(node => node.data.visibility === group.visibility)
+  })).filter(group => group.children.length > 0)
+})
+
+const canCreateSelectedFolder = computed(() => {
+  if (props.currentParentId === null || props.currentParentId === undefined) return true
+  return folders.value.find(folder => String(folder.id) === String(props.currentParentId))?.canCreate === true
+})
 
 const filterTree = (nodes, keyword) => {
   if (!keyword) return nodes
@@ -213,6 +236,7 @@ const handleTreeClick = context => {
   if (!node) return
 
   const data = node.data || node
+  if (data.isGroup) return
   const id = String(node.value ?? data.value)
   const path = Array.isArray(node.path)
     ? node.path
@@ -225,7 +249,7 @@ const handleTreeClick = context => {
 
 const handleFolderAction = (action, node) => {
   const payload = resolveFolderActionPayload(action, node)
-  if (payload && !payload.folder.isDefault) emit('folder-action', payload.folder, payload.action)
+  if (payload && payload.folder.canManage === true) emit('folder-action', payload.folder, payload.action)
 }
 
 const handleExpand = keys => {

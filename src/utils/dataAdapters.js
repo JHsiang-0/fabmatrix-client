@@ -188,7 +188,22 @@ export function normalizePrinterDetail(data) {
 }
 
 export function normalizePrintFile(record) {
-  const normalized = normalizeIdFields(record, ['id', 'parentId', 'userId'])
+  const normalized = normalizeIdFields(record, ['id', 'parentId', 'userId', 'ownerId'])
+
+  if (normalized && typeof normalized === 'object') {
+    normalized.visibility = normalized.visibility === 'PUBLIC' ? 'PUBLIC' : 'PRIVATE'
+    if (normalized.userId === null || normalized.userId === undefined) {
+      normalized.userId = normalized.ownerId ?? null
+    }
+    const capabilityFields = ['canManage', 'canUpload', 'canCreate', 'canDelete', 'canMove', 'canPrint', 'canDownload']
+    capabilityFields.forEach(field => {
+      if (Object.prototype.hasOwnProperty.call(normalized, field)) normalized[field] = normalized[field] === true
+    })
+    if (Object.prototype.hasOwnProperty.call(normalized, 'level')) {
+      const level = Number(normalized.level)
+      normalized.level = Number.isInteger(level) && level > 0 ? level : (normalized.parentId == null ? 1 : 2)
+    }
+  }
 
   if (normalized && Object.prototype.hasOwnProperty.call(normalized, 'folder')) {
     normalized.folder = normalized.folder === true || normalized.folder === 1

@@ -48,7 +48,7 @@
           <t-checkbox-group v-model="selectedFileIds" class="selection-group">
             <t-checkbox v-for="file in files" :key="file.id" :value="file.id" class="selection-row">
               <span>{{ file.originalName || `文件 #${file.id}` }}</span>
-              <small>{{ file.id }}</small>
+              <small>{{ file.visibility === 'PUBLIC' ? '公共' : '个人' }} · {{ file.id }}</small>
             </t-checkbox>
           </t-checkbox-group>
           <t-empty v-if="!files.length" description="暂无文件，请先批量上传或刷新。" />
@@ -349,6 +349,7 @@ async function loadResources() {
     ])
     const seenFileIds = new Set()
     files.value = folderPages.flatMap(page => page?.data?.records || [])
+      .filter(file => file.canPrint === true)
       .filter(file => {
         const id = String(file.id)
         if (seenFileIds.has(id)) return false
@@ -555,7 +556,8 @@ async function openExistingJob(item) {
 
 onMounted(async () => {
   await loadResources()
-  selectedFileIds.value = queryIds(route.query.fileIds)
+  const visibleIds = new Set(files.value.map(file => String(file.id)))
+  selectedFileIds.value = queryIds(route.query.fileIds).filter(id => visibleIds.has(String(id)))
 })
 
 watch([selectedFileIds, selectedPrinterIds, strategy, action], () => {

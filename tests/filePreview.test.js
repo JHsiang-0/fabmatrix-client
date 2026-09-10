@@ -66,7 +66,7 @@ test('returns an access-filtered nested file tree without internal fields', asyn
   const rootNames = response.data.map(node => node.name)
   const defaultFolder = response.data.find(node => node.id === 4)
 
-  assert.deepEqual(rootNames, ['我的文件夹', '测试文件'])
+  assert.deepEqual(rootNames, ['公共文件', '我的文件夹', '测试文件'])
   assert.equal(defaultFolder.isDefault, true)
   assert.deepEqual(defaultFolder.children, [])
   const defaultFolderFiles = await request('POST', '/api/v1/print-files/page', {
@@ -79,8 +79,49 @@ test('returns an access-filtered nested file tree without internal fields', asyn
   assert.equal(defaultFolderFiles.data.records[0].originalName, 'calibration.bgcode')
   assert.equal(response.data.some(node => node.id === 1), false)
   assert.equal(response.data.every(node => node.userId === 2), true)
+  assert.equal(response.data.find(node => node.visibility === 'PUBLIC').canUpload, true)
+  assert.equal(response.data.find(node => node.visibility === 'PUBLIC').canManage, false)
   assert.equal('safeName' in defaultFolder, false)
   assert.equal('fileUrl' in defaultFolderFiles.data.records[0], false)
+})
+
+test('allows authenticated public browse upload and job creation but denies public structure management', async () => {
+  setupSession()
+
+  const publicPage = await request('POST', '/api/v1/print-files/page', {
+    pageNum: 1,
+    pageSize: 10,
+    parentId: 5,
+    folder: false
+  }, operatorHeaders)
+  assert.equal(publicPage.data.records[0].visibility, 'PUBLIC')
+  assert.equal(publicPage.data.records[0].canPrint, true)
+  assert.equal(publicPage.data.records[0].canDelete, true)
+
+  const uploaded = await request('POST', '/api/v1/print-files/upload', {
+    file: { name: 'public-upload.gcode', size: 12 },
+    parentId: 5
+  }, operatorHeaders)
+  assert.equal(uploaded.data.visibility, 'PUBLIC')
+
+  const jobId = await request('POST', '/api/v1/print-jobs', {
+    fileId: publicPage.data.records[0].id,
+    priority: 0
+  }, operatorHeaders)
+  assert.ok(jobId.data)
+
+  await assert.rejects(
+    request('POST', '/api/v1/print-files/folder/create', {
+      parentId: 5,
+      folderName: '不应创建'
+    }, operatorHeaders),
+    error => error.response.status === 403
+  )
+  const move = await request('PUT', '/api/v1/print-files/batch/move', {
+    ids: [23],
+    parentId: 5
+  }, operatorHeaders)
+  assert.equal(move.data.items[0].success, false)
 })
 
 test('allows the real default folder as a second-level parent but still caps depth at two', async () => {
