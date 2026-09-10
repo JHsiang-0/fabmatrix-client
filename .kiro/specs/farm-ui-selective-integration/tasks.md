@@ -15,11 +15,13 @@
 
 完成记录：已基于本地 `4b45769`（功能基线 `2896a55` 加入本 Spec 文档）创建备份分支 `backup/feat-ui-003-electron-before-selective-sync-20260910` 和集成分支 `integration/ui-sync-30adedc`；重新 fetch 后确认远程目标为 `30adedc`，未执行整分支合并或覆盖操作。
 
-### [ ] SYNC-001.1 建立防回退门禁
+### [x] SYNC-001.1 建立防回退门禁
 
 - 只补充或保留契约回归测试，不修改生产逻辑。
 - 覆盖文件权限/目录操作、逐文件上传、打印机监控、REST/WS 合并、RECONCILING、批量派发幂等和 ADMIN/OPERATOR 权限。
 - 验收：现有 Node 测试全通过，且不得删除 `tests/printerMonitoring.test.js`、文件库和 WebSocket 测试。
+
+完成记录：由 Luna 补充 `tests/sync0011RegressionGuard.test.js`，覆盖文件库目录与权限、逐项上传、打印机监控、REST/WS 合并、RECONCILING、批量派发幂等和关键测试文件保留；相关测试 77/77、全量测试 197/197，lint/build 均通过。
 
 ### [ ] SYNC-001.2 应用壳、登录和导航视觉适配
 
