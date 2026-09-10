@@ -68,12 +68,14 @@
 
 完成记录：选择性移植步骤条、资源选择、预览、确认和结果区域的 TDesign 视觉层级、滚动、长文本和响应式布局；保留 Preview 零副作用、Confirm 四字段、幂等、过期、部分失败和恢复预览/重试。相关测试 30/30、全量测试 203/203，lint/build 通过。
 
-### [ ] SYNC-001.7 总览和全屏看板视觉移植
+### [x] SYNC-001.7 总览和全屏看板视觉移植
 
 - 范围：`src/views/Dashboard.vue`、`src/views/FullscreenDashboard.vue`、`src/components/FarmDashboard.vue`、`DashboardHeader.vue`、`DashboardDetailsPanel.vue` 和看板测试。
 - 可移植统计卡片、趋势、头部、区域切换、空态和响应式布局。
 - 暂不接入动态 30×60 网格，网格后端契约另立 `SYNC-002`。
 - 验收：REST 初始化、WS 增量、断线/陈旧/恢复、空错态、全屏退出和 Electron 尺寸行为均通过。
+
+完成记录：选择性移植看板统计卡片、趋势、状态区域、头部、详情区、全屏状态卡和响应式布局；保留 REST 初始化、WS 增量、断线/stale/recovering、权限、详情、全屏生命周期和现有网格逻辑，未引入动态 30×60 网格。相关测试 23/23、全量测试 204/204，lint/build 通过。
 
 ### [ ] SYNC-001.8 个人中心和审计视觉移植
 
