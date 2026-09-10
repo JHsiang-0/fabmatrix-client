@@ -135,7 +135,7 @@ test('批量派发页面完成真实预览确认流程', async ({ browser }) => 
     await login(page)
     await openSidebarItem(page, 1440, '批量派发')
     await page.getByRole('checkbox', { name: /gearbox\.gcode/ }).check({ force: true })
-    await page.getByRole('checkbox', { name: /bracket\.gcode/ }).check({ force: true })
+    await page.getByRole('checkbox', { name: /^bracket\.gcode个人/ }).check({ force: true })
     await page.getByRole('checkbox', { name: /Printer_A12F/ }).check({ force: true })
     await page.getByRole('button', { name: '下一步：配置策略', exact: true }).click()
     await page.getByRole('button', { name: '生成派发预览', exact: true }).click()
