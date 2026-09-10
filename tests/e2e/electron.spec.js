@@ -43,7 +43,7 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     })
 
     await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible()
-    await expect(page.getByRole('banner', { name: '应用标题栏' })).toContainText('FabMatrix Desktop')
+    await expect(page.getByRole('banner', { name: '应用标题栏' })).toContainText('嘉东三维联动3D打印机实时控制系统')
     await expect(page.getByText('Mock 调试账号请使用系统中已有的用户名和密码', { exact: true })).toHaveCount(0)
     const connectionButton = page.getByRole('button', { name: '配置服务器地址', exact: true })
     await expect(connectionButton).toBeVisible()
