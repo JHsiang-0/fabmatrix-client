@@ -6,10 +6,10 @@
     2. 平板（768px - 1279px）：水平布局，适度紧凑
     3. 桌面（>= 1280px）：完整水平布局，所有功能可见
   -->
-  <div v-cloak class="flex flex-col lg:flex-row justify-between items-stretch lg:items-center p-fluid-md bg-white rounded-lg shadow-sm gap-fluid-md">
+  <div v-cloak class="dashboard-header flex flex-col lg:flex-row justify-between items-stretch lg:items-center p-fluid-md bg-white rounded-lg shadow-sm gap-fluid-md">
 
     <!-- 左侧：标题和车间信息 -->
-    <div class="flex items-center shrink-0">
+    <div class="dashboard-header__identity header-left flex items-center shrink-0">
       <div class="flex items-center gap-3">
         <!-- 图标：移动端缩小 -->
         <office-building :size="isMobile ? '24' : '28'" class="text-primary" />
@@ -28,9 +28,9 @@
     </div>
 
     <!-- 中间：状态统计条 - 响应式布局 -->
-    <div class="flex flex-col items-center gap-2 flex-1 lg:max-w-[800px]">
+    <div class="dashboard-header__summary header-center flex flex-col items-center gap-2 flex-1 lg:max-w-[800px]">
       <!-- 状态标签行：平板和桌面端使用 flex，移动端使用 wrap -->
-      <div class="flex flex-wrap items-center gap-1 justify-center lg:justify-center">
+      <div class="dashboard-header__stats stats-bar flex flex-wrap items-center gap-1 justify-center lg:justify-center">
 
         <!-- 设备总数 - 始终显示 -->
         <StatBadge
@@ -40,7 +40,7 @@
           iconBgClass="bg-gray-600"
         />
 
-        <div class="w-px h-5 bg-gray-100 mx-1 shrink-0"></div>
+        <div class="w-px h-5 bg-gray-100 mx-1 shrink-0" aria-hidden="true"></div>
 
         <!-- 打印中 - 高亮显示 -->
         <StatBadge
@@ -106,7 +106,7 @@
       </div>
 
       <!-- 进度概览 - 仅在有设备时显示 -->
-      <div class="flex items-center gap-3 w-full max-w-[400px]" v-if="totalCount > 0">
+      <div class="dashboard-header__progress flex items-center gap-3 w-full max-w-[400px]" v-if="totalCount > 0">
         <div class="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden flex">
           <div class="h-full bg-blue-600 transition-all" :style="{ width: printingPercent + '%' }"></div>
           <div class="h-full bg-green-600 transition-all" :style="{ width: completedPercent + '%' }"></div>
@@ -118,7 +118,7 @@
     </div>
 
     <!-- 右侧：操作按钮 - 响应式布局 -->
-    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 lg:gap-3 shrink-0">
+    <div class="dashboard-header__actions action-group flex flex-col sm:flex-row items-stretch sm:items-center gap-2 lg:gap-3 shrink-0">
       <!-- 外部传入的操作按钮（解锁/保存布局） -->
       <slot name="actions"></slot>
 
@@ -136,7 +136,7 @@
 
       <!-- 最后更新时间 - 移动端隐藏，平板显示 -->
       <span
-        class="hidden sm:flex items-center justify-center gap-1 text-fluid-xs text-gray-400 font-normal"
+        class="dashboard-header__updated hidden sm:flex items-center justify-center gap-1 text-fluid-xs text-gray-400 font-normal"
         v-if="lastUpdateTime"
       >
         <clock size="12" />
@@ -313,6 +313,41 @@ function handleRefresh() {
 </script>
 
 <style scoped>
+.dashboard-header {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  color: var(--app-text-primary);
+}
+
+.dashboard-header__identity,
+.dashboard-header__summary,
+.dashboard-header__actions {
+  min-width: 0;
+}
+
+.dashboard-header__identity > div:last-child,
+.dashboard-header__summary {
+  overflow: hidden;
+}
+
+.dashboard-header__stats {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.dashboard-header__progress {
+  max-width: 100%;
+}
+
+.dashboard-header__updated {
+  color: var(--app-text-secondary);
+}
+
 /* ============================================
    动画关键帧
    ============================================ */

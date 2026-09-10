@@ -64,7 +64,7 @@
       </section>
 
       <section class="dashboard-grid">
-        <t-card bordered class="dashboard-card trend-card">
+        <t-card bordered hover-shadow class="dashboard-card dashboard-card--trend trend-card">
           <template #header>
             <div class="card-heading">
               <div>
@@ -103,7 +103,7 @@
           <t-empty v-else description="近 7 日暂无任务记录" />
         </t-card>
 
-        <t-card bordered class="dashboard-card status-card">
+        <t-card bordered hover-shadow class="dashboard-card dashboard-card--status status-card">
           <template #header>
             <div class="card-heading">
               <div>
@@ -131,7 +131,7 @@
       </section>
 
       <section class="dashboard-grid dashboard-grid--three">
-        <t-card bordered class="dashboard-card activity-card">
+        <t-card bordered hover-shadow class="dashboard-card dashboard-card--activity activity-card">
           <template #header>
             <div class="card-heading">
               <div>
@@ -164,7 +164,7 @@
           <t-empty v-else description="当前没有活动任务" />
         </t-card>
 
-        <t-card bordered class="dashboard-card recent-card">
+        <t-card bordered hover-shadow class="dashboard-card dashboard-card--recent recent-card">
           <template #header>
             <div class="card-heading">
               <div>
@@ -196,7 +196,7 @@
           <t-empty v-else description="暂无打印任务" />
         </t-card>
 
-        <t-card bordered class="dashboard-card alert-card">
+        <t-card bordered hover-shadow class="dashboard-card dashboard-card--alerts alert-card">
           <template #header>
             <div class="card-heading">
               <div>

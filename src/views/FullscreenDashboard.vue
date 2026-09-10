@@ -7,7 +7,7 @@
     </div>
 
     <div v-if="snapshotError" class="fullscreen-dashboard__state fullscreen-dashboard__state--error">
-      <t-card bordered>
+      <t-card bordered class="fullscreen-dashboard__overlay-card">
         <t-alert theme="error" title="实时看板快照加载失败" :close-btn="false">
           <template #default>{{ snapshotErrorMessage }}</template>
           <template #operation>
@@ -18,13 +18,13 @@
     </div>
 
     <div v-else-if="snapshotLoading" class="fullscreen-dashboard__state">
-      <t-card bordered>
+      <t-card bordered class="fullscreen-dashboard__overlay-card">
         <t-loading text="正在加载打印机快照..." />
       </t-card>
     </div>
 
     <div v-else-if="noDevices" class="fullscreen-dashboard__state">
-      <t-card bordered>
+      <t-card bordered class="fullscreen-dashboard__overlay-card">
         <t-empty type="empty" title="看板暂无设备" description="请先在打印机管理中分配设备位置">
           <template #action>
             <t-button theme="primary" @click="router.push('/printers')">前往设备管理</t-button>
@@ -161,6 +161,7 @@ onUnmounted(() => {
 <style scoped>
 .fullscreen-dashboard {
   position: relative;
+  box-sizing: border-box;
   width: 100vw;
   height: 100dvh;
   min-height: 100%;
@@ -202,6 +203,11 @@ onUnmounted(() => {
 
 .fullscreen-dashboard__state .t-card { width: min(520px, 100%); }
 .fullscreen-dashboard__state--error .t-card { width: min(680px, 100%); }
+.fullscreen-dashboard__overlay-card {
+  border-color: var(--app-border);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-raised);
+}
 
 @media (max-width: 767px) {
   .fullscreen-dashboard__actions { top: var(--app-spacing-3); right: var(--app-spacing-3); }

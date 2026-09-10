@@ -1,7 +1,7 @@
 <template>
-  <div v-cloak class="h-full bg-gray-100 flex flex-col overflow-hidden">
+  <div v-cloak class="farm-dashboard h-full bg-gray-100 flex flex-col overflow-hidden">
     <!-- 顶部标题和统计 -->
-    <div class="p-4 pb-0">
+    <div class="farm-dashboard__header p-4 pb-0">
       <dashboard-header :status-counts="store.statusCounts" :workshop-name="workshopName"
         :last-update-time="lastUpdateTime" @refresh="handleRefresh">
       <!-- 布局锁定/编辑模式切换按钮 -->
@@ -16,12 +16,12 @@
       </dashboard-header>
       <t-alert
         v-if="store.wsConnectionState !== 'OPEN' || store.isRealtimeStale || store.isRecovering"
-        class="mt-2"
+        class="farm-dashboard__realtime-alert mt-2"
         theme="warning"
         :title="store.isRecovering ? '正在恢复实时状态' : (store.isRealtimeStale ? '实时状态可能已陈旧' : '实时连接未建立，当前看板数据可能不是最新')"
         :close-btn="false"
       />
-      <div v-if="store.alerts.length" class="mt-2 space-y-2" aria-live="polite">
+      <div v-if="store.alerts.length" class="farm-dashboard__alerts mt-2 space-y-2" aria-live="polite">
         <t-alert
           v-for="alert in store.alerts"
           :key="alert.id"
@@ -35,6 +35,7 @@
     </div>
 
     <dashboard-details-panel
+      class="farm-dashboard__details"
       :status-counts="store.statusCounts"
       :active-jobs="activeJobs"
       :history-jobs="historyJobs"
@@ -44,10 +45,10 @@
     />
 
     <!-- 独立车间看板容器 - 响应式布局，与状态栏对齐 -->
-    <div class="dashboard-workshop-scroll app-scroll-region relative w-full flex-1 px-4 pb-4 bg-gray-100">
+    <div class="farm-dashboard__workshop dashboard-workshop-scroll app-scroll-region relative w-full flex-1 px-4 pb-4 bg-gray-100">
 
       <!-- 厂房网格布局 - 与DashboardHeader保持相同最大宽度 -->
-      <div class="w-full max-w-[1920px] mx-auto bg-gray-100 border border-gray-200 rounded-xl shadow-sm p-4">
+      <div class="farm-dashboard__workshop-surface w-full max-w-[1920px] mx-auto bg-gray-100 border border-gray-200 rounded-xl shadow-sm p-4">
         <!-- 使用 GridMap 组件 -->
         <grid-map :device-matrix="store.deviceMatrix" :real-time-status="store.realTimeStatus"
           :grid-config="store.GRID_CONFIG" :is-edit-mode="isEditMode" :dragged-device="draggedDevice"
@@ -621,5 +622,51 @@ onMounted(() => {
 .dashboard-workshop-scroll {
   min-height: 0;
   overflow: auto;
+}
+
+.farm-dashboard {
+  min-width: 0;
+  background: var(--app-page-background);
+  color: var(--app-text-primary);
+}
+
+.farm-dashboard__header,
+.farm-dashboard__details,
+.farm-dashboard__workshop {
+  min-width: 0;
+}
+
+.farm-dashboard__header,
+.farm-dashboard__details {
+  flex: 0 0 auto;
+}
+
+.farm-dashboard__realtime-alert :deep(.t-alert),
+.farm-dashboard__alerts :deep(.t-alert) {
+  border-radius: var(--app-radius);
+}
+
+.farm-dashboard__workshop {
+  box-sizing: border-box;
+  background: var(--app-page-background);
+}
+
+.farm-dashboard__workshop-surface {
+  box-sizing: border-box;
+  min-width: 0;
+  background: var(--app-surface);
+  border-color: var(--app-border);
+}
+
+@media (max-width: 767px) {
+  .farm-dashboard__header,
+  .farm-dashboard__workshop {
+    padding-left: var(--app-spacing-3);
+    padding-right: var(--app-spacing-3);
+  }
+
+  .farm-dashboard__workshop-surface {
+    padding: var(--app-spacing-3);
+  }
 }
 </style>

@@ -4,6 +4,9 @@ import fs from 'node:fs'
 
 const dashboardSource = fs.readFileSync(new URL('../src/views/Dashboard.vue', import.meta.url), 'utf8')
 const fullscreenSource = fs.readFileSync(new URL('../src/views/FullscreenDashboard.vue', import.meta.url), 'utf8')
+const farmDashboardSource = fs.readFileSync(new URL('../src/components/FarmDashboard.vue', import.meta.url), 'utf8')
+const dashboardHeaderSource = fs.readFileSync(new URL('../src/components/DashboardHeader.vue', import.meta.url), 'utf8')
+const dashboardDetailsSource = fs.readFileSync(new URL('../src/components/DashboardDetailsPanel.vue', import.meta.url), 'utf8')
 const deviceStoreSource = fs.readFileSync(new URL('../src/stores/printer/deviceStore.js', import.meta.url), 'utf8')
 const appSource = fs.readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8')
 const realtimeStoreSource = fs.readFileSync(new URL('../src/stores/printer/realtimeStore.js', import.meta.url), 'utf8')
@@ -34,6 +37,20 @@ test('全屏看板覆盖快照恢复、实时断线、全屏能力和缩放场�
   assert.match(fullscreenSource, /fullscreenSupported/)
   assert.match(fullscreenSource, /event\.key === 'Escape'/)
   assert.match(fullscreenSource, /addEventListener\('resize'/)
+})
+
+test('看板视觉分区使用 TDesign 容器并保留响应式滚动边界', () => {
+  assert.match(dashboardSource, /<t-card bordered hover-shadow class="dashboard-card dashboard-card--trend/)
+  assert.match(farmDashboardSource, /class="farm-dashboard /)
+  assert.match(farmDashboardSource, /dashboard-workshop-scroll app-scroll-region/)
+  assert.match(farmDashboardSource, /farm-dashboard__workshop-surface/)
+  assert.match(dashboardHeaderSource, /class="dashboard-header /)
+  assert.match(dashboardHeaderSource, /dashboard-header__stats stats-bar/)
+  assert.match(dashboardDetailsSource, /dashboard-details-panel/)
+  assert.match(dashboardDetailsSource, /dashboard-detail-card dashboard-detail-card--trend/)
+  assert.match(dashboardDetailsSource, /dashboard-trend-chart/)
+  assert.match(fullscreenSource, /fullscreen-dashboard__overlay-card/)
+  assert.match(fullscreenSource, /height: 100dvh;[\s\S]*overflow: hidden;/)
 })
 
 test('设备 Store 暴露真实快照错误供全屏页原位重试', () => {
