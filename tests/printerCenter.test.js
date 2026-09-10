@@ -44,6 +44,19 @@ test('打印机列表使用局部滚动和显式详情入口，不再以绝对�
   assert.match(source, /<t-alert v-if="loadError && tableData\.length"/)
 })
 
+test('打印机中心视觉适配保留紧凑筛选、表格反馈和响应式分页', () => {
+  assert.match(source, /class="[^"]*printer-manage-page[^"]*"/)
+  assert.match(source, /class="printer-management-toolbar-card"/)
+  assert.match(source, /<t-radio-group[\s\S]*class="printer-management-tabs"/)
+  assert.match(source, /const printerStatusTabs = \[\{ value: '', label: '全部' \}/)
+  assert.match(source, /class="printer-management-table printer-table"[\s\S]*hover/)
+  assert.match(source, /printer-management-status-card/)
+  assert.match(source, /printer-management-ellipsis/)
+  assert.match(source, /printer-management-table-footer/)
+  assert.match(source, /\.printer-management-table :deep\(\.t-table__body tr:hover > td\)/)
+  assert.match(source, /@media \(max-width: 768px\)/)
+})
+
 test('打印机详情抽屉标题有稳定回退且详情内容由 Drawer Body 滚动', () => {
   assert.match(detailSource, /return deviceName \? `\$\{deviceName\} - 详细信息` : '打印机详情'/)
   assert.match(detailSource, /v-model:visible="drawerVisible"/)

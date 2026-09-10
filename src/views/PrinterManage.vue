@@ -1,5 +1,5 @@
 <template>
-  <div class="app-page-shell app-page-background">
+  <div class="app-page-shell app-page-background printer-manage-page">
     <!-- 设备详情抽屉 -->
     <DeviceDetailDrawer
       v-model="detailDrawerVisible"
@@ -40,46 +40,62 @@
       </div>
       </template>
       <template #actions>
-      <div class="app-page-toolbar__actions">
+      <div class="app-page-toolbar__actions printer-page-actions">
         <t-button v-if="isAdmin" :theme="batchMonitorTarget ? 'success' : 'warning'" variant="outline"
           :disabled="selectedPrinterIds.length === 0 || monitorActionLoading" :loading="monitorActionLoading"
           @click="handleBatchMonitorToggle">
           {{ batchMonitorTarget ? '启用监控' : '停用监控' }}{{ selectedPrinterIds.length ? ` (${selectedPrinterIds.length})` : '' }}
         </t-button>
-        <t-button :icon="renderIcon(Refresh)" :loading="loading" @click="fetchData" size="medium">
+        <t-button size="medium" theme="default" variant="base" :icon="renderIcon(Refresh)" :loading="loading" @click="fetchData">
           刷新
         </t-button>
-        <t-button variant="outline" @click="openUnallocatedDialog">
+        <t-button size="medium" theme="warning" variant="base" :icon="renderIcon(FolderAdd)" @click="openUnallocatedDialog">
           未分配设备
         </t-button>
-        <t-button v-if="isAdmin" theme="warning" @click="openScanDialog">
-          <span><aim /></span>
+        <t-button v-if="isAdmin" size="medium" theme="success" variant="base" :icon="renderIcon(Aim)" @click="openScanDialog">
           扫描局域网设备
         </t-button>
-        <t-button v-if="isAdmin" theme="success" @click="handleAdd">
-          <span><plus /></span>
+        <t-button v-if="isAdmin" size="medium" theme="primary" :icon="renderIcon(Plus)" @click="handleAdd">
           新增打印机
         </t-button>
       </div>
       </template>
     </PageHeader>
 
-    <div class="printer-filter-bar">
-      <t-input
-        v-model="keyword"
-        clearable
-        placeholder="按机器名称搜索"
-        @enter="applyFilters"
-        @clear="applyFilters"
-      >
-        <template #prefixIcon><search /></template>
-      </t-input>
-      <t-select v-model="statusFilter" clearable placeholder="按状态筛选" @change="applyFilters">
-        <t-option label="全部状态" value="" />
-        <t-option v-for="option in statusOptions" :key="option.value" :label="option.label" :value="option.value" />
-      </t-select>
-      <t-button theme="primary" @click="applyFilters">查询</t-button>
-    </div>
+    <section class="printer-management-toolbar-card" aria-label="打印机筛选和视图工具栏">
+      <div class="printer-management-toolbar-card__top">
+        <t-radio-group
+          v-model="statusFilter"
+          class="printer-management-tabs"
+          variant="default-filled"
+          size="small"
+          aria-label="打印机状态筛选"
+          @change="applyStatusTab"
+        >
+          <t-radio-button
+            v-for="tab in printerStatusTabs"
+            :key="tab.value || 'all'"
+            :value="tab.value"
+          >
+            {{ tab.label }}
+          </t-radio-button>
+        </t-radio-group>
+
+        <div class="printer-management-toolbar-card__controls">
+          <t-input
+            v-model="keyword"
+            class="printer-management-filter__search"
+            clearable
+            placeholder="按机器名称、IP 地址或编号搜索"
+            @enter="applyFilters"
+            @clear="applyFilters"
+          >
+            <template #prefixIcon><search /></template>
+          </t-input>
+          <t-button theme="primary" size="medium" @click="applyFilters">查询</t-button>
+        </div>
+      </div>
+    </section>
 
     <!-- 数据表格 -->
     <t-card class="printer-manage-card app-page-card">
@@ -104,7 +120,8 @@
           :loading="loading"
           height="100%"
           style="width: 100%"
-          class="printer-table"
+          class="printer-management-table printer-table"
+          hover
           @row-click="handleRowClick"
           @selection-change="handlePrinterSelectionChange"
           row-class-name="printer-table-row"
@@ -118,9 +135,12 @@
 
         <TdTableColumn prop="name" label="机器名称" min-width="150">
           <template #default="scope">
-            <div class="flex items-center gap-2 font-medium">
-              <printer size="16" :stroke-color="getStatusColor(scope.row.status)" />
-              <span>{{ scope.row.name }}</span>
+            <div class="printer-management-primary">
+              <div class="printer-management-name">
+                <span class="printer-management-status-dot" :class="`printer-management-status-dot--${getStatusClass(scope.row.status)}`" />
+                <span class="printer-management-ellipsis" :title="scope.row.name">{{ scope.row.name }}</span>
+              </div>
+              <span class="printer-management-muted">#{{ scope.row.id }}</span>
             </div>
           </template>
         </TdTableColumn>
@@ -139,18 +159,20 @@
 
         <TdTableColumn prop="status" label="当前状态" width="120" align="center">
           <template #default="scope">
-            <StatusTag domain="printer" :status="scope.row.status" />
+            <span class="printer-management-status-card">
+              <StatusTag domain="printer" :status="scope.row.status" />
+            </span>
           </template>
         </TdTableColumn>
 
         <TdTableColumn prop="connectionStatus" label="通信状态" width="150" align="center">
           <template #default="scope">
-            <div class="flex flex-col items-center gap-1">
+            <div class="printer-management-connection">
               <t-tag size="small" :theme="getConnectionTheme(scope.row.connectionStatus)" variant="light">
                 {{ getConnectionLabel(scope.row.connectionStatus) }}
               </t-tag>
               <span v-if="scope.row.connectionStatus === 'OFFLINE' && scope.row.lastCommunicationError"
-                class="max-w-32 truncate text-xs text-gray-500" :title="scope.row.lastCommunicationError">
+                class="printer-management-ellipsis printer-management-muted" :title="scope.row.lastCommunicationError">
                 {{ scope.row.lastCommunicationError }}
               </span>
             </div>
@@ -159,16 +181,16 @@
 
         <TdTableColumn label="监控" width="110" align="center">
           <template #default="scope">
-            <t-switch :value="scope.row.monitorEnabled === true" :disabled="!isAdmin || monitorUpdatingIds.includes(scope.row.id)"
+            <t-switch class="printer-management-monitor" :value="scope.row.monitorEnabled === true" :disabled="!isAdmin || monitorUpdatingIds.includes(scope.row.id)"
               :loading="monitorUpdatingIds.includes(scope.row.id)" @click.stop @change="value => handleMonitorChange(scope.row, value)" />
           </template>
         </TdTableColumn>
 
         <TdTableColumn label="最近通信" width="180" align="center">
           <template #default="scope">
-            <div class="flex flex-col items-center gap-1 text-xs text-gray-600">
+            <div class="printer-management-recent">
               <span>{{ formatDateTime(scope.row.lastSeenAt) }}</span>
-              <span v-if="Number(scope.row.consecutiveFailureCount) > 0" class="text-orange-600">
+              <span v-if="Number(scope.row.consecutiveFailureCount) > 0" class="printer-management-recent__failure">
                 连续失败 {{ scope.row.consecutiveFailureCount }} 次
               </span>
             </div>
@@ -181,11 +203,18 @@
 
         <TdTableColumn label="当前任务" width="180" align="center">
           <template #default="scope">
-            <div class="text-center">
-              <span v-if="scope.row.currentJobId" class="text-sm">
-                <span class="text-xs text-gray-500">任务 #{{ scope.row.currentJobId }}</span>
+            <div class="printer-management-task">
+              <span class="printer-management-task__icon" :class="{ 'printer-management-task__icon--active': scope.row.currentJobId }">
+                <printer size="13" />
               </span>
-              <span v-else class="text-gray-400 text-sm">无</span>
+              <div class="printer-management-task__content">
+                <span v-if="scope.row.currentJobId" class="printer-management-task__name" :title="scope.row.currentJobFileName || `任务 #${scope.row.currentJobId}`">
+                  {{ scope.row.currentJobFileName || `任务 #${scope.row.currentJobId}` }}
+                </span>
+                <span v-else class="printer-management-muted">无活动任务</span>
+                <span v-if="scope.row.currentJobId" class="printer-management-muted">任务 #{{ scope.row.currentJobId }}</span>
+                <t-progress v-if="scope.row.currentJobId && scope.row.progress !== undefined" :percentage="getProgress(scope.row)" :label="false" :stroke-width="4" :status="getProgressStatus(scope.row)" />
+              </div>
             </div>
           </template>
         </TdTableColumn>
@@ -240,13 +269,17 @@
       </div>
 
       <template #footer>
-        <t-pagination
-          v-model:current="queryParams.pageNum"
-          v-model:pageSize="queryParams.pageSize"
-          :total="total"
-          :show-page-size="false"
-          @change="fetchData"
-        />
+        <div class="printer-management-table-footer">
+          <span class="printer-management-table-summary">共 <strong>{{ total }}</strong> 台设备</span>
+          <t-pagination
+            v-model:current="queryParams.pageNum"
+            v-model:pageSize="queryParams.pageSize"
+            :total="total"
+            :show-page-size="false"
+            :total-content="false"
+            @change="fetchData"
+          />
+        </div>
       </template>
     </t-card>
 
@@ -567,6 +600,7 @@ const statusOptions = Object.values(PRINTER_STATUS).map(value => ({
   value,
   label: PRINTER_STATUS_MAP[value].label
 }))
+const printerStatusTabs = [{ value: '', label: '全部' }, ...statusOptions]
 
 const activeStatusFilterKey = computed(() => {
   const value = Array.isArray(route.query.status) ? route.query.status[0] : route.query.status
@@ -669,7 +703,9 @@ const displayTableData = computed(() => tableData.value.map(printer => {
     if (realtime[field] !== undefined) merged[field] = realtime[field]
   })
   const realtimeState = realtime.businessStatus || realtime.unifiedState || realtime.state
-  if (realtimeState) merged.status = normalizePrinterStatus(realtimeState)
+  if (realtimeState && String(realtimeState).toUpperCase() !== PRINTER_STATUS.OFFLINE) {
+    merged.status = normalizePrinterStatus(realtimeState)
+  }
   return merged
 }))
 
@@ -709,22 +745,23 @@ const scanStatsText = computed(() => {
   return `共扫描到 ${total} 台设备，其中 ${newCount} 台新设备，${existingCount} 台已知设备`
 })
 
-// 获取状态对应颜色
-const getStatusColor = (status) => {
-  const themeColors = {
-    primary: '#1d4ed8',
-    default: '#6b7280',
-    warning: '#d97706',
-    danger: '#dc2626',
-    success: '#059669'
-  }
-  const config = PRINTER_STATUS_MAP[String(status || '').toUpperCase()]
-  return themeColors[config?.type] || themeColors.default
-}
-
 // 获取状态标签类型
 const getStatusLabel = (status) => {
   return PRINTER_STATUS_MAP[String(status || '').toUpperCase()]?.label || '未知'
+}
+
+const getStatusClass = status => String(status || 'UNKNOWN').toLowerCase()
+
+const getProgress = printer => {
+  const progress = Number(printer.progress)
+  if (!Number.isFinite(progress)) return 0
+  return Math.min(100, Math.max(0, Math.round(progress)))
+}
+
+const getProgressStatus = printer => {
+  if (String(printer.status || '').toUpperCase() === PRINTER_STATUS.ERROR) return 'error'
+  if (getProgress(printer) >= 100) return 'success'
+  return 'active'
 }
 
 // 判断是否应该显示"确认清理"按钮
@@ -1031,6 +1068,11 @@ const applyFilters = () => {
   if (statusFilter.value === activeStatusFilterKey.value) fetchData()
 }
 
+const applyStatusTab = value => {
+  statusFilter.value = value || ''
+  applyFilters()
+}
+
 const clearStatusFilter = () => {
   statusFilter.value = ''
   applyFilters()
@@ -1213,22 +1255,96 @@ const handleBatchAdd = async () => {
 </script>
 
 <style scoped>
-.printer-filter-bar {
-  display: flex;
-  align-items: center;
-  flex: 0 0 auto;
+.printer-manage-page {
   gap: var(--app-spacing-3);
-  margin-bottom: var(--app-spacing-4);
-  padding: var(--app-spacing-3);
+}
+
+.printer-page-actions {
+  gap: var(--app-spacing-2);
+}
+
+.printer-management-toolbar-card {
+  flex: 0 0 auto;
+  padding: var(--app-spacing-2) var(--app-spacing-3);
   background: var(--app-surface);
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius);
+  box-shadow: var(--app-shadow);
 }
 
-.printer-filter-bar .t-input { width: min(320px, 100%); }
-.printer-filter-bar .t-select { width: 180px; }
+.printer-management-toolbar-card__top,
+.printer-management-toolbar-card__controls {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.printer-management-toolbar-card__top {
+  justify-content: space-between;
+  gap: var(--app-spacing-4);
+}
+
+.printer-management-toolbar-card__controls {
+  flex: 0 0 auto;
+  gap: var(--app-spacing-2);
+}
+
+.printer-management-tabs {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+  min-height: 40px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.printer-management-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.printer-management-tabs :deep(.t-radio-button) {
+  flex: 0 0 auto;
+  min-width: 64px;
+  height: 34px;
+  justify-content: center;
+  color: var(--app-text-secondary);
+  border: 0;
+  box-shadow: none;
+}
+
+.printer-management-tabs :deep(.t-radio-button::before),
+.printer-management-tabs :deep(.t-radio-button.t-is-checked + .t-radio-button::before) {
+  display: none;
+}
+
+.printer-management-tabs :deep(.t-radio-button:hover) {
+  color: var(--app-primary);
+}
+
+.printer-management-tabs :deep(.t-radio-button.t-is-checked) {
+  color: var(--app-primary);
+  background: var(--app-primary-light);
+  border: 0;
+  box-shadow: none;
+}
+
+.printer-management-filter__search {
+  flex: 0 1 280px;
+  width: 280px;
+  min-width: 0;
+}
+
+.printer-manage-card {
+  min-height: 0;
+}
+
+.printer-manage-card :deep(.t-card__body) {
+  padding: 0;
+}
 
 .printer-manage-card :deep(.t-card__footer) {
+  padding: var(--app-spacing-3) var(--app-spacing-4);
   border-top: 1px solid var(--app-border);
 }
 
@@ -1241,15 +1357,214 @@ const handleBatchAdd = async () => {
   overflow: hidden;
 }
 
-.printer-table { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.printer-table {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.printer-management-table :deep(.t-table__content) {
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+.printer-management-table :deep(.t-table__header tr),
+.printer-management-table :deep(.t-table__body tr) {
+  height: 52px;
+}
+
+.printer-management-table :deep(th),
+.printer-management-table :deep(td) {
+  color: var(--app-text-primary);
+  font-size: var(--td-font-size-body-small);
+}
+
+.printer-management-table :deep(.t-table__header th) {
+  color: var(--app-text-secondary);
+  font-weight: 500;
+  background: var(--app-surface-muted);
+}
+
+.printer-management-table :deep(.t-table__body tr) {
+  transition: background-color 0.18s ease;
+}
+
+.printer-management-table :deep(.t-table__body tr:hover > td) {
+  background: var(--app-surface-hover);
+}
+
+.printer-management-table :deep(.t-table__body tr:hover > td:first-child) {
+  box-shadow: inset 3px 0 var(--app-primary);
+}
 
 .printer-table-row :deep(td) {
   cursor: pointer;
 }
 
+.printer-management-primary,
+.printer-management-name,
+.printer-management-connection,
+.printer-management-recent,
+.printer-management-task,
+.printer-management-task__content {
+  display: flex;
+  min-width: 0;
+}
+
+.printer-management-primary,
+.printer-management-connection,
+.printer-management-recent {
+  align-items: center;
+  flex-direction: column;
+  gap: var(--app-spacing-1);
+}
+
+.printer-management-name {
+  align-items: center;
+  max-width: 100%;
+  gap: var(--app-spacing-1);
+  font-weight: 600;
+}
+
+.printer-management-ellipsis,
+.printer-management-task__name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.printer-management-muted {
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+}
+
+.printer-management-status-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.printer-management-status-dot--printing { background: var(--app-primary); }
+.printer-management-status-dot--idle { background: var(--app-success); }
+.printer-management-status-dot--preparing,
+.printer-management-status-dot--paused { background: var(--app-warning); }
+.printer-management-status-dot--error { background: var(--app-danger); }
+.printer-management-status-dot--offline,
+.printer-management-status-dot--unknown { background: var(--app-text-placeholder); }
+
+.printer-management-status-card {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: var(--app-spacing-1) var(--app-spacing-2);
+  background: var(--app-surface-muted);
+  border-radius: var(--app-radius-small);
+}
+
+.printer-management-connection,
+.printer-management-recent {
+  text-align: center;
+}
+
+.printer-management-recent__failure {
+  color: var(--app-warning);
+  font-size: var(--td-font-size-body-small);
+}
+
+.printer-management-task {
+  align-items: center;
+  justify-content: center;
+  gap: var(--app-spacing-2);
+  text-align: left;
+}
+
+.printer-management-task__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--app-text-placeholder);
+  background: var(--app-surface-muted);
+  border-radius: var(--app-radius-small);
+}
+
+.printer-management-task__icon--active {
+  color: var(--app-primary);
+  background: var(--app-primary-light);
+}
+
+.printer-management-task__content {
+  flex-direction: column;
+  gap: 2px;
+}
+
+.printer-management-task__content :deep(.t-progress) {
+  width: 96px;
+}
+
+.printer-management-table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-spacing-4);
+  min-width: 0;
+}
+
+.printer-management-table-summary {
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+  white-space: nowrap;
+}
+
+.printer-management-table-summary strong {
+  color: var(--app-text-primary);
+}
+
+.printer-management-table-footer :deep(.t-pagination) {
+  min-width: 0;
+}
+
+.printer-filter-bar {
+  display: none;
+}
+
 @media (max-width: 768px) {
-  .printer-filter-bar { align-items: stretch; flex-direction: column; }
-  .printer-filter-bar .t-input,
-  .printer-filter-bar .t-select { width: 100%; }
+  .printer-management-toolbar-card__top {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--app-spacing-2);
+  }
+
+  .printer-management-toolbar-card__controls {
+    width: 100%;
+  }
+
+  .printer-management-filter__search {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .printer-page-actions {
+    width: 100%;
+  }
+
+  .printer-page-actions :deep(.t-button) {
+    flex: 1 1 auto;
+  }
+
+  .printer-management-table-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .printer-management-table-footer :deep(.t-pagination) {
+    align-self: flex-end;
+  }
 }
 </style>

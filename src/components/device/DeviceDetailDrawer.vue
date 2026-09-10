@@ -34,7 +34,7 @@
         </template>
 
         <!-- 内容区域 - 使用流式内边距 -->
-            <div v-if="detailLoading" class="flex min-h-48 items-center justify-center">
+        <div v-if="detailLoading" class="flex min-h-48 items-center justify-center">
             <t-loading text="正在加载打印机详情..." />
         </div>
 
@@ -46,7 +46,7 @@
 
         <div v-else-if="device" class="printer-detail-drawer__content p-fluid-md flex flex-col gap-fluid-lg">
             <!-- 实时状态概览卡片 -->
-            <div class="p-fluid-md rounded-lg bg-gray-100 border" :class="[
+            <div class="printer-detail-drawer__status-card p-fluid-md rounded-lg bg-gray-100 border" :class="[
                 currentStateClass === 'error' ? 'bg-red-50 border-red-300' : '',
                 currentStateClass === 'preparing' || currentStateClass === 'paused' ? 'bg-yellow-50 border-yellow-300' : '',
                 currentStateClass === 'printing' ? 'bg-gray-100 border-gray-500' : ''
@@ -66,7 +66,7 @@
                     <span class="shrink-0 mt-0.5">
                         <Warning />
                     </span>
-                    <span class="line-clamp-3">{{ realTimeData.systemMessage }}</span>
+                    <span class="line-clamp-3" :title="realTimeData.systemMessage">{{ realTimeData.systemMessage }}</span>
                 </div>
             </div>
 
@@ -279,7 +279,7 @@
                     </t-tag>
                 </div>
 
-                <t-card class="border-gray-200">
+                <t-card class="printer-detail-drawer__sub-card border-gray-200">
                     <template #header>
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <span class="text-sm font-semibold text-gray-900">打印统计</span>
@@ -297,7 +297,7 @@
                     <t-empty v-else description="暂无统计数据" />
                 </t-card>
 
-                <t-card class="border-gray-200">
+                <t-card class="printer-detail-drawer__sub-card border-gray-200">
                     <template #header>
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <span class="text-sm font-semibold text-gray-900">状态历史</span>
@@ -323,6 +323,7 @@
                     <t-skeleton v-else-if="historyLoading" :loading="true" theme="paragraph" />
                     <t-table
                         v-else-if="statusHistory.length > 0"
+                        class="printer-history-table"
                         :data="statusHistory"
                         :columns="historyColumns"
                         row-key="id"
@@ -369,21 +370,21 @@
                         打开 Mainsail 界面
                     </t-button>
 
-                    <!-- 操作按钮网格 - 移动端 2列，桌面 3列 -->
-                    <div class="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                        <t-button theme="warning" :disabled="actionLoading || !canPause" :loading="actionLoading" @click="handleAction('pause')" class="h-10">
+                    <!-- 操作按钮网格 - 移动端单列，桌面 3列 -->
+                    <div class="printer-detail-drawer__remote-actions">
+                        <t-button theme="warning" size="medium" :disabled="actionLoading || !canPause" :loading="actionLoading" @click="handleAction('pause')" class="printer-detail-drawer__remote-action">
                             <span>
                                 <VideoPause />
                             </span>
                             暂停
                         </t-button>
-                        <t-button theme="success" :disabled="actionLoading || !canResume" :loading="actionLoading" @click="handleAction('resume')">
+                        <t-button theme="success" size="medium" :disabled="actionLoading || !canResume" :loading="actionLoading" @click="handleAction('resume')" class="printer-detail-drawer__remote-action">
                             <span>
                                 <VideoPlay />
                             </span>
                             恢复
                         </t-button>
-                        <t-button theme="danger" :disabled="actionLoading || !canCancel" :loading="actionLoading" @click="handleAction('cancel')">
+                        <t-button theme="danger" size="medium" :disabled="actionLoading || !canCancel" :loading="actionLoading" @click="handleAction('cancel')" class="printer-detail-drawer__remote-action">
                             <span>
                                 <CircleClose />
                             </span>
@@ -468,8 +469,8 @@ const isLargeScreen = computed(() => windowWidth.value >= 1920)
 const drawerSize = computed(() => {
     if (isMobile.value) return '100%'      // 移动端：全屏
     if (isTablet.value) return '70%'       // 平板：70% 宽度
-    if (isLargeScreen.value) return '480px' // 大屏：固定 480px (30rem)
-    return '416px'                          // 桌面：固定 416px (26rem)
+    if (isLargeScreen.value) return '560px' // 大屏：固定 560px (35rem)
+    return '520px'                          // 桌面：固定 520px (32.5rem)
 })
 
 // 响应式描述列表列数
@@ -618,12 +619,23 @@ const drawerVisible = computed({
     set: value => handleVisibleChange(value)
 })
 
-const historyColumns = [
-    { colKey: 'status', title: '状态', width: 100 },
-    { colKey: 'filename', title: '文件', ellipsis: true },
-    { colKey: 'progress', title: '进度', width: 70 },
-    { colKey: 'recordedAt', title: '记录时间', width: 150 }
-]
+const historyColumns = computed(() => {
+    if (isMobile.value) {
+        return [
+            { colKey: 'status', title: '状态', width: 82 },
+            { colKey: 'filename', title: '文件', width: 112, ellipsis: true },
+            { colKey: 'progress', title: '进度', width: 60 },
+            { colKey: 'recordedAt', title: '记录时间', width: 148 }
+        ]
+    }
+
+    return [
+        { colKey: 'status', title: '状态', width: 92 },
+        { colKey: 'filename', title: '文件', width: 136, ellipsis: true },
+        { colKey: 'progress', title: '进度', width: 72 },
+        { colKey: 'recordedAt', title: '记录时间', width: 152 }
+    ]
+})
 
 const statisticCards = computed(() => {
     const stats = props.statistics || {}
@@ -694,7 +706,7 @@ const drawerTitle = computed(() => {
 
 /** 当前状态 */
 const currentState = computed(() => {
-    const sourceState = props.realTimeData?.businessStatus || props.realTimeData?.state || props.device?.status
+    const sourceState = props.realTimeData?.businessStatus || props.realTimeData?.unifiedState || props.device?.status
     if (String(sourceState || '').toUpperCase() === 'ASSIGNED') return PRINTER_STATUS.IDLE
     return normalizePrinterStatus(sourceState)
 })
@@ -883,6 +895,71 @@ async function handleStartPrint(action) {
     min-width: 0;
 }
 
+.printer-detail-drawer__status-card {
+    background: var(--app-surface-muted);
+    border-color: var(--app-border);
+    box-shadow: var(--app-shadow);
+}
+
+.printer-detail-drawer__monitor-section {
+    padding: var(--app-spacing-4);
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+}
+
+.printer-detail-drawer__monitor-section :deep(.t-descriptions) {
+    margin-top: var(--app-spacing-3);
+}
+
+.printer-detail-drawer__sub-card {
+    overflow: hidden;
+}
+
+.printer-detail-drawer__sub-card :deep(.t-card__header) {
+    padding: var(--app-spacing-3) var(--app-spacing-4);
+    background: var(--app-surface-muted);
+    border-bottom: 1px solid var(--app-border);
+}
+
+.printer-detail-drawer__sub-card :deep(.t-card__body) {
+    padding: var(--app-spacing-4);
+}
+
+.printer-detail-drawer :deep(.printer-history-table) {
+    width: 100%;
+    min-width: 0;
+}
+
+.printer-detail-drawer :deep(.printer-history-table .t-table__content) {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.printer-detail-drawer :deep(.printer-history-table table) {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.printer-detail-drawer :deep(.printer-history-table td:nth-child(2)) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.printer-detail-drawer__remote-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--app-spacing-2);
+}
+
+.printer-detail-drawer__remote-action {
+    width: 100%;
+    min-height: 40px;
+    justify-content: center;
+}
+
 .printer-detail-drawer__header {
     display: flex;
     align-items: center;
@@ -906,6 +983,10 @@ async function handleStartPrint(action) {
 @media (max-width: 767px) {
     :deep(.t-drawer) {
         width: 100% !important;
+    }
+
+    .printer-detail-drawer__remote-actions {
+        grid-template-columns: 1fr;
     }
 
 }
