@@ -825,6 +825,10 @@ const batchMoveForm = reactive({ parentId: '' })
 
 const folderFormRef = ref(null)
 
+watch(() => folderForm.level, level => {
+  if (Number(level) === 1) folderForm.parentId = null
+})
+
 // 分页状态
 const pagination = reactive({
   pageNum: 1,
@@ -840,10 +844,37 @@ const flattenFolders = (nodes, result = []) => {
   return result
 }
 
+const MAX_LONG_ID = '9223372036854775807'
+
+const isPureLongId = value => {
+  const normalized = String(value ?? '').trim()
+  if (!/^\d+$/.test(normalized)) return false
+
+  const significantDigits = normalized.replace(/^0+/, '') || '0'
+  return significantDigits.length < MAX_LONG_ID.length
+    || (significantDigits.length === MAX_LONG_ID.length && significantDigits <= MAX_LONG_ID)
+}
+
+const isFirstLevelFolder = folder => folder?.folder === true
+  && Number(folder.level || 1) === 1
+  && (folder.parentId === null || folder.parentId === undefined)
+
+const isCreateableFirstLevelFolder = folder => isFirstLevelFolder(folder)
+  && isPureLongId(folder.id)
+  && folder.isGroup !== true
+  && folder.synthetic !== true
+  && folder.canCreate === true
+
 const firstLevelFolders = computed(() => flattenFolders(folderTreeFolders.value)
-  .filter(folder => Number(folder.level || 1) === 1 && (folder.parentId === null || folder.parentId === undefined))
-  .filter(folder => folder.canCreate === true)
+  .filter(isCreateableFirstLevelFolder)
   .map(folder => ({ value: folder.id, label: folder.name || folder.originalName || `文件夹 ${folder.id}` })))
+
+const findRealFolderById = id => {
+  if (!isPureLongId(id)) return null
+  const normalizedId = String(id).trim()
+  return flattenFolders(folderTreeFolders.value)
+    .find(folder => folder?.folder === true && isPureLongId(folder.id) && String(folder.id).trim() === normalizedId) || null
+}
 
 const isDescendantFolder = (candidateId, ancestorId) => {
   let current = flattenFolders(folderTreeFolders.value)
@@ -1078,7 +1109,15 @@ const refreshLibrary = () => fetchData()
 const refreshLibraryPreservingSelection = ids => fetchData({ preserveSelectedIds: ids })
 
 const handleFolderSelect = selection => {
-  const nextParentId = selection?.id ?? null
+  let nextParentId = null
+  if (selection !== null && selection !== undefined) {
+    const selectedId = selection.id
+    if (selectedId !== null && selectedId !== undefined && selectedId !== '') {
+      const folder = findRealFolderById(selectedId)
+      if (!folder) return
+      nextParentId = String(folder.id)
+    }
+  }
   if (String(currentParentId.value) === String(nextParentId)) return
   currentParentId.value = nextParentId
   pagination.pageNum = 1
@@ -1099,7 +1138,7 @@ const handleFolderTreeLoaded = folders => {
     ? null
     : flattenFolders(folderTreeFolders.value)
       .find(folder => folder?.isDefault && folder.visibility !== 'PUBLIC' && String(folder.userId) === String(currentUserId))
-  if (defaultFolder) {
+  if (defaultFolder && isPureLongId(defaultFolder.id)) {
     currentParentId.value = defaultFolder.id
     pagination.pageNum = 1
     selectedIds.value = []
@@ -1116,16 +1155,9 @@ const openCreateFolderDialog = () => {
     return
   }
   folderForm.name = ''
-  const selectedFolder = flattenFolders(folderTreeFolders.value)
-    .find(folder => String(folder.id) === String(currentParentId.value))
-  if (selectedFolder?.level === 1) {
-    folderForm.level = 2
-    folderForm.parentId = selectedFolder.id
-  } else {
-    folderForm.level = 1
-    folderForm.parentId = null
-  }
-  folderForm.visibility = selectedFolder?.visibility === 'PUBLIC' ? 'PUBLIC' : 'PRIVATE'
+  folderForm.level = 1
+  folderForm.parentId = null
+  folderForm.visibility = 'PRIVATE'
   createFolderDialogVisible.value = true
 }
 
@@ -1135,13 +1167,36 @@ const openCreateFolderDialog = () => {
 const handleCreateFolder = async () => {
   const validation = await folderFormRef.value?.validate()
   if (validation !== true && validation !== undefined) return
+
+  if (Number(folderForm.level) === 1) {
+    if (folderForm.parentId !== null && folderForm.parentId !== undefined && folderForm.parentId !== '') {
+      message.warning('一级目录不能选择父目录')
+      return
+    }
+  } else if (Number(folderForm.level) === 2) {
+    const parentFolder = findRealFolderById(folderForm.parentId)
+    if (!isCreateableFirstLevelFolder(parentFolder)) {
+      message.warning('请选择可创建二级目录的一级父目录')
+      return
+    }
+  } else {
+    message.warning('请选择有效的目录级别')
+    return
+  }
+
+  const parentFolder = Number(folderForm.level) === 2
+    ? findRealFolderById(folderForm.parentId)
+    : null
+  const visibility = Number(folderForm.level) === 2
+    ? (parentFolder.visibility === 'PUBLIC' ? 'PUBLIC' : 'PRIVATE')
+    : folderForm.visibility
   creatingFolder.value = true
 
   try {
     await createFolder({
-      parentId: folderForm.level === 2 ? folderForm.parentId : null,
+      parentId: Number(folderForm.level) === 2 ? parentFolder.id : null,
       folderName: folderForm.name,
-      visibility: folderForm.level === 1 ? folderForm.visibility : currentFolder.value?.visibility
+      visibility
     })
     message.success('文件夹创建成功')
     createFolderDialogVisible.value = false

@@ -76,6 +76,45 @@ test('文件夹树只消费后端真实目录节点并保留路径和错误恢�
   assert.doesNotMatch(folderTreeSource, /checkable|draggable|allow-drop|onDrop/)
 })
 
+test('UI-004.20.1 拦截所有虚拟文件分组值并保护真实目录选择', () => {
+  assert.match(folderTreeSource, /const virtualGroupValues = new Set\(\['private', 'public', '__private__', '__public__'\]\)/)
+  assert.match(folderTreeSource, /const getNodeLayers = context =>/)
+  assert.match(folderTreeSource, /visit\(value\.node\)[\s\S]*visit\(value\.data\)[\s\S]*visit\(value\.rawNode\)/)
+  assert.match(folderTreeSource, /if \(layers\.some\(layer => layer\.isGroup === true\)\) return true/)
+  assert.match(folderTreeSource, /\['value', 'key', 'id'\]\.some\(field =>/)
+  assert.match(folderTreeSource, /if \(isVirtualGroupNode\(context\)\) return/)
+
+  for (const value of ['private', 'public', '__private__', '__public__']) {
+    assert.match(folderTreeSource, new RegExp(`virtualGroupValues.*${value.replaceAll('_', '\\_')}`))
+  }
+  assert.match(source, /const findRealFolderById = id =>/)
+  assert.match(source, /const handleFolderSelect = selection =>[\s\S]*const folder = findRealFolderById\(selectedId\)[\s\S]*if \(!folder\) return/)
+  assert.doesNotMatch(source, /const nextParentId = selection\?\.id \?\? null/)
+})
+
+test('UI-004.20.1 新建目录默认根级且二级目录必须显式选择可创建父目录', () => {
+  const openCreateSource = source.match(/const openCreateFolderDialog = \(\) =>[\s\S]*?createFolderDialogVisible\.value = true/)?.[0] || ''
+  const createFolderSource = source.match(/const handleCreateFolder = async \(\) =>[\s\S]*?\n}\n\nconst handleFolderAction/)?.[0] || ''
+
+  assert.match(openCreateSource, /folderForm\.level = 1/)
+  assert.match(openCreateSource, /folderForm\.parentId = null/)
+  assert.match(openCreateSource, /folderForm\.visibility = 'PRIVATE'/)
+  assert.doesNotMatch(openCreateSource, /selectedFolder|currentParentId\.value/)
+  assert.match(source, /watch\(\(\) => folderForm\.level, level =>[\s\S]*folderForm\.parentId = null/)
+
+  assert.match(source, /const isPureLongId = value =>[\s\S]*MAX_LONG_ID/)
+  assert.match(source, /const isCreateableFirstLevelFolder = folder =>[\s\S]*folder\.canCreate === true/)
+  assert.match(createFolderSource, /if \(!isCreateableFirstLevelFolder\(parentFolder\)\) \{[\s\S]*return/)
+  assert.match(createFolderSource, /parentId: Number\(folderForm\.level\) === 2 \? parentFolder\.id : null/)
+  assert.match(createFolderSource, /parentFolder\.visibility === 'PUBLIC' \? 'PUBLIC' : 'PRIVATE'/)
+  assert.doesNotMatch(createFolderSource, /currentFolder\.value\?\.visibility/)
+})
+
+test('UI-004.20.1 文件树新建按钮保留 TDesign 尺寸并增加右侧安全间距', () => {
+  assert.match(folderTreeSource, /<t-space class="file-folder-tree__actions" size="small">/)
+  assert.match(folderTreeSource, /\.file-folder-tree__actions \{[\s\S]*margin-right: var\(--app-spacing-1\)/)
+})
+
 test('文件夹 More 面板按 TDesign Dropdown click 签名传递三类动作', () => {
   const actionOptions = folderTreeSource.match(/const folderActionOptions = \[[\s\S]*?\n\]/)?.[0] || ''
   assert.match(actionOptions, /content: '重命名'[\s\S]*value: 'rename'[\s\S]*EditIcon/)

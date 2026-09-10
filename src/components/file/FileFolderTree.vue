@@ -2,7 +2,7 @@
   <aside class="file-folder-tree" aria-label="文件夹导航">
     <div class="file-folder-tree__header">
       <h2 class="file-folder-tree__title">文件夹列表</h2>
-      <t-space size="small">
+      <t-space class="file-folder-tree__actions" size="small">
         <t-button
           v-if="canCreateSelectedFolder"
           theme="primary"
@@ -179,6 +179,35 @@ const activeKeys = computed(() => props.currentParentId === null || props.curren
   ? []
   : [String(props.currentParentId)])
 
+const virtualGroupValues = new Set(['private', 'public', '__private__', '__public__'])
+
+const getNodeLayers = context => {
+  const layers = []
+  const visited = new Set()
+  const visit = value => {
+    if (!value || typeof value !== 'object' || visited.has(value)) return
+    visited.add(value)
+    layers.push(value)
+    visit(value.node)
+    visit(value.data)
+    visit(value.rawNode)
+  }
+  visit(context)
+  return layers
+}
+
+const isVirtualGroupNode = context => {
+  const layers = getNodeLayers(context)
+  if (layers.some(layer => layer.isGroup === true)) return true
+
+  return layers.some(layer => ['value', 'key', 'id'].some(field => {
+    const value = layer[field]
+    return value !== undefined
+      && value !== null
+      && virtualGroupValues.has(String(value).trim().toLowerCase())
+  }))
+}
+
 const normalizeExpandedKeys = keys => {
   const validKeys = new Set()
   const visit = nodes => nodes.forEach(node => {
@@ -236,7 +265,7 @@ const handleTreeClick = context => {
   if (!node) return
 
   const data = node.data || node
-  if (data.isGroup) return
+  if (isVirtualGroupNode(context)) return
   const id = String(node.value ?? data.value)
   const path = Array.isArray(node.path)
     ? node.path
@@ -288,6 +317,10 @@ defineExpose({ refresh })
   gap: var(--app-spacing-2);
   flex: 0 0 auto;
   margin-bottom: var(--app-spacing-3);
+}
+
+.file-folder-tree__actions {
+  margin-right: var(--app-spacing-1);
 }
 
 .file-folder-tree__title {
