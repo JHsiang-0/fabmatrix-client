@@ -6,11 +6,24 @@ import { mockState, resetMockState } from '../src/mock/data.js'
 const request = (method, url, data, headers, params) => mockRequest({ method, url, data, headers, params })
 const adminHeaders = { Authorization: 'Bearer file-preview-admin' }
 const operatorHeaders = { Authorization: 'Bearer file-preview-operator' }
+const thirdUserHeaders = { Authorization: 'Bearer file-preview-third-user' }
 
 function setupSession() {
   resetMockState()
+  mockState.users.push({
+    id: 3,
+    username: 'third-user',
+    password: 'Third123',
+    role: 'OPERATOR',
+    email: null,
+    phone: null,
+    enabled: true,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z'
+  })
   mockState.sessions['file-preview-admin'] = { userId: 1, username: 'admin', role: 'ADMIN' }
   mockState.sessions['file-preview-operator'] = { userId: 2, username: 'operator', role: 'OPERATOR' }
+  mockState.sessions['file-preview-third-user'] = { userId: 3, username: 'third-user', role: 'OPERATOR' }
 }
 
 test('returns safe preview metadata and keeps filament length in meters', async () => {
@@ -122,6 +135,60 @@ test('allows authenticated public browse upload and job creation but denies publ
     parentId: 5
   }, operatorHeaders)
   assert.equal(move.data.items[0].success, false)
+})
+
+test('allows admin to move public folders across creators and keeps operator management denied', async () => {
+  setupSession()
+
+  await assert.rejects(
+    request('PUT', '/api/v1/print-files/folder/5/rename', {
+      folderName: '不应重命名'
+    }, operatorHeaders),
+    error => error.response.status === 403
+  )
+
+  const source = await request('POST', '/api/v1/print-files/folder/create', {
+    folderName: '公共源目录',
+    visibility: 'PUBLIC'
+  }, adminHeaders)
+  const target = await request('POST', '/api/v1/print-files/folder/create', {
+    folderName: '公共目标目录',
+    visibility: 'PUBLIC'
+  }, adminHeaders)
+  mockState.files.find(file => file.id === source.data.id).userId = 2
+  mockState.files.find(file => file.id === target.data.id).userId = 3
+
+  const moved = await request('PUT', `/api/v1/print-files/folder/${source.data.id}/move`, {
+    parentId: target.data.id
+  }, adminHeaders)
+  assert.equal(moved.data.parentId, target.data.id)
+  assert.equal(mockState.files.find(file => file.id === source.data.id).parentId, target.data.id)
+})
+
+test('allows a third user to read public files but only the uploader can delete', async () => {
+  setupSession()
+
+  const publicPage = await request('POST', '/api/v1/print-files/page', {
+    pageNum: 1,
+    pageSize: 10,
+    parentId: 5,
+    folder: false
+  }, thirdUserHeaders)
+  assert.deepEqual(publicPage.data.records.map(file => file.id), [24])
+  assert.equal(publicPage.data.records[0].canPrint, true)
+  const preview = await request('GET', '/api/v1/print-files/24/preview', undefined, thirdUserHeaders)
+  assert.equal(preview.data.id, 24)
+  const thumbnail = await request('GET', '/api/v1/print-files/24/thumbnail', undefined, thirdUserHeaders)
+  assert.equal(thumbnail.data, null)
+
+  await assert.rejects(
+    request('DELETE', '/api/v1/print-files/24', undefined, thirdUserHeaders),
+    error => error.response.status === 403
+  )
+  assert.equal(mockState.files.some(file => file.id === 24), true)
+
+  await request('DELETE', '/api/v1/print-files/24', undefined, operatorHeaders)
+  assert.equal(mockState.files.some(file => file.id === 24), false)
 })
 
 test('allows the real default folder as a second-level parent but still caps depth at two', async () => {

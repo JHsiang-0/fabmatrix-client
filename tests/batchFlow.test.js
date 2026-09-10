@@ -5,11 +5,58 @@ import { mockState, resetMockState } from '../src/mock/data.js'
 
 const request = (method, url, data, headers) => mockRequest({ method, url, data, headers })
 const headers = { Authorization: 'Bearer batch-flow-session' }
+const publicOwnerHeaders = { Authorization: 'Bearer batch-public-owner' }
+const publicConfirmerHeaders = { Authorization: 'Bearer batch-public-confirmer' }
 
 function setupSession() {
   resetMockState()
+  mockState.users.push({
+    id: 3,
+    username: 'third-user',
+    password: 'Third123',
+    role: 'OPERATOR',
+    email: null,
+    phone: null,
+    enabled: true,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z'
+  })
   mockState.sessions['batch-flow-session'] = { userId: 1, username: 'admin', role: 'ADMIN' }
 }
+
+test('allows another operator to confirm a plan containing a readable public file', async () => {
+  resetMockState()
+  mockState.users.push({
+    id: 3,
+    username: 'third-user',
+    password: 'Third123',
+    role: 'OPERATOR',
+    email: null,
+    phone: null,
+    enabled: true,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z'
+  })
+  mockState.sessions['batch-public-owner'] = { userId: 2, username: 'operator', role: 'OPERATOR' }
+  mockState.sessions['batch-public-confirmer'] = { userId: 3, username: 'third-user', role: 'OPERATOR' }
+
+  const preview = await request('POST', '/api/v1/print-jobs/batch/preview', {
+    fileIds: [24],
+    printerIds: [404],
+    strategy: 'ONE_TO_ONE',
+    action: 'QUEUE'
+  }, publicOwnerHeaders)
+  assert.equal(preview.data.items[0].canExecute, true)
+
+  const confirmed = await request('POST', '/api/v1/print-jobs/batch/confirm', {
+    planId: preview.data.planId,
+    version: preview.data.version,
+    itemIds: [preview.data.items[0].itemId],
+    confirmationToken: preview.data.confirmationToken
+  }, publicConfirmerHeaders)
+  assert.equal(confirmed.data.items[0].success, true)
+  assert.equal(confirmed.data.items[0].job.userId, 3)
+})
 
 test('previews without creating jobs or occupying printers, then confirms all items once', async () => {
   setupSession()

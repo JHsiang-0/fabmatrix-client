@@ -81,10 +81,44 @@ const setJobStatus = (job, nextStatus) => {
   job.updatedAt = now()
 }
 
-const visibilityOf = file => file?.visibility === 'PUBLIC' ? 'PUBLIC' : 'PRIVATE'
-const canReadFile = (session, file) => session.role === 'ADMIN'
-  || visibilityOf(file) === 'PUBLIC'
-  || String(session.userId) === String(file?.userId)
+const visibilityOf = file => {
+  const visibility = String(file?.visibility || '').trim().toUpperCase()
+  return visibility === 'PUBLIC' || visibility === 'PRIVATE' ? visibility : null
+}
+
+const resolveFilePath = file => {
+  if (!file || file.id === undefined || file.id === null || !visibilityOf(file)
+    || file.userId === null || file.userId === undefined) return null
+  const nodes = []
+  const visited = new Set()
+  let current = file
+  let folderLevel = file.folder ? 1 : 0
+  const visibility = visibilityOf(file)
+  while (current) {
+    const currentId = String(current.id)
+    if (visited.has(currentId) || visibilityOf(current) !== visibility
+      || current.userId === null || current.userId === undefined) return null
+    visited.add(currentId)
+    nodes.push(current)
+    if (current.parentId === null || current.parentId === undefined) break
+    const parent = findFile(current.parentId)
+    if (!parent?.folder) return null
+    folderLevel += 1
+    if (folderLevel > 2) return null
+    current = parent
+  }
+  if (!current || (file.parentId !== null && file.parentId !== undefined && !current.folder)) return null
+  return { leaf: file, root: current, nodes, visibility, folderLevel }
+}
+
+const canReadFile = (session, file) => {
+  const path = resolveFilePath(file)
+  if (!path) return false
+  if (session.role === 'ADMIN' || path.visibility === 'PUBLIC') return true
+  return String(session.userId) === String(path.root.userId)
+    && String(session.userId) === String(path.leaf.userId)
+    && path.nodes.every(node => String(node.userId) === String(path.root.userId))
+}
 const canReadResource = (session, userId) => session.role === 'ADMIN' || String(session.userId) === String(userId)
 
 const fileCapabilities = (session, file) => {
@@ -94,11 +128,11 @@ const fileCapabilities = (session, file) => {
   const folder = Boolean(file?.folder)
   return {
     visibility: publicFile ? 'PUBLIC' : 'PRIVATE',
-    canManage: folder && !file.isDefault && (admin || (!publicFile && owner)),
+    canManage: folder && !file.isDefault && ((!publicFile && owner) || (admin && publicFile)),
     canCreate: folder && (admin || (!publicFile && owner)),
     canUpload: folder && (admin || publicFile || owner),
     canDelete: !folder && (admin || owner),
-    canMove: !folder && (admin || (!publicFile && owner)),
+    canMove: !folder && ((!publicFile && owner) || (admin && publicFile)),
     canPrint: !folder && canReadFile(session, file),
     canDownload: !folder && canReadFile(session, file),
     level: file.level || getFolderLevel(file)
@@ -110,21 +144,7 @@ const toSessionFile = (session, file) => ({
   ...fileCapabilities(session, file)
 })
 
-const getFolderLevel = folder => {
-  let level = 1
-  let current = folder
-  const visited = new Set()
-  while (current.parentId !== null && current.parentId !== undefined) {
-    if (visited.has(String(current.id))) return -1
-    visited.add(String(current.id))
-    const parent = findFile(current.parentId)
-    if (!parent?.folder || visibilityOf(parent) !== visibilityOf(folder)) return -1
-    level += 1
-    current = parent
-    if (level > 2) return level
-  }
-  return level
-}
+const getFolderLevel = folder => resolveFilePath(folder)?.folderLevel || -1
 
 const getFolderLevelForMove = (folder, foldersById, movedFolderId, movedParentId) => {
   let level = 1
@@ -163,6 +183,7 @@ const requireFolderParent = (session, parentId, options = {}) => {
   const parent = findFile(normalizedId)
   if (!parent) fail(404, 404, '父文件夹不存在')
   if (!parent.folder) fail(422, 422, '父级资源不是文件夹')
+  if (!canReadFile(session, parent)) fail(403, 403, '无权访问该文件夹')
   const canCreate = session.role === 'ADMIN'
     || (visibilityOf(parent) === 'PRIVATE' && String(parent.userId) === String(session.userId))
   if (!canCreate || (visibilityOf(parent) === 'PUBLIC' && session.role !== 'ADMIN')) {
@@ -178,6 +199,7 @@ const requireUploadParent = (session, parentId) => {
   const parent = findFile(Number(parentId))
   if (!parent) fail(404, 404, '父文件夹不存在')
   if (!parent.folder) fail(422, 422, '父级资源不是文件夹')
+  if (!canReadFile(session, parent)) fail(403, 403, '无权访问该文件夹')
   if (session.role !== 'ADMIN' && visibilityOf(parent) === 'PRIVATE'
     && String(parent.userId) !== String(session.userId)) {
     fail(403, 403, '无权向该文件夹上传文件')
@@ -863,9 +885,6 @@ const handleFilePage = config => {
   const parentId = params.parentId == null || params.parentId === '' ? null : Number(params.parentId)
   if (parentId !== null) requirePageFolderParent(session, parentId)
   let records = mockState.files.filter(item => item.parentId === parentId)
-  if (session.role !== 'ADMIN') {
-    records = records.filter(item => canReadResource(session, item.userId))
-  }
   if (params.fileName) {
     const fileName = String(params.fileName).trim().toLowerCase()
     records = records.filter(item => item.originalName.toLowerCase().includes(fileName))
@@ -1041,12 +1060,11 @@ const handleRenameFolder = config => {
   const folder = getFileForSession(config, id)
   if (!folder.folder) fail(422, 422, '目标资源不是文件夹')
   if (folder.isDefault) fail(422, 422, '默认目录不可重命名')
-  if (session.role !== 'ADMIN' && (visibilityOf(folder) === 'PUBLIC'
-    || String(folder.userId) !== String(session.userId))) fail(403, 403, '无权管理该文件夹')
+  if (fileCapabilities(session, folder).canManage !== true) fail(403, 403, '无权管理该文件夹')
   const folderName = normalizeMockFolderName(getBody(config).folderName)
   if (mockState.files.some(file => (
     file.folder && String(file.id) !== String(folder.id)
-      && String(file.userId) === String(folder.userId)
+      && (visibilityOf(folder) === 'PUBLIC' || String(file.userId) === String(folder.userId))
       && (file.parentId ?? null) === (folder.parentId ?? null)
       && file.originalName === folderName
   ))) {
@@ -1063,8 +1081,7 @@ const handleMoveFolder = config => {
   const folder = getFileForSession(config, id)
   if (!folder.folder) fail(422, 422, '目标资源不是文件夹')
   if (folder.isDefault) fail(422, 422, '默认目录不可移动')
-  if (session.role !== 'ADMIN' && (visibilityOf(folder) === 'PUBLIC'
-    || String(folder.userId) !== String(session.userId))) fail(403, 403, '无权管理该文件夹')
+  if (fileCapabilities(session, folder).canManage !== true) fail(403, 403, '无权管理该文件夹')
 
   const rawParentId = getBody(config).parentId
   const parentId = rawParentId == null || rawParentId === '' ? null : Number(rawParentId)
@@ -1082,7 +1099,8 @@ const handleMoveFolder = config => {
   if (target && visibilityOf(target) !== visibilityOf(folder)) {
     fail(403, 403, '禁止跨可见性移动文件夹')
   }
-  if (target && String(target.userId) !== String(folder.userId) && session.role !== 'ADMIN') {
+  if (target && visibilityOf(folder) !== 'PUBLIC'
+    && String(target.userId) !== String(folder.userId)) {
     fail(403, 403, '目标文件夹必须属于源文件夹用户')
   }
   if (target && (target.parentId !== null && target.parentId !== undefined
@@ -1101,7 +1119,7 @@ const handleMoveFolder = config => {
   })
   if (mockState.files.some(file => (
     file.folder && String(file.id) !== String(folder.id)
-      && String(file.userId) === String(folder.userId)
+      && (visibilityOf(folder) === 'PUBLIC' || String(file.userId) === String(folder.userId))
       && (file.parentId ?? null) === parentId
       && file.originalName === folder.originalName
   ))) {
@@ -1119,8 +1137,7 @@ const handleDeleteFolder = config => {
   const folder = getFileForSession(config, id)
   if (!folder.folder) fail(422, 422, '目标资源不是文件夹')
   if (folder.isDefault) fail(422, 422, '默认目录不可删除')
-  if (session.role !== 'ADMIN' && (visibilityOf(folder) === 'PUBLIC'
-    || String(folder.userId) !== String(session.userId))) fail(403, 403, '无权管理该文件夹')
+  if (fileCapabilities(session, folder).canManage !== true) fail(403, 403, '无权管理该文件夹')
   if (mockState.files.some(file => String(file.parentId) === String(folder.id))) {
     fail(409, 409, '文件夹非空，包含文件或子目录，无法删除')
   }
@@ -1132,7 +1149,7 @@ const getFileForSession = (config, id) => {
   const session = requireSession(config, ['ADMIN', 'OPERATOR'])
   const file = findFile(id)
   if (!file) fail(404, 404, '文件不存在')
-  if (!canReadFile(session, file)) fail(403, 403, '无权访问此文件')
+  if (!canReadFile(session, file)) fail(404, 404, '文件不存在')
   return file
 }
 
@@ -1299,7 +1316,8 @@ const handleBatchMoveFiles = config => {
     if (target && visibilityOf(target) !== visibilityOf(file)) {
       return { id, success: false, reason: '禁止跨可见性移动文件' }
     }
-    if (target && session.role !== 'ADMIN' && String(target.userId) !== String(file.userId)) {
+    if (target && visibilityOf(file) !== 'PUBLIC'
+      && String(target.userId) !== String(file.userId)) {
       return { id, success: false, reason: '目标文件夹必须属于文件所属用户' }
     }
     if ((file.parentId ?? null) === parentId) {
@@ -1705,10 +1723,7 @@ const handleBatchConfirm = config => {
   const session = requireSession(config, ['ADMIN', 'OPERATOR'])
   const body = getBody(config)
   const plan = mockState.batchPlans.find(item => item.planId === body.planId)
-  if (!plan || !canReadResource(session, plan.userId)) fail(404, 404, '批量派发计划不存在')
-  if (plan.status === 'CONFIRMED' && plan.confirmResult) {
-    return { ...cloneMockData(plan.confirmResult), idempotent: true, repeated: true }
-  }
+  if (!plan) fail(404, 404, '批量派发计划不存在')
   if (Number(body.version) !== plan.version || body.confirmationToken !== plan.confirmationToken) {
     fail(409, 409, '批量派发计划版本或确认令牌不匹配')
   }
@@ -1717,6 +1732,14 @@ const handleBatchConfirm = config => {
   const itemIds = normalizeBatchIds(body.itemIds)
   if (!itemIds.length) fail(400, 400, '至少确认一个可执行项')
   const planItems = new Map(plan.items.map(item => [String(item.itemId), item]))
+  const requestedItems = itemIds.map(itemId => planItems.get(itemId)).filter(Boolean)
+  if (requestedItems.length !== itemIds.length
+    || requestedItems.some(item => !canReadFile(session, findFile(item.fileId)))) {
+    fail(404, 404, '批量派发计划不存在')
+  }
+  if (plan.status === 'CONFIRMED' && plan.confirmResult) {
+    return { ...cloneMockData(plan.confirmResult), idempotent: true, repeated: true }
+  }
   const items = []
   const seen = new Set()
   itemIds.forEach(itemId => {

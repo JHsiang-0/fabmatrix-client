@@ -870,7 +870,9 @@ const moveFolderTargets = computed(() => {
     .filter(folder => folder.canManage === true)
     .filter(folder => String(folder.id) !== String(source.id))
     .filter(folder => !isDescendantFolder(folder.id, source.id))
-    .filter(folder => folder.userId === undefined || String(folder.userId) === String(source.userId))
+    .filter(folder => folder.visibility === source.visibility)
+    .filter(folder => source.visibility === 'PUBLIC'
+      || folder.userId === undefined || String(folder.userId) === String(source.userId))
     .map(folder => ({
       value: folder.id,
       label: folder.name || folder.originalName || `文件夹 ${folder.id}`
@@ -889,8 +891,18 @@ const batchMoveTargets = computed(() => {
     label: '根目录',
     disabled: currentId === null || currentId === undefined
   }]
+  const selectedFiles = fileList.value.filter(file => selectedIds.value
+    .some(id => String(id) === String(file.id)))
+  const selectedVisibility = selectedFiles.length > 0
+    && new Set(selectedFiles.map(file => file.visibility)).size === 1
+    ? selectedFiles[0].visibility
+    : null
   const folderTargets = flattenFolders(folderTreeFolders.value)
     .filter(folder => folder?.folder !== false)
+    .filter(folder => folder.canUpload === true)
+    .filter(folder => !selectedVisibility || folder.visibility === selectedVisibility)
+    .filter(folder => !selectedVisibility || selectedVisibility === 'PUBLIC'
+      || selectedFiles.every(file => String(folder.userId) === String(file.userId)))
     .map(folder => ({
       value: folder.id,
       label: `${folder.level === 2 ? '　└ ' : ''}${folder.name || folder.originalName || `文件夹 ${folder.id}`}`,
