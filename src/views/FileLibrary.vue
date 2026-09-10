@@ -2088,9 +2088,12 @@ onBeforeUnmount(() => {
 .file-library-toolbar-card {
   flex: 0 0 auto;
   min-width: 0;
+  border-color: var(--app-border);
 }
 
 .file-library-toolbar-card :deep(.t-card__body) {
+  box-sizing: border-box;
+  min-width: 0;
   padding: var(--app-spacing-3) var(--app-spacing-4);
 }
 
@@ -2101,6 +2104,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  border-color: var(--app-border);
 }
 
 .file-library-results-card :deep(.t-card__body) {
@@ -2281,6 +2285,7 @@ onBeforeUnmount(() => {
   scrollbar-gutter: stable;
   scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
   scrollbar-width: thin;
+  overflow-x: auto;
   overflow-y: auto;
 }
 
@@ -2730,6 +2735,12 @@ onBeforeUnmount(() => {
   position: relative;
   min-width: 0;
   overflow: hidden;
+  border-color: var(--app-border);
+  transition: box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.file-card:hover {
+  border-color: var(--td-brand-color-3);
 }
 
 .file-card :deep(.t-card__body) {
@@ -2916,7 +2927,8 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   flex: 0 0 auto;
-  padding-top: 0;
+  padding-top: var(--app-spacing-3);
+  border-top: 1px solid var(--app-border);
 }
 
 .file-table__name-cell {

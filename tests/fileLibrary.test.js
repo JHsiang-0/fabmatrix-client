@@ -342,6 +342,22 @@ test('文件库列表表头单行、数据行紧凑且保留横向滚动', () =>
   assert.match(source, /<TdTableColumn prop="filamentWeight" label="耗材重量" width="85">/)
 })
 
+test('文件库视觉容器保留 TDesign 层级、独立滚动和响应式细节', () => {
+  assert.match(source, /<t-card bordered class="file-library-toolbar-card" aria-label="文件操作工具栏">/)
+  assert.match(source, /<t-card v-if="fileList\.length && viewMode === 'grid'" bordered class="file-library-results-card file-library-grid-card"/)
+  assert.match(source, /<t-card v-if="fileList\.length && viewMode === 'list'" bordered class="file-library-results-card file-library-table-card"/)
+  assert.match(source, /\.file-library-results-card \{[\s\S]*border-color: var\(--app-border\)/)
+  assert.match(source, /\.file-table-view :deep\(\.t-table__content\)[\s\S]*overflow-x: auto[\s\S]*overflow-y: auto/)
+  assert.match(source, /\.file-card \{[\s\S]*border-color: var\(--app-border\)[\s\S]*transition: box-shadow/)
+  assert.match(source, /\.file-card:hover \{[\s\S]*border-color: var\(--td-brand-color-3\)/)
+  assert.match(source, /\.file-library-pagination \{[\s\S]*padding-top: var\(--app-spacing-3\)[\s\S]*border-top: 1px solid var\(--app-border\)/)
+  assert.match(folderTreeSource, /\.file-folder-tree__search :deep\(\.t-input__inner\)[\s\S]*color: var\(--app-text-primary\)/)
+  assert.match(folderTreeSource, /\.file-folder-tree :deep\(\.t-tree__item:hover\)[\s\S]*background-color: var\(--td-bg-color-container-hover\)/)
+  assert.match(detailSource, /class="file-detail-drawer__error-alert"/)
+  assert.match(detailSource, /\.file-detail-drawer :deep\(\.t-drawer__body\)[\s\S]*overflow-y: auto/)
+  assert.match(detailSource, /@media \(max-width: 460px\)/)
+})
+
 test('文件库提供批量移动 API、目标校验、操作锁定和部分失败保留', () => {
   assert.match(apiSource, /url: '\/api\/v1\/print-files\/batch\/move'/)
   assert.match(apiSource, /method: 'put'/)

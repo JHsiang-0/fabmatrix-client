@@ -24,7 +24,7 @@
       </div>
 
       <template v-else-if="file">
-        <t-alert v-if="error" theme="error" :title="error" :close-btn="false">
+        <t-alert v-if="error" theme="error" :title="error" :close-btn="false" class="file-detail-drawer__error-alert">
           <template #operation>
             <t-button size="small" variant="outline" @click="emit('retry')">重试</t-button>
           </template>
@@ -287,9 +287,22 @@ const getJobStatusTagType = status => ({
 
 .file-detail-drawer__body {
   display: flex;
+  box-sizing: border-box;
+  width: 100%;
   min-height: 100%;
   flex-direction: column;
   gap: var(--app-spacing-1);
+  padding-bottom: var(--app-spacing-2);
+}
+
+.file-detail-drawer :deep(.t-drawer__body) {
+  overflow-y: auto;
+  scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
+  scrollbar-width: thin;
+}
+
+.file-detail-drawer__error-alert {
+  overflow-wrap: anywhere;
 }
 
 .file-detail-drawer__loading {
@@ -300,6 +313,7 @@ const getJobStatusTagType = status => ({
   display: grid;
   grid-template-columns: 88px minmax(0, 1fr);
   align-items: center;
+  min-width: 0;
   gap: var(--app-spacing-2);
 }
 
@@ -326,6 +340,7 @@ const getJobStatusTagType = status => ({
 
 .file-detail-drawer__identity {
   min-width: 0;
+  overflow: hidden;
 }
 
 .file-detail-drawer__name-tooltip,

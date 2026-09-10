@@ -394,6 +394,7 @@ defineExpose({ refresh })
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
+  color: var(--app-text-primary);
 }
 
 .file-folder-tree__error {
@@ -450,6 +451,7 @@ defineExpose({ refresh })
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
+  min-height: var(--td-comp-size-l);
   border-radius: var(--td-radius-default);
 }
 
