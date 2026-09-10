@@ -1,7 +1,7 @@
 # SYNC-001 选择性界面集成任务
 
-> 基线：`2896a55d7d0623d2ff798bf863ef0ebb35c99255`  
-> 远程审计目标：`origin/feat/ui-003-electron` / `30adedc`  
+> 基线：`2896a55d7d0623d2ff798bf863ef0ebb35c99255`
+> 远程审计目标：`origin/feat/ui-003-electron` / `30adedc`
 > 共同祖先：`27bcc42a1494e85da8adac63da821fb1e9c191fb`
 
 ## 任务清单

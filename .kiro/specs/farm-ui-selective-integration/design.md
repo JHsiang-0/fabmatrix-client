@@ -89,4 +89,3 @@ tests/printerMonitoring.test.js
 - 每个 `SYNC-001.x` 独立提交。
 - 已提交的集成改动使用 `git revert` 回退，不使用 `reset --hard` 覆盖共享分支。
 - 若单个页面验收失败，只回退该页面提交，不回退本地功能基线。
-
