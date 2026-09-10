@@ -1724,6 +1724,9 @@ const handleBatchConfirm = config => {
   const body = getBody(config)
   const plan = mockState.batchPlans.find(item => item.planId === body.planId)
   if (!plan) fail(404, 404, '批量派发计划不存在')
+  if (session.role !== 'ADMIN' && String(plan.userId) !== String(session.userId)) {
+    fail(403, 403, '无权确认此批量派发计划')
+  }
   if (Number(body.version) !== plan.version || body.confirmationToken !== plan.confirmationToken) {
     fail(409, 409, '批量派发计划版本或确认令牌不匹配')
   }

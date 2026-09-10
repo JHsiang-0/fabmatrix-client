@@ -243,7 +243,7 @@
 - 需要后端配合：否。
 - 需要真实打印机：否。
 - 风险：启动动作包含逐项安全确认，失败点多。
-- 完成状态：已完成（2026-09-04）。批量确认仅提交 `planId/version/itemIds/confirmationToken`，同一计划成功确认后重复请求只回放原结果，不重复创建任务；确认结果按项展示 `jobId/status/errorCode/message/retryable`，部分失败不覆盖成功项。成功创建的活动任务同步进入 Job Store。Mock 已覆盖预览无副作用、全成功、执行时打印机冲突部分失败、token 冲突和计划过期场景。`npm.cmd test`（50/50）、`npm.cmd run lint`、`npm.cmd run build`、`npm.cmd run build:mock` 均通过。
+- 完成状态：已完成（2026-09-04，UI-004.20 安全复审后修订）。批量确认仅提交 `planId/version/itemIds/confirmationToken`，且服务端与 Mock 均强制只有计划创建者或 ADMIN 可确认；PUBLIC 文件只允许其他用户用于自己创建的新计划。相同计划成功确认后的重复请求只回放原结果，不重复创建任务；确认结果按项展示 `jobId/status/errorCode/message/retryable`，部分失败不覆盖成功项。成功创建的活动任务同步进入 Job Store。`npm.cmd test`、`npm.cmd run lint`、`npm.cmd run build`、`npm.cmd run build:mock` 均通过。
 
 ### [x] T104 批量失败项恢复
 

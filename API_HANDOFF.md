@@ -273,7 +273,7 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 | POST | `/print-jobs/safe/confirm` | ADMIN/OPERATOR | `printerId,operatorId?` | 安全确认 |
 | POST | `/print-jobs/safe/start` | ADMIN/OPERATOR | `jobId,operatorId?,action?` | 启动或仅上传 |
 | POST | `/print-jobs/batch/preview` | ADMIN/OPERATOR | `fileIds,printerIds,strategy,action` | `DispatchPlanPreviewVO`；预览无副作用 |
-| POST | `/print-jobs/batch/confirm` | ADMIN/OPERATOR | `planId,version,itemIds,confirmationToken` | `BatchDispatchConfirmVO`；逐项创建任务并返回结果 |
+| POST | `/print-jobs/batch/confirm` | ADMIN/OPERATOR | `planId,version,itemIds,confirmationToken` | `BatchDispatchConfirmVO`；仅计划创建者或 ADMIN 可确认，逐项创建任务并返回结果 |
 | POST | `/print-jobs/batch/retry-preview` | ADMIN/OPERATOR | `sourcePlanId,sourceItemIds,retryKey` | `DispatchPlanPreviewVO`；只恢复无任务 ID 且可重试的失败项 |
 
 ### 4.4 设备控制
@@ -366,12 +366,12 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 | `StartPrintJobRequest` | `jobId,operatorId?,action?` | `action` 为 `START_PRINT` 或 `UPLOAD_ONLY`；`operatorId` 已废弃 |
 | `UpdatePrintJobPriorityRequest` | `priority` | 必填，范围 0-100；只允许修改 `QUEUED` 任务 |
 | `BatchDispatchPreviewRequest` | `fileIds,printerIds,strategy,action?` | 两个数组均非空且最多 100 项；策略为 `ONE_TO_ONE|ROUND_ROBIN|AUTO_MATCH`；动作默认为 `UPLOAD_ONLY`，还可为 `QUEUE|START_AFTER_CONFIRM` |
-| `BatchDispatchConfirmRequest` | `planId,version,itemIds,confirmationToken` | 均必填；使用最近一次未过期预览返回的值；`itemIds` 最多 100 个 |
+| `BatchDispatchConfirmRequest` | `planId,version,itemIds,confirmationToken` | 均必填；使用最近一次未过期预览返回的值；`itemIds` 最多 100 个；仅 `plan.createdBy` 或 ADMIN 可确认，PUBLIC 文件不会转移计划所有权 |
 | `BatchDispatchRetryPreviewRequest` | `sourcePlanId,sourceItemIds,retryKey` | 均必填；只提交确认结果中 `retryable=true` 且 `jobId=null` 的明细；每次最多 100 个 |
 
 批量预览响应 `DispatchPlanPreviewVO` 字段为 `planId`、`version`、`mode`、`strategy`、`action`、`confirmationToken`、`expiresAt`、`items`、`conflicts`。明细 `DispatchPlanItemVO` 包含 `itemId`、文件/打印机 ID 和名称、`printerStatus`、`canExecute`、`status`、`reasonCode`、`message`、`jobId`、`sourcePlanId`、`sourceItemId`、`recoveryAction`、`attemptCount`、`retryable`。确认响应 `BatchDispatchConfirmVO` 包含 `planId`、`status`、`repeated` 和逐项 `items`。
 
-批量确认是幂等的：重复提交同一 `planId + version + confirmationToken` 时读取已保存结果并返回 `repeated=true`；前端不要用旧计划调用恢复预览。恢复预览必须使用 `sourcePlanId`、`sourceItemIds` 和新的 `retryKey`。
+批量确认是幂等的：重复提交同一 `planId + version + confirmationToken` 时读取已保存结果并返回 `repeated=true`；确认人必须是计划创建者或 ADMIN，PUBLIC 文件只允许被其他用户用于自己创建的新计划，不能用于确认他人计划；前端不要用旧计划调用恢复预览。恢复预览必须使用 `sourcePlanId`、`sourceItemIds` 和新的 `retryKey`。
 
 ### 4.8 前端错误处理约定
 
@@ -520,7 +520,7 @@ Service 层测试已覆盖任务状态转换、重试/重新排队/优先级更�
 | GET | `/print-files/{id}/jobs` | ADMIN/OPERATOR | Query：`pageNum,pageSize` | `PageResult<PrintJobVO>` | 已完成 |
 | GET | `/print-files/{id}/preview` | ADMIN/OPERATOR | Path ID | `PrintFilePreviewVO` | 已完成 |
 
-文件接口按当前登录用户隔离资源；`OPERATOR` 只能访问本人文件，`ADMIN` 可查看和管理全部文件。管理员分页查询可通过 `userId` 筛选指定用户，不传时查询全部。
+文件接口按当前登录用户隔离资源；`OPERATOR` 可访问本人 PRIVATE 文件及有效路径上的 PUBLIC 文件，`ADMIN` 可查看和管理全部有效文件。管理员分页查询可通过 `userId` 筛选指定用户，不传时查询全部。
 
 `GET /print-files/tree` 当前冻结为返回完整树，不分页、不接受必填参数；若以后传入 `parentId`，只作为从指定目录开始的兼容扩展。`FileNodeVO` 字段为：`id`、`parentId`、`folder`、`name`、`fileSize`、`materialType`、`createdAt`、`children`。目录和文件均返回 `children` 数组，文件节点数组为空；`name` 为目录名或文件原始名。节点按目录优先、同级创建时间倒序排列。操作员只获得本人节点，管理员获得全部节点；孤立节点按根节点返回，避免前端丢失数据。
 
