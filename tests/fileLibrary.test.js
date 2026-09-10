@@ -63,7 +63,7 @@ test('文件夹树只消费后端真实目录节点并保留路径和错误恢�
   assert.match(folderTreeSource, /#label="\{ node \}"/)
   assert.match(folderTreeSource, /class="file-folder-tree__label" :title="node\.label"/)
   assert.match(folderTreeSource, /\.file-folder-tree__label[\s\S]*display: block[\s\S]*overflow: hidden[\s\S]*text-overflow: ellipsis[\s\S]*white-space: nowrap/)
-  assert.match(folderTreeSource, /\.t-tree__label[\s\S]*flex: 1 1 auto[\s\S]*min-width: 0[\s\S]*max-width: 100%/)
+  assert.match(folderTreeSource, /\.t-tree__label[\s\S]*flex: 1 1 0%[\s\S]*width: 0[\s\S]*min-width: 0[\s\S]*max-width: 100%/)
   assert.match(folderTreeSource, /\.t-tree__item[\s\S]*min-width: 0/)
   assert.match(folderTreeSource, /Array\.isArray\(node\.path\)[\s\S]*Array\.isArray\(data\.path\)/)
   assert.match(folderTreeSource, /path\n {2}\}\)/)
@@ -137,11 +137,29 @@ test('UI-004.20.3 文件树头部和文件库工具栏保持紧凑可收缩布�
 
 test('UI-004.20.2 文件树节点为可收缩标签与固定操作区', () => {
   assert.match(folderTreeSource, /:deep\(\.t-tree__item\) \{[\s\S]*box-sizing: border-box[\s\S]*width: 100%[\s\S]*min-width: 0/)
-  assert.match(folderTreeSource, /:deep\(\.t-tree__label\) \{[\s\S]*flex: 1 1 0%[\s\S]*width: 0[\s\S]*min-width: 0[\s\S]*max-width: none/)
+  assert.match(folderTreeSource, /:deep\(\.t-tree__label\) \{[\s\S]*flex: 1 1 0%[\s\S]*width: 0[\s\S]*min-width: 0[\s\S]*max-width: 100%/)
   assert.match(folderTreeSource, /:deep\(\.t-tree__operations\) \{[\s\S]*flex: 0 0 var\(--td-comp-size-m\)[\s\S]*width: var\(--td-comp-size-m\)[\s\S]*min-width: var\(--td-comp-size-m\)[\s\S]*max-width: var\(--td-comp-size-m\)/)
   assert.match(folderTreeSource, /class="file-folder-tree__operation-control"/)
   assert.match(folderTreeSource, /\.file-folder-tree__operation-control \{[\s\S]*flex: 0 0 var\(--td-comp-size-m\)[\s\S]*min-width: var\(--td-comp-size-m\)[\s\S]*max-width: var\(--td-comp-size-m\)/)
   assert.match(folderTreeSource, /\.file-folder-tree__label \{[\s\S]*width: 100%[\s\S]*overflow: hidden[\s\S]*text-overflow: ellipsis[\s\S]*white-space: nowrap/)
+})
+
+test('UI-004.20.4 文件树内层宽度随 240px 侧栏完整传递', () => {
+  assert.match(folderTreeSource, /\.file-folder-tree \{[\s\S]*width: 100%[\s\S]*max-width: 100%[\s\S]*align-self: stretch[\s\S]*box-sizing: border-box[\s\S]*min-width: 0/)
+  assert.match(folderTreeSource, /\.file-folder-tree__header \{[\s\S]*width: 100%[\s\S]*max-width: 100%[\s\S]*min-width: 0[\s\S]*box-sizing: border-box/)
+  assert.match(folderTreeSource, /\.file-folder-tree__search \{[\s\S]*width: 100%[\s\S]*max-width: 100%[\s\S]*min-width: 0[\s\S]*box-sizing: border-box/)
+  assert.match(folderTreeSource, /\.file-folder-tree__search :deep\(\.t-input__wrap\) \{[\s\S]*width: 100%[\s\S]*max-width: 100%[\s\S]*min-width: 0[\s\S]*box-sizing: border-box/)
+  assert.match(folderTreeSource, /\.file-folder-tree__search :deep\(\.t-input\) \{[\s\S]*width: 100%[\s\S]*max-width: 100%[\s\S]*min-width: 0[\s\S]*box-sizing: border-box/)
+  assert.match(folderTreeSource, /\.file-folder-tree__search :deep\(\.t-input__inner\) \{[\s\S]*width: 100%[\s\S]*max-width: 100%[\s\S]*min-width: 0[\s\S]*box-sizing: border-box/)
+  assert.match(folderTreeSource, /\.file-folder-tree__nodes \{[\s\S]*width: 100%[\s\S]*max-width: 100%[\s\S]*min-width: 0[\s\S]*box-sizing: border-box/)
+  assert.match(folderTreeSource, /\.file-folder-tree :deep\(\.t-tree\) \{[\s\S]*width: 100%[\s\S]*max-width: 100%[\s\S]*min-width: 0[\s\S]*box-sizing: border-box/)
+  assert.match(folderTreeSource, /\.file-folder-tree :deep\(\.t-tree__list\) \{[\s\S]*width: 100%[\s\S]*max-width: 100%[\s\S]*min-width: 0[\s\S]*box-sizing: border-box/)
+  assert.match(folderTreeSource, /<t-tooltip[\s\S]*class="file-folder-tree__label"/)
+  assert.match(folderTreeSource, /\.file-folder-tree__label \{[\s\S]*overflow: hidden[\s\S]*text-overflow: ellipsis[\s\S]*white-space: nowrap/)
+  assert.match(folderTreeSource, /\.file-folder-tree :deep\(\.t-tree__operations\) \{[\s\S]*flex: 0 0 var\(--td-comp-size-m\)[\s\S]*min-width: var\(--td-comp-size-m\)[\s\S]*max-width: var\(--td-comp-size-m\)/)
+  assert.match(source, /<t-aside width="240px" class="file-library-sidebar">/)
+  assert.match(source, /\.file-library-sidebar \{[\s\S]*flex: 0 0 240px[\s\S]*width: 240px[\s\S]*min-width: 240px[\s\S]*max-width: 240px[\s\S]*box-sizing: border-box[\s\S]*align-items: stretch/)
+  assert.match(source, /\.file-library-sidebar-card \{[\s\S]*width: 100%[\s\S]*min-width: 0[\s\S]*box-sizing: border-box[\s\S]*align-items: stretch/)
 })
 
 test('文件夹 More 面板按 TDesign Dropdown click 签名传递三类动作', () => {

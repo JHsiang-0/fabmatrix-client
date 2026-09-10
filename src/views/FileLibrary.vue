@@ -2050,6 +2050,8 @@ onBeforeUnmount(() => {
   width: 240px;
   min-width: 240px;
   max-width: 240px;
+  box-sizing: border-box;
+  align-items: stretch;
   min-height: 0;
   overflow: hidden;
 }
@@ -2068,6 +2070,8 @@ onBeforeUnmount(() => {
   width: 100%;
   min-width: 0;
   min-height: 0;
+  box-sizing: border-box;
+  align-items: stretch;
   overflow: hidden;
 }
 

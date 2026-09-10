@@ -304,6 +304,9 @@ defineExpose({ refresh })
   display: flex;
   flex-direction: column;
   width: 100%;
+  max-width: 100%;
+  align-self: stretch;
+  box-sizing: border-box;
   height: 100%;
   min-width: 0;
   min-height: 0;
@@ -315,6 +318,10 @@ defineExpose({ refresh })
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   gap: var(--app-spacing-2);
   flex: 0 0 auto;
   margin-bottom: var(--app-spacing-3);
@@ -356,9 +363,27 @@ defineExpose({ refresh })
 }
 
 .file-folder-tree__search :deep(.t-input) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border-color: transparent;
   background: var(--app-surface-muted);
   box-shadow: none;
+}
+
+.file-folder-tree__search :deep(.t-input__wrap) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.file-folder-tree__search :deep(.t-input__inner) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .file-folder-tree__error {
@@ -377,14 +402,21 @@ defineExpose({ refresh })
 
 .file-folder-tree__nodes {
   flex: 1 1 auto;
+  width: 100%;
+  max-width: 100%;
   min-height: 0;
+  min-width: 0;
+  box-sizing: border-box;
   overflow: visible;
 }
 
 .file-folder-tree :deep(.t-tree__label) {
-  flex: 1 1 auto;
+  display: flex;
+  flex: 1 1 0%;
+  width: 0;
   min-width: 0;
   max-width: 100%;
+  box-sizing: border-box;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -407,11 +439,26 @@ defineExpose({ refresh })
   border-radius: var(--td-radius-default);
 }
 
-.file-folder-tree :deep(.t-tree__label) {
-  flex: 1 1 0%;
-  width: 0;
+.file-folder-tree :deep(.t-tree__label > span) {
+  display: block;
+  width: 100%;
   min-width: 0;
-  max-width: none;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.file-folder-tree :deep(.t-tree) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.file-folder-tree :deep(.t-tree__list) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .file-folder-tree :deep(.t-tree__operations) {
@@ -419,6 +466,7 @@ defineExpose({ refresh })
   width: var(--td-comp-size-m);
   min-width: var(--td-comp-size-m);
   max-width: var(--td-comp-size-m);
+  box-sizing: border-box;
   margin-left: var(--app-spacing-1);
 }
 
