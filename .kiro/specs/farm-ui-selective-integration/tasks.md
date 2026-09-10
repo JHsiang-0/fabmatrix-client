@@ -6,12 +6,14 @@
 
 ## 任务清单
 
-### [ ] SYNC-001.0 冻结集成基线
+### [x] SYNC-001.0 冻结集成基线
 
 - 从 `2896a55` 创建日期化备份分支和 `integration/ui-sync-30adedc`。
 - 记录远程 SHA、远程视觉提交清单、保护文件清单和回滚点。
 - 禁止直接 pull、整分支 merge/rebase、整文件选择 `theirs`。
 - 验收：基线 `git status --short` 干净，远程 SHA 可复现。
+
+完成记录：已基于本地 `4b45769`（功能基线 `2896a55` 加入本 Spec 文档）创建备份分支 `backup/feat-ui-003-electron-before-selective-sync-20260910` 和集成分支 `integration/ui-sync-30adedc`；重新 fetch 后确认远程目标为 `30adedc`，未执行整分支合并或覆盖操作。
 
 ### [ ] SYNC-001.1 建立防回退门禁
 
