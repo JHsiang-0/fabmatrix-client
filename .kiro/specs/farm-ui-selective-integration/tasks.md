@@ -23,12 +23,14 @@
 
 完成记录：由 Luna 补充 `tests/sync0011RegressionGuard.test.js`，覆盖文件库目录与权限、逐项上传、打印机监控、REST/WS 合并、RECONCILING、批量派发幂等和关键测试文件保留；相关测试 77/77、全量测试 197/197，lint/build 均通过。
 
-### [ ] SYNC-001.2 应用壳、登录和导航视觉适配
+### [x] SYNC-001.2 应用壳、登录和导航视觉适配
 
 - 范围：`src/App.vue`、`src/components/layout/*`、`src/views/Login.vue`、`src/views/ServerConnection.vue`、`src/config/navigation.js`、必要主题样式和对应测试。
 - 保留自绘 Electron 标题栏、IPC、权限过滤、登录守卫和唯一滚动所有者。
 - 不整体重写登录业务和服务器连接保存逻辑。
 - 验收：登录、导航、窗口缩放、权限菜单和服务器配置行为不变，视觉改动使用 TDesign。
+
+完成记录：选择性移植应用壳、导航品牌入口、折叠菜单图标、登录语义主题变量和服务器连接卡片视觉；保留 Electron IPC、自定义标题栏、登录守卫、权限过滤、实时连接生命周期与服务器配置保存逻辑。相关测试 21/21、全量测试 197/197，lint/build 均通过；Electron 标题保留为“嘉东三维联动3D打印机实时控制系统”。
 
 ### [ ] SYNC-001.3 打印机中心视觉移植
 
