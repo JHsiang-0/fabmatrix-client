@@ -16,7 +16,7 @@ const moveDialogSource = source.match(/<t-dialog[^>]*header="批量移动文件"
 
 test('文件中心使用正式分页契约并提供文件夹树与单一主工作区', () => {
   assert.match(source, /<FileFolderTree[\s\S]*:current-parent-id="currentParentId"[\s\S]*@select="handleFolderSelect"[\s\S]*@create="openCreateFolderDialog"/)
-  assert.match(source, /<t-aside width="260px" class="file-library-sidebar">/)
+  assert.match(source, /<t-aside width="240px" class="file-library-sidebar">/)
   assert.match(source, /<t-content class="file-library-content">/)
   assert.match(source, /parentId: currentParentId\.value/)
   assert.doesNotMatch(source, /navigateToRoot|navigateToFolder|<t-breadcrumb/)
@@ -116,8 +116,23 @@ test('UI-004.20.1 文件树新建按钮保留 TDesign 尺寸并增加右侧安�
 })
 
 test('UI-004.20.2 文件树桌面宽度固定且移动端恢复全宽', () => {
-  assert.match(source, /\.file-library-sidebar \{[\s\S]*flex: 0 0 260px[\s\S]*width: 260px[\s\S]*min-width: 260px[\s\S]*max-width: 260px/)
+  assert.match(source, /<t-aside width="240px" class="file-library-sidebar">/)
+  assert.match(source, /\.file-library-sidebar \{[\s\S]*flex: 0 0 240px[\s\S]*width: 240px[\s\S]*min-width: 240px[\s\S]*max-width: 240px/)
   assert.match(source, /@media \(max-width: 640px\) \{[\s\S]*\.file-library-sidebar \{[\s\S]*width: 100% !important[\s\S]*min-width: 0[\s\S]*max-width: 100%/)
+})
+
+test('UI-004.20.3 文件树头部和文件库工具栏保持紧凑可收缩布局', () => {
+  assert.match(folderTreeSource, /\.file-folder-tree__header \{[\s\S]*display: grid[\s\S]*grid-template-columns: minmax\(0, 1fr\) auto/)
+  assert.match(folderTreeSource, /\.file-folder-tree__header \{[\s\S]*padding-right: var\(--app-spacing-1\)/)
+  assert.match(folderTreeSource, /\.file-folder-tree__actions \{[\s\S]*margin-right: var\(--app-spacing-1\)/)
+  assert.match(folderTreeSource, /\.file-folder-tree__search \{[\s\S]*width: 100%[\s\S]*box-sizing: border-box/)
+  assert.match(source, /\.file-library-filter-form \{[\s\S]*justify-content: space-between[\s\S]*flex-wrap: nowrap/)
+  assert.match(source, /\.file-library-toolbar-actions \{[\s\S]*flex: 0 1 auto[\s\S]*width: max-content/)
+  assert.match(source, /\.file-library-search-actions \{[\s\S]*flex: 0 0 auto[\s\S]*width: max-content/)
+  assert.match(source, /\.file-library-search-input \{[\s\S]*flex: 0 0 220px[\s\S]*width: 220px[\s\S]*max-width: 100%[\s\S]*box-sizing: border-box/)
+  assert.match(source, /\.file-library-filter-form :deep\(\.t-button\) \{[\s\S]*height: var\(--td-comp-size-m\)[\s\S]*white-space: nowrap/)
+  assert.match(source, /\.file-library-view-mode \{[\s\S]*flex: 0 0 auto[\s\S]*width: max-content[\s\S]*height: var\(--td-comp-size-m\)/)
+  assert.match(source, /\.file-library-view-mode :deep\(\.t-radio-button\) \{[\s\S]*flex: 0 0 36px[\s\S]*justify-content: center/)
 })
 
 test('UI-004.20.2 文件树节点为可收缩标签与固定操作区', () => {

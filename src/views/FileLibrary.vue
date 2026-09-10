@@ -5,7 +5,7 @@
     />
 
     <t-layout class="file-library-layout">
-      <t-aside width="260px" class="file-library-sidebar">
+      <t-aside width="240px" class="file-library-sidebar">
         <t-card bordered class="file-library-sidebar-card" aria-label="文件夹导航">
           <FileFolderTree
             ref="folderTreeRef"
@@ -2046,10 +2046,10 @@ onBeforeUnmount(() => {
 
 .file-library-sidebar {
   display: flex;
-  flex: 0 0 260px;
-  width: 260px;
-  min-width: 260px;
-  max-width: 260px;
+  flex: 0 0 240px;
+  width: 240px;
+  min-width: 240px;
+  max-width: 240px;
   min-height: 0;
   overflow: hidden;
 }
@@ -2161,21 +2161,31 @@ onBeforeUnmount(() => {
 }
 
 .file-library-toolbar-actions {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
+  width: max-content;
+  max-width: 100%;
 }
 
 .file-library-search-actions {
   flex: 0 0 auto;
+  width: max-content;
+  max-width: 100%;
   justify-content: flex-end;
 }
 
 .file-library-search-input {
+  flex: 0 0 220px;
   width: 220px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .file-library-view-mode {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
+  width: max-content;
+  max-width: 100%;
   height: var(--td-comp-size-m);
   padding: 2px;
   border-radius: var(--td-radius-medium);
@@ -2183,6 +2193,7 @@ onBeforeUnmount(() => {
 
 .file-library-view-mode :deep(.t-radio-button) {
   display: inline-flex;
+  flex: 0 0 36px;
   align-items: center;
   justify-content: center;
   width: 36px;
@@ -2226,6 +2237,8 @@ onBeforeUnmount(() => {
 
 .file-library-filter-form :deep(.t-button) {
   flex: 0 0 auto;
+  height: var(--td-comp-size-m);
+  white-space: nowrap;
 }
 
 .file-library-filter-form :deep(.t-input__wrap) {
@@ -3052,9 +3065,17 @@ onBeforeUnmount(() => {
 
   .file-library-search-actions {
     justify-content: flex-start;
+    width: 100%;
   }
 
-  .file-library-search-input { width: min(240px, 100%); }
+  .file-library-toolbar-actions {
+    width: 100%;
+  }
+
+  .file-library-search-input {
+    flex: 0 1 220px;
+    width: min(220px, 100%);
+  }
 }
 
 @media (max-width: 1024px) {

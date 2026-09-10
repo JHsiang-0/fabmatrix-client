@@ -312,20 +312,30 @@ defineExpose({ refresh })
 }
 
 .file-folder-tree__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: var(--app-spacing-2);
   flex: 0 0 auto;
   margin-bottom: var(--app-spacing-3);
+  padding-right: var(--app-spacing-1);
 }
 
 .file-folder-tree__actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+  min-width: var(--td-comp-size-m);
   margin-right: var(--app-spacing-1);
 }
 
 .file-folder-tree__title {
+  min-width: 0;
+  overflow: hidden;
   margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--app-text-primary);
   font-size: var(--td-font-size-title-medium);
   font-weight: 600;
@@ -334,6 +344,10 @@ defineExpose({ refresh })
 
 .file-folder-tree__search {
   flex: 0 0 auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   margin-bottom: var(--app-spacing-3);
   background: var(--app-surface-muted);
   border-radius: var(--app-radius-small);
