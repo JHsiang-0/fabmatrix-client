@@ -16,7 +16,7 @@ const moveDialogSource = source.match(/<t-dialog[^>]*header="批量移动文件"
 
 test('文件中心使用正式分页契约并提供文件夹树与单一主工作区', () => {
   assert.match(source, /<FileFolderTree[\s\S]*:current-parent-id="currentParentId"[\s\S]*@select="handleFolderSelect"[\s\S]*@create="openCreateFolderDialog"/)
-  assert.match(source, /<t-aside width="240px" class="file-library-sidebar">/)
+  assert.match(source, /<t-aside width="210px" class="file-library-sidebar">/)
   assert.match(source, /<t-content class="file-library-content">/)
   assert.match(source, /parentId: currentParentId\.value/)
   assert.doesNotMatch(source, /navigateToRoot|navigateToFolder|<t-breadcrumb/)
@@ -131,9 +131,9 @@ test('UI-004.20.1 文件树新建按钮保留 TDesign 尺寸并增加右侧安�
 })
 
 test('UI-004.20.2 文件树桌面宽度固定且移动端恢复全宽', () => {
-  assert.match(source, /<t-aside width="240px" class="file-library-sidebar">/)
-  assert.match(source, /\.file-library-sidebar \{[\s\S]*flex: 0 0 240px[\s\S]*width: 240px[\s\S]*min-width: 240px[\s\S]*max-width: 240px/)
-  assert.match(source, /@media \(max-width: 640px\) \{[\s\S]*\.file-library-sidebar \{[\s\S]*width: 100% !important[\s\S]*min-width: 0[\s\S]*max-width: 100%/)
+  assert.match(source, /<t-aside width="210px" class="file-library-sidebar">/)
+  assert.match(source, /\.file-library-sidebar \{[\s\S]*flex: 0 0 210px[\s\S]*width: 210px[\s\S]*min-width: 210px[\s\S]*max-width: 210px/)
+  assert.match(source, /@media \(max-width: 640px\) \{[\s\S]*\.file-library-sidebar \{[\s\S]*flex: 0 0 240px[\s\S]*width: 100% !important[\s\S]*min-width: 0[\s\S]*max-width: 100%/)
 })
 
 test('UI-004.20.3 文件树头部和文件库工具栏保持紧凑可收缩布局', () => {
@@ -159,7 +159,7 @@ test('UI-004.20.2 文件树节点为可收缩标签与固定操作区', () => {
   assert.match(folderTreeSource, /\.file-folder-tree__label \{[\s\S]*width: 100%[\s\S]*overflow: hidden[\s\S]*text-overflow: ellipsis[\s\S]*white-space: nowrap/)
 })
 
-test('UI-004.20.4 文件树内层宽度随 240px 侧栏完整传递', () => {
+test('UI-004.20.4 文件树内层宽度随 210px 侧栏完整传递', () => {
   assert.match(folderTreeSource, /\.file-folder-tree \{[\s\S]*width: 100%[\s\S]*max-width: 100%[\s\S]*align-self: stretch[\s\S]*box-sizing: border-box[\s\S]*min-width: 0/)
   assert.match(folderTreeSource, /\.file-folder-tree__header \{[\s\S]*width: 100%[\s\S]*max-width: 100%[\s\S]*min-width: 0[\s\S]*box-sizing: border-box/)
   assert.match(folderTreeSource, /\.file-folder-tree__search \{[\s\S]*width: 100%[\s\S]*max-width: 100%[\s\S]*min-width: 0[\s\S]*box-sizing: border-box/)
@@ -172,8 +172,8 @@ test('UI-004.20.4 文件树内层宽度随 240px 侧栏完整传递', () => {
   assert.match(folderTreeSource, /<t-tooltip[\s\S]*class="file-folder-tree__label"/)
   assert.match(folderTreeSource, /\.file-folder-tree__label \{[\s\S]*overflow: hidden[\s\S]*text-overflow: ellipsis[\s\S]*white-space: nowrap/)
   assert.match(folderTreeSource, /\.file-folder-tree :deep\(\.t-tree__operations\) \{[\s\S]*flex: 0 0 var\(--td-comp-size-m\)[\s\S]*min-width: var\(--td-comp-size-m\)[\s\S]*max-width: var\(--td-comp-size-m\)/)
-  assert.match(source, /<t-aside width="240px" class="file-library-sidebar">/)
-  assert.match(source, /\.file-library-sidebar \{[\s\S]*flex: 0 0 240px[\s\S]*width: 240px[\s\S]*min-width: 240px[\s\S]*max-width: 240px[\s\S]*box-sizing: border-box[\s\S]*align-items: stretch/)
+  assert.match(source, /<t-aside width="210px" class="file-library-sidebar">/)
+  assert.match(source, /\.file-library-sidebar \{[\s\S]*flex: 0 0 210px[\s\S]*width: 210px[\s\S]*min-width: 210px[\s\S]*max-width: 210px[\s\S]*box-sizing: border-box[\s\S]*align-items: stretch/)
   assert.match(source, /\.file-library-sidebar-card \{[\s\S]*width: 100%[\s\S]*min-width: 0[\s\S]*box-sizing: border-box[\s\S]*align-items: stretch/)
 })
 

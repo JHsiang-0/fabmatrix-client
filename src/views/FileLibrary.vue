@@ -5,7 +5,7 @@
     />
 
     <t-layout class="file-library-layout">
-      <t-aside width="240px" class="file-library-sidebar">
+      <t-aside width="210px" class="file-library-sidebar">
         <t-card bordered class="file-library-sidebar-card" aria-label="文件夹导航">
           <FileFolderTree
             ref="folderTreeRef"
@@ -2046,10 +2046,10 @@ onBeforeUnmount(() => {
 
 .file-library-sidebar {
   display: flex;
-  flex: 0 0 240px;
-  width: 240px;
-  min-width: 240px;
-  max-width: 240px;
+  flex: 0 0 210px;
+  width: 210px;
+  min-width: 210px;
+  max-width: 210px;
   box-sizing: border-box;
   align-items: stretch;
   min-height: 0;
