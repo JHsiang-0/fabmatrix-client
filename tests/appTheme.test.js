@@ -19,7 +19,7 @@ test('FabMatrix theme maps application semantics to installed TDesign tokens', (
 })
 
 test('responsive shell keeps desktop dimensions in semantic tokens', () => {
-  assert.match(themeSource, /--app-sidebar-width:\s*216px/)
+  assert.match(themeSource, /--app-sidebar-width:\s*232px/)
   assert.match(themeSource, /--app-sidebar-collapsed-width:\s*64px/)
   assert.match(themeSource, /--app-sidebar-mobile-width:\s*280px/)
   assert.match(themeSource, /--app-content-padding:\s*var\(--app-spacing-6\)/)
@@ -44,8 +44,10 @@ test('navigation follows the T208-1 information architecture', () => {
 })
 
 test('brand and profile entry are real FabMatrix routes', () => {
-  assert.doesNotMatch(sidebarSource, /class="app-brand(?:__logo|__name)?"/)
-  assert.match(sidebarSource, /class="app-sidebar__top-spacer"/)
+  assert.match(sidebarSource, /<t-button[\s\S]*class="app-brand"[\s\S]*@click="goDashboard"/)
+  assert.match(sidebarSource, /class="app-brand__logo"/)
+  assert.match(sidebarSource, /class="app-brand__name"/)
+  assert.match(sidebarSource, /router\.push\('\/dashboard'\)/)
   assert.match(sidebarSource, /class="app-menu app-scroll-region"/)
   assert.match(sidebarSource, /<t-menu[\s\S]*v-model:expanded="expandedGroupKeys"/)
   assert.match(sidebarSource, /\.app-menu \{[\s\S]*box-sizing: border-box;[\s\S]*min-width: 0;[\s\S]*width: 100% !important;/)
@@ -70,7 +72,8 @@ test('brand and profile entry are real FabMatrix routes', () => {
 })
 
 test('应用头部使用明确的看板入口、组合式实时状态和带图标的用户菜单', () => {
-  assert.match(headerSource, /<ViewListIcon size="20" \/>/)
+  assert.match(headerSource, /<MenuUnfoldIcon v-if="collapsed" size="20" \/>/)
+  assert.match(headerSource, /<MenuFoldIcon v-else size="20" \/>/)
   assert.match(headerSource, /class="app-header__realtime-control"[^]*variant="dark"[^]*class="app-header__realtime-status"/)
   assert.match(headerSource, /app-header__realtime-control--with-action/)
   assert.match(headerSource, /size="medium"[^]*variant="dark"/)

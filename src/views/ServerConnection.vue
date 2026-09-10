@@ -244,13 +244,18 @@ const goLogin = () => router.push({ name: 'login' })
   min-height: 100%;
   padding: 24px 32px;
   background: var(--app-page-background);
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .connection-card {
   width: min(100%, 760px);
-  padding: 0;
+  box-sizing: border-box;
+  padding: 28px 32px;
   margin: auto;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-large);
+  box-shadow: var(--app-shadow-raised);
 }
 
 .connection-brand-bar {
@@ -429,6 +434,7 @@ const goLogin = () => router.push({ name: 'login' })
 
   .connection-card {
     width: 100%;
+    padding: 24px 20px;
   }
 
   .connection-brand-bar {

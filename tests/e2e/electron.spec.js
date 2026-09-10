@@ -43,7 +43,7 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     })
 
     await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible()
-    await expect(page.getByRole('banner', { name: '应用标题栏' })).toContainText('嘉东三维__联动3D打印机实时控制系统')
+    await expect(page.getByRole('banner', { name: '应用标题栏' })).toContainText('FabMatrix Desktop')
     await expect(page.getByText('Mock 调试账号请使用系统中已有的用户名和密码', { exact: true })).toHaveCount(0)
     const connectionButton = page.getByRole('button', { name: '配置服务器地址', exact: true })
     await expect(connectionButton).toBeVisible()
@@ -71,13 +71,13 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     await page.getByRole('button', { name: '登录', exact: true }).click()
     await expect(page).toHaveURL(/127\.0\.0\.1:5177\/#\/dashboard/)
     await expect(page.getByRole('heading', { name: '概览仪表盘' })).toBeVisible()
-    await expect(page.locator('.app-sidebar .app-brand')).toHaveCount(0)
-    const sidebarSpacerBox = await page.locator('.app-sidebar__top-spacer').boundingBox()
+    await expect(page.locator('.app-sidebar .app-brand')).toBeVisible()
+    const sidebarBrandBox = await page.locator('.app-sidebar .app-brand').boundingBox()
     const appHeaderBox = await page.locator('.app-header').boundingBox()
-    expect(sidebarSpacerBox).not.toBeNull()
+    expect(sidebarBrandBox).not.toBeNull()
     expect(appHeaderBox).not.toBeNull()
-    expect(Math.abs(sidebarSpacerBox.y - appHeaderBox.y)).toBeLessThanOrEqual(1)
-    expect(Math.abs(sidebarSpacerBox.height - appHeaderBox.height)).toBeLessThanOrEqual(1)
+    expect(Math.abs(sidebarBrandBox.y - appHeaderBox.y)).toBeLessThanOrEqual(1)
+    expect(Math.abs(sidebarBrandBox.height - appHeaderBox.height)).toBeLessThanOrEqual(1)
 
     for (const size of [[800, 560], [1024, 640], [1200, 760]]) {
       await electronApp.evaluate(({ BrowserWindow }, nextSize) => {

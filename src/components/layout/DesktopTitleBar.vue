@@ -2,7 +2,7 @@
   <header class="desktop-titlebar" aria-label="应用标题栏" @dblclick="handleDoubleClick">
     <div class="desktop-titlebar__brand">
       <img src="/icon.png" alt="" aria-hidden="true" class="desktop-titlebar__logo">
-      <span class="desktop-titlebar__title">嘉东三维__联动3D打印机实时控制系统</span>
+      <span class="desktop-titlebar__title">FabMatrix Desktop</span>
     </div>
 
     <div class="desktop-titlebar__actions" aria-label="窗口控制">

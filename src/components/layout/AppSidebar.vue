@@ -8,7 +8,16 @@
     }"
     :width="props.isMobile ? 'var(--app-sidebar-mobile-width)' : (props.collapsed ? 'var(--app-sidebar-collapsed-width)' : 'var(--app-sidebar-width)')"
   >
-    <div class="app-sidebar__top-spacer" aria-hidden="true" />
+    <t-button
+      variant="text"
+      class="app-brand"
+      aria-label="FabMatrix"
+      :title="props.collapsed && !props.isMobile ? 'FabMatrix' : ''"
+      @click="goDashboard"
+    >
+      <img src="/icon.png" alt="" aria-hidden="true" class="app-brand__logo">
+      <span v-if="!props.collapsed || props.isMobile" class="app-brand__name">FabMatrix</span>
+    </t-button>
 
     <t-menu
       v-model:expanded="expandedGroupKeys"
@@ -78,6 +87,10 @@ const visibleGroups = computed(() => navigationGroups.map(group => ({
 })).filter(group => group.items.length > 0))
 const expandedGroupKeys = ref([])
 
+const goDashboard = () => {
+  router.push('/dashboard')
+}
+
 const syncExpandedGroup = () => {
   const activeGroup = visibleGroups.value.find(group => group.items.some(item => item.to === route.path))
   if (activeGroup) expandedGroupKeys.value = [activeGroup.key]
@@ -105,11 +118,40 @@ const handleItemClick = item => {
   transition: width 0.2s ease, transform 0.2s ease;
 }
 
-.app-sidebar__top-spacer {
-  box-sizing: border-box;
-  flex: 0 0 var(--app-header-height);
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--app-spacing-3);
+  width: 100%;
   height: var(--app-header-height);
+  padding: 0 var(--app-spacing-5);
+  color: var(--app-text-primary);
+  text-align: left;
+  background: var(--app-surface);
+  border: 0;
   border-bottom: 1px solid var(--app-border);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.app-brand__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.app-brand__name {
+  overflow: hidden;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-menu {
@@ -140,6 +182,11 @@ const handleItemClick = item => {
 .app-sidebar__version {
   font-size: 0.75rem;
   line-height: 24px;
+}
+
+.app-sidebar--collapsed .app-brand {
+  justify-content: center;
+  padding: 0;
 }
 
 :deep(.t-menu__item) {

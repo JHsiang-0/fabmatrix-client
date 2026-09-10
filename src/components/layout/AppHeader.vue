@@ -8,7 +8,8 @@
         :title="collapsed ? '展开菜单' : '收起菜单'"
         @click="$emit('toggle-sidebar')"
       >
-        <ViewListIcon size="20" />
+        <MenuUnfoldIcon v-if="collapsed" size="20" />
+        <MenuFoldIcon v-else size="20" />
       </t-button>
 
     </div>
@@ -89,8 +90,9 @@ import {
   DesktopIcon,
   HelpCircleIcon,
   MailIcon,
+  MenuFoldIcon,
+  MenuUnfoldIcon,
   SettingIcon,
-  ViewListIcon
 } from 'tdesign-icons-vue-next'
 import { enterAppFullscreen } from '@/utils/fullscreen'
 import { useRealtimeStore } from '@/stores/printer/realtimeStore'
