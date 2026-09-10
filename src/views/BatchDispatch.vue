@@ -9,7 +9,7 @@
       </template>
     </PageHeader>
 
-    <t-steps :current="currentStep" readonly class="mb-4">
+    <t-steps :current="currentStep" readonly class="batch-dispatch-steps mb-4">
       <t-step-item title="选择资源" content="选择可见文件和打印机" />
       <t-step-item title="配置策略" content="选择分配策略与动作" />
       <t-step-item title="无副作用预览" content="确认冲突和执行范围" />
@@ -21,15 +21,17 @@
       <section class="dispatch-panel" aria-labelledby="batch-upload-title">
         <div class="dispatch-panel__heading"><h2 id="batch-upload-title">批量上传</h2></div>
         <p class="hint">支持最多 100 个 .gcode、.g、.3mf、.stl 文件；单个文件不超过 1GB，批量会按单请求约 1GB 自动分组，结果按文件分别返回。</p>
-        <t-upload theme="file" multiple :auto-upload="false" accept=".gcode,.g,.3mf,.stl"
-          :files="uploadFiles" @select-change="handleFileChange" />
-        <t-progress v-if="uploading" class="mt-3" :percentage="uploadProgress" />
-        <t-space class="mt-3">
-          <t-button theme="primary" :loading="uploading" :disabled="!uploadFiles.length" @click="uploadSelected">
-            {{ uploading ? '上传中…' : '批量上传' }}
-          </t-button>
-          <t-button v-if="uploading" variant="outline" @click="cancelUpload">取消上传</t-button>
-        </t-space>
+        <div class="batch-upload-control">
+          <t-upload theme="file" multiple :auto-upload="false" accept=".gcode,.g,.3mf,.stl"
+            :files="uploadFiles" @select-change="handleFileChange" />
+          <t-progress v-if="uploading" class="batch-upload-progress" :percentage="uploadProgress" />
+          <t-space class="batch-upload-actions">
+            <t-button theme="primary" :loading="uploading" :disabled="!uploadFiles.length" @click="uploadSelected">
+              {{ uploading ? '上传中…' : '批量上传' }}
+            </t-button>
+            <t-button v-if="uploading" variant="outline" @click="cancelUpload">取消上传</t-button>
+          </t-space>
+        </div>
         <t-alert v-if="uploadResult" class="mt-3" :theme="uploadFailureCount ? 'warning' : 'success'"
           :title="`上传完成：成功 ${uploadSuccessCount} 个，失败 ${uploadFailureCount} 个`"
           :close-btn="false">
@@ -45,7 +47,8 @@
       <div class="selection-grid">
         <section class="dispatch-panel" :aria-label="`选择文件（${selectedFileIds.length}）`">
           <div class="dispatch-panel__heading"><h2>选择文件（{{ selectedFileIds.length }}）</h2></div>
-          <t-checkbox-group v-model="selectedFileIds" class="selection-group">
+          <t-loading v-if="loadingResources" class="resource-loading" text="加载文件资源" />
+          <t-checkbox-group v-else v-model="selectedFileIds" class="selection-group app-scroll-region">
             <t-checkbox v-for="file in files" :key="file.id" :value="file.id" class="selection-row">
               <span>{{ file.originalName || `文件 #${file.id}` }}</span>
               <small>{{ file.visibility === 'PUBLIC' ? '公共' : '个人' }} · {{ file.id }}</small>
@@ -56,7 +59,8 @@
 
         <section class="dispatch-panel" :aria-label="`选择打印机（${selectedPrinterIds.length}）`">
           <div class="dispatch-panel__heading"><h2>选择打印机（{{ selectedPrinterIds.length }}）</h2></div>
-          <t-checkbox-group v-model="selectedPrinterIds" class="selection-group">
+          <t-loading v-if="loadingResources" class="resource-loading" text="加载打印机资源" />
+          <t-checkbox-group v-else v-model="selectedPrinterIds" class="selection-group app-scroll-region">
             <t-checkbox v-for="printer in printers" :key="printer.id" :value="printer.id" class="selection-row">
               <span>{{ printer.name }}</span>
               <small>{{ printer.ipAddress }} · {{ printer.status }}</small>
@@ -111,11 +115,20 @@
           {{ conflict.message || conflict.reasonCode || conflict.code || '资源冲突' }}
         </div>
       </t-alert>
-      <div v-for="item in previewData.items || []" :key="item.itemId" class="preview-row">
-        <span>{{ item.fileName || `文件 #${item.fileId}` }} → {{ item.printerName || (item.printerId ? `打印机 #${item.printerId}` : '未分配') }}</span>
-        <t-tag :theme="item.canExecute ? 'success' : 'danger'" variant="light">
-          {{ item.message || item.reasonCode || (item.canExecute ? '可执行' : '存在冲突') }}
-        </t-tag>
+      <div class="preview-list app-scroll-region" aria-label="派发预览明细">
+        <div v-for="item in previewData.items || []" :key="item.itemId" class="preview-row">
+          <t-tooltip
+            class="preview-row__label-tooltip"
+            :content="`${item.fileName || `文件 #${item.fileId}`} → ${item.printerName || (item.printerId ? `打印机 #${item.printerId}` : '未分配')}`"
+          >
+            <span class="preview-row__label">
+              {{ item.fileName || `文件 #${item.fileId}` }} → {{ item.printerName || (item.printerId ? `打印机 #${item.printerId}` : '未分配') }}
+            </span>
+          </t-tooltip>
+          <t-tag class="preview-row__status" :theme="item.canExecute ? 'success' : 'danger'" variant="light">
+            {{ item.message || item.reasonCode || (item.canExecute ? '可执行' : '存在冲突') }}
+          </t-tag>
+        </div>
       </div>
       <t-alert v-if="executableItemIds.length" class="mb-3" theme="warning" title="确认前请检查影响范围" :close-btn="false">
         本次将按“{{ previewData.action || action }}”处理 {{ executableItemIds.length }} 项可执行明细；确认后由后端按计划版本和令牌幂等执行。
@@ -140,34 +153,42 @@
           <span v-if="existingJobItems.length">需打开已有任务 {{ existingJobItems.length }} 项，请在结果明细中逐项处理。</span>
         </t-space>
       </t-alert>
-      <t-tabs v-if="confirmData?.items?.length" v-model="resultTab" class="mt-3">
+      <t-tabs v-if="confirmData?.items?.length" v-model="resultTab" class="dispatch-result-tabs mt-3">
         <t-tab-panel value="all" :label="`全部结果（${confirmData.items.length}）`" />
         <t-tab-panel value="success" :label="`成功项（${confirmSuccessCount}）`" />
         <t-tab-panel value="retryable" :label="`可恢复失败（${retryableConfirmItems.length}）`" />
         <t-tab-panel value="existing" :label="`已有任务（${existingJobItems.length}）`" />
       </t-tabs>
       <t-empty v-if="confirmData?.items?.length && !visibleConfirmItems.length" class="mt-3" description="当前分类暂无结果" />
-      <t-table v-if="visibleConfirmItems.length" class="mt-3" :data="visibleConfirmItems" :columns="confirmColumns"
-        row-key="itemId" bordered size="small">
-        <template #status="{ row }">
-          <t-tag :theme="resultTheme(row)" variant="light">{{ row.status }}</t-tag>
-        </template>
-        <template #message="{ row }">
-          {{ row.message || '—' }}
-        </template>
-        <template #retryable="{ row }">
-          {{ row.retryable ? '是' : '否' }}
-        </template>
-        <template #source="{ row }">
-          {{ row.sourcePlanId ? `${row.sourcePlanId} / ${row.sourceItemId}` : '—' }}
-        </template>
-        <template #recovery="{ row }">
-          <t-button v-if="row.jobId && row.recoveryAction === 'OPEN_EXISTING_JOB'" variant="text" size="small" @click="openExistingJob(row)">
-            打开任务
-          </t-button>
-          <span v-else>—</span>
-        </template>
-      </t-table>
+      <div v-if="visibleConfirmItems.length" class="dispatch-result-table-wrap app-scroll-region">
+        <t-table class="dispatch-result-table" :data="visibleConfirmItems" :columns="confirmColumns"
+          row-key="itemId" bordered size="small" table-layout="fixed" hover>
+          <template #status="{ row }">
+            <t-tag :theme="resultTheme(row)" variant="light">{{ row.status }}</t-tag>
+          </template>
+          <template #message="{ row }">
+            <t-tooltip v-if="row.message" class="result-cell__tooltip" :content="String(row.message)">
+              <span class="result-cell__text">{{ row.message }}</span>
+            </t-tooltip>
+            <span v-else>—</span>
+          </template>
+          <template #retryable="{ row }">
+            {{ row.retryable ? '是' : '否' }}
+          </template>
+          <template #source="{ row }">
+            <t-tooltip v-if="row.sourcePlanId" class="result-cell__tooltip" :content="`${row.sourcePlanId} / ${row.sourceItemId}`">
+              <span class="result-cell__text">{{ row.sourcePlanId }} / {{ row.sourceItemId }}</span>
+            </t-tooltip>
+            <span v-else>—</span>
+          </template>
+          <template #recovery="{ row }">
+            <t-button v-if="row.jobId && row.recoveryAction === 'OPEN_EXISTING_JOB'" variant="text" size="small" @click="openExistingJob(row)">
+              打开任务
+            </t-button>
+            <span v-else>—</span>
+          </template>
+        </t-table>
+      </div>
       <div class="step-actions">
         <t-button variant="outline" @click="goToSelection">重新选择资源</t-button>
         <t-button v-if="confirmData && !previewExpired" variant="outline" :loading="confirming" @click="replayConfirm">
@@ -568,22 +589,58 @@ onUnmounted(stopPreviewExpiryTimer)
 </script>
 
 <style scoped>
-.batch-dispatch-page { display: flex; flex-direction: column; min-height: 100%; overflow: visible; color: var(--app-text-primary); gap: var(--app-spacing-4); }
-.hint { color: var(--app-text-secondary); margin: 6px 0 12px; }
-.dispatch-panel { min-width: 0; padding: var(--app-spacing-5); background: var(--app-surface); border: 1px solid var(--app-border); border-radius: var(--app-radius-large); }
-.dispatch-panel__heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--app-spacing-4); }
-.dispatch-panel__heading h2 { margin: 0; color: var(--app-text-primary); font-size: var(--td-font-size-title-medium); font-weight: 700; }
-.selection-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.selection-row, .preview-row { display: flex; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--app-border-subtle); }
-.selection-row span { flex: 1; }
-small { color: var(--app-text-placeholder); }
-.options-form { max-width: 560px; }
-.option-select { width: 280px; }
-.step-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.batch-dispatch-page { display: flex; min-width: 0; flex-direction: column; min-height: 100%; overflow: visible; color: var(--app-text-primary); gap: var(--app-spacing-4); }
+.batch-dispatch-page :deep(.app-page-toolbar__actions) { flex-wrap: wrap; }
+.batch-dispatch-steps { min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+.batch-dispatch-steps :deep(.t-steps__inner) { min-width: 680px; }
+.hint { margin: 0 0 var(--app-spacing-4); color: var(--app-text-secondary); line-height: 1.5; }
+.dispatch-panel { display: flex; min-width: 0; min-height: 0; flex-direction: column; padding: var(--app-spacing-5); background: var(--app-surface); border: 1px solid var(--app-border); border-radius: var(--app-radius-large); }
+.dispatch-panel__heading { display: flex; align-items: center; justify-content: space-between; min-width: 0; gap: var(--app-spacing-3); margin-bottom: var(--app-spacing-4); }
+.dispatch-panel__heading h2 { min-width: 0; margin: 0; overflow: hidden; color: var(--app-text-primary); font-size: var(--td-font-size-title-medium); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.batch-upload-control { display: flex; min-width: 0; flex-direction: column; }
+.batch-upload-control :deep(.t-upload) { width: 100%; }
+.batch-upload-control :deep(.t-upload__file-list) { max-height: 180px; overflow-y: auto; }
+.batch-upload-progress { margin-top: var(--app-spacing-3); }
+.batch-upload-actions { margin-top: var(--app-spacing-3); flex-wrap: wrap; }
+.selection-grid { display: grid; flex: 1 1 auto; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--app-spacing-4); min-height: 0; }
+.selection-grid .dispatch-panel { min-height: 280px; }
+.selection-group { display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; max-height: min(420px, 50vh); flex-direction: column; gap: 0; overflow: auto; padding: 0 var(--app-spacing-1); }
+.selection-row { display: flex; align-items: center; min-width: 0; gap: var(--app-spacing-3); padding: var(--app-spacing-2) 0; border-bottom: 1px solid var(--app-border-subtle); }
+.selection-row span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.selection-row small { flex: 0 0 auto; color: var(--app-text-placeholder); white-space: nowrap; }
+.resource-loading { display: flex; flex: 1 1 auto; align-items: center; justify-content: center; min-height: 160px; }
+.preview-list { display: flex; min-width: 0; max-height: min(460px, 52vh); flex-direction: column; overflow: auto; border: 1px solid var(--app-border); border-radius: var(--app-radius-medium); }
+.preview-row { display: flex; align-items: center; justify-content: space-between; min-width: 0; gap: var(--app-spacing-4); padding: var(--app-spacing-3); border-bottom: 1px solid var(--app-border-subtle); }
+.preview-row:last-child { border-bottom: 0; }
+.preview-row__label-tooltip, .preview-row__label { min-width: 0; overflow: hidden; }
+.preview-row__label-tooltip { flex: 1 1 auto; }
+.preview-row__label { display: block; text-overflow: ellipsis; white-space: nowrap; }
+.preview-row__status { flex: 0 0 auto; max-width: min(40%, 260px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dispatch-result-tabs { flex: 0 0 auto; }
+.dispatch-result-table-wrap { min-width: 0; max-height: min(460px, 52vh); overflow: auto; border: 1px solid var(--app-border); border-radius: var(--app-radius-medium); }
+.dispatch-result-table { min-width: 0; }
+.dispatch-result-table :deep(.t-table) { min-width: 920px; table-layout: fixed; }
+.dispatch-result-table :deep(.t-table__content) { overflow: visible; }
+.dispatch-result-table :deep(.t-table th) { height: 40px; padding: 0 var(--app-spacing-3); color: var(--app-text-secondary); font-weight: 600; background: var(--app-surface-muted); }
+.dispatch-result-table :deep(.t-table td) { height: 50px; padding: var(--app-spacing-2) var(--app-spacing-3); border-bottom-color: var(--app-border); }
+.dispatch-result-table :deep(.t-table__body tr:hover > td) { background: var(--app-surface-hover); }
+.result-cell__tooltip, .result-cell__text { display: block; min-width: 0; max-width: 100%; overflow: hidden; }
+.result-cell__text { text-overflow: ellipsis; white-space: nowrap; }
+.step-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--app-spacing-3); margin-top: var(--app-spacing-5); padding-top: var(--app-spacing-4); border-top: 1px solid var(--app-border); }
+.options-form { width: min(100%, 560px); }
+.option-select { width: min(280px, 100%); }
 @media (max-width: 800px) {
   .selection-grid { grid-template-columns: 1fr; }
+  .selection-grid .dispatch-panel { min-height: 240px; }
   .option-select { width: 100%; }
   .step-actions { justify-content: stretch; }
   .step-actions :deep(.t-button) { flex: 1 1 auto; }
+}
+@media (max-width: 560px) {
+  .dispatch-panel { padding: var(--app-spacing-4); }
+  .batch-dispatch-page :deep(.app-page-toolbar__actions) { width: 100%; }
+  .batch-dispatch-page :deep(.app-page-toolbar__actions) > * { flex: 1 1 auto; }
+  .preview-row { align-items: flex-start; flex-direction: column; gap: var(--app-spacing-2); }
+  .preview-row__status { max-width: 100%; }
 }
 </style>
