@@ -16,7 +16,7 @@ const moveDialogSource = source.match(/<t-dialog[^>]*header="批量移动文件"
 
 test('文件中心使用正式分页契约并提供文件夹树与单一主工作区', () => {
   assert.match(source, /<FileFolderTree[\s\S]*:current-parent-id="currentParentId"[\s\S]*@select="handleFolderSelect"[\s\S]*@create="openCreateFolderDialog"/)
-  assert.match(source, /<t-aside width="208px" class="file-library-sidebar">/)
+  assert.match(source, /<t-aside width="260px" class="file-library-sidebar">/)
   assert.match(source, /<t-content class="file-library-content">/)
   assert.match(source, /parentId: currentParentId\.value/)
   assert.doesNotMatch(source, /navigateToRoot|navigateToFolder|<t-breadcrumb/)
@@ -113,6 +113,20 @@ test('UI-004.20.1 新建目录默认根级且二级目录必须显式选择可�
 test('UI-004.20.1 文件树新建按钮保留 TDesign 尺寸并增加右侧安全间距', () => {
   assert.match(folderTreeSource, /<t-space class="file-folder-tree__actions" size="small">/)
   assert.match(folderTreeSource, /\.file-folder-tree__actions \{[\s\S]*margin-right: var\(--app-spacing-1\)/)
+})
+
+test('UI-004.20.2 文件树桌面宽度固定且移动端恢复全宽', () => {
+  assert.match(source, /\.file-library-sidebar \{[\s\S]*flex: 0 0 260px[\s\S]*width: 260px[\s\S]*min-width: 260px[\s\S]*max-width: 260px/)
+  assert.match(source, /@media \(max-width: 640px\) \{[\s\S]*\.file-library-sidebar \{[\s\S]*width: 100% !important[\s\S]*min-width: 0[\s\S]*max-width: 100%/)
+})
+
+test('UI-004.20.2 文件树节点为可收缩标签与固定操作区', () => {
+  assert.match(folderTreeSource, /:deep\(\.t-tree__item\) \{[\s\S]*box-sizing: border-box[\s\S]*width: 100%[\s\S]*min-width: 0/)
+  assert.match(folderTreeSource, /:deep\(\.t-tree__label\) \{[\s\S]*flex: 1 1 0%[\s\S]*width: 0[\s\S]*min-width: 0[\s\S]*max-width: none/)
+  assert.match(folderTreeSource, /:deep\(\.t-tree__operations\) \{[\s\S]*flex: 0 0 var\(--td-comp-size-m\)[\s\S]*width: var\(--td-comp-size-m\)[\s\S]*min-width: var\(--td-comp-size-m\)[\s\S]*max-width: var\(--td-comp-size-m\)/)
+  assert.match(folderTreeSource, /class="file-folder-tree__operation-control"/)
+  assert.match(folderTreeSource, /\.file-folder-tree__operation-control \{[\s\S]*flex: 0 0 var\(--td-comp-size-m\)[\s\S]*min-width: var\(--td-comp-size-m\)[\s\S]*max-width: var\(--td-comp-size-m\)/)
+  assert.match(folderTreeSource, /\.file-folder-tree__label \{[\s\S]*width: 100%[\s\S]*overflow: hidden[\s\S]*text-overflow: ellipsis[\s\S]*white-space: nowrap/)
 })
 
 test('文件夹 More 面板按 TDesign Dropdown click 签名传递三类动作', () => {

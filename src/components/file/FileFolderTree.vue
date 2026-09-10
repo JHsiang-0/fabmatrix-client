@@ -60,25 +60,26 @@
         </t-tooltip>
       </template>
       <template #operations="{ node }">
-        <t-dropdown
-          v-if="unwrapFolderTreeNode(node)?.canManage === true"
-          :options="folderActionOptions"
-          trigger="click"
-          @click="dropdownAction => handleFolderAction(dropdownAction, node)"
-        >
-          <t-button
-            class="file-folder-tree__more"
-            variant="text"
-            shape="square"
-            size="small"
-            :disabled="folderActionLoading || deletingFolderId !== null && deletingFolderId !== undefined"
-            :aria-label="`打开文件夹 ${node.label} 操作面板`"
-            :title="`打开文件夹 ${node.label} 操作面板`"
-            @click.stop
+        <span v-if="unwrapFolderTreeNode(node)?.canManage === true" class="file-folder-tree__operation-control">
+          <t-dropdown
+            :options="folderActionOptions"
+            trigger="click"
+            @click="dropdownAction => handleFolderAction(dropdownAction, node)"
           >
-            <MoreIcon />
-          </t-button>
-        </t-dropdown>
+            <t-button
+              class="file-folder-tree__more"
+              variant="text"
+              shape="square"
+              size="small"
+              :disabled="folderActionLoading || deletingFolderId !== null && deletingFolderId !== undefined"
+              :aria-label="`打开文件夹 ${node.label} 操作面板`"
+              :title="`打开文件夹 ${node.label} 操作面板`"
+              @click.stop
+            >
+              <MoreIcon />
+            </t-button>
+          </t-dropdown>
+        </span>
       </template>
     </t-tree>
   </aside>
@@ -377,6 +378,7 @@ defineExpose({ refresh })
 
 .file-folder-tree__label {
   display: block;
+  width: 100%;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -385,8 +387,25 @@ defineExpose({ refresh })
 }
 
 .file-folder-tree :deep(.t-tree__item) {
+  box-sizing: border-box;
+  width: 100%;
   min-width: 0;
   border-radius: var(--td-radius-default);
+}
+
+.file-folder-tree :deep(.t-tree__label) {
+  flex: 1 1 0%;
+  width: 0;
+  min-width: 0;
+  max-width: none;
+}
+
+.file-folder-tree :deep(.t-tree__operations) {
+  flex: 0 0 var(--td-comp-size-m);
+  width: var(--td-comp-size-m);
+  min-width: var(--td-comp-size-m);
+  max-width: var(--td-comp-size-m);
+  margin-left: var(--app-spacing-1);
 }
 
 .file-folder-tree :deep(.t-tree__item:hover),
@@ -414,6 +433,20 @@ defineExpose({ refresh })
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.16s ease;
+}
+
+.file-folder-tree__operation-control {
+  display: inline-flex;
+  flex: 0 0 var(--td-comp-size-m);
+  width: var(--td-comp-size-m);
+  min-width: var(--td-comp-size-m);
+  max-width: var(--td-comp-size-m);
+}
+
+.file-folder-tree__operation-control :deep(.t-dropdown) {
+  display: inline-flex;
+  flex: 0 0 var(--td-comp-size-m);
+  width: var(--td-comp-size-m);
 }
 
 .file-folder-tree :deep(.t-tree__item:hover) .file-folder-tree__more,
