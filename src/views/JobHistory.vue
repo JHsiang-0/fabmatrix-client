@@ -1,5 +1,5 @@
 <template>
-  <div class="app-page-shell app-page-background">
+  <div class="app-page-shell app-page-background job-history-page">
     <PageHeader title="打印历史记录">
       <template #actions>
       <div class="app-page-toolbar__actions">
@@ -61,28 +61,30 @@
       </QueryToolbar>
 
       <!-- 数据表格区 -->
-      <AsyncState
-        v-if="loading || (loadError && tableData.length === 0)"
-        :loading="loading"
-        :error="loadError"
-        @retry="fetchData"
-      />
-      <t-empty v-else-if="tableData.length === 0" description="暂无打印历史记录" />
-      <t-alert v-if="loadError && tableData.length" theme="error" :close-btn="false" class="mb-3">
-        <template #default>{{ loadError }}</template>
-        <template #operation>
-          <t-button size="small" variant="outline" @click="fetchData">重试</t-button>
-        </template>
-      </t-alert>
-      <TdTable
-        v-if="tableData.length"
-        :data="tableData"
-        @row-click="openTaskDetail"
-        :loading="loading"
-        :height="historyTableHeight"
-        style="width: 100%"
-        class="history-table"
-      >
+      <div class="history-content">
+        <AsyncState
+          v-if="loading || (loadError && tableData.length === 0)"
+          :loading="loading"
+          :error="loadError"
+          @retry="fetchData"
+        />
+        <t-empty v-else-if="tableData.length === 0" description="暂无打印历史记录" />
+        <t-alert v-if="loadError && tableData.length" theme="error" :close-btn="false" class="history-inline-error mb-3">
+          <template #default>{{ loadError }}</template>
+          <template #operation>
+            <t-button size="small" variant="outline" @click="fetchData">重试</t-button>
+          </template>
+        </t-alert>
+        <div v-if="tableData.length" class="history-table-wrapper">
+          <TdTable
+            :data="tableData"
+            @row-click="openTaskDetail"
+            :loading="loading"
+            :height="historyTableHeight"
+            style="width: 100%"
+            class="history-table history-management-table"
+            hover
+          >
         <TdTableColumn prop="id" label="任务ID" width="100" align="center">
           <template #default="scope">
             <span class="font-mono font-semibold text-gray-700">#{{ scope.row.id }}</span>
@@ -176,17 +178,19 @@
             </t-popconfirm>
           </template>
         </TdTableColumn>
-      </TdTable>
+          </TdTable>
+        </div>
 
-      <!-- 底部分页区 -->
-      <div class="mt-4 flex justify-center px-4">
-        <t-pagination
-          v-model:current="pagination.pageNum"
-          v-model:pageSize="pagination.pageSize"
-          :total="pagination.total"
-          :show-page-size="false"
-          @change="handlePaginationChange"
-        />
+        <!-- 底部分页区 -->
+        <div class="history-pagination-footer mt-4 flex justify-center px-4">
+          <t-pagination
+            v-model:current="pagination.pageNum"
+            v-model:pageSize="pagination.pageSize"
+            :total="pagination.total"
+            :show-page-size="false"
+            @change="handlePaginationChange"
+          />
+        </div>
       </div>
     </section>
     <TaskDetailDrawer
@@ -454,14 +458,40 @@ fetchData()
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  padding: var(--app-spacing-5);
+  padding: var(--app-spacing-4);
   background: var(--app-surface);
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-large);
 }
 
 .history-filter-toolbar {
-  margin-bottom: var(--app-spacing-5);
+  flex: 0 0 auto;
+  margin-bottom: var(--app-spacing-4);
+}
+
+.job-history-page {
+  gap: var(--app-spacing-3);
+}
+
+.history-content {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.history-inline-error {
+  flex: 0 0 auto;
+}
+
+.history-table-wrapper {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .history-table {
@@ -470,5 +500,74 @@ fetchData()
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+.history-management-table :deep(.t-table) {
+  min-width: 1260px;
+}
+
+.history-management-table :deep(.t-table__content) {
+  overflow: auto;
+  scrollbar-color: var(--app-border-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.history-management-table :deep(.t-table th) {
+  height: 44px;
+  padding: 0 var(--app-spacing-3);
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+  font-weight: 600;
+  background: var(--app-surface-muted);
+}
+
+.history-management-table :deep(.t-table td) {
+  height: 58px;
+  padding: var(--app-spacing-2) var(--app-spacing-3);
+  border-bottom-color: var(--app-border);
+}
+
+.history-management-table :deep(.t-table__body tr) {
+  transition: background-color 160ms ease;
+}
+
+.history-management-table :deep(.t-table__body tr:hover > td) {
+  background: var(--app-surface-hover);
+}
+
+.history-management-table :deep(.t-table__body tr:hover > td:first-child) {
+  box-shadow: inset 3px 0 0 var(--td-brand-color);
+}
+
+.history-pagination-footer {
+  flex: 0 0 auto;
+  padding-top: var(--app-spacing-1);
+  border-top: 1px solid var(--app-border);
+}
+
+@media (max-width: 900px) {
+  .history-workspace {
+    padding: var(--app-spacing-3);
+  }
+
+  .history-filter-toolbar :deep(.t-select),
+  .history-filter-toolbar :deep(.t-input),
+  .history-filter-toolbar :deep(.t-date-range-picker) {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .history-filter-toolbar :deep(.flex.items-center.gap-2) {
+    width: 100%;
+  }
+
+  .history-filter-toolbar :deep(.flex.items-center.gap-2.ml-auto) {
+    margin-left: 0;
+  }
+
+  .history-filter-toolbar :deep(.flex.items-center.gap-2.ml-auto) > * {
+    flex: 1 1 0;
+  }
 }
 </style>

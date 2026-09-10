@@ -22,7 +22,7 @@
         <t-skeleton :loading="true" theme="article" />
       </div>
       <template v-else-if="task">
-        <t-alert v-if="error" theme="error" :title="error" :close-btn="false" />
+        <t-alert v-if="error" theme="error" :title="error" :close-btn="false" class="task-detail-drawer__error-alert" />
         <t-alert
           v-if="task.status === 'RECONCILING'"
           theme="warning"
@@ -31,7 +31,7 @@
         >
           <template #default>设备状态无法自动确认，请人工核对打印结果。</template>
           <template #operation>
-            <t-space size="small" break-line>
+            <t-space size="small" break-line class="task-detail-drawer__reconcile-actions">
               <t-button size="small" theme="success" :disabled="reconcileLoading" @click="openReconcile('COMPLETED')">确认完成</t-button>
               <t-button size="small" theme="danger" variant="outline" :disabled="reconcileLoading" @click="openReconcile('FAILED')">确认失败</t-button>
               <t-button size="small" theme="warning" variant="outline" :disabled="reconcileLoading" @click="openReconcile('CANCELLED')">确认取消</t-button>
@@ -40,7 +40,7 @@
           </template>
         </t-alert>
 
-        <t-descriptions bordered :column="1" size="small">
+        <t-descriptions class="task-detail-drawer__descriptions" bordered :column="1" size="small">
           <t-descriptions-item label="任务 ID">#{{ task.id }}</t-descriptions-item>
           <t-descriptions-item label="文件 ID">{{ formatValue(task.fileId) }}</t-descriptions-item>
           <t-descriptions-item label="打印机 ID">{{ formatValue(task.printerId) }}</t-descriptions-item>
@@ -57,7 +57,7 @@
           <t-descriptions-item label="完成时间">{{ formatDateTime(task.completedAt) }}</t-descriptions-item>
           <t-descriptions-item label="更新时间">{{ formatDateTime(task.updatedAt) }}</t-descriptions-item>
           <t-descriptions-item v-if="hasValue(task.errorReason)" label="失败/核对原因">
-            <span class="task-detail-drawer__error">{{ task.errorReason }}</span>
+            <span class="task-detail-drawer__error" :title="task.errorReason">{{ task.errorReason }}</span>
           </t-descriptions-item>
         </t-descriptions>
 
@@ -193,6 +193,9 @@ const submitReconcile = async () => {
 
 .task-detail-drawer__body {
   display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  padding-bottom: var(--app-spacing-2);
   min-height: 100%;
   flex-direction: column;
   gap: var(--app-spacing-4);
@@ -206,6 +209,25 @@ const submitReconcile = async () => {
   display: flex;
   flex-direction: column;
   gap: var(--app-spacing-3);
+}
+
+.task-detail-drawer__reconcile-actions {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.task-detail-drawer__descriptions {
+  overflow: hidden;
+  border-radius: var(--app-radius-medium);
+}
+
+.task-detail-drawer__descriptions :deep(.t-descriptions__label),
+.task-detail-drawer__descriptions :deep(.t-descriptions__content) {
+  vertical-align: top;
+}
+
+.task-detail-drawer__error-alert {
+  overflow-wrap: anywhere;
 }
 
 .task-detail-drawer__timeline {
@@ -224,5 +246,17 @@ const submitReconcile = async () => {
 
 .task-detail-drawer__error {
   color: var(--td-error-color);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 600px) {
+  .task-detail-drawer__body {
+    gap: var(--app-spacing-3);
+  }
+
+  .task-detail-drawer__reconcile-actions {
+    width: 100%;
+  }
 }
 </style>

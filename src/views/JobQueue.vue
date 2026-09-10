@@ -1,5 +1,5 @@
 <template>
-  <div class="app-page-shell app-page-background">
+  <div class="app-page-shell app-page-background job-queue-page">
     <PageHeader title="生产调度队列">
       <template #actions>
       <div class="app-page-toolbar__actions">
@@ -24,7 +24,7 @@
         empty-description="当前没有排队中的任务，机器都在闲着呢！"
         @retry="fetchQueue"
       />
-      <t-alert v-if="queueError && queueData.length" theme="error" :close-btn="false" class="mb-3">
+      <t-alert v-if="queueError && queueData.length" theme="error" :close-btn="false" class="job-queue-inline-error mb-3">
         <template #default>{{ queueError.message || queueError }}</template>
         <template #operation>
           <t-button size="small" variant="outline" @click="fetchQueue">重试</t-button>
@@ -36,7 +36,7 @@
         :loading="queueLoading"
         :height="queueTableHeight"
         style="width: 100%"
-        class="job-table"
+        class="job-queue-table job-table"
       >
         <TdTableColumn prop="id" label="任务单号" width="100" align="center">
           <template #default="scope">
@@ -100,7 +100,7 @@
 
         <TdTableColumn label="调度操作" width="300" align="center" fixed="right">
           <template #default="scope">
-            <t-space size="small">
+            <t-space size="small" class="task-action-group">
               <t-button size="small" variant="text" @click="openTaskDetail(scope.row)">详情</t-button>
               <t-button
                 size="small"
@@ -136,7 +136,7 @@
         empty-description="当前没有活动任务"
         @retry="fetchActive"
       />
-      <t-alert v-if="activeError && activePageData.length" theme="error" :close-btn="false" class="mb-3">
+      <t-alert v-if="activeError && activePageData.length" theme="error" :close-btn="false" class="job-queue-inline-error mb-3">
         <template #default>{{ activeError.message || activeError }}</template>
         <template #operation>
           <t-button size="small" variant="outline" @click="fetchActive">重试</t-button>
@@ -148,7 +148,7 @@
         :loading="activeLoading"
         :height="activeTableHeight"
         style="width: 100%"
-        class="job-table"
+        class="job-queue-table job-table"
       >
         <TdTableColumn prop="id" label="任务单号" width="110" align="center">
           <template #default="scope">
@@ -175,7 +175,7 @@
         </TdTableColumn>
         <TdTableColumn label="操作" width="300" align="center" fixed="right">
           <template #default="scope">
-            <t-space size="small">
+            <t-space size="small" class="task-action-group">
               <t-button size="small" variant="text" @click="openTaskDetail(scope.row)">详情</t-button>
               <t-dropdown
                 trigger="click"
@@ -188,7 +188,7 @@
           </template>
         </TdTableColumn>
       </TdTable>
-      <div v-if="activeTotal > activePageSize" class="flex justify-center mt-4">
+      <div v-if="activeTotal > activePageSize" class="job-queue-pagination flex justify-center mt-4">
         <t-pagination
           v-model:current="activePage"
           :page-size="activePageSize"
@@ -891,6 +891,15 @@ onMounted(() => {
   min-height: 0;
 }
 
+.job-queue-page {
+  gap: var(--app-spacing-3);
+}
+
+.job-queue-page :deep(.app-page-header__actions),
+.job-queue-page :deep(.app-page-toolbar__actions) {
+  flex-wrap: wrap;
+}
+
 .job-queue-tabs :deep(.t-tabs__content),
 .job-queue-tabs :deep(.t-tab-panel) {
   display: flex;
@@ -909,7 +918,7 @@ onMounted(() => {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  padding: var(--app-spacing-5);
+  padding: var(--app-spacing-4);
   background: var(--app-surface);
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-large);
@@ -921,6 +930,92 @@ onMounted(() => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+.job-queue-table :deep(.t-table) {
+  min-width: 920px;
+}
+
+.job-queue-table :deep(.t-table__content) {
+  overflow: auto;
+  scrollbar-color: var(--app-border-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.job-queue-table :deep(.t-table th) {
+  height: 44px;
+  padding: 0 var(--app-spacing-3);
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+  font-weight: 600;
+  background: var(--app-surface-muted);
+}
+
+.job-queue-table :deep(.t-table td) {
+  height: 58px;
+  padding: var(--app-spacing-2) var(--app-spacing-3);
+  color: var(--app-text-primary);
+  border-bottom-color: var(--app-border);
+}
+
+.job-queue-table :deep(.t-table__body tr) {
+  transition: background-color 160ms ease;
+}
+
+.job-queue-table :deep(.t-table__body tr:hover > td) {
+  background: var(--app-surface-hover);
+}
+
+.job-queue-table :deep(.t-table__body tr:hover > td:first-child) {
+  box-shadow: inset 3px 0 0 var(--td-brand-color);
+}
+
+.job-queue-inline-error {
+  flex: 0 0 auto;
+  margin-bottom: var(--app-spacing-3);
+}
+
+.task-action-group {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.job-queue-pagination {
+  flex: 0 0 auto;
+  padding-top: var(--app-spacing-1);
+}
+
+.job-queue-page :deep(.t-dialog__body) {
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .job-panel {
+    padding: var(--app-spacing-3);
+  }
+
+  .job-queue-page :deep(.app-page-toolbar__actions) {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .job-queue-page :deep(.app-page-toolbar__actions) {
+    justify-content: stretch;
+  }
+
+  .job-queue-page :deep(.app-page-toolbar__actions) > * {
+    flex: 1 1 0;
+  }
+
+  .job-queue-tabs :deep(.t-tabs__nav-item) {
+    min-width: 0;
+  }
+
+  .task-action-group {
+    gap: var(--app-spacing-1);
+  }
 }
 
 @keyframes rotate {
