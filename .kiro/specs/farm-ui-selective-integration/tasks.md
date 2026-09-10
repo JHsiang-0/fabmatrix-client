@@ -86,12 +86,14 @@
 
 完成记录：选择性移植个人中心卡片/表单、审计筛选/表格/分页/详情 Drawer 的 TDesign 视觉和响应式长文本布局；保留字段白名单、脱敏、ADMIN 权限、脏表单取消、改密后重新登录、统一错误提示和真实 API 调用。相关测试 12 项、全量测试 205 项，lint/build 通过。
 
-### [ ] SYNC-001.9 全量验收和集成交付
+### [x] SYNC-001.9 全量验收和集成交付
 
 - 执行 `npm test`、`npm run lint`、`npm run build`、普通浏览器回归和 Electron/desktop-mock 回归。
 - 检查 800×560、1024×640、1200×760、1440×900、1920×855 下页面溢出、滚动所有者、弹窗和详情 Drawer。
 - 执行 `git status --short`、`git diff --check`，只暂存本 Spec 实际文件并创建 Conventional Commit。
 - 验收通过后只推送新的集成分支，不直接覆盖 `origin/feat/ui-003-electron`。
+
+完成记录：修复 800×560 Electron 窗口下打印机筛选/操作区挤压表格滚动容器的响应式回归（`b542077`）。最终 `npm test` 205/205、`npm run lint`、`npm run build`、`npm run build:mock`、`npm run build:desktop:mock` 均通过；浏览器 E2E 9/9、Electron E2E 3/3、Electron dist 1/1 通过。组合 `npm run test:e2e:all` 的 13 项中 12 项通过，`electron-dist` 在组合执行时受 dist 构建顺序/隔离影响未读取到运行诊断；按其独立入口 `npm run test:electron:dist` 已重建 desktop 产物并通过。最终工作区干净，未推送远程。
 
 ## 依赖关系
 
