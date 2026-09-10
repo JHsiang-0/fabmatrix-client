@@ -5,6 +5,7 @@ import { mockState, resetMockState } from '../src/mock/data.js'
 
 const request = (method, url, data, headers, params) => mockRequest({ method, url, data, headers, params })
 const adminHeaders = { Authorization: 'Bearer file-preview-admin' }
+const secondAdminHeaders = { Authorization: 'Bearer file-preview-second-admin' }
 const operatorHeaders = { Authorization: 'Bearer file-preview-operator' }
 const thirdUserHeaders = { Authorization: 'Bearer file-preview-third-user' }
 
@@ -22,6 +23,7 @@ function setupSession() {
     updatedAt: '2026-01-01T00:00:00Z'
   })
   mockState.sessions['file-preview-admin'] = { userId: 1, username: 'admin', role: 'ADMIN' }
+  mockState.sessions['file-preview-second-admin'] = { userId: 3, username: 'second-admin', role: 'ADMIN' }
   mockState.sessions['file-preview-operator'] = { userId: 2, username: 'operator', role: 'OPERATOR' }
   mockState.sessions['file-preview-third-user'] = { userId: 3, username: 'third-user', role: 'OPERATOR' }
 }
@@ -135,6 +137,59 @@ test('allows authenticated public browse upload and job creation but denies publ
     parentId: 5
   }, operatorHeaders)
   assert.equal(move.data.items[0].success, false)
+})
+
+test('blocks admin writes into another user private folders and shares public name namespaces', async () => {
+  setupSession()
+
+  await assert.rejects(
+    request('POST', '/api/v1/print-files/folder/create', {
+      parentId: 4,
+      folderName: '不应创建'
+    }, adminHeaders),
+    error => error.response.status === 403
+  )
+  await assert.rejects(
+    request('POST', '/api/v1/print-files/upload', {
+      parentId: 4,
+      file: { name: '不应上传.gcode', size: 12 }
+    }, adminHeaders),
+    error => error.response.status === 403
+  )
+
+  const publicRoot = await request('POST', '/api/v1/print-files/folder/create', {
+    folderName: '共享命名空间',
+    visibility: 'PUBLIC'
+  }, adminHeaders)
+  await assert.rejects(
+    request('POST', '/api/v1/print-files/folder/create', {
+      folderName: '共享命名空间',
+      visibility: 'PUBLIC'
+    }, secondAdminHeaders),
+    error => error.response.status === 409
+  )
+  const publicChild = await request('POST', '/api/v1/print-files/folder/create', {
+    parentId: publicRoot.data.id,
+    folderName: '共享子目录'
+  }, adminHeaders)
+  await assert.rejects(
+    request('POST', '/api/v1/print-files/folder/create', {
+      parentId: publicRoot.data.id,
+      folderName: '共享子目录'
+    }, secondAdminHeaders),
+    error => error.response.status === 409
+  )
+  assert.equal(publicChild.data.visibility, 'PUBLIC')
+
+  await request('POST', '/api/v1/print-files/folder/create', {
+    folderName: '各自私有命名空间',
+    visibility: 'PRIVATE'
+  }, adminHeaders)
+  const privateRootForSecondAdmin = await request('POST', '/api/v1/print-files/folder/create', {
+    folderName: '各自私有命名空间',
+    visibility: 'PRIVATE'
+  }, secondAdminHeaders)
+  assert.equal(privateRootForSecondAdmin.data.visibility, 'PRIVATE')
 })
 
 test('allows admin to move public folders across creators and keeps operator management denied', async () => {

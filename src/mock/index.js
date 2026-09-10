@@ -129,8 +129,8 @@ const fileCapabilities = (session, file) => {
   return {
     visibility: publicFile ? 'PUBLIC' : 'PRIVATE',
     canManage: folder && !file.isDefault && ((!publicFile && owner) || (admin && publicFile)),
-    canCreate: folder && (admin || (!publicFile && owner)),
-    canUpload: folder && (admin || publicFile || owner),
+    canCreate: folder && ((publicFile && admin) || (!publicFile && owner)),
+    canUpload: folder && (publicFile || owner),
     canDelete: !folder && (admin || owner),
     canMove: !folder && ((!publicFile && owner) || (admin && publicFile)),
     canPrint: !folder && canReadFile(session, file),
@@ -184,9 +184,10 @@ const requireFolderParent = (session, parentId, options = {}) => {
   if (!parent) fail(404, 404, '父文件夹不存在')
   if (!parent.folder) fail(422, 422, '父级资源不是文件夹')
   if (!canReadFile(session, parent)) fail(403, 403, '无权访问该文件夹')
-  const canCreate = session.role === 'ADMIN'
-    || (visibilityOf(parent) === 'PRIVATE' && String(parent.userId) === String(session.userId))
-  if (!canCreate || (visibilityOf(parent) === 'PUBLIC' && session.role !== 'ADMIN')) {
+  const canCreate = visibilityOf(parent) === 'PUBLIC'
+    ? session.role === 'ADMIN'
+    : String(parent.userId) === String(session.userId)
+  if (!canCreate) {
     fail(403, 403, '无权管理该文件夹')
   }
   const level = getFolderLevel(parent)
@@ -200,7 +201,7 @@ const requireUploadParent = (session, parentId) => {
   if (!parent) fail(404, 404, '父文件夹不存在')
   if (!parent.folder) fail(422, 422, '父级资源不是文件夹')
   if (!canReadFile(session, parent)) fail(403, 403, '无权访问该文件夹')
-  if (session.role !== 'ADMIN' && visibilityOf(parent) === 'PRIVATE'
+  if (visibilityOf(parent) === 'PRIVATE'
     && String(parent.userId) !== String(session.userId)) {
     fail(403, 403, '无权向该文件夹上传文件')
   }
@@ -978,6 +979,13 @@ const handleBatchUpload = config => {
   }
 }
 
+const isSameFolderNameNamespace = (file, parentId, visibility, ownerUserId) => {
+  if ((file.parentId ?? null) !== parentId) return false
+  if (parentId !== null) return true
+  if (visibilityOf(file) !== visibility) return false
+  return visibility === 'PUBLIC' || String(file.userId) === String(ownerUserId)
+}
+
 const handleCreateFolder = config => {
   const session = requireSession(config, ['ADMIN', 'OPERATOR'])
   const body = getBody(config)
@@ -992,8 +1000,8 @@ const handleCreateFolder = config => {
   const visibility = parent ? visibilityOf(parent) : body.visibility === 'PUBLIC' ? 'PUBLIC' : 'PRIVATE'
   if (visibility === 'PUBLIC' && session.role !== 'ADMIN') fail(403, 403, '无权创建公共目录')
   if (mockState.files.some(file => (
-    file.folder && visibilityOf(file) === visibility &&
-    (file.parentId ?? null) === parentId && file.originalName === folderName
+    file.folder && file.originalName === folderName
+      && isSameFolderNameNamespace(file, parentId, visibility, session.userId)
   ))) {
     fail(409, 'PRINT_FOLDER_NAME_CONFLICT', '该目录下已存在同名文件夹')
   }
@@ -1064,8 +1072,8 @@ const handleRenameFolder = config => {
   const folderName = normalizeMockFolderName(getBody(config).folderName)
   if (mockState.files.some(file => (
     file.folder && String(file.id) !== String(folder.id)
-      && (visibilityOf(folder) === 'PUBLIC' || String(file.userId) === String(folder.userId))
-      && (file.parentId ?? null) === (folder.parentId ?? null)
+      && isSameFolderNameNamespace(file, folder.parentId ?? null,
+        visibilityOf(folder), folder.userId)
       && file.originalName === folderName
   ))) {
     fail(409, 'PRINT_FOLDER_NAME_CONFLICT', '该目录下已存在同名文件夹')
@@ -1119,8 +1127,7 @@ const handleMoveFolder = config => {
   })
   if (mockState.files.some(file => (
     file.folder && String(file.id) !== String(folder.id)
-      && (visibilityOf(folder) === 'PUBLIC' || String(file.userId) === String(folder.userId))
-      && (file.parentId ?? null) === parentId
+      && isSameFolderNameNamespace(file, parentId, visibilityOf(folder), folder.userId)
       && file.originalName === folder.originalName
   ))) {
     fail(409, 'PRINT_FOLDER_NAME_CONFLICT', '目标目录下已存在同名文件夹')
