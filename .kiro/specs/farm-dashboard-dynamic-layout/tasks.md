@@ -129,7 +129,7 @@ SecurityConfig 显式限制 GET 为 ADMIN/OPERATOR、PUT 为 ADMIN（PUT 保存�
 刷新布局和完整设备快照，编辑状态保留草稿并标记过期；断线重连后按同样规则收敛。新增 Mock 双客户端、权限、冲突、
 原子性和状态分层测试；前端全量测试 224/224、lint、build 均通过。
 
-### [ ] SYNC-002.8 建立回归护栏并完成联调验收
+### [x] SYNC-002.8 建立回归护栏并完成联调验收
 
 - 替换 `dashboardOverview.test.js` 中固定 4×12 和禁止动态布局的旧门禁。
 - 恢复/重写 `gridLayout.test.js`、`gridAisleUi.test.js`，补充权限、事务、冲突、缩容、超过 100 台和 WebSocket 测试。
@@ -137,11 +137,13 @@ SecurityConfig 显式限制 GET 为 ADMIN/OPERATOR、PUT 为 ADMIN（PUT 保存�
 - 执行后端 `mvn test`，前端 `npm test`、`npm run lint`、`npm run build`、浏览器 E2E、Electron E2E 和 desktop dist 验证。
 - 验收：全部命令通过；MySQL 与 SQLite 至少各完成一次真实约束/事务验收。
 
-自动化完成记录：已将浏览器与 Electron 全屏看板断言更新为现行 Header 文案，新增 `gridAisleUi.test.js`，
-覆盖动态横/纵过道、交叉标签、内部滚动和共享模板，并保留已有布局、权限、事务、冲突、缩容、超过 100 台和
-WebSocket 回归护栏。前端全量测试 227/227、lint、生产/desktop/desktop-mock 构建、浏览器 E2E 9/9、
-Electron E2E 3/3、Electron-dist E2E 1/1 通过；后端 `mvn test` 通过。真实 MySQL/SQLite 数据卷验收未执行，
-因当前任务明确禁止连接真实数据库或数据卷，待具备隔离环境后补做，故本任务暂不标记 DONE。
+完成记录：已将浏览器与 Electron 全屏看板断言更新为现行 Header 文案，新增 `gridAisleUi.test.js`，覆盖动态
+横/纵过道、交叉标签、内部滚动和共享模板，并保留已有布局、权限、事务、冲突、缩容、超过 100 台和 WebSocket
+回归护栏。前端全量测试 227/227、lint、生产/desktop/desktop-mock 构建、浏览器 E2E 9/9、Electron E2E 3/3、
+Electron-dist E2E 1/1 通过；后端 `mvn test` 通过。2026-09-11 在 WSL Ubuntu-LTS 的 MySQL 8.4 `farm-mysql`
+容器和实际 SQLite 文件 `target/local-edition-test-data/farm.db` 完成真实约束/事务验收：MySQL 迁移前预检为空，
+迁移后布局定义、CHECK、主键、时间列、联合唯一索引和辅助过程清理正确；两端重复槽位、半空/非正数坐标拒绝，
+事务回滚后均无临时数据残留。本任务验收完成。
 
 ### [x] SYNC-002.9 完成迁移交付与文档收口
 
