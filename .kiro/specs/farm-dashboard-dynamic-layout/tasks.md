@@ -66,7 +66,7 @@ SYNC-002.9 迁移交付与文档收口
 SecurityConfig 显式限制 GET 为 ADMIN/OPERATOR、PUT 为 ADMIN（PUT 保存逻辑留在 SYNC-002.3）。
 新增 Controller 安全测试和 Service 默认创建/规范化测试，后端专项与全量 Maven 测试通过。
 
-### [ ] SYNC-002.3 实现原子布局保存与坐标约束
+### [x] SYNC-002.3 实现原子布局保存与坐标约束
 
 - 实现 `PUT /api/v1/dashboard-layout`，一次提交布局草稿、位置变化、版本和缩容策略。
 - 锁定布局行并校验 `expectedVersion`；重复保存、并发冲突返回 409。
@@ -76,6 +76,10 @@ SecurityConfig 显式限制 GET 为 ADMIN/OPERATOR、PUT 为 ADMIN（PUT 保存�
 - 移除/封堵 PrinterAddDTO、PrinterUpdateDTO 和旧位置服务绕过动态布局约束的路径；旧 positions API 标记弃用。
 - 审计日志与 WebSocket 事件只在事务提交后发布。
 - 验收：交换、冲突、并发、越界、不存在设备和第 N 条 SQL 故障注入均符合规格，绝不部分成功。
+
+完成记录：后端新增带 `expectedVersion` 的布局原子保存、MySQL/SQLite 锁定读取、设备最终态校验、交换前清空坐标、
+`REJECT/UNALLOCATE` 缩容策略和结构化冲突响应；审计及 `LAYOUT_UPDATED` 均在事务提交后处理，旧 `/printers/positions`
+入口已停用。新增保存、版本冲突、缩容、权限、结构化错误和 WebSocket 提交后广播测试，后端专项与全量 Maven 测试通过。
 
 ### [ ] SYNC-002.4 实现前端布局 API、Store 与纯函数
 
