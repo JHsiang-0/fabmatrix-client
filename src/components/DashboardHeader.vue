@@ -12,16 +12,6 @@
         <TimeIcon size="13" />
         {{ labels.updatedAt }} <strong>{{ lastUpdateTime }}</strong>
       </span>
-      <t-button
-        class="dashboard-header__workshop-switch dashboard-header__action-button"
-        theme="primary"
-        variant="outline"
-        size="small"
-        disabled
-      >
-        <template #icon><Location size="14" /></template>
-        <span class="dashboard-header__workshop-name">{{ workshopName }}</span>
-      </t-button>
       <slot name="actions"></slot>
       <t-button
         class="dashboard-header__action-button"
@@ -41,23 +31,19 @@
 
 <script setup>
 import { ref } from 'vue'
-import { LocationIcon as Location, RefreshIcon as Refresh, TimeIcon } from 'tdesign-icons-vue-next'
+import { RefreshIcon as Refresh, TimeIcon } from 'tdesign-icons-vue-next'
 import { renderIcon } from '@/utils/tdesign'
 
 defineOptions({ name: 'DashboardHeader' })
 
 const labels = {
-  title: 'FabMatrix 3D 打印控制系统',
+  title: '嘉东三维联动打印机实时控制系统',
   refresh: '刷新',
   refreshing: '刷新中...',
   updatedAt: '更新于'
 }
 
 defineProps({
-  workshopName: {
-    type: String,
-    default: '3F-一号车间'
-  },
   lastUpdateTime: {
     type: String,
     default: ''
@@ -121,27 +107,6 @@ function handleRefresh() {
 .dashboard-header__brand-title-row h1 {
   min-width: 0;
   flex: 1 1 auto;
-}
-
-.dashboard-header__workshop-switch {
-  min-width: 120px;
-}
-
-.dashboard-header__workshop-switch :deep(.t-button__text) {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  gap: 4px;
-}
-
-.dashboard-header__workshop-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dashboard-header__workshop-switch :deep(svg) {
-  flex: 0 0 auto;
 }
 
 .dashboard-header h1 {

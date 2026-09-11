@@ -2,7 +2,7 @@
   <div v-cloak class="farm-dashboard h-full bg-gray-100 flex flex-col overflow-hidden">
     <!-- 顶部品牌和操作 -->
     <div class="dashboard-top-shell">
-      <dashboard-header :workshop-name="workshopName" :last-update-time="lastUpdateTime" @refresh="handleRefresh">
+      <dashboard-header :last-update-time="lastUpdateTime" @refresh="handleRefresh">
       <!-- 布局锁定/编辑模式切换按钮 -->
       <template #actions>
         <t-button v-if="canManageLayout && !isEditMode" class="dashboard-action-button" theme="default" variant="outline"
@@ -150,9 +150,6 @@ const targetSlot = ref({ row: null, col: null }) // 目标槽位坐标（物理�
 /** 设备详情抽屉相关状态 */
 const drawerVisible = ref(false)
 const activeDevice = ref(null)
-
-/** 车间信息 */
-const workshopName = ref('3F-一号车间')
 
 /** 最后更新时间 */
 const lastUpdateTime = ref('')

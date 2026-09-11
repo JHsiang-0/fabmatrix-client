@@ -123,6 +123,14 @@
 - 验收：`node --test tests/dashboardOverview.test.js`（10/10）、`npm test`（208/208）、`npm run lint`、`npm run build`、`npm run build:mock`、`npm run build:desktop:mock`、`npm run test:e2e`（9/9）和 `git diff --check` 均通过；构建仅保留既有动态导入与大 chunk 警告。
 - 完成记录：已完成（2026-09-11）。
 
+### [x] SYNC-001.13 清理全屏看板头部文案
+
+- 范围：`src/components/DashboardHeader.vue`、`src/components/FarmDashboard.vue`、`tests/dashboardOverview.test.js` 和本任务文档。
+- 统一全屏看板头部标题为“嘉东三维联动打印机实时控制系统”，移除硬编码车间名称、车间切换按钮、位置图标及对应无用样式；保留紧凑头部、更新时间、布局设置、刷新、退出全屏和响应式行为。
+- `FarmDashboard` 仅清理车间名称 ref 和头部传参，不修改动态网格、REST/WS、权限、拖拽或设备控制业务。
+- 动态行列、过道布局及相关后端契约仍属于 `SYNC-002`，未在本任务实现。
+- 完成记录：已完成（2026-09-11）。
+
 ## 依赖关系
 
 ```text
