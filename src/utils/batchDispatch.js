@@ -19,6 +19,18 @@ function resolvePrinterId(strategy, printerIds, index) {
   return printerIds[index] ?? null
 }
 
+export function acquireBatchConfirmLock({ confirming, actionLoadingKey, planId }) {
+  if (confirming.value || actionLoadingKey.value) return false
+  confirming.value = true
+  actionLoadingKey.value = `confirm:${planId}`
+  return true
+}
+
+export function releaseBatchConfirmLock({ confirming, actionLoadingKey }) {
+  confirming.value = false
+  actionLoadingKey.value = ''
+}
+
 /**
  * 构造批量预览的前端上下文。后端请求仍只使用交接文档冻结的四个字段。
  */

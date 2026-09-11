@@ -53,6 +53,15 @@ test('批量预览和确认只展示后端字段，并保留幂等回放与恢�
   assert.doesNotMatch(adapterSource, /item-\$\{index\}/)
 })
 
+test('批量确认在确认框前占用锁，并在取消或请求完成后释放', () => {
+  const confirmBlock = source.slice(source.indexOf('async function confirm'), source.indexOf('function replayConfirm'))
+  assert.match(confirmBlock, /if \(confirming\.value \|\| actionLoadingKey\.value\) return/)
+  assert.match(confirmBlock, /acquireBatchConfirmLock\(\{ confirming, actionLoadingKey, planId: previewData\.value\.planId \}\)/)
+  assert.ok(confirmBlock.indexOf('acquireBatchConfirmLock') < confirmBlock.indexOf('await confirmMessage'))
+  assert.match(confirmBlock, /catch \{[\s\S]*releaseBatchConfirmLock\(\{ confirming, actionLoadingKey \}\)/)
+  assert.match(confirmBlock, /finally \{[\s\S]*releaseBatchConfirmLock\(\{ confirming, actionLoadingKey \}\)/)
+})
+
 test('批量派发视觉区域使用 TDesign 密度并保留独立滚动和响应式状态', () => {
   assert.match(source, /class="batch-dispatch-steps mb-4"/)
   assert.match(source, /class="batch-upload-control"/)

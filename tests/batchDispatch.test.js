@@ -3,8 +3,10 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { getNavigationItem } from '../src/config/navigation.js'
 import {
+  acquireBatchConfirmLock,
   createBatchPreviewRequest,
   normalizeBatchConfirmResult,
+  releaseBatchConfirmLock,
   toBatchPreviewPayload
 } from '../src/utils/batchDispatch.js'
 
@@ -66,4 +68,82 @@ test('does not treat recovery-required results as successful jobs', () => {
   assert.equal(item.success, false)
   assert.equal(item.jobId, 'job-1')
   assert.equal(item.recoveryAction, 'OPEN_EXISTING_JOB')
+})
+
+test('批量确认快速双击只打开一个确认框并只发送一个确认请求', async () => {
+  const state = { confirming: { value: false }, actionLoadingKey: { value: '' } }
+  const plan = { planId: 'plan-1', version: 2, itemIds: ['item-1'], confirmationToken: 'token-1' }
+  const requestCalls = []
+  let resolvePrompt
+  let promptCalls = 0
+  const confirmMessage = () => {
+    promptCalls += 1
+    return new Promise(resolve => { resolvePrompt = resolve })
+  }
+  const confirmRequest = async payload => {
+    requestCalls.push({ url: '/api/v1/print-jobs/batch/confirm', payload })
+    return { data: { planId: plan.planId } }
+  }
+  const confirm = async () => {
+    if (!acquireBatchConfirmLock({ ...state, planId: plan.planId })) return false
+    try {
+      await confirmMessage()
+      await confirmRequest(plan)
+      return true
+    } finally {
+      releaseBatchConfirmLock(state)
+    }
+  }
+
+  const first = confirm()
+  const second = confirm()
+  assert.equal(promptCalls, 1)
+  assert.equal(await second, false)
+  assert.equal(requestCalls.length, 0)
+  assert.equal(state.confirming.value, true)
+  assert.equal(state.actionLoadingKey.value, 'confirm:plan-1')
+
+  resolvePrompt()
+  assert.equal(await first, true)
+  assert.equal(requestCalls.length, 1)
+  assert.equal(requestCalls[0].url, '/api/v1/print-jobs/batch/confirm')
+  assert.equal(state.confirming.value, false)
+  assert.equal(state.actionLoadingKey.value, '')
+})
+
+test('批量确认取消或请求异常后释放锁并允许再次操作', async () => {
+  const state = { confirming: { value: false }, actionLoadingKey: { value: '' } }
+  let promptCalls = 0
+  const confirmMessage = () => {
+    promptCalls += 1
+    if (promptCalls === 1) return Promise.reject('cancel')
+    return Promise.resolve()
+  }
+  const confirm = async confirmRequest => {
+    if (!acquireBatchConfirmLock({ ...state, planId: 'plan-2' })) return false
+    try {
+      await confirmMessage()
+      await confirmRequest()
+      return true
+    } finally {
+      releaseBatchConfirmLock(state)
+    }
+  }
+
+  const cancelled = confirm(async () => {})
+  await assert.rejects(cancelled, error => error === 'cancel')
+  assert.equal(state.confirming.value, false)
+  assert.equal(state.actionLoadingKey.value, '')
+
+  let requestCalls = 0
+  assert.equal(await confirm(async () => { requestCalls += 1 }), true)
+  assert.equal(promptCalls, 2)
+  assert.equal(requestCalls, 1)
+  assert.equal(state.confirming.value, false)
+  assert.equal(state.actionLoadingKey.value, '')
+
+  await assert.rejects(confirm(async () => { throw new Error('request failed') }), /request failed/)
+  assert.equal(requestCalls, 1)
+  assert.equal(state.confirming.value, false)
+  assert.equal(state.actionLoadingKey.value, '')
 })

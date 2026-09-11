@@ -100,7 +100,7 @@
       </t-form>
       <div class="step-actions">
         <t-button variant="outline" @click="goToSelection">上一步</t-button>
-        <t-button theme="primary" :loading="previewing" @click="preview">
+        <t-button theme="primary" :loading="isActionLoading('preview')" :disabled="actionLoadingKey !== ''" @click="preview">
           {{ previewing ? '生成中…' : '生成派发预览' }}
         </t-button>
       </div>
@@ -134,8 +134,8 @@
         本次将按“{{ previewData.action || action }}”处理 {{ executableItemIds.length }} 项可执行明细；确认后由后端按计划版本和令牌幂等执行。
       </t-alert>
       <div class="step-actions">
-        <t-button variant="outline" :disabled="confirming" @click="goToStrategy">返回配置</t-button>
-        <t-button theme="primary" :disabled="previewExpired || confirming || confirmData || !executableItemIds.length" :loading="confirming" @click="confirm">
+        <t-button variant="outline" :disabled="confirming || actionLoadingKey !== ''" @click="goToStrategy">返回配置</t-button>
+        <t-button theme="primary" :disabled="previewExpired || confirming || actionLoadingKey !== '' || confirmData || !executableItemIds.length" :loading="isActionLoading('confirm')" @click="confirm">
         {{ confirming ? '执行中…' : `确认执行（${executableItemIds.length}项）` }}
         </t-button>
       </div>
@@ -147,7 +147,7 @@
         成功 {{ confirmSuccessCount }} 项，失败 {{ confirmFailureCount }} 项
         <span v-if="confirmData.repeated">（重复确认已返回原结果）</span>
         <t-space class="mt-2">
-          <t-button v-if="retryableConfirmItems.length" variant="outline" size="small" @click="retryFailedConfirmItems">
+          <t-button v-if="retryableConfirmItems.length" variant="outline" size="small" :loading="isActionLoading('retry')" :disabled="actionLoadingKey !== ''" @click="retryFailedConfirmItems">
             重新预览可恢复项（{{ retryableConfirmItems.length }}）
           </t-button>
           <span v-if="existingJobItems.length">需打开已有任务 {{ existingJobItems.length }} 项，请在结果明细中逐项处理。</span>
@@ -191,7 +191,7 @@
       </div>
       <div class="step-actions">
         <t-button variant="outline" @click="goToSelection">重新选择资源</t-button>
-        <t-button v-if="confirmData && !previewExpired" variant="outline" :loading="confirming" @click="replayConfirm">
+        <t-button v-if="confirmData && !previewExpired" variant="outline" :loading="isActionLoading('confirm')" :disabled="actionLoadingKey !== ''" @click="replayConfirm">
           再次获取执行结果
         </t-button>
       </div>
@@ -206,7 +206,12 @@ import { message, confirmMessage } from '@/utils/message'
 import { batchUploadFiles, getFileList, getFileTree } from '@/api/printFile'
 import { getPrinterList } from '@/api/printer'
 import { previewBatchDispatch, confirmBatchDispatch, retryPreviewBatchDispatch } from '@/api/job'
-import { createBatchPreviewRequest, normalizeBatchConfirmResult } from '@/utils/batchDispatch'
+import {
+  acquireBatchConfirmLock,
+  createBatchPreviewRequest,
+  normalizeBatchConfirmResult,
+  releaseBatchConfirmLock
+} from '@/utils/batchDispatch'
 import {
   getUploadFailureState,
   isBatchUploadSuccess,
@@ -236,6 +241,7 @@ const uploadProgress = ref(0)
 const loadingResources = ref(false)
 const previewing = ref(false)
 const confirming = ref(false)
+const actionLoadingKey = ref('')
 const previewExpired = ref(false)
 const previewExpiresAt = ref(null)
 const recoveryHistory = ref([])
@@ -339,7 +345,7 @@ function goToStrategy() {
 }
 
 function goToSelection() {
-  if (confirming.value) return
+  if (confirming.value || actionLoadingKey.value) return
   invalidatePreview()
   activeStep.value = 0
 }
@@ -476,6 +482,7 @@ async function retryFailedUploads() {
 }
 
 async function preview() {
+  if (actionLoadingKey.value) return
   if (!selectedFileIds.value.length || !selectedPrinterIds.value.length) {
     message.warning('请至少选择一个文件和一台打印机')
     return
@@ -485,6 +492,7 @@ async function preview() {
     return
   }
   previewing.value = true
+  actionLoadingKey.value = 'preview:batch'
   invalidatePreview()
   const previewRequest = createBatchPreviewRequest({
     fileIds: selectedFileIds.value,
@@ -502,14 +510,17 @@ async function preview() {
     message.error(error?.message || '生成预览失败')
   } finally {
     previewing.value = false
+    actionLoadingKey.value = ''
   }
 }
 
 async function confirm(replay = false) {
-  if (confirming.value || (!replay && confirmData.value) || !previewData.value || previewExpired.value || !executableItemIds.value.length) {
+  if (confirming.value || actionLoadingKey.value) return
+  if ((!replay && confirmData.value) || !previewData.value || previewExpired.value || !executableItemIds.value.length) {
     message.warning(previewExpired.value ? '预览已过期，请重新生成' : '当前没有可执行的预览项')
     return
   }
+  if (!acquireBatchConfirmLock({ confirming, actionLoadingKey, planId: previewData.value.planId })) return
   if (!replay) {
     try {
       await confirmMessage(
@@ -518,11 +529,11 @@ async function confirm(replay = false) {
         { confirmButtonText: '确认执行', cancelButtonText: '返回检查', type: 'warning' }
       )
     } catch {
+      releaseBatchConfirmLock({ confirming, actionLoadingKey })
       return
     }
   }
 
-  confirming.value = true
   try {
     const response = await confirmBatchDispatch({
       planId: previewData.value.planId,
@@ -538,7 +549,7 @@ async function confirm(replay = false) {
     console.error('确认批量派发失败:', error)
     message.error(error?.message || '确认执行失败，请刷新预览')
   } finally {
-    confirming.value = false
+    releaseBatchConfirmLock({ confirming, actionLoadingKey })
   }
 }
 
@@ -548,9 +559,10 @@ function replayConfirm() {
 
 async function retryFailedConfirmItems() {
   const items = retryableConfirmItems.value
-  if (!items.length || !confirmData.value?.planId) return
+  if (!items.length || !confirmData.value?.planId || actionLoadingKey.value) return
   const sourceItemIds = items.map(item => item.itemId).sort()
   const retryKey = `batch-retry:${confirmData.value.planId}:${sourceItemIds.join(',')}`
+  actionLoadingKey.value = `retry:${confirmData.value.planId}`
   try {
     const response = await retryPreviewBatchDispatch({
       sourcePlanId: confirmData.value.planId,
@@ -566,6 +578,8 @@ async function retryFailedConfirmItems() {
   } catch (error) {
     console.error('生成失败项恢复预览失败:', error)
     message.error(error?.message || '生成恢复预览失败')
+  } finally {
+    actionLoadingKey.value = ''
   }
 }
 
