@@ -145,12 +145,23 @@ test('TC-003 任务分页 API 在发送前拒绝 status 与 statuses 混用', ()
 
 test('TC-005 详情请求只允许最新任务响应提交详情状态', () => {
   const detailRequestSource = storeSource.slice(storeSource.indexOf('async function fetchJobDetail'))
-  assert.match(storeSource, /const detailRequestGuard = createLatestRequestGuard\(\)/)
-  assert.match(detailRequestSource, /const requestId = detailRequestGuard\.begin\(\)/)
-  assert.match(detailRequestSource, /!detailRequestGuard\.isCurrent\(requestId\)/)
+  assert.match(storeSource, /detailRequestGuard = createLatestRequestGuard\(\)/)
+  assert.match(detailRequestSource, /const guard = detailRequestGuard/)
+  assert.match(detailRequestSource, /const requestId = guard\.begin\(\)/)
+  assert.match(detailRequestSource, /guard\.isCurrent\(requestId\)/)
   assert.match(detailRequestSource, /cacheJobDetail\(id, detail\)/)
-  assert.match(detailRequestSource, /if \(detailRequestGuard\.isCurrent\(requestId\)\) detailLoading\.value = false/)
-  assert.match(detailRequestSource, /if \(!detailRequestGuard\.isCurrent\(requestId\)\) return null/)
+  assert.doesNotMatch(detailRequestSource, /detailRequestGuard\.isCurrent\(requestId\)/)
+  assert.match(storeSource, /function invalidateJobDetailRequest\(\)/)
+  assert.match(storeSource, /detailRequestGuard\.invalidate\(\)/)
+})
+
+test('TC-005 详情恢复可从活动页查找或按保存 ID 直接加载，关闭会失效详情请求', () => {
+  assert.match(queueSource, /\[\.\.\.queueData\.value, \.\.\.activePageData\.value\]\.find/)
+  assert.match(queueSource, /else openTaskDetail\(\{ id: jobId \}\)/)
+  const fetchQueueSource = queueSource.slice(queueSource.indexOf('const fetchQueue ='), queueSource.indexOf('const handleActivePageChange'))
+  assert.match(fetchQueueSource, /finally[\s\S]*restoreTaskDetailContext\(\)/)
+  assert.match(historySource, /jobStore\.invalidateJobDetailRequest\(\)/)
+  assert.match(queueSource, /jobStore\.invalidateJobDetailRequest\(\)/)
 })
 
 test('TC-003 历史页固定终态和完成时间字段，并在重置时恢复默认分页条件', () => {

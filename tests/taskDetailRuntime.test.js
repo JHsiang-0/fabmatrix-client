@@ -17,10 +17,12 @@ const axiosResponse = (config, data) => ({
 
 const deferred = () => {
   let resolve
-  const promise = new Promise(done => {
+  let reject
+  const promise = new Promise((done, fail) => {
     resolve = done
+    reject = fail
   })
-  return { promise, resolve }
+  return { promise, resolve, reject }
 }
 
 const waitFor = async predicate => {
@@ -86,6 +88,50 @@ test('不同任务快速切换时旧详情响应不会覆盖最新详情、缓�
   assert.equal(detail.fileName, '最新任务.gcode')
   assert.equal(store.jobDetails.get('1002').fileName, '最新任务.gcode')
   assert.equal(store.jobDetails.has('1001'), false)
+  assert.equal(store.detailError, null)
+  assert.equal(store.detailLoading, false)
+
+  const lateSuccess = store.fetchJobDetail('1003')
+  await waitFor(() => requests.has('1003'))
+  store.invalidateJobDetailRequest()
+  const currentSuccess = store.fetchJobDetail('1004')
+  await waitFor(() => requests.has('1004'))
+  requests.get('1003').resolve(axiosResponse(requests.get('1003').config, {
+    id: '1003',
+    fileId: '22',
+    status: 'QUEUED',
+    fileName: '关闭后到达.gcode'
+  }))
+  assert.equal(await lateSuccess, null)
+  assert.equal(store.jobDetails.has('1003'), false)
+  assert.equal(store.detailError, null)
+  assert.equal(store.detailLoading, true)
+  requests.get('1004').resolve(axiosResponse(requests.get('1004').config, {
+    id: '1004',
+    fileId: '23',
+    status: 'PRINTING',
+    fileName: '当前任务.gcode'
+  }))
+  assert.equal((await currentSuccess).fileName, '当前任务.gcode')
+  assert.equal(store.detailLoading, false)
+
+  const lateFailure = store.fetchJobDetail('1005')
+  await waitFor(() => requests.has('1005'))
+  store.invalidateJobDetailRequest()
+  const currentFailure = store.fetchJobDetail('1006')
+  await waitFor(() => requests.has('1006'))
+  requests.get('1005').reject(new Error('关闭后的旧详情失败'))
+  assert.equal(await lateFailure, null)
+  assert.equal(store.jobDetails.has('1005'), false)
+  assert.equal(store.detailError, null)
+  assert.equal(store.detailLoading, true)
+  requests.get('1006').resolve(axiosResponse(requests.get('1006').config, {
+    id: '1006',
+    fileId: '24',
+    status: 'PAUSED',
+    fileName: '当前任务-失败分支.gcode'
+  }))
+  assert.equal((await currentFailure).fileName, '当前任务-失败分支.gcode')
   assert.equal(store.detailError, null)
   assert.equal(store.detailLoading, false)
 })

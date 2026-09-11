@@ -68,13 +68,13 @@ test('显示适配器按集合选择当前值或历史快照，并统一处理�
   assert.equal(getJobDisplay(job, 'history').operatorUsername, 'snapshot-operator')
 
   const missing = getJobDisplay({ id: '9007199254740993', fileId: '9007199254740995', printerId: '9007199254740997', userId: '7', operatorId: null })
-  assert.equal(missing.fileName, '已删除文件 #9007199254740995')
-  assert.equal(missing.printerName, '已删除打印机 #9007199254740997')
-  assert.equal(missing.machineNumber, '已删除打印机 #9007199254740997')
-  assert.equal(missing.creatorUsername, '未知用户 #7')
+  assert.equal(missing.fileName, '关联不可用文件 #9007199254740995')
+  assert.equal(missing.printerName, '关联不可用打印机 #9007199254740997')
+  assert.equal(missing.machineNumber, '关联不可用打印机 #9007199254740997')
+  assert.equal(missing.creatorUsername, '关联不可用用户 #7')
   assert.equal(missing.operatorUsername, '未分配')
   assert.equal(getJobDisplay({}).printerName, '未分配')
-  assert.equal(getJobDisplay({}).fileName, '未知文件')
+  assert.equal(getJobDisplay({}).fileName, '字段缺失文件')
 })
 
 test('详情适配器按活动当前资源优先、历史任务快照优先并返回来源', () => {
@@ -116,12 +116,69 @@ test('详情适配器按活动当前资源优先、历史任务快照优先并�
     userId: '9007199254740999',
     operatorId: null
   }, 'current')
-  assert.equal(missing.fileName, '已删除文件 #9007199254740995')
-  assert.equal(missing.printerName, '已删除打印机 #9007199254740997')
-  assert.equal(missing.sources.fileName, '关联已删除')
-  assert.equal(missing.sources.printerName, '关联已删除')
+  assert.equal(missing.fileName, '关联不可用文件 #9007199254740995')
+  assert.equal(missing.printerName, '关联不可用打印机 #9007199254740997')
+  assert.equal(missing.sources.fileName, '关联不可用')
+  assert.equal(missing.sources.printerName, '关联不可用')
   assert.equal(missing.operatorUsername, '未分配')
   assert.equal(missing.sources.operatorUsername, '未分配')
+})
+
+test('详情适配器以打印机整体关联决定来源，部分快照不会把另一字段误报为未分配', () => {
+  const cases = [
+    {
+      name: '活动当前名称优先，机器编号缺失',
+      mode: 'current',
+      job: { printerName: '当前设备', machineNumber: '   ', machineNumberSnapshot: '历史编号' },
+      expected: ['当前设备', '字段缺失机器编号', '当前资源']
+    },
+    {
+      name: '活动当前机器编号优先，名称缺失',
+      mode: 'current',
+      job: { printerNameSnapshot: '历史设备', machineNumber: '当前编号' },
+      expected: ['字段缺失打印机名称', '当前编号', '当前资源']
+    },
+    {
+      name: '历史快照名称优先，机器编号缺失',
+      mode: 'history',
+      job: { printerName: '当前设备', machineNumber: '当前编号', printerNameSnapshot: '执行时设备' },
+      expected: ['执行时设备', '字段缺失机器编号', '任务快照']
+    },
+    {
+      name: '历史快照机器编号优先，名称缺失',
+      mode: 'history',
+      job: { printerName: '当前设备', machineNumber: '当前编号', machineNumberSnapshot: '执行时编号' },
+      expected: ['字段缺失打印机名称', '执行时编号', '任务快照']
+    },
+    {
+      name: '历史无快照时回退当前整体关联',
+      mode: 'history',
+      job: { printerName: '当前设备', machineNumber: '当前编号' },
+      expected: ['当前设备', '当前编号', '当前资源']
+    }
+  ]
+
+  cases.forEach(({ name, mode, job, expected }) => {
+    const display = getJobDetailDisplay({ printerId: null, ...job }, mode)
+    assert.deepEqual([
+      display.printerName,
+      display.machineNumber,
+      display.sources.printerName
+    ], expected, name)
+    assert.equal(display.sources.machineNumber, expected[2], name)
+    assert.notEqual(display.machineNumber, '未分配', name)
+  })
+
+  const unavailable = getJobDetailDisplay({ printerId: '9007199254740997' }, 'current')
+  assert.equal(unavailable.sources.printerName, '关联不可用')
+  assert.equal(unavailable.sources.machineNumber, '关联不可用')
+  assert.doesNotMatch(unavailable.printerName, /关联已删除/)
+
+  const unassigned = getJobDetailDisplay({}, 'current')
+  assert.equal(unassigned.printerName, '未分配')
+  assert.equal(unassigned.machineNumber, '未分配')
+  assert.equal(unassigned.sources.printerName, '未分配')
+  assert.equal(unassigned.sources.machineNumber, '未分配')
 })
 
 test('800×560 窄视口保留组件视口、内部横向滚动和固定操作列（静态 DOM/CSS 护栏）', () => {

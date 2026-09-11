@@ -34,6 +34,9 @@
       </div>
       <template v-else-if="task">
         <t-alert v-if="error" theme="error" :title="error" :close-btn="false" class="task-detail-drawer__error-alert" />
+        <t-alert v-if="reconcileStale" theme="error" :close-btn="false" class="task-detail-drawer__stale-alert">
+          当前任务详情刷新失败，已停止人工核对操作，请刷新任务详情后再试。
+        </t-alert>
         <t-alert
           v-if="task.status === 'RECONCILING'"
           theme="warning"
@@ -43,10 +46,10 @@
           <template #default>设备状态无法自动确认，请人工核对打印结果。</template>
           <template #operation>
             <t-space size="small" break-line class="task-detail-drawer__reconcile-actions">
-              <t-button size="small" theme="success" :disabled="reconcileLoading" @click="openReconcile('COMPLETED')">确认完成</t-button>
-              <t-button size="small" theme="danger" variant="outline" :disabled="reconcileLoading" @click="openReconcile('FAILED')">确认失败</t-button>
-              <t-button size="small" theme="warning" variant="outline" :disabled="reconcileLoading" @click="openReconcile('CANCELLED')">确认取消</t-button>
-              <t-button size="small" variant="outline" :disabled="reconcileLoading" @click="openReconcile('QUEUED')">重新排队</t-button>
+              <t-button size="small" theme="success" :disabled="reconcileLoading || reconcileStale" @click="openReconcile('COMPLETED')">确认完成</t-button>
+              <t-button size="small" theme="danger" variant="outline" :disabled="reconcileLoading || reconcileStale" @click="openReconcile('FAILED')">确认失败</t-button>
+              <t-button size="small" theme="warning" variant="outline" :disabled="reconcileLoading || reconcileStale" @click="openReconcile('CANCELLED')">确认取消</t-button>
+              <t-button size="small" variant="outline" :disabled="reconcileLoading || reconcileStale" @click="openReconcile('QUEUED')">重新排队</t-button>
             </t-space>
           </template>
         </t-alert>
@@ -185,6 +188,9 @@
         </t-select>
       </t-form-item>
       <t-form-item label="核对原因" name="reason">
+        <t-alert v-if="reconcileValidationError" theme="error" :close-btn="false" class="task-detail-drawer__form-error">
+          {{ reconcileValidationError }}
+        </t-alert>
         <t-textarea
           v-model="reconcileForm.reason"
           :maxlength="255"
@@ -211,7 +217,9 @@ const props = defineProps({
   task: { type: Object, default: null },
   loading: { type: Boolean, default: false },
   error: { type: String, default: '' },
-  reconcileLoading: { type: Boolean, default: false }
+  reconcileLoading: { type: Boolean, default: false },
+  reconcileSuccessKey: { type: [String, Number], default: 0 },
+  reconcileStale: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['update:modelValue', 'reconcile'])
@@ -228,7 +236,7 @@ const statusView = computed(() => getStatusView('job', props.task?.status))
 const sourceTagTheme = source => {
   if (source === JOB_DISPLAY_SOURCE.CURRENT) return 'primary'
   if (source === JOB_DISPLAY_SOURCE.SNAPSHOT) return 'warning'
-  if (source === JOB_DISPLAY_SOURCE.DELETED) return 'danger'
+  if (source === JOB_DISPLAY_SOURCE.UNAVAILABLE) return 'danger'
   return 'default'
 }
 
@@ -247,17 +255,16 @@ const reconcileForm = ref({
   result: 'COMPLETED',
   reason: ''
 })
+const reconcileValidationError = ref('')
 const reconcileRules = {
   result: [{ required: true, message: '请选择核对结果', trigger: 'change' }],
-  reason: [
-    { required: true, message: '请填写核对原因', trigger: 'blur' },
-    { max: 255, message: '核对原因最多 255 个字符', trigger: 'blur' }
-  ]
+  reason: [{ required: true, message: '请填写核对原因', trigger: 'blur' }]
 }
 
 function resetReconcile() {
   reconcileDialogVisible.value = false
   reconcileForm.value = { result: 'COMPLETED', reason: '' }
+  reconcileValidationError.value = ''
 }
 
 watch(() => props.modelValue, visible => {
@@ -268,25 +275,45 @@ watch(() => props.task?.id, () => {
   resetReconcile()
 })
 
+watch(() => props.reconcileSuccessKey, (value, previous) => {
+  if (value !== previous) resetReconcile()
+})
+
 const openReconcile = result => {
-  if (props.reconcileLoading || props.task?.status !== 'RECONCILING') return
+  if (props.reconcileLoading || props.reconcileStale || props.task?.status !== 'RECONCILING') return
   reconcileForm.value = { result, reason: '' }
+  reconcileValidationError.value = ''
   reconcileDialogVisible.value = true
 }
 
 const submitReconcile = async () => {
-  if (props.reconcileLoading || props.task?.status !== 'RECONCILING') return
+  if (props.reconcileLoading || props.reconcileStale || props.task?.status !== 'RECONCILING') return
+  reconcileValidationError.value = ''
+  let validationResult
   try {
-    await reconcileFormRef.value?.validate()
+    validationResult = await reconcileFormRef.value?.validate()
   } catch {
+    return
+  }
+  if (validationResult !== true) {
+    reconcileValidationError.value = '请修正表单后再提交'
+    return
+  }
+
+  const reason = reconcileForm.value.reason.trim()
+  if (!reason) {
+    reconcileValidationError.value = '请填写核对原因'
+    return
+  }
+  if (reason.length > 255) {
+    reconcileValidationError.value = '核对原因最多 255 个字符'
     return
   }
 
   emit('reconcile', {
     result: reconcileForm.value.result,
-    reason: reconcileForm.value.reason.trim()
+    reason
   })
-  reconcileDialogVisible.value = false
 }
 </script>
 
@@ -386,6 +413,11 @@ const submitReconcile = async () => {
   display: flex;
   flex-direction: column;
   gap: var(--app-spacing-3);
+}
+
+.task-detail-drawer__stale-alert,
+.task-detail-drawer__form-error {
+  overflow-wrap: anywhere;
 }
 
 .task-detail-drawer__reconcile-actions {

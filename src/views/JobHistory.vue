@@ -224,6 +224,8 @@
       :loading="detailLoading"
       :error="detailErrorText"
       :reconcile-loading="reconcileSubmitting"
+      :reconcile-success-key="reconcileSuccessKey"
+      :reconcile-stale="reconcileStale"
       @update:model-value="handleTaskDetailVisibility"
       @reconcile="handleReconcile"
     />
@@ -270,11 +272,14 @@ const tableData = ref([])
 const detailDrawerVisible = ref(false)
 const selectedJob = ref(null)
 const reconcileSubmitting = ref(false)
+const reconcileSuccessKey = ref(0)
+const reconcileStale = ref(false)
 const JOB_HISTORY_DETAIL_CONTEXT_KEY = 'farm-ui:job-history-detail'
 const getHistoryDisplay = getHistoryJobDisplay
 
 const openTaskDetail = job => {
   selectedJob.value = job
+  reconcileStale.value = false
   sessionStorage.setItem(JOB_HISTORY_DETAIL_CONTEXT_KEY, String(job.id))
   detailDrawerVisible.value = true
   jobStore.fetchJobDetail(job.id).then(detail => {
@@ -286,33 +291,59 @@ const openTaskDetail = job => {
 
 const handleTaskDetailVisibility = visible => {
   if (!visible) {
+    jobStore.invalidateJobDetailRequest()
     detailDrawerVisible.value = false
     selectedJob.value = null
+    reconcileStale.value = false
     sessionStorage.removeItem(JOB_HISTORY_DETAIL_CONTEXT_KEY)
   }
 }
 
+const refreshReconcileContext = async job => {
+  const refreshResults = await Promise.allSettled([
+    jobStore.fetchJobDetail(job.id),
+    fetchData({ rethrow: true }),
+    jobStore.fetchQueue(),
+    jobStore.fetchActive(),
+    realtimeStore.refreshPrinterSnapshot()
+  ])
+  const [detailResult, historyResult, queueResult, activeResult, printerResult] = refreshResults
+  const isCurrentJob = selectedJob.value && String(selectedJob.value.id) === String(job.id)
+
+  if (isCurrentJob) {
+    if (detailResult.status === 'rejected') {
+      reconcileStale.value = true
+      message.error('任务详情刷新失败，已保留旧详情并锁定人工核对操作')
+    } else if (detailResult.status === 'fulfilled' && detailResult.value) {
+      selectedJob.value = detailResult.value
+      reconcileStale.value = false
+    } else {
+      reconcileStale.value = true
+      message.error('任务详情刷新失败，已保留旧详情并锁定人工核对操作')
+    }
+  }
+  if (historyResult.status === 'rejected') message.warning('打印历史列表刷新失败，请稍后手动刷新')
+  if (queueResult.status === 'rejected') message.warning('待派发任务列表刷新失败，请稍后手动刷新')
+  if (activeResult.status === 'rejected') message.warning('活动任务列表刷新失败，请稍后手动刷新')
+  if (printerResult.status === 'rejected') message.warning('打印机状态刷新失败，请稍后手动刷新看板')
+
+  return refreshResults
+}
+
 const handleReconcile = async payload => {
   const job = selectedJob.value
-  if (reconcileSubmitting.value || !job || job.status !== 'RECONCILING') return
+  if (reconcileSubmitting.value || reconcileStale.value || !job || job.status !== 'RECONCILING') return
 
   reconcileSubmitting.value = true
   try {
     await reconcilePrintJob(job.id, payload)
     message.success('人工核对已提交')
-
-    const refreshResults = await Promise.allSettled([
-      jobStore.fetchJobDetail(job.id),
-      fetchData(),
-      realtimeStore.refreshPrinterSnapshot()
-    ])
-    const detailResult = refreshResults[0]
-    if (detailResult.status === 'fulfilled' && detailResult.value && selectedJob.value && String(selectedJob.value.id) === String(job.id)) {
-      selectedJob.value = detailResult.value
-    }
+    await refreshReconcileContext(job)
+    if (selectedJob.value && String(selectedJob.value.id) === String(job.id)) reconcileSuccessKey.value += 1
   } catch (error) {
+    console.error('人工核对请求失败:', error)
     if (!error?.toastShown) message.error(error?.message || '人工核对失败')
-    await fetchData()
+    await refreshReconcileContext(job)
   } finally {
     reconcileSubmitting.value = false
   }
@@ -430,7 +461,7 @@ const handlePaginationChange = ({ current, pageSize }) => {
 }
 
 // 获取数据
-const fetchData = async () => {
+const fetchData = async ({ rethrow = false } = {}) => {
   loading.value = true
   loadError.value = ''
   try {
@@ -442,13 +473,17 @@ const fetchData = async () => {
       pagination.total = res.data?.total || 0
       restoreTaskDetailContext()
     } else {
-      loadError.value = res.message || '打印历史加载失败，请重试'
-      message.error(res.message || '获取数据失败')
+      const responseError = new Error(res.message || '打印历史加载失败，请重试')
+      responseError.toastShown = true
+      loadError.value = responseError.message
+      message.error(responseError.message)
+      if (rethrow) throw responseError
     }
   } catch (error) {
     console.error('获取打印历史记录失败:', error)
     loadError.value = error?.message || '打印历史加载失败，请重试'
-    message.error('获取打印历史记录失败')
+    if (!error?.toastShown) message.error(error?.message || '获取打印历史记录失败')
+    if (rethrow) throw error
   } finally {
     loading.value = false
   }

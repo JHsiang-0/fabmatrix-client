@@ -29,7 +29,7 @@ export const useJobStore = defineStore('job', () => {
   const activePageSize = ref(10)
   const pendingRealtimeStatuses = new Map()
   const activeRequestGuard = createLatestRequestGuard()
-  const detailRequestGuard = createLatestRequestGuard()
+  let detailRequestGuard = createLatestRequestGuard()
   let realtimeFlushScheduled = false
 
   function cacheJobDetail(id, detail) {
@@ -91,23 +91,31 @@ export const useJobStore = defineStore('job', () => {
   }
 
   async function fetchJobDetail(id) {
-    const requestId = detailRequestGuard.begin()
+    const guard = detailRequestGuard
+    const requestId = guard.begin()
     if (requestId === null) return null
     detailLoading.value = true
     detailError.value = null
     try {
       const response = await getJobDetail(id)
       const detail = response.data
-      if (!detailRequestGuard.isCurrent(requestId)) return null
+      if (!guard.isCurrent(requestId)) return null
       cacheJobDetail(id, detail)
       return detail
     } catch (error) {
-      if (!detailRequestGuard.isCurrent(requestId)) return null
+      if (!guard.isCurrent(requestId)) return null
       detailError.value = error
       throw error
     } finally {
-      if (detailRequestGuard.isCurrent(requestId)) detailLoading.value = false
+      if (guard.isCurrent(requestId)) detailLoading.value = false
     }
+  }
+
+  function invalidateJobDetailRequest() {
+    detailRequestGuard.invalidate()
+    detailRequestGuard = createLatestRequestGuard()
+    detailLoading.value = false
+    detailError.value = null
   }
 
   function normalizeRealtimeJobStatus(message = {}) {
@@ -196,6 +204,7 @@ export const useJobStore = defineStore('job', () => {
     fetchQueue,
     fetchActive,
     fetchJobDetail,
+    invalidateJobDetailRequest,
     applyRealtimeJobStatus,
     applyRealtimeJobStatuses,
     queueRealtimeJobStatus,

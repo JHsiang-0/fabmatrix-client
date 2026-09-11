@@ -444,6 +444,8 @@
       :loading="detailLoading"
       :error="detailErrorText"
       :reconcile-loading="reconcileSubmitting"
+      :reconcile-success-key="reconcileSuccessKey"
+      :reconcile-stale="reconcileStale"
       @update:model-value="handleTaskDetailVisibility"
       @reconcile="handleReconcile"
     />
@@ -527,6 +529,8 @@ const createTaskResults = ref([])
 const createTaskBatchKey = ref('')
 const actionLoadingKey = ref('')
 const reconcileSubmitting = ref(false)
+const reconcileSuccessKey = ref(0)
+const reconcileStale = ref(false)
 
 const createTaskForm = ref({
   fileId: undefined,
@@ -543,6 +547,7 @@ const createTaskRules = {
 
 const openTaskDetail = async job => {
   selectedJob.value = job
+  reconcileStale.value = false
   const jobId = String(job.id)
   sessionStorage.setItem(JOB_QUEUE_DETAIL_CONTEXT_KEY, jobId)
   detailDrawerVisible.value = true
@@ -559,33 +564,57 @@ const openTaskDetail = async job => {
 
 const handleTaskDetailVisibility = visible => {
   if (!visible) {
+    jobStore.invalidateJobDetailRequest()
     detailDrawerVisible.value = false
     selectedJob.value = null
+    reconcileStale.value = false
     sessionStorage.removeItem(JOB_QUEUE_DETAIL_CONTEXT_KEY)
   }
 }
 
+const refreshReconcileContext = async job => {
+  const refreshResults = await Promise.allSettled([
+    jobStore.fetchJobDetail(job.id),
+    jobStore.fetchQueue(),
+    jobStore.fetchActive(),
+    realtimeStore.refreshPrinterSnapshot()
+  ])
+  const [detailResult, queueResult, activeResult, printerResult] = refreshResults
+  const isCurrentJob = selectedJob.value && String(selectedJob.value.id) === String(job.id)
+
+  if (isCurrentJob) {
+    if (detailResult.status === 'rejected') {
+      reconcileStale.value = true
+      message.error('任务详情刷新失败，已保留旧详情并锁定人工核对操作')
+    } else if (detailResult.status === 'fulfilled' && detailResult.value) {
+      selectedJob.value = detailResult.value
+      reconcileStale.value = false
+    } else {
+      reconcileStale.value = true
+      message.error('任务详情刷新失败，已保留旧详情并锁定人工核对操作')
+    }
+  }
+  if (queueResult.status === 'rejected') message.warning('待派发任务列表刷新失败，请稍后手动刷新')
+  if (activeResult.status === 'rejected') message.warning('活动任务列表刷新失败，请稍后手动刷新')
+  if (printerResult.status === 'rejected') message.warning('打印机状态刷新失败，请稍后手动刷新看板')
+
+  return refreshResults
+}
+
 const handleReconcile = async payload => {
   const job = selectedJob.value
-  if (reconcileSubmitting.value || !job || job.status !== 'RECONCILING') return
+  if (reconcileSubmitting.value || reconcileStale.value || !job || job.status !== 'RECONCILING') return
 
   reconcileSubmitting.value = true
   try {
     await reconcilePrintJob(job.id, payload)
     message.success('人工核对已提交')
-
-    const refreshResults = await Promise.allSettled([
-      jobStore.fetchJobDetail(job.id),
-      jobStore.refresh(),
-      realtimeStore.refreshPrinterSnapshot()
-    ])
-    const detailResult = refreshResults[0]
-    if (detailResult.status === 'fulfilled' && detailResult.value && selectedJob.value && String(selectedJob.value.id) === String(job.id)) {
-      selectedJob.value = detailResult.value
-    }
+    await refreshReconcileContext(job)
+    if (selectedJob.value && String(selectedJob.value.id) === String(job.id)) reconcileSuccessKey.value += 1
   } catch (error) {
+    console.error('人工核对请求失败:', error)
     if (!error?.toastShown) message.error(error?.message || '人工核对失败')
-    await fetchQueue()
+    await refreshReconcileContext(job)
   } finally {
     reconcileSubmitting.value = false
   }
@@ -595,8 +624,9 @@ const restoreTaskDetailContext = () => {
   const jobId = sessionStorage.getItem(JOB_QUEUE_DETAIL_CONTEXT_KEY)
   if (!jobId || selectedJob.value) return
 
-  const job = queueData.value.find(item => String(item.id) === jobId)
+  const job = [...queueData.value, ...activePageData.value].find(item => String(item.id) === jobId)
   if (job) openTaskDetail(job)
+  else openTaskDetail({ id: jobId })
 }
 
 const hasValue = value => value !== undefined && value !== null && value !== ''
@@ -809,9 +839,10 @@ const handleActiveAction = async (job, item) => {
 const fetchQueue = async () => {
   try {
     await jobStore.refresh()
-    restoreTaskDetailContext()
   } catch {
     // 请求层已统一提示
+  } finally {
+    restoreTaskDetailContext()
   }
 }
 

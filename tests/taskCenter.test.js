@@ -62,11 +62,29 @@ test('任务详情标题和技术信息遵循可读优先、默认折叠与长�
 })
 
 test('任务详情加载、错误、空状态与核对链路均有显式回归护栏', () => {
+  const submitSource = detailSource.slice(detailSource.indexOf('const submitReconcile'))
   assert.match(detailSource, /任务详情加载中/)
   assert.match(detailSource, /v-else-if="error"[^>]*theme="error"/)
   assert.match(detailSource, /description="未选择任务"/)
   assert.match(detailSource, /设备状态无法自动确认，请人工核对打印结果。/)
   assert.match(detailSource, /reconcileLoading/)
+  assert.match(detailSource, /validationResult = await reconcileFormRef\.value\?\.validate\(\)/)
+  assert.match(detailSource, /validationResult !== true/)
+  assert.match(detailSource, /const reason = reconcileForm\.value\.reason\.trim\(\)/)
+  assert.match(detailSource, /if \(!reason\)/)
+  assert.match(detailSource, /reason\.length > 255/)
+  assert.doesNotMatch(detailSource, /max:\s*255/)
+  assert.match(detailSource, /reason = reconcileForm\.value\.reason\.trim\(\)[\s\S]*reason\.length > 255/)
+  const reasonValidation = submitSource.slice(submitSource.indexOf('const reason'), submitSource.indexOf("emit('reconcile'"))
+  assert.ok(reasonValidation.indexOf('.trim()') < reasonValidation.indexOf('reason.length > 255'))
+  for (const [rawReason, valid] of [
+    [`   ${'x'.repeat(255)}  `, true],
+    [` ${'x'.repeat(256)} `, false]
+  ]) {
+    assert.equal(rawReason.trim().length <= 255, valid)
+  }
+  assert.match(submitSource, /emit\('reconcile',/)
+  assert.doesNotMatch(submitSource, /reconcileDialogVisible\.value = false/)
   assert.match(detailSource, /核对原因最多 255 个字符/)
   assert.match(detailSource, /resetReconcile\(\)/)
   assert.match(detailSource, /watch\(\(\) => props\.task\?\.id/)
@@ -104,11 +122,26 @@ test('任务中心视觉适配保留 TDesign 分区、表格反馈和详情核�
 })
 
 test('任务核对仍有重复提交保护并刷新任务、队列和打印机状态', () => {
-  assert.match(queueSource, /reconcileSubmitting\.value \|\| !job \|\| job\.status !== 'RECONCILING'/)
+  for (const source of [queueSource, historySource]) {
+    assert.match(source, /const refreshResults = await Promise\.allSettled\(/)
+    assert.match(source, /detailResult\.status === 'fulfilled'/)
+    assert.match(source, /detailResult\.status === 'rejected'/)
+    assert.match(source, /reconcileStale\.value = true/)
+    assert.match(source, /catch \(error\)[\s\S]*refreshReconcileContext\(job\)/)
+  }
+  assert.match(queueSource, /reconcileSubmitting\.value \|\| reconcileStale\.value \|\| !job \|\| job\.status !== 'RECONCILING'/)
   assert.match(queueSource, /reconcilePrintJob\(job\.id, payload\)/)
-  assert.match(queueSource, /jobStore\.refresh\(\)/)
+  assert.match(queueSource, /Promise\.allSettled\([\s\S]*jobStore\.fetchQueue\(\)[\s\S]*jobStore\.fetchActive\(\)[\s\S]*refreshPrinterSnapshot\(\)/)
+  assert.match(queueSource, /待派发任务列表刷新失败，请稍后手动刷新/)
+  assert.match(queueSource, /活动任务列表刷新失败，请稍后手动刷新/)
+  assert.match(queueSource, /打印机状态刷新失败，请稍后手动刷新看板/)
+  assert.match(queueSource, /reconcileStale\.value = true/)
+  assert.match(queueSource, /jobStore\.invalidateJobDetailRequest\(\)/)
   assert.match(queueSource, /realtimeStore\.refreshPrinterSnapshot\(\)/)
-  assert.match(historySource, /reconcileSubmitting\.value \|\| !job \|\| job\.status !== 'RECONCILING'/)
+  assert.match(historySource, /reconcileSubmitting\.value \|\| reconcileStale\.value \|\| !job \|\| job\.status !== 'RECONCILING'/)
   assert.match(historySource, /reconcilePrintJob\(job\.id, payload\)/)
-  assert.match(historySource, /fetchData\(\)/)
+  assert.match(historySource, /fetchData\(\{ rethrow: true \}\)/)
+  assert.match(historySource, /待派发任务列表刷新失败，请稍后手动刷新/)
+  assert.match(historySource, /活动任务列表刷新失败，请稍后手动刷新/)
+  assert.match(historySource, /打印机状态刷新失败，请稍后手动刷新看板/)
 })

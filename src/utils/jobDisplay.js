@@ -13,9 +13,9 @@ export const JOB_DISPLAY_MODE = Object.freeze({
 export const JOB_DISPLAY_SOURCE = Object.freeze({
   CURRENT: '当前资源',
   SNAPSHOT: '任务快照',
-  DELETED: '关联已删除',
+  UNAVAILABLE: '关联不可用',
   UNASSIGNED: '未分配',
-  UNKNOWN: '未关联'
+  MISSING: '字段缺失'
 })
 
 const isHistoryMode = mode => mode === JOB_DISPLAY_MODE.HISTORY || mode === 'snapshot-first'
@@ -36,33 +36,17 @@ const pickDisplayValue = (job, mode, currentField, snapshotField) => {
 }
 
 const missingResource = (label, id) => hasDisplayValue(id)
-  ? `已删除${label} #${idText(id)}`
-  : `未知${label}`
+  ? `关联不可用${label} #${idText(id)}`
+  : `字段缺失${label}`
 
 const unknownUser = id => hasDisplayValue(id)
-  ? `未知用户 #${idText(id)}`
-  : '未知用户'
+  ? `关联不可用用户 #${idText(id)}`
+  : '字段缺失用户'
 
 const displayFileName = (job, mode) => (
   pickDisplayValue(job, mode, 'fileName', 'fileNameSnapshot')
   || missingResource('文件', job?.fileId)
 )
-
-const hasHistoricalPrinterIdentity = job => (
-  hasDisplayValue(job?.printerId)
-  || hasDisplayValue(job?.printerNameSnapshot)
-  || hasDisplayValue(job?.machineNumberSnapshot)
-)
-
-const displayPrinterPart = (job, mode, field, snapshotField) => {
-  const hasPrinter = isHistoryMode(mode)
-    ? hasHistoricalPrinterIdentity(job)
-    : hasDisplayValue(job?.printerId)
-
-  if (!hasPrinter) return '未分配'
-  return pickDisplayValue(job, mode, field, snapshotField)
-    || missingResource('打印机', job?.printerId)
-}
 
 const displayUser = (job, mode, currentField, snapshotField, idField, unassignedWhenMissing) => {
   const username = pickDisplayValue(job, mode, currentField, snapshotField)
@@ -78,6 +62,7 @@ const displayUser = (job, mode, currentField, snapshotField, idField, unassigned
  */
 export function getJobDisplay(job = {}, mode = JOB_DISPLAY_MODE.CURRENT) {
   const normalizedMode = isHistoryMode(mode) ? JOB_DISPLAY_MODE.HISTORY : JOB_DISPLAY_MODE.CURRENT
+  const printer = getPrinterDetailDisplay(job, normalizedMode)
 
   return {
     jobId: idText(job.id),
@@ -86,8 +71,8 @@ export function getJobDisplay(job = {}, mode = JOB_DISPLAY_MODE.CURRENT) {
     userId: idText(job.userId),
     operatorId: idText(job.operatorId),
     fileName: displayFileName(job, normalizedMode),
-    printerName: displayPrinterPart(job, normalizedMode, 'printerName', 'printerNameSnapshot'),
-    machineNumber: displayPrinterPart(job, normalizedMode, 'machineNumber', 'machineNumberSnapshot'),
+    printerName: printer.printerName,
+    machineNumber: printer.machineNumber,
     creatorUsername: displayUser(job, normalizedMode, 'creatorUsername', 'creatorUsernameSnapshot', 'userId', false),
     operatorUsername: displayUser(job, normalizedMode, 'operatorUsername', 'operatorUsernameSnapshot', 'operatorId', true)
   }
@@ -111,15 +96,47 @@ const getDetailField = (job, mode, currentField, snapshotField, idField, missing
   if (!hasDisplayValue(job?.[idField])) {
     return {
       value: unassignedValue,
-      source: unassignedValue === '未分配' ? JOB_DISPLAY_SOURCE.UNASSIGNED : JOB_DISPLAY_SOURCE.UNKNOWN
+      source: unassignedValue === '未分配' ? JOB_DISPLAY_SOURCE.UNASSIGNED : JOB_DISPLAY_SOURCE.MISSING
     }
   }
-  return { value: missingValue(job?.[idField]), source: JOB_DISPLAY_SOURCE.DELETED }
+  return { value: missingValue(job?.[idField]), source: JOB_DISPLAY_SOURCE.UNAVAILABLE }
 }
 
 const detailMissingFile = id => missingResource('文件', id)
 const detailMissingPrinter = id => missingResource('打印机', id)
 const detailMissingUser = id => unknownUser(id)
+
+const getPrinterDetailDisplay = (job, mode) => {
+  const current = [displayText(job?.printerName), displayText(job?.machineNumber)]
+  const snapshot = [displayText(job?.printerNameSnapshot), displayText(job?.machineNumberSnapshot)]
+  const hasCurrent = current.some(Boolean)
+  const hasSnapshot = snapshot.some(Boolean)
+  let source
+  let values
+
+  if (isHistoryMode(mode) && hasSnapshot) {
+    source = JOB_DISPLAY_SOURCE.SNAPSHOT
+    values = snapshot
+  } else if (hasCurrent) {
+    source = JOB_DISPLAY_SOURCE.CURRENT
+    values = current
+  } else if (hasSnapshot) {
+    source = JOB_DISPLAY_SOURCE.SNAPSHOT
+    values = snapshot
+  } else if (hasDisplayValue(job?.printerId)) {
+    source = JOB_DISPLAY_SOURCE.UNAVAILABLE
+    values = [detailMissingPrinter(job?.printerId), detailMissingPrinter(job?.printerId)]
+  } else {
+    source = JOB_DISPLAY_SOURCE.UNASSIGNED
+    values = ['未分配', '未分配']
+  }
+
+  return {
+    printerName: values[0] || '字段缺失打印机名称',
+    machineNumber: values[1] || '字段缺失机器编号',
+    source
+  }
+}
 
 /**
  * 任务详情可读摘要适配器。
@@ -133,23 +150,22 @@ const detailMissingUser = id => unknownUser(id)
 export function getJobDetailDisplay(job = {}, mode = JOB_DISPLAY_MODE.CURRENT) {
   const normalizedMode = isHistoryMode(mode) ? JOB_DISPLAY_MODE.HISTORY : JOB_DISPLAY_MODE.CURRENT
   const base = getJobDisplay(job, normalizedMode)
-  const fileName = getDetailField(job, normalizedMode, 'fileName', 'fileNameSnapshot', 'fileId', detailMissingFile, '未知文件')
-  const printerName = getDetailField(job, normalizedMode, 'printerName', 'printerNameSnapshot', 'printerId', detailMissingPrinter, '未分配')
-  const machineNumber = getDetailField(job, normalizedMode, 'machineNumber', 'machineNumberSnapshot', 'printerId', detailMissingPrinter, '未分配')
-  const creatorUsername = getDetailField(job, normalizedMode, 'creatorUsername', 'creatorUsernameSnapshot', 'userId', detailMissingUser, '未知用户')
+  const fileName = getDetailField(job, normalizedMode, 'fileName', 'fileNameSnapshot', 'fileId', detailMissingFile, '字段缺失文件')
+  const printer = getPrinterDetailDisplay(job, normalizedMode)
+  const creatorUsername = getDetailField(job, normalizedMode, 'creatorUsername', 'creatorUsernameSnapshot', 'userId', detailMissingUser, '字段缺失用户')
   const operatorUsername = getDetailField(job, normalizedMode, 'operatorUsername', 'operatorUsernameSnapshot', 'operatorId', detailMissingUser, '未分配')
 
   return {
     ...base,
     fileName: fileName.value,
-    printerName: printerName.value,
-    machineNumber: machineNumber.value,
+    printerName: printer.printerName,
+    machineNumber: printer.machineNumber,
     creatorUsername: creatorUsername.value,
     operatorUsername: operatorUsername.value,
     sources: {
       fileName: fileName.source,
-      printerName: printerName.source,
-      machineNumber: machineNumber.source,
+      printerName: printer.source,
+      machineNumber: printer.source,
       creatorUsername: creatorUsername.source,
       operatorUsername: operatorUsername.source
     },
