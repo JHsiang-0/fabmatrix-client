@@ -1,4 +1,4 @@
-import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
+import { createMemoryHistory, createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { message } from '@/utils/message'
 import { resolveRouteAccess, ROUTE_ACCESS } from '@/utils/permissions'
@@ -6,11 +6,14 @@ import Layout from '@/layout/index.vue' // 引入刚写的布局组件
 
 const APP_ROLES = ['ADMIN', 'OPERATOR']
 const isDesktop = import.meta.env.MODE.startsWith('desktop')
+const routerHistory = typeof window === 'undefined'
+  ? createMemoryHistory(import.meta.env.BASE_URL)
+  : isDesktop
+    ? createWebHashHistory(import.meta.env.BASE_URL)
+    : createWebHistory(import.meta.env.BASE_URL)
 
 const router = createRouter({
-  history: isDesktop
-    ? createWebHashHistory(import.meta.env.BASE_URL)
-    : createWebHistory(import.meta.env.BASE_URL),
+  history: routerHistory,
   routes: [
     {
       path: '/login',

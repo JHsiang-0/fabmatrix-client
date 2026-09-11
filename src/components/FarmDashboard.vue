@@ -205,7 +205,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import {
   CheckCircleIcon,
   ChevronRightIcon,
@@ -258,10 +258,6 @@ const reconnecting = ref(false)
 const isEditMode = ref(false)
 const canManageLayout = computed(() => userStore.isAdmin)
 
-watch(canManageLayout, canManage => {
-  if (!canManage) isEditMode.value = false
-})
-
 /** 拖拽相关状态 */
 const draggedDevice = ref(null)
 const draggedFrom = ref(null)
@@ -285,6 +281,30 @@ const aisleAxisOptions = [
   { label: '纵向过道', value: 'COLUMN' },
   { label: '横向过道', value: 'ROW' }
 ]
+
+const hasUnsavedLayoutChanges = computed(() => Boolean(store.layoutDraft)
+  && (store.layoutDirty || positionChanges.value.length > 0))
+
+function clearLayoutEditingState() {
+  store.discardLayoutEdit()
+  positionChanges.value = []
+  isEditMode.value = false
+  layoutDialogVisible.value = false
+  aisleListVisible.value = false
+  aisleDialogVisible.value = false
+  summaryDialogVisible.value = false
+  shrinkDialogVisible.value = false
+  conflictDialogVisible.value = false
+  outOfBoundsDialogVisible.value = false
+  bindDialogVisible.value = false
+  draggedDevice.value = null
+  draggedFrom.value = null
+  dragOverCell.value = null
+}
+
+watch(canManageLayout, canManage => {
+  if (!canManage) clearLayoutEditingState()
+})
 
 /** 绑定设备弹窗相关状态 */
 const bindDialogVisible = ref(false)
@@ -776,22 +796,25 @@ function toggleEditMode() {
 }
 
 async function cancelLayoutEdit() {
-  if (!store.layoutDirty && !positionChanges.value.length) {
-    store.cancelLayoutEdit()
-    isEditMode.value = false
-    return
-  }
   try {
-    await confirmMessage('当前布局草稿尚未保存，确定放弃修改吗？', '取消布局编辑', {
-      confirmButtonText: '放弃修改',
-      cancelButtonText: '继续编辑',
-      type: 'warning'
-    })
-    store.cancelLayoutEdit()
+    if (hasUnsavedLayoutChanges.value) {
+      await confirmMessage('当前布局草稿尚未保存，确定放弃修改吗？', '取消布局编辑', {
+        confirmButtonText: '放弃修改',
+        cancelButtonText: '继续编辑',
+        type: 'warning'
+      })
+    }
+    const wasStale = store.layoutConflict?.reason === 'STALE_DRAFT'
+    const refreshPromise = store.cancelLayoutEdit()
     positionChanges.value = []
     isEditMode.value = false
+    await refreshPromise
+    if (wasStale) message.success('已重新载入服务端布局')
   } catch (error) {
-    if (error !== 'cancel') console.error('取消布局编辑失败:', error)
+    if (error !== 'cancel') {
+      console.error('取消布局编辑失败:', error)
+      message.error(error?.message || '重新载入布局失败，请手动刷新')
+    }
   }
 }
 
@@ -958,11 +981,9 @@ async function executeSaveLayout() {
 async function reloadLatestLayout() {
   conflictDialogVisible.value = false
   try {
-    await store.loadLayout()
-    await store.fetchDeviceData()
-    positionChanges.value = []
+    clearLayoutEditingState()
+    await store.refreshLayout()
     overflowPolicy.value = 'REJECT'
-    isEditMode.value = false
     message.success('已重新载入服务端布局')
   } catch (error) {
     message.error(error?.message || '重新载入布局失败，请重试')
@@ -970,7 +991,7 @@ async function reloadLatestLayout() {
 }
 
 function handleBeforeUnload(event) {
-  if (isEditMode.value && (store.layoutDirty || positionChanges.value.length)) {
+  if (hasUnsavedLayoutChanges.value) {
     event.preventDefault()
     event.returnValue = ''
   }
@@ -988,8 +1009,8 @@ async function handleRefresh() {
   try {
     message.info('正在刷新打印机数据...')
 
-    // 重新获取设备和任务数据，实时连接继续由应用根部维护。
-    await Promise.all([store.fetchDeviceData(), fetchHistory()])
+    // 同代刷新布局和设备，任务历史并行加载；实时连接继续由应用根部维护。
+    await Promise.all([store.refreshLayout(), fetchHistory()])
 
     updateLastUpdateTime()
     message.success('打印机状态已刷新')
@@ -1018,7 +1039,29 @@ onMounted(() => {
   window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
-onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnload))
+onBeforeRouteLeave(async () => {
+  if (!hasUnsavedLayoutChanges.value) {
+    clearLayoutEditingState()
+    return true
+  }
+  try {
+    await confirmMessage('当前布局草稿尚未保存，确定离开并放弃修改吗？', '离开布局编辑', {
+      confirmButtonText: '放弃并离开',
+      cancelButtonText: '继续编辑',
+      type: 'warning'
+    })
+    clearLayoutEditingState()
+    return true
+  } catch (error) {
+    if (error !== 'cancel') console.error('离开布局编辑确认失败:', error)
+    return false
+  }
+})
+
+onBeforeUnmount(() => {
+  if (typeof window !== 'undefined') window.removeEventListener('beforeunload', handleBeforeUnload)
+  clearLayoutEditingState()
+})
 
 async function initializeDashboard() {
   try {

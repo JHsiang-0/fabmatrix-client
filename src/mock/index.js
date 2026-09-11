@@ -884,12 +884,20 @@ const handleUnallocatedPrinters = config => {
 const handlePositions = config => {
   requireSession(config, ['ADMIN'])
   const positions = Array.isArray(config.data) ? config.data : []
-  positions.forEach(position => {
-    const printer = findPrinter(position.id)
-    if (printer) {
-      printer.gridRow = position.gridRow ?? null
-      printer.gridCol = position.gridCol ?? null
-      printer.updatedAt = now()
+  handleDashboardLayout({
+    ...config,
+    method: 'put',
+    data: {
+      expectedVersion: mockState.dashboardLayout.version,
+      rowCount: mockState.dashboardLayout.rowCount,
+      columnCount: mockState.dashboardLayout.columnCount,
+      aisles: cloneMockData(mockState.dashboardLayout.aisles),
+      overflowPolicy: 'REJECT',
+      positionChanges: positions.map(position => ({
+        printerId: position?.id,
+        gridRow: position?.gridRow ?? null,
+        gridCol: position?.gridCol ?? null
+      }))
     }
   })
   return null

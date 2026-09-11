@@ -38,6 +38,22 @@ test('编辑工作流覆盖取消确认、缩容下架确认、冲突提示和�
   assert.match(source, /onBeforeUnmount\(/)
 })
 
+test('未保存草稿在路由离开时确认，并在权限丢失或卸载时统一清理', () => {
+  assert.match(source, /import \{ onBeforeRouteLeave, useRouter \} from 'vue-router'/)
+  assert.match(source, /const hasUnsavedLayoutChanges = computed/)
+  assert.match(source, /onBeforeRouteLeave\(async \(\) =>/)
+  assert.match(source, /if \(!hasUnsavedLayoutChanges\.value\) \{[\s\S]*clearLayoutEditingState\(\)[\s\S]*return true/)
+  assert.match(source, /放弃并离开/)
+  assert.match(source, /watch\(canManageLayout,[\s\S]*clearLayoutEditingState\(\)/)
+  assert.match(source, /onBeforeUnmount\(\(\) => \{[\s\S]*clearLayoutEditingState\(\)/)
+  assert.match(source, /store\.discardLayoutEdit\(\)/)
+})
+
+test('手动刷新协调获取布局、设备和历史快照', () => {
+  assert.match(source, /Promise\.all\(\[store\.refreshLayout\(\), fetchHistory\(\)\]\)/)
+  assert.doesNotMatch(source, /Promise\.all\(\[store\.fetchDeviceData\(\), fetchHistory\(\)\]\)/)
+})
+
 test('坐标异常告警提供编辑态撤销和查看态重新加载回退动作', () => {
   assert.match(source, /撤销布局修改/)
   assert.match(source, /重新加载服务端数据/)

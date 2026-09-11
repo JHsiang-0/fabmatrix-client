@@ -25,8 +25,8 @@ test('非编辑客户端刷新布局和设备快照，编辑客户端只标记�
   assert.match(gridSource, /const generation = \+\+layoutLoadGeneration/)
   assert.match(gridSource, /if \(generation !== layoutLoadGeneration\) return layoutSnapshot\.value/)
   assert.match(gridSource, /const hasDraft = draftBaseVersion\.value !== null/)
-  assert.match(gridSource, /let reconcileGeneration = 0/)
-  assert.match(gridSource, /if \(generation !== reconcileGeneration/)
+  assert.match(gridSource, /let refreshGeneration = 0/)
+  assert.match(gridSource, /if \(generation !== refreshGeneration/)
   assert.match(gridSource, /layoutLoadController\?\.abort\(\)/)
 })
 
@@ -46,7 +46,7 @@ test('连续布局事件使用 deferred 结果只提交最新协调代次', asyn
   resolveLatest({ version: 3 })
   await new Promise(resolve => setImmediate(resolve))
   assert.deepEqual(committed, { version: 3 })
-  assert.match(gridSource, /const generation = \+\+reconcileGeneration/)
+  assert.match(gridSource, /const generation = \+\+refreshGeneration/)
 })
 
 test('实时恢复使用生命周期代次和 AbortController 隔离断开后的旧分页响应', () => {

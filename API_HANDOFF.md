@@ -229,7 +229,7 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 | PUT | `/printers/positions` | ADMIN | 位置更新数组 | 已弃用；ADMIN 兼容调用并委托动态布局原子事务 |
 | GET | `/printers/unallocated` | ADMIN/OPERATOR | Query：`keyword` | `PrinterVO[]` |
 
-### 4.1.1 动态看板布局（SYNC-002 目标契约，尚未实现）
+### 4.1.1 动态看板布局（SYNC-002 已实现；旧 positions 废弃兼容）
 
 | 方法 | 地址 | 权限 | 参数 | 返回 |
 |---|---|---|---|---|
@@ -810,7 +810,7 @@ LAYOUT_UPDATED    共享布局版本变化（布局字段仅位于 data）
 
 `JOB_STATUS` 只在任务有绑定打印机时发送；没有打印机的 `QUEUED` 任务以 REST 队列/分页结果为准。客户端必须丢弃重复或旧 `sequence` 事件，发现断档或未知 `version` 时重新请求打印机 REST 快照。服务端不会发送包含 API Key、Token、密码、session key 或 RustFS key 的消息。当前五类消息均已实现；`LAYOUT_UPDATED` 的 `printerId` 为 null，布局字段仅位于 `data`，不覆盖设备状态。
 
-当前已实现消息类型和 `FarmStatusMessage` 顶层结构，并由服务端校验类型、时间戳、关联 ID 和敏感字段。鉴权成功后服务端发送一次 `SNAPSHOT`，其 `data.printers` 使用安全 `PrinterVO`，没有打印机时返回空数组。监控任务通过 `WebSocketEventPublisher` 发布 `PRINTER_STATUS` 和 `PRINTER_OFFLINE`：状态/进度数据变化时推送，连续离线只推送一次，设备恢复后重新推送状态。任务服务和监控任务在任务状态 `updateById` 成功后发布 `JOB_STATUS`；有数据库事务时，四类业务事件统一在事务提交后广播，事务回滚不广播；无事务的监控场景直接发布。没有绑定打印机的排队任务不发送任务事件。服务端按 `farm.websocket.heartbeat-interval`（Spring Duration，默认 `30s`）发送协议级 Ping，连接上限按 `farm.websocket.max-connections` 配置（默认 100），失败连接会清理。2026-09-03 的历史容器冒烟曾收到 46 台打印机的快照，后续当前实例验证为 49 台；两者均为当时数据库设备数量，不属于固定契约。前端已完成自动重连、告警展示、重复/乱序事件丢弃、sequence 断档后的 REST 快照恢复和客户端测试，浏览器端完整端到端与真实设备事件仍待后续联调。本阶段已完成握手鉴权，生产环境不再允许匿名广播。
+当前已实现消息类型和 `FarmStatusMessage` 顶层结构，并由服务端校验类型、时间戳、关联 ID 和敏感字段。鉴权成功后服务端发送一次 `SNAPSHOT`，其 `data.printers` 使用安全 `PrinterVO`，没有打印机时返回空数组。监控任务通过 `WebSocketEventPublisher` 发布 `PRINTER_STATUS` 和 `PRINTER_OFFLINE`：状态/进度数据变化时推送，连续离线只推送一次，设备恢复后重新推送状态。任务服务和监控任务在任务状态 `updateById` 成功后发布 `JOB_STATUS`，布局事务发布 `LAYOUT_UPDATED`；有数据库事务时，五类业务事件统一在事务提交后广播，事务回滚不广播；无事务的监控场景直接发布。没有绑定打印机的排队任务不发送任务事件。服务端按 `farm.websocket.heartbeat-interval`（Spring Duration，默认 `30s`）发送协议级 Ping，连接上限按 `farm.websocket.max-connections` 配置（默认 100），失败连接会清理。2026-09-03 的历史容器冒烟曾收到 46 台打印机的快照，后续当前实例验证为 49 台；两者均为当时数据库设备数量，不属于固定契约。前端已完成自动重连、告警展示、重复/乱序事件丢弃、sequence 断档后的 REST 快照恢复和客户端测试，浏览器端完整端到端与真实设备事件仍待后续联调。本阶段已完成握手鉴权，生产环境不再允许匿名广播。
 
 ## 8. 打印机协议适配约定
 

@@ -12,6 +12,12 @@ const request = (method, data, headers = adminHeaders) => mockRequest({
   data,
   headers
 })
+const positionsRequest = data => mockRequest({
+  method: 'PUT',
+  url: '/api/v1/printers/positions',
+  data,
+  headers: adminHeaders
+})
 
 const saveBody = overrides => ({
   expectedVersion: mockState.dashboardLayout.version,
@@ -126,6 +132,52 @@ test('Mock HTTP/WS 路由保留大 ID 字符串并保持布局事件仅使用 da
   const event = events.find(item => item.type === 'LAYOUT_UPDATED')
   assert.equal(event?.data?.layoutVersion, 2)
   assert.equal(event?.layoutVersion, undefined)
+  stream.close()
+  globalThis.window = previousWindow
+})
+
+test('旧 positions 路由复用布局原子校验、回滚和版本事件且保留 null 响应', async () => {
+  const before = JSON.stringify({ layout: mockState.dashboardLayout, printers: mockState.printers })
+  const assertRolledBack = () => {
+    assert.equal(JSON.stringify({ layout: mockState.dashboardLayout, printers: mockState.printers }), before)
+  }
+
+  await assert.rejects(() => positionsRequest([
+    { id: '408', gridRow: 4, gridCol: 12 },
+    { id: '999999', gridRow: 4, gridCol: 11 }
+  ]), error => {
+    assert.equal(error.response.status, 404)
+    return true
+  })
+  assertRolledBack()
+
+  await assert.rejects(() => positionsRequest([
+    { id: '407', gridRow: 4, gridCol: 12 },
+    { id: '408', gridRow: 4, gridCol: 12 }
+  ]), error => {
+    assert.equal(error.response.status, 400)
+    assert.equal(error.response.data.data.reason, 'DUPLICATE_SLOT')
+    return true
+  })
+  assertRolledBack()
+
+  await assert.rejects(() => positionsRequest([
+    { id: '408', gridRow: 5, gridCol: 1 }
+  ]), error => {
+    assert.equal(error.response.status, 400)
+    return true
+  })
+  assertRolledBack()
+
+  const previousWindow = globalThis.window
+  globalThis.window = { setInterval, clearInterval }
+  const events = []
+  const stream = createMockWebSocketStream({ onMessage: event => events.push(event) })
+  const response = await positionsRequest([{ id: '408', gridRow: 4, gridCol: 12 }])
+  assert.equal(response.data, null)
+  assert.equal(mockState.dashboardLayout.version, 2)
+  assert.equal(mockState.printers.find(printer => String(printer.id) === '408').gridRow, 4)
+  assert.equal(events.find(event => event.type === 'LAYOUT_UPDATED')?.data?.layoutVersion, 2)
   stream.close()
   globalThis.window = previousWindow
 })

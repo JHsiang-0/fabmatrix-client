@@ -1,5 +1,7 @@
 # Farm UI v2 设计与审计
 
+> 历史方案说明：本文的固定 4×12、旧 positions 直写和部分失败处理描述已由 SYNC-002 取代。当前实现使用服务端动态布局快照、草稿乐观锁和原子位置保存；旧 positions 仅为 ADMIN 废弃兼容入口。
+
 ## 1. 审计方法与可信度
 
 本设计基于实际源码静态审计，不按文件名、旧页面文案或 TODO 勾选推断功能完成度。已核对：
@@ -262,7 +264,7 @@ PRINTER_STATUS / PRINTER_OFFLINE / JOB_STATUS 增量
 | 扫描 | GET | `/api/v1/printers/scan` | 相同 | 同上 | 部分实现 | subnet 一致 | 基本一致 | ADMIN 正确 | 否：扫描 status/协议不一致 | 展示真实协议和逐项状态 | P0 | 中 |
 | 批量添加 | POST | `/api/v1/printers/batch-add` | 相同 | 同上 | 调用错误 | 否：丢 firmwareType，带无用 name | 否：读 successCount，后端是 inserted/updated | ADMIN 正确 | 否：返回模型错误 | 保留协议，按 BatchUpsertResult 展示 | P0 | 高：RRF 会误录 KLIPPER |
 | MAC/IP查询 | GET | `/by-mac/{mac}`、`/by-ip/{ip}` | 无 | 无 | 未实现/非主流程 | — | — | 双角色 | 未实现 | 仅扫描去重需要时接入 | P2 | 低 |
-| 位置 | PUT | `/api/v1/printers/positions` | 相同 | API、deviceStore、FarmDashboard | 部分实现 | 是 | 只返回总成功消息，无逐项 | ADMIN 正确 | 部分：忽略不存在设备 | 失败回滚视图并刷新 | P0 | 中 |
+| 动态布局与位置 | GET/PUT | `/api/v1/dashboard-layout`；旧 `/printers/positions` 废弃兼容 | 相同 | `api/dashboardLayout.js`、grid/device Store、FarmDashboard | 已实现 | `expectedVersion`、布局、过道、缩容策略和位置变化一致 | 保存返回最新布局与变更摘要；旧入口保留 null 成功响应 | 新资源仅 ADMIN 写，双方读；旧入口仅 ADMIN | 原子校验、整体回滚和版本事件一致 | 冲突保留草稿；放弃过期草稿后刷新布局与设备 | P0 | 真实 MySQL 8.4 最终迁移复核 pending |
 | 未分配 | GET | `/api/v1/printers/unallocated?keyword` | 未发送 keyword，客户端筛选 | `api/printer.js`、BindDeviceDialog | 部分实现 | 部分 | 是 | 页面仅 ADMIN 使用，API本身双角色 | 否：保留 ONLINE 映射 | 支持 keyword，统一状态 | P1 | 低 |
 | 暂停/恢复 | POST | `/api/v1/control/{id}/pause|resume` | 相同 | API、FarmDashboard | 部分实现 | 是 | 是 | 双角色一致 | 否：resume 未路由 | 集中动作矩阵，补 Mock | P0 | 高 |
 | 取消当前设备任务 | POST | `/api/v1/control/{id}/cancel` | 相同 | 同上 | 部分实现 | 是 | 是 | 双角色一致 | 未实现 | 补 Mock 和 422/409 状态 | P0 | 高 |

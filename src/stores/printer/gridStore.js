@@ -32,7 +32,7 @@ export const useGridStore = defineStore('grid', () => {
   let layoutLoadGeneration = 0
   let layoutLoadController = null
   let editGeneration = 0
-  let reconcileGeneration = 0
+  let refreshGeneration = 0
 
   const activeLayout = computed(() => layoutDraft.value || layoutSnapshot.value)
   const layoutVersion = computed(() => layoutSnapshot.value?.version ?? null)
@@ -131,9 +131,22 @@ export const useGridStore = defineStore('grid', () => {
     }
   }
 
+  async function refreshLayout(options = {}) {
+    const generation = ++refreshGeneration
+    const editGenerationAtRequest = editGeneration
+    const latest = await loadLayout()
+    if (generation !== refreshGeneration) return layoutSnapshot.value
+    if (layoutDraft.value && editGeneration !== editGenerationAtRequest) return latest
+    const minimumVersion = Number(options.minimumVersion || 0)
+    if (!layoutDraft.value && minimumVersion > 0
+      && Number(latest?.version || 0) < minimumVersion) return latest
+    await deviceStore.fetchDeviceData()
+    if (generation !== refreshGeneration) return layoutSnapshot.value
+    return latest
+  }
+
   async function reconcileLayoutEvent(nextVersion) {
     if (!layoutSnapshot.value || nextVersion <= Number(layoutSnapshot.value.version || 0)) return
-    const generation = ++reconcileGeneration
     if (layoutDraft.value) {
       layoutConflict.value = {
         reason: 'STALE_DRAFT',
@@ -144,12 +157,7 @@ export const useGridStore = defineStore('grid', () => {
       return
     }
     try {
-      const latest = await loadLayout()
-      if (generation !== reconcileGeneration || !latest
-        || Number(latest.version) < Number(realtimeStore.layoutVersion || nextVersion)) return
-      if (layoutDraft.value) return
-      await deviceStore.fetchDeviceData()
-      if (generation !== reconcileGeneration) return
+      await refreshLayout({ minimumVersion: Number(realtimeStore.layoutVersion || nextVersion) })
     } catch (error) {
       if (!isCancelled(error)) layoutError.value = error
     }
@@ -157,11 +165,9 @@ export const useGridStore = defineStore('grid', () => {
 
   async function recoverAfterRealtimeReconnect() {
     if (!layoutSnapshot.value) return
-    const generation = ++reconcileGeneration
     try {
-      const latest = await loadLayout()
-      if (generation !== reconcileGeneration || !latest) return
-      if (!layoutDraft.value) await deviceStore.fetchDeviceData()
+      if (layoutDraft.value) await loadLayout()
+      else await refreshLayout()
     } catch (error) {
       if (!isCancelled(error)) layoutError.value = error
     }
@@ -202,13 +208,21 @@ export const useGridStore = defineStore('grid', () => {
     return positionDraft.value
   }
 
-  function cancelLayoutEdit() {
+  function discardLayoutEdit() {
     editGeneration++
     layoutDraft.value = null
     positionDraft.value = []
     draftBaseVersion.value = null
     layoutConflict.value = null
     layoutError.value = null
+  }
+
+  async function cancelLayoutEdit(options = {}) {
+    const shouldReload = options.reloadStale !== false
+      && layoutConflict.value?.reason === 'STALE_DRAFT'
+    discardLayoutEdit()
+    if (shouldReload) return refreshLayout()
+    return layoutSnapshot.value
   }
 
   async function saveLayoutDraft(changes = positionDraft.value, overflowPolicy = 'REJECT') {
@@ -282,11 +296,12 @@ export const useGridStore = defineStore('grid', () => {
     invalidPositionDevices,
     statusCounts,
     loadLayout,
-    refreshLayout: loadLayout,
+    refreshLayout,
     beginLayoutEdit,
     startLayoutEdit,
     updateLayoutDraft,
     setPositionDraft,
+    discardLayoutEdit,
     cancelLayoutEdit,
     saveLayoutDraft,
     formatRowLabel: formatGridRowLabel,

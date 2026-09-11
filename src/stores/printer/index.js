@@ -156,6 +156,7 @@ export function usePrinterStore() {
     startLayoutEdit: grid.startLayoutEdit,
     updateLayoutDraft: grid.updateLayoutDraft,
     setPositionDraft: grid.setPositionDraft,
+    discardLayoutEdit: grid.discardLayoutEdit,
     cancelLayoutEdit: grid.cancelLayoutEdit,
     saveLayoutDraft: grid.saveLayoutDraft,
     calculateGridFit: grid.calculateGridFit,
