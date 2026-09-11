@@ -186,15 +186,20 @@ export function deletePrinter(id) {
 
 /**
  * 扫描局域网内的打印机设备
- * @param {string} subnet - 子网地址（如：192.168.1）
+ * @param {string} subnet - 子网地址（如：192.168.0）
  * @returns {Promise<{code: number, message: string, data: Array<ScannedDevice>}>} 扫描结果
  */
-export function scanPrinters(subnet) {
+export function scanPrinters(subnet, options = {}) {
   return request({
     url: '/api/v1/printers/scan',
     method: 'get',
-    params: { subnet }
-  })
+    params: { subnet },
+    timeout: 30_000,
+    ...options
+  }).then(response => mapResponseData(
+    response,
+    data => Array.isArray(data) ? data : []
+  ))
 }
 
 /**
@@ -227,7 +232,10 @@ export function getUnallocatedPrinters() {
     method: 'get'
   }).then(response => mapResponseData(
     response,
-    data => Array.isArray(data) ? data.map(normalizePrinter) : []
+    data => {
+      const records = Array.isArray(data) ? data : data?.records
+      return Array.isArray(records) ? records.map(normalizePrinter) : []
+    }
   ))
 }
 

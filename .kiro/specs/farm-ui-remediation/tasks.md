@@ -1624,3 +1624,41 @@ Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅�
 `UI-004.20.1 数据迁移与权限模型` → `UI-004.20.2 后端接口与测试` → `UI-004.20.3 前端树/目录创建联调` → `UI-004.20.4 文件动作与能力控制` → `UI-004.20.5 浏览器、Electron 与升级验收`。
 
 完成前门禁：前端执行 `npm test`、`npm run lint`、`npm run build`、相关 Browser/Electron E2E；后端执行完整测试与实际迁移预演。每个子任务独立检查 `git status --short`、`git diff --check` 并创建本地提交，不执行 `git push`。
+
+### [x] UI-005 打印机管理交互与信息密度整改
+
+优先级：P1
+
+状态：已完成
+
+目标：在既有打印机列表、详情、监控、未分配设备和局域网扫描契约上，收敛交互入口与信息密度，确保 ADMIN/OPERATOR 权限、加载/空/错状态和响应式滚动语义保持一致。
+
+范围：`src/views/PrinterManage.vue`、确有必要时的 `src/api/printer.js`、相关打印机专项测试和本任务记录；不修改后端、依赖锁、环境文件或 `src/stores/printerStore.js.backup`。
+
+工作内容：
+
+- 仅在 ADMIN 且存在选择项时展示批量启用/停用监控按钮；保留请求和防重复保护。
+- 稳健解包未分配设备响应，删除无契约的协议列，并保证 Drawer 有明确可关闭入口及 Loading/Empty/Error 状态。
+- 将局域网扫描默认网段和提示统一为 `192.168.0`，扫描请求使用独立超时；扫描结果区限高并内部滚动，批量请求保留后端支持的可选字段。
+- 将协议编辑控件改为 TDesign `default-filled` radio-group/radio-button，文案为 RRF、Klipper，提交值仍为 RRF/KLIPPER。
+- 删除查询按钮，名称搜索约 300ms 防抖实时查询，Enter/清空立即查询，筛选或搜索重置页码并在卸载时清理定时器。
+- 隐藏独立 ID 与名称下的 `#id`，缺少 machineNumber 显示 `-`；行点击打开详情，删除详情按钮，阻止行内操作冒泡。
+- 直接使用 StatusTag 展示业务状态，压缩行高，设置表格最小宽度并固定选择列/操作列。
+
+验收：
+
+- 覆盖批量按钮条件显示、协议选择器、实时搜索、隐藏 ID、固定首尾列、未分配响应归一化/可关闭和扫描结果限高测试。
+- 打印机列表、未分配 Drawer、扫描 Dialog 在 800×560 及窄屏下标题、表格滚动和底部操作区可达。
+- 完成专项 `npm test`、`npm run lint`、`npm run build` 与 `git diff --check`，不引入其他 Task 或用户已有改动。
+
+完成记录：批量监控操作仅在 ADMIN 有选择项时出现；列表隐藏内部 ID、名称下 ID 和详情按钮，行点击打开详情，行内操作阻止冒泡，业务状态直接使用 StatusTag，选择列/操作列固定并将数据行压缩为 46px。搜索改为准确的机器名称输入，支持 300ms 防抖、Enter/清空立即刷新、页码重置和卸载清理；协议改为 RRF/Klipper 的 default-filled radio。未分配设备按统一 envelope 的 data 数组稳健解包，移除无契约协议列并为 Drawer 保留显式关闭、加载、空和错误状态。扫描默认 `192.168.0`，请求增加独立 30 秒超时，结果表格限高内部滚动并按字段存在性提交 suggestedName、isNewDevice、firmwareType、apiKey。
+
+修改文件：`src/views/PrinterManage.vue`、`src/api/printer.js`、`tests/printerCenter.test.js`、`tests/printerMonitoring.test.js`、`tests/e2e/electron.spec.js`、本任务记录。
+
+测试：`npm test`（263/263）、`npm run test:e2e -- --reporter=line`（11/11）、`npm run test:electron -- --reporter=line`（3/3）。
+
+lint：`npm run lint` 通过，Oxlint 和 ESLint 均无错误；检查 lint 自动修复后的 diff 未发现任务外改动。
+
+build：`npm run build` 通过；保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
+
+Git 检查：提交前执行 `git status --short`、`git diff --check`，仅暂存本任务实际修改文件；不执行 `git push`。

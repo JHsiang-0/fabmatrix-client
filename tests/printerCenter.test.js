@@ -3,12 +3,18 @@ import test from 'node:test'
 import fs from 'node:fs'
 
 const source = fs.readFileSync(new URL('../src/views/PrinterManage.vue', import.meta.url), 'utf8')
+const printerApiSource = fs.readFileSync(new URL('../src/api/printer.js', import.meta.url), 'utf8')
 const detailSource = fs.readFileSync(new URL('../src/components/device/DeviceDetailDrawer.vue', import.meta.url), 'utf8')
 const tableAdapterSource = fs.readFileSync(new URL('../src/components/TdTable.vue', import.meta.url), 'utf8')
 
 test('打印机中心使用正式名称和状态筛选契约', () => {
   assert.match(source, /v-model="keyword"/)
   assert.match(source, /name: keyword\.value\.trim\(\)/)
+  assert.match(source, /placeholder="搜索机器名称"/)
+  assert.match(source, /@input="scheduleKeywordSearch"/)
+  assert.match(source, /setTimeout\(\(\) => \{/)
+  assert.match(source, /}, 300\)/)
+  assert.match(source, /onUnmounted\(clearKeywordDebounce\)/)
   assert.match(source, /Object\.values\(PRINTER_STATUS\)/)
   assert.doesNotMatch(source, /statusFilterConfig = \{[\s\S]*ATTENTION/)
   assert.match(source, /status: activeStatusFilterKey\.value/)
@@ -38,7 +44,9 @@ test('打印机删除显示关联任务风险并保留逐项执行状态', () =>
 test('打印机列表使用局部滚动和显式详情入口，不再以绝对定位裁剪内容', () => {
   assert.match(source, /height="100%"/)
   assert.doesNotMatch(source, /calc\(100vh - 320px\)/)
-  assert.match(source, /@click\.stop="handleRowClick\(scope\.row\)"/)
+  assert.doesNotMatch(source, /<t-button[^>]*>\s*详情\s*<\/t-button>/)
+  assert.match(source, /@click\.stop="handleEdit\(scope\.row\)"/)
+  assert.match(source, /aria-label="删除打印机"[^>]*@click\.stop/)
   assert.doesNotMatch(source, /printer-manage-card__table[\s\S]*position: absolute/)
   assert.match(source, /printer-manage-card__table[\s\S]*overflow: hidden/)
   assert.match(source, /<t-alert v-if="loadError && tableData\.length"/)
@@ -50,11 +58,55 @@ test('打印机中心视觉适配保留紧凑筛选、表格反馈和响应式�
   assert.match(source, /<t-radio-group[\s\S]*class="printer-management-tabs"/)
   assert.match(source, /const printerStatusTabs = \[\{ value: '', label: '全部' \}/)
   assert.match(source, /class="printer-management-table printer-table"[\s\S]*hover/)
-  assert.match(source, /printer-management-status-card/)
+  assert.doesNotMatch(source, /printer-management-status-card/)
+  assert.match(source, /<StatusTag domain="printer" :status="scope\.row\.status" \/>/)
   assert.match(source, /printer-management-ellipsis/)
   assert.match(source, /printer-management-table-footer/)
   assert.match(source, /\.printer-management-table :deep\(\.t-table__body tr:hover > td\)/)
   assert.match(source, /@media \(max-width: 768px\)/)
+})
+
+test('UI-005 打印机管理压缩字段、固定首尾列并按条件显示批量监控', () => {
+  assert.match(source, /v-if="isAdmin && selectedPrinterIds\.length > 0"/)
+  assert.match(source, /<TdTableColumn v-if="isAdmin" type="selection"[^>]*fixed="left"/)
+  assert.match(source, /<TdTableColumn label="操作"[^>]*fixed="right"/)
+  assert.doesNotMatch(source, /<TdTableColumn prop="id" label="ID"/)
+  assert.match(source, /scope\.row\.machineNumber \|\| '-'/)
+  assert.doesNotMatch(source, /printer-management-muted">#\{\{ scope\.row\.id \}\}/)
+  assert.match(source, /height: 46px/)
+  assert.match(source, /min-width: 1180px/)
+})
+
+test('UI-005 协议选择、扫描默认网段和扫描结果限高使用 TDesign 语义', () => {
+  assert.match(source, /<t-radio-group v-model="form\.firmwareType" variant="default-filled" size="medium"/)
+  assert.match(source, /<t-radio-button value="RRF">RRF<\/t-radio-button>/)
+  assert.match(source, /<t-radio-button value="KLIPPER">Klipper<\/t-radio-button>/)
+  assert.match(source, /const subnet = ref\('192\.168\.0'\)/)
+  assert.match(source, /placeholder="例：192\.168\.0"/)
+  assert.match(source, /<div class="printer-scan-results__table">/)
+  assert.match(source, /class="printer-scan-dialog"/)
+  assert.match(source, /height="240px"/)
+  assert.match(source, /max-height: min\(360px, calc\(100vh - 220px\)\)/)
+  assert.match(source, /max-height: 240px/)
+})
+
+test('UI-005 未分配设备按 envelope data 数组稳健解包并保留关闭入口', () => {
+  assert.match(source, /const data = response\?\.data \?\? response/)
+  assert.match(source, /unallocatedPrinters\.value = Array\.isArray\(data\) \? data : \[\]/)
+  assert.match(source, /<t-drawer v-model:visible="unallocatedDialogVisible"[\s\S]*:close-btn="true"/)
+  assert.match(source, /@close="unallocatedDialogVisible = false"/)
+  const unallocatedColumnsSource = source.split('const unallocatedColumns = [')[1].split(']')[0]
+  assert.doesNotMatch(unallocatedColumnsSource, /firmwareType|协议/)
+})
+
+test('UI-005 扫描 API 使用独立超时且不改变全局请求配置', () => {
+  assert.match(printerApiSource, /export function scanPrinters\(subnet, options = \{\}\)/)
+  assert.match(printerApiSource, /timeout: 30_000/)
+  assert.match(printerApiSource, /data => Array\.isArray\(data\) \? data : \[\]/)
+  assert.match(printerApiSource, /export function getUnallocatedPrinters\(\)/)
+  assert.match(printerApiSource, /const records = Array\.isArray\(data\) \? data : data\?\.records/)
+  assert.match(source, /\['suggestedName', 'isNewDevice', 'firmwareType', 'apiKey'\]/)
+  assert.match(source, /if \(device\[field\] !== undefined && device\[field\] !== null\) payload\[field\] = device\[field\]/)
 })
 
 test('打印机详情抽屉标题有稳定回退且详情内容由 Drawer Body 滚动', () => {

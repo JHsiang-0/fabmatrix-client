@@ -41,8 +41,8 @@
       </template>
       <template #actions>
       <div class="app-page-toolbar__actions printer-page-actions">
-        <t-button v-if="isAdmin" :theme="batchMonitorTarget ? 'success' : 'warning'" variant="outline"
-          :disabled="selectedPrinterIds.length === 0 || monitorActionLoading" :loading="monitorActionLoading"
+        <t-button v-if="isAdmin && selectedPrinterIds.length > 0" :theme="batchMonitorTarget ? 'success' : 'warning'" variant="outline"
+          :disabled="monitorActionLoading" :loading="monitorActionLoading"
           @click="handleBatchMonitorToggle">
           {{ batchMonitorTarget ? '启用监控' : '停用监控' }}{{ selectedPrinterIds.length ? ` (${selectedPrinterIds.length})` : '' }}
         </t-button>
@@ -68,7 +68,7 @@
           v-model="statusFilter"
           class="printer-management-tabs"
           variant="default-filled"
-          size="small"
+          size="medium"
           aria-label="打印机状态筛选"
           @change="applyStatusTab"
         >
@@ -86,13 +86,14 @@
             v-model="keyword"
             class="printer-management-filter__search"
             clearable
-            placeholder="按机器名称、IP 地址或编号搜索"
+            placeholder="搜索机器名称"
+            size="medium"
+            @input="scheduleKeywordSearch"
             @enter="applyFilters"
             @clear="applyFilters"
           >
             <template #prefixIcon><search /></template>
           </t-input>
-          <t-button theme="primary" size="medium" @click="applyFilters">查询</t-button>
         </div>
       </div>
     </section>
@@ -126,12 +127,7 @@
           @selection-change="handlePrinterSelectionChange"
           row-class-name="printer-table-row"
         >
-        <TdTableColumn v-if="isAdmin" type="selection" width="52" align="center" />
-        <TdTableColumn prop="id" label="ID" width="80" align="center">
-          <template #default="scope">
-            <span class="font-mono font-semibold text-gray-600">{{ scope.row.id }}</span>
-          </template>
-        </TdTableColumn>
+        <TdTableColumn v-if="isAdmin" type="selection" width="52" align="center" fixed="left" />
 
         <TdTableColumn prop="name" label="机器名称" min-width="150">
           <template #default="scope">
@@ -140,14 +136,13 @@
                 <span class="printer-management-status-dot" :class="`printer-management-status-dot--${getStatusClass(scope.row.status)}`" />
                 <span class="printer-management-ellipsis" :title="scope.row.name">{{ scope.row.name }}</span>
               </div>
-              <span class="printer-management-muted">#{{ scope.row.id }}</span>
             </div>
           </template>
         </TdTableColumn>
 
         <TdTableColumn prop="machineNumber" label="机器编号" width="110" align="center">
           <template #default="scope">
-            <span class="font-mono text-sm">{{ scope.row.machineNumber || `#${scope.row.id}` }}</span>
+            <span class="font-mono text-sm">{{ scope.row.machineNumber || '-' }}</span>
           </template>
         </TdTableColumn>
 
@@ -159,9 +154,7 @@
 
         <TdTableColumn prop="status" label="当前状态" width="120" align="center">
           <template #default="scope">
-            <span class="printer-management-status-card">
-              <StatusTag domain="printer" :status="scope.row.status" />
-            </span>
+            <StatusTag domain="printer" :status="scope.row.status" />
           </template>
         </TdTableColumn>
 
@@ -198,7 +191,7 @@
         </TdTableColumn>
 
         <TdTableColumn prop="firmwareType" label="协议" width="100" align="center">
-          <template #default="scope">{{ scope.row.firmwareType || '-' }}</template>
+          <template #default="scope">{{ getFirmwareLabel(scope.row.firmwareType) }}</template>
         </TdTableColumn>
 
         <TdTableColumn label="当前任务" width="180" align="center">
@@ -222,14 +215,11 @@
         <TdTableColumn label="操作" width="280" align="center" fixed="right">
           <template #default="scope">
             <div class="flex items-center justify-center gap-1">
-              <t-button size="small" variant="text" @click.stop="handleRowClick(scope.row)">
-                详情
-              </t-button>
               <!-- 确认热床已清理按钮 -->
               <t-button
                 v-if="shouldShowSafeButton(scope.row)"
                 size="small" theme="warning"
-                @click="handleConfirmSafe(scope.row)"
+                @click.stop="handleConfirmSafe(scope.row)"
                 :loading="confirmingSafeIds.includes(scope.row.id)"
               >
                 <span><check /></span>
@@ -239,24 +229,25 @@
               <t-button
                 v-if="shouldShowStartButton(scope.row)"
                 size="small" theme="success"
-                @click="handleStartJob(scope.row)"
+                @click.stop="handleStartJob(scope.row)"
                 :loading="startingJobIds.includes(scope.row.id)"
               >
                 <span><printer /></span>
                 启动打印
               </t-button>
               <!-- 编辑按钮 -->
-              <t-button v-if="isAdmin" size="small" theme="primary" @click="handleEdit(scope.row)">
+              <t-button v-if="isAdmin" size="small" theme="primary" @click.stop="handleEdit(scope.row)">
                 <span><edit /></span>
                 编辑
               </t-button>
               <!-- 删除按钮 -->
               <t-popconfirm v-if="isAdmin" :content="getDeleteMessage(scope.row)"
                 theme="danger"
+                @click.stop
                 @confirm="handleDelete(scope.row.id)"
               >
                 <template #default>
-                  <t-button size="small" theme="danger" variant="outline" aria-label="删除打印机" :loading="deletingIds.includes(scope.row.id)">
+                  <t-button size="small" theme="danger" variant="outline" aria-label="删除打印机" :loading="deletingIds.includes(scope.row.id)" @click.stop>
                     <span><delete /></span>
                     删除
                   </t-button>
@@ -306,10 +297,10 @@
         </t-form-item>
 
         <t-form-item label="设备协议" name="firmwareType">
-          <t-select v-model="form.firmwareType" placeholder="请选择设备协议" style="width: 100%">
-            <t-option label="RRF 3.7" value="RRF" />
-            <t-option label="Klipper / Moonraker" value="KLIPPER" />
-          </t-select>
+          <t-radio-group v-model="form.firmwareType" variant="default-filled" size="medium" class="printer-firmware-options">
+            <t-radio-button value="RRF">RRF</t-radio-button>
+            <t-radio-button value="KLIPPER">Klipper</t-radio-button>
+          </t-radio-group>
         </t-form-item>
 
         <t-form-item label="当前耗材" name="currentMaterial">
@@ -348,7 +339,7 @@
     </t-dialog>
 
     <!-- 未分配设备抽屉 -->
-    <t-drawer v-model:visible="unallocatedDialogVisible" header="未分配设备" size="720px" destroy-on-close>
+    <t-drawer v-model:visible="unallocatedDialogVisible" header="未分配设备" size="720px" :close-btn="true" destroy-on-close @close="unallocatedDialogVisible = false">
       <AsyncState
         v-if="unallocatedLoading || unallocatedError || unallocatedPrinters.length === 0"
         :loading="unallocatedLoading"
@@ -378,7 +369,7 @@
     </t-drawer>
 
     <!-- 扫描局域网设备弹窗 -->
-    <t-dialog v-model:visible="scanDialogVisible" header="扫描局域网设备"
+    <t-dialog v-model:visible="scanDialogVisible" header="扫描局域网设备" class="printer-scan-dialog"
       width="800px"
       destroy-on-close
     >
@@ -388,7 +379,7 @@
           <t-form-item label="网段前缀">
             <t-input
               v-model="subnet"
-              placeholder="例：192.168.1"
+              placeholder="例：192.168.0"
               size="medium"
               :disabled="isScanning"
             >
@@ -413,7 +404,7 @@
       </div>
 
       <!-- 扫描结果表格 -->
-      <div v-else-if="scanResults.length > 0" class="bg-white rounded-lg">
+      <div v-else-if="scanResults.length > 0" class="printer-scan-results bg-white rounded-lg">
         <!-- 统计文案 -->
         <div class="mb-4">
           <t-alert
@@ -424,14 +415,16 @@
         </div>
 
         <!-- 结果表格 -->
+        <div class="printer-scan-results__table">
         <TdTable
           ref="scanTableRef"
           :data="scanResults"
+          height="240px"
           style="width: 100%"
           class="rounded-lg overflow-hidden"
           @selection-change="handleSelectionChange"
         >
-          <TdTableColumn type="selection" width="50" align="center" />
+          <TdTableColumn type="selection" width="50" align="center" fixed="left" />
 
           <TdTableColumn label="设备类型" width="120" align="center">
             <template #default="scope">
@@ -454,14 +447,6 @@
           <TdTableColumn label="MAC 地址" width="140" align="center">
             <template #default="scope">
               <span class="font-mono text-sm font-medium text-gray-700">{{ scope.row.macAddress }}</span>
-            </template>
-          </TdTableColumn>
-
-          <TdTableColumn prop="firmwareType" label="协议" width="130" align="center">
-            <template #default="scope">
-              <t-tag size="small" variant="light-outline" theme="default">
-                {{ scope.row.firmwareType || '-' }}
-              </t-tag>
             </template>
           </TdTableColumn>
 
@@ -493,6 +478,7 @@
             </template>
           </TdTableColumn>
         </TdTable>
+        </div>
       </div>
 
       <!-- 空状态 -->
@@ -525,7 +511,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -590,6 +576,7 @@ const queryParams = reactive({
 })
 
 const keyword = ref('')
+let keywordDebounceTimer = null
 const statusFilter = ref('')
 const statusFilterConfig = Object.fromEntries(Object.entries(PRINTER_STATUS_MAP).map(([value, config]) => [value, {
     label: config.label,
@@ -657,7 +644,7 @@ const rules = {
 
 // ===== 扫描状态 =====
 const scanDialogVisible = ref(false)
-const subnet = ref('192.168.1')
+const subnet = ref('192.168.0')
 const isScanning = ref(false)
 const hasScanned = ref(false)
 const scanResults = ref([])
@@ -672,7 +659,6 @@ const unallocatedColumns = [
   { colKey: 'name', title: '机器名称', ellipsis: true },
   { colKey: 'ipAddress', title: 'IP 地址', width: 150 },
   { colKey: 'status', title: '状态', width: 100, cell: 'status' },
-  { colKey: 'firmwareType', title: '协议', width: 100 },
   { colKey: 'position', title: '位置', width: 140, cell: 'position' }
 ]
 
@@ -736,6 +722,10 @@ const getConnectionTheme = status => ({
   OFFLINE: 'danger',
   UNKNOWN: 'default'
 }[String(status || 'UNKNOWN').toUpperCase()] || 'default')
+
+const getFirmwareLabel = firmwareType => String(firmwareType || '').toUpperCase() === 'KLIPPER'
+  ? 'Klipper'
+  : String(firmwareType || '').toUpperCase() === 'RRF' ? 'RRF' : '-'
 
 // 扫描统计文案
 const scanStatsText = computed(() => {
@@ -1059,13 +1049,29 @@ const fetchData = async () => {
   }
 }
 
+const clearKeywordDebounce = () => {
+  if (keywordDebounceTimer) {
+    clearTimeout(keywordDebounceTimer)
+    keywordDebounceTimer = null
+  }
+}
+
 const applyFilters = () => {
+  clearKeywordDebounce()
   queryParams.pageNum = 1
   const query = { ...route.query }
   if (statusFilter.value) query.status = statusFilter.value
   else delete query.status
   router.replace({ path: route.path, query })
   if (statusFilter.value === activeStatusFilterKey.value) fetchData()
+}
+
+const scheduleKeywordSearch = () => {
+  clearKeywordDebounce()
+  keywordDebounceTimer = setTimeout(() => {
+    keywordDebounceTimer = null
+    applyFilters()
+  }, 300)
 }
 
 const applyStatusTab = value => {
@@ -1083,6 +1089,8 @@ watch(() => route.query.status, value => {
   queryParams.pageNum = 1
   fetchData()
 }, { immediate: true })
+
+onUnmounted(clearKeywordDebounce)
 
 // 点击新增按钮
 const handleAdd = () => {
@@ -1170,7 +1178,9 @@ const loadUnallocatedPrinters = async () => {
   unallocatedLoading.value = true
   unallocatedError.value = ''
   try {
-    unallocatedPrinters.value = await getUnallocatedPrinters()
+    const response = await getUnallocatedPrinters()
+    const data = response?.data ?? response
+    unallocatedPrinters.value = Array.isArray(data) ? data : []
   } catch (error) {
     unallocatedError.value = error?.message || '未分配设备加载失败，请重试'
   } finally {
@@ -1206,8 +1216,9 @@ const handleScan = async () => {
   selectedDevices.value = []
   try {
     const res = await scanPrinters(subnet.value)
+    const devices = res?.data ?? res
     // 为每个设备添加 name 字段（默认使用 suggestedName）
-    scanResults.value = (res.data || []).map(device => ({
+    scanResults.value = (Array.isArray(devices) ? devices : []).map(device => ({
       ...device,
       name: device.suggestedName || ''
     }))
@@ -1223,12 +1234,17 @@ const handleBatchAdd = async () => {
   if (selectedDevices.value.length === 0) return
 
   // 构造符合新 API 契约的请求体
-  const devicesToSubmit = selectedDevices.value.map(device => ({
-    ipAddress: device.ipAddress,
-    macAddress: device.macAddress,
-    name: device.name || device.suggestedName,
-    firmwareType: device.firmwareType
-  }))
+  const devicesToSubmit = selectedDevices.value.map(device => {
+    const payload = {
+      ipAddress: device.ipAddress,
+      macAddress: device.macAddress,
+      name: device.name || device.suggestedName
+    }
+    for (const field of ['suggestedName', 'isNewDevice', 'firmwareType', 'apiKey']) {
+      if (device[field] !== undefined && device[field] !== null) payload[field] = device[field]
+    }
+    return payload
+  })
 
   isBatchAdding.value = true
   try {
@@ -1294,7 +1310,7 @@ const handleBatchAdd = async () => {
   flex: 1 1 auto;
   align-items: center;
   min-width: 0;
-  min-height: 40px;
+  min-height: 32px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -1306,7 +1322,7 @@ const handleBatchAdd = async () => {
 .printer-management-tabs :deep(.t-radio-button) {
   flex: 0 0 auto;
   min-width: 64px;
-  height: 34px;
+  height: 32px;
   justify-content: center;
   color: var(--app-text-secondary);
   border: 0;
@@ -1333,6 +1349,15 @@ const handleBatchAdd = async () => {
   flex: 0 1 280px;
   width: 280px;
   min-width: 0;
+}
+
+.printer-firmware-options {
+  width: 100%;
+}
+
+.printer-firmware-options :deep(.t-radio-button) {
+  flex: 1 1 0;
+  justify-content: center;
 }
 
 .printer-manage-card {
@@ -1371,13 +1396,19 @@ const handleBatchAdd = async () => {
 
 .printer-management-table :deep(.t-table__header tr),
 .printer-management-table :deep(.t-table__body tr) {
-  height: 52px;
+  height: 46px;
 }
 
 .printer-management-table :deep(th),
 .printer-management-table :deep(td) {
   color: var(--app-text-primary);
   font-size: var(--td-font-size-body-small);
+  vertical-align: middle;
+}
+
+.printer-management-table :deep(.t-table__header table),
+.printer-management-table :deep(.t-table__body table) {
+  min-width: 1180px;
 }
 
 .printer-management-table :deep(.t-table__header th) {
@@ -1455,16 +1486,6 @@ const handleBatchAdd = async () => {
 .printer-management-status-dot--offline,
 .printer-management-status-dot--unknown { background: var(--app-text-placeholder); }
 
-.printer-management-status-card {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 72px;
-  padding: var(--app-spacing-1) var(--app-spacing-2);
-  background: var(--app-surface-muted);
-  border-radius: var(--app-radius-small);
-}
-
 .printer-management-connection,
 .printer-management-recent {
   text-align: center;
@@ -1532,6 +1553,32 @@ const handleBatchAdd = async () => {
 
 .printer-filter-bar {
   display: none;
+}
+
+.printer-scan-results {
+  overflow: hidden;
+}
+
+.printer-scan-dialog :deep(.t-dialog__body) {
+  max-height: min(360px, calc(100vh - 220px));
+  overflow-y: auto;
+}
+
+.printer-scan-dialog :deep(.t-dialog__footer) {
+  flex: 0 0 auto;
+}
+
+.printer-scan-results__table {
+  height: 240px;
+  max-height: 240px;
+  overflow: hidden;
+}
+
+.printer-scan-results__table :deep(.td-table-adapter),
+.printer-scan-results__table :deep(.t-table),
+.printer-scan-results__table :deep(.t-table__content) {
+  height: 100%;
+  max-height: 240px;
 }
 
 @media (max-width: 1100px) {
