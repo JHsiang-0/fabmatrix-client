@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { getPrinterDetail, getPrinterList, batchUpdatePositions, updatePrinter } from '@/api/printer'
 import { GRID_CONFIG } from '@/utils/constants'
+import { collectAllPages } from '@/utils/pagination'
 
 const MAX_DETAIL_CACHE_SIZE = 100
 
@@ -104,25 +105,21 @@ export const useDeviceStore = defineStore('device', () => {
   // ============================================
 
   /**
-   * 获取设备数据
-   * @description 从 API 获取打印机列表，并过滤掉无效坐标的设备
+   * 获取全部设备数据。
+   * @description 看板必须保留未分配、半空、重复和越界坐标，交由布局层生成异常清单。
    */
   async function fetchDeviceData() {
     loading.value = true
     error.value = null
     try {
-      const response = await getPrinterList({ pageSize: 100 })
-      const records = response.data?.records || []
+      const firstPage = await getPrinterList({ pageNum: 1, pageSize: 100 })
+      const records = await collectAllPages(
+        (pageNum, pageSize) => getPrinterList({ pageNum, pageSize }),
+        firstPage
+      )
 
-      // 只保留有有效坐标的设备
-      const filtered = records.filter(d => {
-        const hasValidRow = typeof d.gridRow === 'number' && d.gridRow > 0
-        const hasValidCol = typeof d.gridCol === 'number' && d.gridCol > 0
-        return hasValidRow && hasValidCol
-      })
-
-      // 直接赋值，触发 rawDeviceList 的响应式更新，deviceMatrix computed 会自动重新计算
-      rawDeviceList.value = filtered
+      // 直接赋值，触发 rawDeviceList 的响应式更新；异常位置不能在这里静默丢弃。
+      rawDeviceList.value = records
       version.value++
     } catch (requestError) {
       console.error('[DeviceStore] 获取设备数据失败:', requestError)

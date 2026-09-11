@@ -53,6 +53,18 @@ export function usePrinterStore() {
 
   const {
     statusCounts,
+    layoutSnapshot,
+    layoutDraft,
+    layoutVersion,
+    layoutLimits,
+    layoutLoading,
+    layoutSaving,
+    layoutError,
+    layoutConflict,
+    layoutDirty,
+    positionDraft,
+    gridConfig,
+    invalidPositionDevices
   } = storeToRefs(grid)
 
   // ============================================
@@ -90,6 +102,18 @@ export function usePrinterStore() {
     // Getters (来自 gridStore)
     // ============================================
     statusCounts,
+    layoutSnapshot,
+    layoutDraft,
+    layoutVersion,
+    layoutLimits,
+    layoutLoading,
+    layoutSaving,
+    layoutError,
+    layoutConflict,
+    layoutDirty,
+    positionDraft,
+    gridConfig,
+    invalidPositionDevices,
 
     // ============================================
     // Constants (来自 gridStore) - 非响应式
@@ -121,6 +145,16 @@ export function usePrinterStore() {
     getPhysicalCol: grid.getPhysicalCol,
     getPhysicalColByIndex: grid.getPhysicalColByIndex,
     isAisleCell: grid.isAisleCell,
+    getPhysicalRowByIndex: grid.getPhysicalRowByIndex,
+    isAisleRowCell: grid.isAisleRowCell,
+    loadLayout: grid.loadLayout,
+    refreshLayout: grid.refreshLayout,
+    beginLayoutEdit: grid.beginLayoutEdit,
+    updateLayoutDraft: grid.updateLayoutDraft,
+    setPositionDraft: grid.setPositionDraft,
+    cancelLayoutEdit: grid.cancelLayoutEdit,
+    saveLayoutDraft: grid.saveLayoutDraft,
+    calculateGridFit: grid.calculateGridFit,
 
     // ============================================
     // 初始化/清理方法

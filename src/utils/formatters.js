@@ -46,7 +46,15 @@ export function formatFilament(mm) {
  * @returns {string} 行标签（如 A, B, C...）
  */
 export function formatRowLabel(row) {
-  return String.fromCharCode(65 + row - 1)
+  if (!Number.isInteger(row) || row < 1) return ''
+  let value = row
+  let label = ''
+  while (value > 0) {
+    value -= 1
+    label = String.fromCharCode(65 + (value % 26)) + label
+    value = Math.floor(value / 26)
+  }
+  return label
 }
 
 /**

@@ -81,7 +81,7 @@ SecurityConfig 显式限制 GET 为 ADMIN/OPERATOR、PUT 为 ADMIN（PUT 保存�
 `REJECT/UNALLOCATE` 缩容策略和结构化冲突响应；审计及 `LAYOUT_UPDATED` 均在事务提交后处理，旧 `/printers/positions`
 入口已停用。新增保存、版本冲突、缩容、权限、结构化错误和 WebSocket 提交后广播测试，后端专项与全量 Maven 测试通过。
 
-### [ ] SYNC-002.4 实现前端布局 API、Store 与纯函数
+### [x] SYNC-002.4 实现前端布局 API、Store 与纯函数
 
 - 新增布局 API 和响应适配，Long ID 继续按字符串安全规范处理。
 - `gridStore` 增加权威快照、编辑草稿、版本、限制、loading/error/conflict 和保存动作。
@@ -90,6 +90,8 @@ SecurityConfig 显式限制 GET 为 ADMIN/OPERATOR、PUT 为 ADMIN（PUT 保存�
 - 删除布局 localStorage 权威读写，不修改 realtimeStore 的设备状态合并语义。
 - 增加纯函数、API、Store 和超过 100 台设备的单元测试。
 - 验收：1×1、4×12、30×60、多过道、交叉、AA 行标签、非法输入和异常坐标均有确定结果。
+
+完成记录：已新增布局 GET/PUT API 适配，Long 类型打印机 ID 在响应边界统一为字符串；`gridStore` 管理服务端权威快照、编辑草稿、版本、限制、保存状态和冲突详情，设备 Store 聚合全部打印机分页且保留异常坐标。新增无 localStorage 权威读写的布局纯函数，支持 1×1、默认 4×12、30×60、多横纵过道交叉、Excel 风格 AA 行标签、严格布局校验、半空/越界/重复槽位清单与视口计算；专项和前端全量测试、lint、build 均通过。
 
 ### [ ] SYNC-002.5 实现动态网格渲染与大布局滚动
 
