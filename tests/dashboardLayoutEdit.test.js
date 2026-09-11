@@ -28,3 +28,9 @@ test('编辑工作流覆盖取消确认、缩容下架确认、冲突提示和�
   assert.match(source, /beforeunload/)
   assert.match(source, /onBeforeUnmount\(/)
 })
+
+test('坐标异常告警提供编辑态撤销和查看态重新加载回退动作', () => {
+  assert.match(source, /撤销布局修改/)
+  assert.match(source, /重新加载服务端数据/)
+  assert.match(source, /class="dashboard-position-alert"/)
+})

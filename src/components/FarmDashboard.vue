@@ -46,6 +46,17 @@
             </li>
           </ul>
         </template>
+        <template #operation>
+          <t-space>
+            <t-button v-if="isEditMode" size="small" variant="outline" @click="cancelLayoutEdit">
+              撤销布局修改
+            </t-button>
+            <t-button v-else size="small" variant="outline" :loading="store.layoutLoading"
+              @click="reloadLatestLayout">
+              重新加载服务端数据
+            </t-button>
+          </t-space>
+        </template>
       </t-alert>
     </div>
 
@@ -1019,6 +1030,7 @@ async function initializeDashboard() {
 }
 
 .farm-dashboard {
+  position: relative;
   min-width: 0;
   background: var(--app-page-background);
   color: var(--app-text-primary);
@@ -1076,8 +1088,15 @@ async function initializeDashboard() {
 }
 
 .dashboard-position-alert {
-  flex: 0 0 auto;
-  margin: 0 var(--app-spacing-4);
+  position: absolute;
+  z-index: 20;
+  top: 3.5rem;
+  right: var(--app-spacing-4);
+  left: var(--app-spacing-4);
+  max-height: min(14rem, 40vh);
+  margin: 0;
+  overflow: auto;
+  box-shadow: var(--app-shadow);
 }
 
 .dashboard-position-issues,

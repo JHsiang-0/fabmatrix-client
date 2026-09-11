@@ -331,7 +331,6 @@ onBeforeUnmount(() => {
 }
 
 .grid-map-canvas.is-edit-mode {
-  padding: 0.25rem;
   border-radius: 0.375rem;
   background-color: #f3f4f6;
   background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px),
