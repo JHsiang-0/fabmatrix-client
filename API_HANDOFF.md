@@ -22,7 +22,7 @@ fileName, printerName, machineNumber, creatorUsername, operatorUsername, materia
 
 历史快照字段为 `fileNameSnapshot`、`printerNameSnapshot`、`machineNumberSnapshot`、`creatorUsernameSnapshot`、`operatorUsernameSnapshot`；重试字段为 `retryOfJobId`、`rootJobId`、`attemptNumber`。
 
-当前 Java Controller 仍返回 `PrintJobVO`，当前接口尚未实现上述目标读模型字段。TC-002/TC-003/TC-007 才负责实现这些目标响应，TC-001 不把当前返回写成已上线目标响应。
+TC-002 已将 queue/page/detail 切换为独立的 `PrintJobSummaryVO`/`PrintJobDetailVO`，并通过一次 LEFT JOIN 查询提供当前文件、打印机和用户摘要；TC-003 的多状态/完成时间分页语义及 TC-007 的快照、重试关联字段填充仍未实施。桌面端和 Mock 仍保持旧任务响应契约，TC-002 不修改它们，分别由 TC-004/TC-008 同步。
 
 ### 2. 查询集合和排序
 
@@ -61,7 +61,7 @@ retry 采用新建任务记录，不使用 attempt 表。新任务为 QUEUED，�
 
 ### 5. 当前实现与实施任务
 
-TC-001 只冻结文档和 OpenAPI 说明。当前 queue/page/detail 的 Java 实际类型仍是 `PrintJobVO`，retry 当前 data 仍为 null；safe assign、safe start、reconcile 当前 data 为 null。OpenAPI 不引用未实现的未来 VO 作为当前 endpoint response schema，只在描述中记录目标差异。目标读模型、分页字段、快照、retry 新记录和旧 assign 的 410 由 TC-002、TC-003、TC-007 等后续实施任务完成。
+TC-001 只冻结契约；TC-002 已上线 queue/page/detail 的目标读模型和摘要 JOIN 查询，safe assign、safe start、safe confirm、reconcile 的成功 `data` 类型均为 null。TC-003 的多状态/文件名/完成时间分页和 TC-007 的快照、retry 新任务记录及旧 assign 的 410 仍未实施。
 
 ## 1. 产品边界
 
@@ -325,9 +325,9 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 
 | 方法 | 地址 | 权限 | 参数 | 返回 |
 |---|---|---|---|---|
-| GET | `/print-jobs/queue` | ADMIN/OPERATOR | 无 | 当前 `PrintJobVO[]`；目标 `PrintJobSummaryVO[]`（TC-001，未实施） |
-| POST | `/print-jobs/page` | ADMIN/OPERATOR | 当前为分页、status、打印机、时间；目标增加 statuses、fileName、timeField | 当前 `PageResult<PrintJobVO>`；目标 `PageResult<PrintJobSummaryVO>`（未实施） |
-| GET | `/print-jobs/{id}` | ADMIN/OPERATOR | Path ID | 当前 `PrintJobVO`；目标 `PrintJobDetailVO`（未实施） |
+| GET | `/print-jobs/queue` | ADMIN/OPERATOR | 无 | `PrintJobSummaryVO[]`；TC-002 已实施，精确 QUEUED、权限下推、priority/createdAt/id 稳定排序 |
+| POST | `/print-jobs/page` | ADMIN/OPERATOR | 当前为分页、单 status、打印机、用户、createdAt 时间范围 | `PageResult<PrintJobSummaryVO>`；TC-002 已实施；statuses、fileName、timeField 由 TC-003 实施 |
+| GET | `/print-jobs/{id}` | ADMIN/OPERATOR | Path ID | `PrintJobDetailVO`；TC-002 已实施，不存在或无权统一 404 |
 | POST | `/print-jobs` | ADMIN/OPERATOR | `fileId,priority,printerId?,idempotencyKey?` | 新任务 ID；同一用户同一幂等键重复请求返回原任务 |
 | POST | `/print-jobs/create` | ADMIN/OPERATOR | `fileId,priority,printerId?,idempotencyKey?` | 新任务 ID（兼容，deprecated） |
 | DELETE | `/print-jobs/{id}` | ADMIN/OPERATOR | Path ID | 取消任务（Service 统一校验、设备控制和解绑） |
@@ -550,7 +550,7 @@ T6.6 取消规则已统一收敛到 `PrintJobService.cancelJob`：Controller 不
 
 文件夹创建和单文件删除以数据库实际写入结果为准；目录记录插入或文件记录删除影响 0 行时返回业务错误。对象存储删除发生在数据库删除之前，若数据库删除失败，服务端不会返回成功，残留对象需按运维清理流程处理。
 
-TC-001 已冻结任务读模型目标：queue/page 使用 `PrintJobSummaryVO`，detail 使用 `PrintJobDetailVO`，列表直接返回可读摘要和快照字段。当前实现仍返回 `PrintJobVO`，前端不得通过逐任务详情请求伪造尚未上线的目标字段；TC-002/TC-003/TC-007 负责后续实现。
+TC-002 已实施任务读模型：queue/page 使用 `PrintJobSummaryVO`，detail 使用 `PrintJobDetailVO`，列表和详情通过固定 LEFT JOIN 直接返回当前可读摘要；关联缺失保留任务并返回 null。快照和重试关联字段保留为可空目标 schema，实际填充仍由 TC-007 实施；多状态、文件名和完成时间分页仍由 TC-003 实施。
 
 T6.8 当前已完成任务 Service 的状态/归属/设备调用测试、任务路由认证测试，以及持久化成功后绑定设备任务的 `JOB_STATUS` 事件测试。由于队列任务没有设备 ID，重试、重新排队和优先级修改不发送 `JOB_STATUS`；真实 MySQL/Redis/RustFS/打印机的端到端链路仍需在现场环境验收。
 
