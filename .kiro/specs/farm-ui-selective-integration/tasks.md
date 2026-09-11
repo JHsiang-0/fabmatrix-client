@@ -95,6 +95,15 @@
 
 完成记录：修复 800×560 Electron 窗口下打印机筛选/操作区挤压表格滚动容器的响应式回归（`b542077`）。最终 `npm test` 205/205、`npm run lint`、`npm run build`、`npm run build:mock`、`npm run build:desktop:mock` 均通过；浏览器 E2E 9/9、Electron E2E 3/3、Electron dist 1/1 通过。组合 `npm run test:e2e:all` 的 13 项中 12 项通过，`electron-dist` 在组合执行时受 dist 构建顺序/隔离影响未读取到运行诊断；按其独立入口 `npm run test:electron:dist` 已重建 desktop 产物并通过。最终工作区干净，未推送远程。
 
+### [x] SYNC-001.10 文件网格卡片完整展示与 TDesign 阴影修复
+
+- 范围：`src/views/FileLibrary.vue`、`tests/fileLibrary.test.js` 和本任务文档。
+- 修复文件名、指标、统计和操作按钮在多行网格、长文本及容器滚动场景下被卡片或网格行裁切的问题。
+- 保留 `<t-card bordered hover-shadow class="file-card">`，移除文件卡片自定义阴影/阴影过渡；不修改文件库业务逻辑、接口、Store、上传、目录权限和列表视图。
+- 验收：网格按内容自动计算行高，操作区完整可见，TDesign 默认 hover-shadow 可见，相关测试、lint、build 通过。
+
+完成记录：网格改用 `grid-auto-rows: max-content` 与顶部对齐，卡片和上下文容器按内容自适应高度，移除卡片裁切和自定义阴影过渡，并允许操作区换行；补充文件库视觉回归断言。`node --test tests/fileLibrary.test.js` 29/29、`npm test` 205/205、`npm run lint`、`npm run build` 均通过；构建仅保留既有动态导入和大 chunk 提示，未产生失败。
+
 ## 依赖关系
 
 ```text

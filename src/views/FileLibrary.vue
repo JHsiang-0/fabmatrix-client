@@ -2715,8 +2715,10 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  grid-auto-rows: max-content;
   gap: var(--app-spacing-3);
   align-content: start;
+  align-items: start;
   min-height: 0;
   padding: 2px 2px var(--app-spacing-3);
   overflow-y: auto;
@@ -2724,19 +2726,18 @@ onBeforeUnmount(() => {
 
 .file-card-context {
   min-width: 0;
-  min-height: 0;
+  min-height: max-content;
 }
 
 .file-card-context :deep(.t-card) {
-  height: 100%;
+  height: auto;
 }
 
 .file-card {
   position: relative;
   min-width: 0;
-  overflow: hidden;
+  height: auto;
   border-color: var(--app-border);
-  transition: box-shadow 160ms ease, border-color 160ms ease;
 }
 
 .file-card:hover {
@@ -2909,7 +2910,9 @@ onBeforeUnmount(() => {
 
 .file-card__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
+  min-width: 0;
   margin-top: auto;
 }
 
@@ -2921,6 +2924,7 @@ onBeforeUnmount(() => {
 
 .file-card__action {
   flex: 1 1 0;
+  min-width: 0;
 }
 
 .file-library-pagination {

@@ -348,7 +348,23 @@ test('文件库视觉容器保留 TDesign 层级、独立滚动和响应式细�
   assert.match(source, /<t-card v-if="fileList\.length && viewMode === 'list'" bordered class="file-library-results-card file-library-table-card"/)
   assert.match(source, /\.file-library-results-card \{[\s\S]*border-color: var\(--app-border\)/)
   assert.match(source, /\.file-table-view :deep\(\.t-table__content\)[\s\S]*overflow-x: auto[\s\S]*overflow-y: auto/)
-  assert.match(source, /\.file-card \{[\s\S]*border-color: var\(--app-border\)[\s\S]*transition: box-shadow/)
+  const fileGridSource = source.match(/\.file-grid-view \{[\s\S]*?\n\}/)?.[0] || ''
+  const fileCardContextSource = source.match(/\.file-card-context \{[\s\S]*?\n\}/)?.[0] || ''
+  const fileCardSource = source.match(/\.file-card \{[\s\S]*?\n\}/)?.[0] || ''
+  const fileCardActionsSource = source.match(/\.file-card__actions \{[\s\S]*?\n\}/)?.[0] || ''
+  const fileCardActionSource = source.match(/\.file-card__action \{[\s\S]*?\n\}/)?.[0] || ''
+  assert.match(fileGridSource, /grid-auto-rows: max-content/)
+  assert.match(fileGridSource, /align-items: start/)
+  assert.match(fileGridSource, /padding: 2px 2px var\(--app-spacing-3\)/)
+  assert.match(fileGridSource, /overflow-y: auto/)
+  assert.match(fileCardContextSource, /min-height: max-content/)
+  assert.doesNotMatch(fileCardContextSource, /height: 100%/)
+  assert.match(fileCardSource, /height: auto/)
+  assert.match(fileCardSource, /border-color: var\(--app-border\)/)
+  assert.doesNotMatch(fileCardSource, /box-shadow|transition/)
+  assert.match(fileCardActionsSource, /display: flex/)
+  assert.match(fileCardActionsSource, /flex-wrap: wrap/)
+  assert.match(fileCardActionSource, /min-width: 0/)
   assert.match(source, /\.file-card:hover \{[\s\S]*border-color: var\(--td-brand-color-3\)/)
   assert.match(source, /\.file-library-pagination \{[\s\S]*padding-top: var\(--app-spacing-3\)[\s\S]*border-top: 1px solid var\(--app-border\)/)
   assert.match(folderTreeSource, /\.file-folder-tree__search :deep\(\.t-input__inner\)[\s\S]*color: var\(--app-text-primary\)/)
