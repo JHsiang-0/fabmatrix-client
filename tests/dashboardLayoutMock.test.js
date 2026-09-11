@@ -105,6 +105,7 @@ test('Mock 请求内重复目标槽位返回 400/DUPLICATE_SLOT 且不改变状�
   })), error => {
     assert.equal(error.response.status, 400)
     assert.equal(error.response.data.data.reason, 'DUPLICATE_SLOT')
+    assert.deepEqual(error.response.data.data.conflicts, ['403', '404'])
     return true
   })
   assert.equal(JSON.stringify({ layout: mockState.dashboardLayout, printers: mockState.printers }), before)

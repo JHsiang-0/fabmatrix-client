@@ -28,6 +28,7 @@ export const useGridStore = defineStore('grid', () => {
   const layoutError = ref(null)
   const layoutConflict = ref(null)
   const positionDraft = ref([])
+  let layoutLoadGeneration = 0
 
   const activeLayout = computed(() => layoutDraft.value || layoutSnapshot.value)
   const layoutVersion = computed(() => layoutSnapshot.value?.version ?? null)
@@ -81,20 +82,32 @@ export const useGridStore = defineStore('grid', () => {
   })
 
   async function loadLayout() {
+    const generation = ++layoutLoadGeneration
     layoutLoading.value = true
     layoutError.value = null
     try {
       const response = await getDashboardLayout()
+      if (generation !== layoutLoadGeneration) return layoutSnapshot.value
+      const hasDraft = Boolean(layoutDraft.value)
       layoutSnapshot.value = response.data
-      layoutDraft.value = null
-      positionDraft.value = []
-      layoutConflict.value = null
+      if (hasDraft) {
+        layoutConflict.value = {
+          reason: 'STALE_DRAFT',
+          serverVersion: response.data?.version ?? null,
+          conflicts: [],
+          outOfBoundsPrinters: []
+        }
+      } else {
+        layoutDraft.value = null
+        positionDraft.value = []
+        layoutConflict.value = null
+      }
       return layoutSnapshot.value
     } catch (error) {
-      layoutError.value = error
+      if (generation === layoutLoadGeneration) layoutError.value = error
       throw error
     } finally {
-      layoutLoading.value = false
+      if (generation === layoutLoadGeneration) layoutLoading.value = false
     }
   }
 

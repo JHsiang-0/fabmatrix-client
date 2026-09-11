@@ -21,4 +21,17 @@ test('非编辑客户端刷新布局和设备快照，编辑客户端只标记�
   assert.match(gridSource, /watch\(\(\) => realtimeStore\.layoutVersion/)
   assert.match(gridSource, /watch\(\(\) => realtimeStore\.wsConnectionState/)
   assert.match(gridSource, /recoverAfterRealtimeReconnect/)
+  assert.match(gridSource, /let layoutLoadGeneration = 0/)
+  assert.match(gridSource, /const generation = \+\+layoutLoadGeneration/)
+  assert.match(gridSource, /if \(generation !== layoutLoadGeneration\) return layoutSnapshot\.value/)
+  assert.match(gridSource, /const hasDraft = Boolean\(layoutDraft\.value\)/)
+})
+
+test('实时恢复使用生命周期代次和 AbortController 隔离断开后的旧分页响应', () => {
+  assert.match(realtimeSource, /let lifecycleGeneration = 0/)
+  assert.match(realtimeSource, /new AbortController\(\)/)
+  assert.match(realtimeSource, /signal: abortController\.signal/)
+  assert.match(realtimeSource, /if \(!isCurrent\(\)\) return null/)
+  assert.match(realtimeSource, /lifecycleGeneration \+= 1/)
+  assert.match(realtimeSource, /recoveryAbortController\?\.abort\(\)/)
 })

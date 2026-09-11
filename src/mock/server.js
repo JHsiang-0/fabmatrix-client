@@ -14,6 +14,31 @@ const normalizePublicLongIds = (value, fields) => {
   return data
 }
 
+const SEMANTIC_ID_FIELDS = new Set([
+  'id', 'printerId', 'currentJobId', 'jobId', 'fileId', 'userId', 'operatorId',
+  'conflicts', 'outOfBoundsPrinters', 'changedPositions', 'unallocatedPrinters'
+])
+
+/** 在 Mock 的 HTTP/WS 边界保留语义 ID 原字符串，绝不触碰计数、版本和时间字段。 */
+export const toPublicSemanticIds = value => {
+  if (Array.isArray(value)) return value.map(toPublicSemanticIds)
+  if (!value || typeof value !== 'object') return value
+  const result = {}
+  Object.entries(value).forEach(([key, item]) => {
+    if (SEMANTIC_ID_FIELDS.has(key)) {
+      if (key === 'conflicts') {
+        result[key] = Array.isArray(item) ? item.map(id => id == null ? id : String(id)) : item
+      } else if (Array.isArray(item)) {
+        result[key] = item.map(toPublicSemanticIds)
+      }
+      else result[key] = item == null ? item : String(item)
+    } else {
+      result[key] = toPublicSemanticIds(item)
+    }
+  })
+  return result
+}
+
 /**
  * 将内部文件对象转换为正式 PrintFileVO，下载地址等内部字段不得出现在响应中。
  */

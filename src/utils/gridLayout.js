@@ -162,7 +162,7 @@ export const DEFAULT_LAYOUT = Object.freeze({
   aisles: Object.freeze([Object.freeze({
     id: 'default-column-aisle',
     axis: 'COLUMN',
-    afterIndex: 7,
+    afterIndex: 6,
     label: '过道',
     size: 100
   })]),

@@ -1,7 +1,7 @@
 import { cloneMockData, mockState, nextMockId, resetMockState } from './data.js'
 import { createMockPage, createMockSuccess, MockRequestError } from './factory.js'
 import { resolveMockErrorScenario } from './scenarios.js'
-import { toPublicFile, toPublicJob, toPublicPrinter } from './server.js'
+import { toPublicFile, toPublicJob, toPublicPrinter, toPublicSemanticIds } from './server.js'
 import { transitionMockJob } from './stateMachine.js'
 import { publishMockWebSocketEvent } from './websocket.js'
 
@@ -941,7 +941,7 @@ const handleDashboardLayout = config => {
   validateMockLayout(body)
 
   const changes = new Map()
-  const targetSlots = new Set()
+  const targetSlots = new Map()
   body.positionChanges.forEach(change => {
     const id = String(change?.printerId ?? '')
     if (!id || changes.has(id)) fail(400, 400, '设备变更列表存在重复 ID')
@@ -955,15 +955,16 @@ const handleDashboardLayout = config => {
     }
     if (hasRow) {
       const targetSlot = layoutPosition(change.gridRow, change.gridCol)
-      if (targetSlots.has(targetSlot)) {
+      const previousPrinterId = targetSlots.get(targetSlot)
+      if (previousPrinterId !== undefined) {
         fail(400, 400, '请求中的目标槽位重复', {
           reason: 'DUPLICATE_SLOT',
           serverVersion: mockState.dashboardLayout.version,
-          conflicts: [],
+          conflicts: [previousPrinterId, printer.id],
           outOfBoundsPrinters: []
         })
       }
-      targetSlots.add(targetSlot)
+      targetSlots.set(targetSlot, printer.id)
     }
     changes.set(id, { printer, gridRow: hasRow ? change.gridRow : null, gridCol: hasCol ? change.gridCol : null })
   })
@@ -2118,7 +2119,7 @@ export const isMockEnabled = runtimeEnv.VITE_USE_MOCK === 'true' || [
   'desktop-mock'
 ].includes(runtimeEnv.MODE)
 
-if ((runtimeEnv.DEV || runtimeEnv.MODE === 'mock' || runtimeEnv.MODE.startsWith('desktop')) && typeof window !== 'undefined') {
+if ((runtimeEnv.DEV || runtimeEnv.MODE === 'mock' || String(runtimeEnv.MODE || '').startsWith('desktop')) && typeof window !== 'undefined') {
   window.__FARM_RESET_MOCK__ = resetMockState
 }
 
@@ -2137,5 +2138,5 @@ export async function mockRequest(config) {
     throw error
   }
   const data = await route(config)
-  return createMockSuccess(data)
+  return createMockSuccess(toPublicSemanticIds(data))
 }

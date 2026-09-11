@@ -22,11 +22,12 @@ import {
  * @param {string} [params.status] - 设备状态（OFFLINE/IDLE/PREPARING/PRINTING/PAUSED/ERROR/UNKNOWN）
  * @returns {Promise<{code: number, message: string, data: {records: Array<Printer>, total: number, pageNum: number, pageSize: number}}>} 分页结果
  */
-export function getPrinterList(params = {}) {
+export function getPrinterList(params = {}, options = {}) {
   return request({
     url: '/api/v1/printers/page',
     method: 'get',
-    params: normalizePageParams(params)
+    params: normalizePageParams(params),
+    ...options
   }).then(response => mapResponseData(
     response,
     data => normalizePageResponse(data, normalizePrinter)

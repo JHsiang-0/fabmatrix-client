@@ -12,31 +12,13 @@
               {{ row.type === 'aisle' ? row.label : `${formatRowLabel(row.number)}${rowSuffix}` }}
             </div>
           </div>
-          <div v-if="isEditMode" class="grid-map-dimension-controls grid-map-row-controls">
-            <t-button shape="square" size="small" variant="outline" :icon="renderIcon(AddIcon)"
-              aria-label="增加行" title="增加行" :disabled="gridConfig.rowCount >= 30"
-              @click.stop="emitDimensionChange('row', 1)" />
-            <t-button shape="square" size="small" variant="outline" :icon="renderIcon(MinusIcon)"
-              aria-label="减少行" title="减少行" :disabled="gridConfig.rowCount <= 1"
-              @click.stop="emitDimensionChange('row', -1)" />
-          </div>
         </div>
 
         <div class="grid-map-body">
-          <div class="grid-map-column-header-row">
-            <div class="grid-map-column-header" :style="columnTemplateStyle">
-              <div v-for="(column, colIndex) in visualColumns" :key="`header-${colIndex}`"
-                class="grid-map-column-label" :class="{ 'is-aisle': column.type === 'aisle' }">
-                {{ column.type === 'aisle' ? column.label : column.number }}
-              </div>
-            </div>
-            <div v-if="isEditMode" class="grid-map-dimension-controls grid-map-column-controls">
-              <t-button shape="square" size="small" variant="outline" :icon="renderIcon(AddIcon)"
-                aria-label="增加列" title="增加列" :disabled="gridConfig.columnCount >= 60"
-                @click.stop="emitDimensionChange('column', 1)" />
-              <t-button shape="square" size="small" variant="outline" :icon="renderIcon(MinusIcon)"
-                aria-label="减少列" title="减少列" :disabled="gridConfig.columnCount <= 1"
-                @click.stop="emitDimensionChange('column', -1)" />
+          <div class="grid-map-column-header" :style="columnTemplateStyle">
+            <div v-for="(column, colIndex) in visualColumns" :key="`header-${colIndex}`"
+              class="grid-map-column-label" :class="{ 'is-aisle': column.type === 'aisle' }">
+              {{ column.type === 'aisle' ? column.label : column.number }}
             </div>
           </div>
 
@@ -60,8 +42,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onBeforeUnmount, onMounted } from 'vue'
-import { AddIcon, MinusIcon } from 'tdesign-icons-vue-next'
+import { computed, ref, onBeforeUnmount, onMounted, nextTick, watch } from 'vue'
 import GridCell from './GridCell.vue'
 import {
   calculateGridFit,
@@ -71,7 +52,6 @@ import {
   getVisualColumns,
   getVisualRows
 } from '@/utils/gridLayout'
-import { renderIcon } from '@/utils/tdesign'
 
 defineOptions({ name: 'GridMap' })
 
@@ -87,7 +67,7 @@ const props = defineProps({
   dragOverCell: { type: Object, default: null }
 })
 
-const emit = defineEmits(['dragstart', 'dragend', 'dragenter', 'dragleave', 'drop', 'cell-click', 'dimension-change'])
+const emit = defineEmits(['dragstart', 'dragend', 'dragenter', 'dragleave', 'drop', 'cell-click'])
 const scrollHost = ref(null)
 const resizeObserver = ref(null)
 const gridFit = ref({ scale: 1, naturalWidth: 0, naturalHeight: 0 })
@@ -180,7 +160,6 @@ function handleDragEnter(rowIndex, colIndex) { emit('dragenter', rowIndex, colIn
 function handleDragLeave() { emit('dragleave') }
 function handleDrop(rowIndex, colIndex) { emit('drop', rowIndex, colIndex) }
 function handleCellClick(device, rowIndex, colIndex) { emit('cell-click', device, rowIndex, colIndex) }
-function emitDimensionChange(axis, delta) { emit('dimension-change', { axis, delta }) }
 
 function handleScroll() {
   // 滚动只发生在看板内部，避免大布局把页面宽度撑开。
@@ -194,6 +173,14 @@ function updateGridFit() {
     isEditMode: props.isEditMode
   })
 }
+
+watch(
+  () => [props.gridConfig, props.isEditMode],
+  () => {
+    void nextTick(updateGridFit)
+  },
+  { deep: true }
+)
 
 onMounted(() => {
   scrollHost.value?.addEventListener('scroll', handleScroll, { passive: true })
@@ -264,25 +251,6 @@ onBeforeUnmount(() => {
   gap: 0.75rem;
 }
 
-.grid-map-dimension-controls {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-}
-
-.grid-map-row-controls {
-  min-height: 2rem;
-  margin-top: 0.5rem;
-}
-
-.grid-map-column-header-row {
-  display: flex;
-  align-items: stretch;
-  gap: 0.5rem;
-}
-
 .grid-map-body {
   display: flex;
   flex-direction: column;
@@ -291,10 +259,6 @@ onBeforeUnmount(() => {
 
 .grid-map-column-header {
   margin-bottom: 0.125rem;
-}
-
-.grid-map-column-controls {
-  width: 4.25rem;
 }
 
 .grid-map-row-label,

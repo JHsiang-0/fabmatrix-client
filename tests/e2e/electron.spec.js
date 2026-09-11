@@ -290,13 +290,14 @@ test('Electron App Shell 在三个桌面窗口尺寸下保持单一滚动模型'
       expect(layoutMetrics.contentView.clientHeight).toBeGreaterThan(0)
     }
 
-    await page.goto(`${E2E_DESKTOP_URL}/#/dashboard`)
-    await expect(page.getByRole('heading', { name: '概览仪表盘' })).toBeVisible()
+    await page.goto(`${E2E_DESKTOP_URL}/#/dashboard/fullscreen`)
+    await expect(page.locator('.fullscreen-dashboard')).toBeVisible()
+    await expect(page.locator('.fullscreen-dashboard .dashboard-header h1')).toBeVisible()
     await electronApp.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()[0]?.setContentSize(800, 560)
     })
     await expect.poll(() => page.evaluate(() => [window.innerWidth, window.innerHeight])).toEqual([800, 560])
-    const gridMetrics = await page.locator('.grid-map-scroll').evaluate(element => ({
+    const gridMetrics = await page.locator('.fullscreen-dashboard .grid-map-scroll').evaluate(element => ({
       clientWidth: element.clientWidth,
       clientHeight: element.clientHeight,
       scrollWidth: element.scrollWidth,

@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createMockPage, createMockSuccess, MockRequestError } from '../src/mock/factory.js'
 import { MOCK_ERROR_SCENARIOS, resolveMockErrorScenario } from '../src/mock/scenarios.js'
-import { toPublicFile, toPublicJob, toPublicPrinter } from '../src/mock/server.js'
+import { toPublicFile, toPublicJob, toPublicPrinter, toPublicSemanticIds } from '../src/mock/server.js'
 import { mockState, resetMockState } from '../src/mock/data.js'
 
 test('creates the unified mock envelope and paginated response', () => {
@@ -90,4 +90,27 @@ test('supports deterministic initialized and uninitialized mock seeds', () => {
   assert.equal(mockState.users.length, 0)
   resetMockState()
   assert.equal(mockState.users.length > 0, true)
+})
+
+test('Mock semantic ID boundary keeps values above 2^53 as strings without changing numeric fields', () => {
+  const largeId = '9007199254740993'
+  const response = toPublicSemanticIds({
+    printerId: largeId,
+    currentJobId: largeId,
+    jobId: largeId,
+    conflicts: [largeId, 403],
+    progress: 35.5,
+    fileSize: 123456,
+    layoutVersion: 7,
+    timestamp: 1700000000000
+  })
+
+  assert.equal(response.printerId, largeId)
+  assert.equal(response.currentJobId, largeId)
+  assert.equal(response.jobId, largeId)
+  assert.deepEqual(response.conflicts, [largeId, '403'])
+  assert.equal(response.progress, 35.5)
+  assert.equal(response.fileSize, 123456)
+  assert.equal(response.layoutVersion, 7)
+  assert.equal(response.timestamp, 1700000000000)
 })

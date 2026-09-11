@@ -1,5 +1,5 @@
 import { mockState } from './data.js'
-import { toPublicPrinter } from './server.js'
+import { toPublicPrinter, toPublicSemanticIds } from './server.js'
 
 let mockEventSequence = 0
 const mockSubscribers = new Set()
@@ -24,13 +24,13 @@ const buildPrinterData = printer => ({
 
 export function createMockWebSocketStream({ onOpen, onMessage, onClose } = {}) {
   let tick = 0
-  const emit = message => onMessage?.({
+  const emit = message => onMessage?.(toPublicSemanticIds({
     version: '1',
     eventId: `mock-event-${++mockEventSequence}`,
     sequence: mockEventSequence,
     timestamp: Date.now(),
     ...message
-  })
+  }))
   mockSubscribers.add(onMessage)
 
   onOpen?.()
@@ -79,12 +79,12 @@ export function createMockWebSocketStream({ onOpen, onMessage, onClose } = {}) {
 /** 向当前所有 Mock 客户端广播服务端事件。 */
 export function publishMockWebSocketEvent(message) {
   // 广播事件的 envelope 只构造一次，所有订阅者共享同一个 eventId/sequence。
-  const event = {
+  const event = toPublicSemanticIds({
     version: '1',
     eventId: `mock-event-${++mockEventSequence}`,
     sequence: mockEventSequence,
     timestamp: Date.now(),
     ...message
-  }
+  })
   mockSubscribers.forEach(subscriber => subscriber?.(event))
 }

@@ -42,7 +42,7 @@ test('打印机监控契约支持列表、详情、单台和批量配置并校�
   assert.equal('lastKnownStatus' in page.records[0], true)
 
   const initial = unwrap(await request('GET', '/api/v1/printers/403/monitor', undefined, adminHeaders))
-  assert.equal(initial.printerId, 403)
+  assert.equal(initial.printerId, '403')
   assert.equal(typeof initial.monitorEnabled, 'boolean')
   assert.equal(['ONLINE', 'OFFLINE', 'UNKNOWN'].includes(initial.connectionStatus), true)
 

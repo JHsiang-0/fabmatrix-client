@@ -142,7 +142,7 @@ const createSeedData = ({ initialized = true, dashboardLayout: layoutOverride = 
     rowCount: 4,
     columnCount: 12,
     aisles: [
-      { id: 'default-column-aisle', axis: 'COLUMN', afterIndex: 7, label: '过道', size: 100 }
+      { id: 'default-column-aisle', axis: 'COLUMN', afterIndex: 6, label: '过道', size: 100 }
     ],
     version: 1,
     limits: {

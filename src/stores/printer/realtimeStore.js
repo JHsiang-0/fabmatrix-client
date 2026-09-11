@@ -54,6 +54,8 @@ export const useRealtimeStore = defineStore('realtime', () => {
   const isRealtimeStale = ref(false)
   const isRecovering = ref(false)
   let recoveryPromise = null
+  let lifecycleGeneration = 0
+  let recoveryAbortController = null
   const userStore = useUserStore()
   const jobStore = useJobStore()
 
@@ -279,7 +281,8 @@ export const useRealtimeStore = defineStore('realtime', () => {
     scheduleBatchUpdate()
   }
 
-  function refreshJobState() {
+  function refreshJobState(generation = lifecycleGeneration) {
+    if (generation !== lifecycleGeneration) return Promise.resolve(null)
     jobStore.refresh().catch(error => {
       console.error('[RealtimeStore] 任务状态恢复失败:', error)
     })
@@ -376,13 +379,18 @@ export const useRealtimeStore = defineStore('realtime', () => {
    */
   async function recoverRealtimeSnapshot() {
     if (recoveryPromise) return recoveryPromise
+    const generation = lifecycleGeneration
+    const abortController = new AbortController()
+    recoveryAbortController = abortController
+    const isCurrent = () => generation === lifecycleGeneration && !abortController.signal.aborted
     isRecovering.value = true
-    recoveryPromise = getPrinterList({ pageNum: 1, pageSize: 100 })
+    recoveryPromise = getPrinterList({ pageNum: 1, pageSize: 100 }, { signal: abortController.signal })
       .then(firstPage => collectAllPages(
-        (pageNum, pageSize) => getPrinterList({ pageNum, pageSize }),
+        (pageNum, pageSize) => getPrinterList({ pageNum, pageSize }, { signal: abortController.signal }),
         firstPage
       ))
       .then(records => {
+        if (!isCurrent()) return null
         const uniquePrinters = Array.from(new Map(
           records
             .filter(printer => printer?.id !== undefined && printer?.id !== null)
@@ -396,15 +404,19 @@ export const useRealtimeStore = defineStore('realtime', () => {
           }, printer.updatedAt || Date.now())
         })
         isRealtimeStale.value = false
-        return refreshJobState()
+        return refreshJobState(generation)
       })
       .catch(error => {
+        if (!isCurrent() || error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError') return null
         console.error('[RealtimeStore] WebSocket 断档恢复失败:', error)
         isRealtimeStale.value = true
       })
       .finally(() => {
-        isRecovering.value = false
-        recoveryPromise = null
+        if (generation === lifecycleGeneration) {
+          isRecovering.value = false
+          recoveryPromise = null
+          recoveryAbortController = null
+        }
       })
     return recoveryPromise
   }
@@ -413,17 +425,22 @@ export const useRealtimeStore = defineStore('realtime', () => {
    * 连接 WebSocket
    */
   function connectWs() {
+    if (isMockEnabled && mockStream) return
+    if (!isMockEnabled && wsClient) disconnectWs()
+    const generation = ++lifecycleGeneration
     if (isMockEnabled) {
-      if (mockStream) return
       lastSequence.value = null
       mockConnectionState.value = 'OPEN'
       mockStream = createMockWebSocketStream({
         onOpen: () => {
+          if (generation !== lifecycleGeneration) return
           resetSequenceBaseline()
-          refreshJobState()
+          refreshJobState(generation)
         },
-        onMessage: handleWebSocketMessage,
-        onClose: () => { mockConnectionState.value = 'CLOSED' }
+        onMessage: message => generation === lifecycleGeneration && handleWebSocketMessage(message),
+        onClose: () => {
+          if (generation === lifecycleGeneration) mockConnectionState.value = 'CLOSED'
+        }
       })
       return
     }
@@ -441,11 +458,6 @@ export const useRealtimeStore = defineStore('realtime', () => {
       return
     }
 
-    // 如果已存在连接，先关闭
-    if (wsClient) {
-      disconnectWs()
-    }
-
     // 创建新的 WebSocket 客户端 - 使用 markRaw 避免响应式代理
     wsClient = markRaw(new WebSocketClient(wsUrl, {
       reconnectDelay: WS_CONFIG.reconnectDelay,
@@ -457,17 +469,21 @@ export const useRealtimeStore = defineStore('realtime', () => {
     }))
 
     // 订阅消息事件
-    wsClient.on('message', handleWebSocketMessage)
+    wsClient.on('message', message => {
+      if (generation === lifecycleGeneration) handleWebSocketMessage(message)
+    })
 
     // 订阅连接事件
     wsClient.on('open', () => {
+      if (generation !== lifecycleGeneration) return
       connectionState.value = 'OPEN'
       resetSequenceBaseline()
-      refreshJobState()
+      refreshJobState(generation)
       console.log('[RealtimeStore] WebSocket 连接已建立')
     })
 
     wsClient.on('close', event => {
+      if (generation !== lifecycleGeneration) return
       connectionState.value = wsClient?.getState() || 'CLOSED'
       if (event?.code !== 1000) {
         isRealtimeStale.value = true
@@ -479,6 +495,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
     })
 
     wsClient.on('error', (error) => {
+      if (generation !== lifecycleGeneration) return
       connectionState.value = wsClient?.getState() || 'CLOSED'
       console.error('[RealtimeStore] WebSocket 错误:', error)
     })
@@ -498,6 +515,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
    * 断开 WebSocket 连接
    */
   function disconnectWs() {
+    lifecycleGeneration += 1
+    recoveryAbortController?.abort()
+    recoveryAbortController = null
     // 取消待处理的 RAF 更新
     cancelPendingUpdate()
 

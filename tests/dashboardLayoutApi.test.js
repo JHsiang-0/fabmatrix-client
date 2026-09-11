@@ -15,6 +15,12 @@ test('布局 API 使用正式 GET/PUT 资源并把 Long printerId 转为字符�
   assert.match(apiSource, /normalizeDashboardSaveResult/)
 })
 
+test('默认布局纵向过道位于第 6 列之后，并保留横向过道校验语义', () => {
+  const layoutSource = read('../src/utils/gridLayout.js')
+  assert.match(layoutSource, /id: 'default-column-aisle',[\s\S]*afterIndex: 6/)
+  assert.match(layoutSource, /axis === 'ROW' \? rowCount : columnCount/)
+})
+
 test('gridStore 保留服务端快照与编辑草稿，并以 expectedVersion 保存', () => {
   assert.match(gridStoreSource, /const layoutSnapshot = ref\(null\)/)
   assert.match(gridStoreSource, /const layoutDraft = ref\(null\)/)

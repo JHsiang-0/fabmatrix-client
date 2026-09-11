@@ -1,3 +1,5 @@
+import { toPublicSemanticIds } from './server.js'
+
 /**
  * Mock 响应工厂。
  * 仅模拟后端统一响应 envelope，不向业务层暴露内部状态对象。
@@ -18,7 +20,7 @@ export class MockRequestError extends Error {
     this.name = 'MockRequestError'
     this.response = {
       status,
-      data: createMockSuccess(data)
+      data: createMockSuccess(toPublicSemanticIds(data))
     }
     this.response.data.code = code
     this.response.data.message = message
