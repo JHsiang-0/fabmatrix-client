@@ -114,6 +114,22 @@ const toMockJobSummary = job => {
 const setJobStatus = (job, nextStatus) => {
   job.status = transitionMockJob(job.status, nextStatus)
   job.updatedAt = now()
+  const printer = findPrinter(job.printerId)
+  const terminal = ['COMPLETED', 'FAILED', 'CANCELLED'].includes(job.status)
+  publishMockWebSocketEvent({
+    type: 'JOB_STATUS',
+    printerId: printer?.id ?? job.printerId ?? null,
+    audienceUserId: job.userId,
+    data: {
+      jobId: String(job.id),
+      currentJobId: terminal || !sameMockId(printer?.currentJobId, job.id) ? null : String(job.id),
+      status: job.status,
+      progress: job.progress,
+      errorReason: job.errorReason,
+      completedAt: job.completedAt,
+      updatedAt: job.updatedAt
+    }
+  })
 }
 
 const visibilityOf = file => {
@@ -1777,10 +1793,13 @@ const handleCreateJob = config => {
   }
   mockState.jobs.push(job)
   if (printer) {
-    setJobStatus(job, 'ASSIGNED')
     printer.currentJobId = job.id
     printer.isSafeToPrint = false
     printer.updatedAt = createdAt
+    setJobStatus(job, 'ASSIGNED')
+  } else {
+    // 未绑定打印机的任务也发布 JOB_STATUS，printerId/currentJobId 明确为 null。
+    setJobStatus(job, 'QUEUED')
   }
   return job.id
 }
@@ -1817,10 +1836,10 @@ const handleAssignJob = config => {
   if (job.status !== 'QUEUED') fail(422, 422, '当前任务状态不允许派发')
   if (printer.status !== 'IDLE' || printer.currentJobId) fail(409, 10002, '打印机当前忙碌')
   job.printerId = printer.id
-  setJobStatus(job, 'ASSIGNED')
   printer.currentJobId = job.id
   printer.status = 'IDLE'
   printer.updatedAt = now()
+  setJobStatus(job, 'ASSIGNED')
   return null
 }
 
@@ -2011,10 +2030,10 @@ const createBatchJob = (session, item, action) => {
     updatedAt: createdAt
   }
   mockState.jobs.push(job)
-  setJobStatus(job, 'ASSIGNED')
   printer.currentJobId = job.id
   printer.isSafeToPrint = false
   printer.updatedAt = now()
+  setJobStatus(job, 'ASSIGNED')
 
   if (action === 'UPLOAD_ONLY') {
     printer.isSafeToPrint = true

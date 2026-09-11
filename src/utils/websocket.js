@@ -35,7 +35,21 @@ const DEFAULT_CONFIG = {
   /** 连接超时时间（毫秒） */
   connectTimeout: 10000,
   /** 连接不活跃超时时间（毫秒），null 表示不检测 */
-  inactivityTimeout: null
+  inactivityTimeout: null,
+  /** 测试或宿主环境可注入实例工厂；生产默认使用浏览器原生 WebSocket。 */
+  webSocketFactory: null
+}
+
+/** 将原生事件和网络错误收敛为固定类别，日志不得展开可能含鉴权 URL 的对象。 */
+export function getSafeWebSocketErrorCategory(error) {
+  const code = String(error?.code || '').toUpperCase()
+  const name = String(error?.name || '').toUpperCase()
+  if (code === 'ERR_CANCELED' || name === 'ABORTERROR' || name === 'CANCELEDERROR') return 'CANCELED'
+  if (code.includes('TIMEOUT') || name === 'TIMEOUTERROR') return 'TIMEOUT'
+  if (error?.response?.status) return 'HTTP_ERROR'
+  if (name === 'SYNTAXERROR') return 'PAYLOAD_ERROR'
+  if (name === 'TYPEERROR') return 'CLIENT_ERROR'
+  return 'CONNECTION_ERROR'
 }
 
 /**
@@ -145,8 +159,10 @@ export class WebSocketClient {
       this._isConnecting = true
       
       try {
-        console.log(`[WebSocket] 正在连接到: ${this.url}`)
-        this.ws = new WebSocket(this.url)
+        console.log('[WebSocket] 正在建立连接')
+        this.ws = this.config.webSocketFactory
+          ? this.config.webSocketFactory(this.url)
+          : new WebSocket(this.url)
         
         // 设置连接超时
         this.connectTimeoutTimer = setTimeout(() => {
@@ -171,7 +187,7 @@ export class WebSocketClient {
         this._bindEvents()
         
       } catch (error) {
-        console.error('[WebSocket] 创建连接失败:', error)
+        console.error(`[WebSocket] 创建连接失败 (${getSafeWebSocketErrorCategory(error)})`)
         this._isConnecting = false
         this._scheduleReconnect()
         reject(error)
@@ -233,7 +249,7 @@ export class WebSocketClient {
       this.ws.send(message)
       return true
     } catch (error) {
-      console.error('[WebSocket] 发送消息失败:', error)
+      console.error(`[WebSocket] 发送消息失败 (${getSafeWebSocketErrorCategory(error)})`)
       return false
     }
   }
@@ -366,7 +382,7 @@ export class WebSocketClient {
    * @private
    */
   _handleClose(event) {
-    console.log(`[WebSocket] 连接关闭: code=${event.code}, reason=${event.reason}`)
+    console.log(`[WebSocket] 连接关闭 (code=${Number(event?.code) || 0})`)
     this._clearTimers()
     this._emit('close', event)
 
@@ -381,7 +397,7 @@ export class WebSocketClient {
    * @private
    */
   _handleError(event) {
-    console.error('[WebSocket] 发生错误:', event)
+    console.error('[WebSocket] 发生错误 (CONNECTION_ERROR)')
     this._emit('error', event)
   }
 
@@ -396,7 +412,7 @@ export class WebSocketClient {
         try {
           handler(...args)
         } catch (error) {
-          console.error(`[WebSocket] 事件处理器执行出错 (${event}):`, error)
+          console.error(`[WebSocket] 事件处理器执行出错 (${event}, ${getSafeWebSocketErrorCategory(error)})`)
         }
       })
     }

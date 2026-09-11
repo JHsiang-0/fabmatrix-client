@@ -130,6 +130,8 @@ test('TC-003 WS 只更新当前 REST 页或已缓存详情，不插入跨页未�
   assert.equal(updated.activeJobs.length, 1)
   assert.match(storeSource, /activeTotal\.value = page\.total/)
   assert.doesNotMatch(storeSource, /activeTotal\.value\s*[+-]=/)
+  assert.match(storeSource, /MAX_REALTIME_EVENT_IDS = 1000/)
+  assert.match(storeSource, /rememberBoundedRealtimeEvent\(realtimeEventIds, eventKey, MAX_REALTIME_EVENT_IDS\)/)
 })
 
 test('TC-003 任务分页 API 在发送前拒绝 status 与 statuses 混用', () => {

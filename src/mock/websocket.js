@@ -4,6 +4,26 @@ import { toPublicPrinter, toPublicSemanticIds } from './server.js'
 let mockEventSequence = 0
 const mockSubscribers = new Set()
 
+const normalizeIdentity = identity => ({
+  userId: identity?.userId === undefined || identity?.userId === null ? null : String(identity.userId),
+  role: String(identity?.role || '').toUpperCase()
+})
+
+const canReceive = (subscriber, message) => {
+  if (message.type !== 'JOB_STATUS') return true
+  if (subscriber.identity.role === 'ADMIN') return true
+  return subscriber.identity.role === 'OPERATOR'
+    && subscriber.identity.userId !== null
+    && message.audienceUserId !== undefined
+    && message.audienceUserId !== null
+    && subscriber.identity.userId === String(message.audienceUserId)
+}
+
+const toWireMessage = message => {
+  const { audienceUserId: _audienceUserId, ...wireMessage } = message
+  return wireMessage
+}
+
 const toState = status => ({
   status,
   unifiedState: status,
@@ -22,16 +42,21 @@ const buildPrinterData = printer => ({
   bedTarget: printer.status === 'PRINTING' ? 60 : 0
 })
 
-export function createMockWebSocketStream({ onOpen, onMessage, onClose } = {}) {
+export function createMockWebSocketStream({ identity, onOpen, onMessage, onClose } = {}) {
   let tick = 0
-  const emit = message => onMessage?.(toPublicSemanticIds({
-    version: '1',
-    eventId: `mock-event-${++mockEventSequence}`,
-    sequence: mockEventSequence,
-    timestamp: Date.now(),
-    ...message
-  }))
-  mockSubscribers.add(onMessage)
+  let sequence = 0
+  const subscriber = { identity: normalizeIdentity(identity), onMessage, nextSequence: () => ++sequence }
+  const emit = message => {
+    if (!canReceive(subscriber, message)) return
+    onMessage?.(toPublicSemanticIds({
+      version: '1',
+      eventId: `mock-event-${++mockEventSequence}`,
+      sequence: subscriber.nextSequence(),
+      timestamp: Date.now(),
+      ...toWireMessage(message)
+    }))
+  }
+  mockSubscribers.add(subscriber)
 
   onOpen?.()
   emit({
@@ -57,6 +82,7 @@ export function createMockWebSocketStream({ onOpen, onMessage, onClose } = {}) {
       emit({
         type: 'JOB_STATUS',
         printerId: printer.id,
+        audienceUserId: job?.userId,
         data: {
           jobId: job?.id,
           currentJobId: printer.currentJobId,
@@ -70,7 +96,7 @@ export function createMockWebSocketStream({ onOpen, onMessage, onClose } = {}) {
   return {
     close() {
       window.clearInterval(timer)
-      mockSubscribers.delete(onMessage)
+      mockSubscribers.delete(subscriber)
       onClose?.()
     }
   }
@@ -78,13 +104,17 @@ export function createMockWebSocketStream({ onOpen, onMessage, onClose } = {}) {
 
 /** 向当前所有 Mock 客户端广播服务端事件。 */
 export function publishMockWebSocketEvent(message) {
-  // 广播事件的 envelope 只构造一次，所有订阅者共享同一个 eventId/sequence。
-  const event = toPublicSemanticIds({
-    version: '1',
-    eventId: `mock-event-${++mockEventSequence}`,
-    sequence: mockEventSequence,
-    timestamp: Date.now(),
-    ...message
+  // 逻辑事件共享 eventId；sequence 按每个会话实际可见消息流单独递增。
+  const eventId = `mock-event-${++mockEventSequence}`
+  const timestamp = Date.now()
+  mockSubscribers.forEach(subscriber => {
+    if (!canReceive(subscriber, message)) return
+    subscriber.onMessage?.(toPublicSemanticIds({
+      version: '1',
+      eventId,
+      sequence: subscriber.nextSequence(),
+      timestamp,
+      ...toWireMessage(message)
+    }))
   })
-  mockSubscribers.forEach(subscriber => subscriber?.(event))
 }

@@ -233,7 +233,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue'
 import {
   RefreshIcon as Refresh,
   SearchIcon as Search,
@@ -246,6 +246,7 @@ import { message } from '@/utils/message'
 import { formatDateTime } from '@/utils/formatters'
 import { renderIcon } from '@/utils/tdesign'
 import { getHistoryJobDisplay } from '@/utils/jobDisplay'
+import { createLatestRequestGuard } from '@/utils/latestRequestGuard'
 import TdTable from '@/components/TdTable.vue'
 import TdTableColumn from '@/components/TdTableColumn.vue'
 import AsyncState from '@/components/AsyncState.vue'
@@ -276,6 +277,8 @@ const reconcileSuccessKey = ref(0)
 const reconcileStale = ref(false)
 const JOB_HISTORY_DETAIL_CONTEXT_KEY = 'farm-ui:job-history-detail'
 const getHistoryDisplay = getHistoryJobDisplay
+const historyRequestGuard = createLatestRequestGuard()
+let historyRefreshScheduled = false
 
 const openTaskDetail = job => {
   selectedJob.value = job
@@ -462,11 +465,14 @@ const handlePaginationChange = ({ current, pageSize }) => {
 
 // 获取数据
 const fetchData = async ({ rethrow = false } = {}) => {
+  const requestId = historyRequestGuard.begin()
+  if (requestId === null) return
   loading.value = true
   loadError.value = ''
   try {
     const params = buildParams()
     const res = await getJobPage(params)
+    if (!historyRequestGuard.isCurrent(requestId)) return
     if (res.code === 200) {
       // 成功响应允许 data=null，按空结果处理，不提示接口异常。
       tableData.value = res.data?.records || []
@@ -480,14 +486,27 @@ const fetchData = async ({ rethrow = false } = {}) => {
       if (rethrow) throw responseError
     }
   } catch (error) {
+    if (!historyRequestGuard.isCurrent(requestId)) return
     console.error('获取打印历史记录失败:', error)
     loadError.value = error?.message || '打印历史加载失败，请重试'
     if (!error?.toastShown) message.error(error?.message || '获取打印历史记录失败')
     if (rethrow) throw error
   } finally {
-    loading.value = false
+    if (historyRequestGuard.isCurrent(requestId)) loading.value = false
   }
 }
+
+// 终态实时事件只使当前查询失效；筛选、页码和每页条数仍由当前页面状态控制。
+watch(() => jobStore.historyInvalidationVersion, () => {
+  if (historyRefreshScheduled) return
+  historyRefreshScheduled = true
+  queueMicrotask(() => {
+    historyRefreshScheduled = false
+    void fetchData()
+  })
+})
+
+onBeforeUnmount(() => historyRequestGuard.invalidate())
 
 // 初始化数据
 fetchData()

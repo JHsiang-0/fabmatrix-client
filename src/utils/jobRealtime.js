@@ -1,15 +1,77 @@
 import { isActiveJob, selectActiveJobs } from './jobSelectors.js'
 
+const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key)
+
+const REALTIME_ACTIVE_STATUSES = Object.freeze([
+  'ASSIGNED',
+  'UPLOADING',
+  'READY',
+  'PRINTING',
+  'PAUSED',
+  'RECONCILING'
+])
+
+const TERMINAL_STATUSES = Object.freeze(['COMPLETED', 'FAILED', 'CANCELLED'])
+
+export const getRealtimeJobId = (message = {}) => {
+  const data = message.data || {}
+  if (hasOwn(data, 'jobId')) return data.jobId
+  if (hasOwn(data, 'currentJobId')) return data.currentJobId
+  if (hasOwn(message, 'jobId')) return message.jobId
+  if (hasOwn(message, 'currentJobId')) return message.currentJobId
+  return null
+}
+
 const sortByUpdatedAt = (left, right) => (
   new Date(right.updatedAt || right.createdAt || 0) - new Date(left.updatedAt || left.createdAt || 0)
 )
 
 export function normalizeRealtimeJobStatus(message = {}) {
   const data = message.data || {}
-  const id = data.jobId ?? message.jobId
-  const status = String(data.status || data.currentJobStatus || '').toUpperCase()
+  const id = getRealtimeJobId(message)
+  const rawStatus = String(data.status || data.currentJobStatus || '').toUpperCase()
+  const status = rawStatus === 'PREPARING' ? 'UPLOADING' : rawStatus
   if (id === undefined || id === null || !status) return null
   return { data, id, status, key: String(id), message }
+}
+
+export const isRealtimeActiveJobStatus = status => REALTIME_ACTIVE_STATUSES.includes(String(status || '').toUpperCase())
+
+export const isTerminalJobStatus = status => TERMINAL_STATUSES.includes(String(status || '').toUpperCase())
+
+export const getRealtimeJobCollection = status => {
+  const normalized = String(status || '').toUpperCase()
+  if (normalized === 'QUEUED') return 'queue'
+  if (isRealtimeActiveJobStatus(normalized) || isActiveJob({ status: normalized })) return 'active'
+  if (isTerminalJobStatus(normalized)) return 'terminal'
+  return null
+}
+
+/** 只取事件中明确存在的字段，避免增量事件清空 REST 摘要。 */
+export function getRealtimeJobPatch(message = {}, normalized = normalizeRealtimeJobStatus(message)) {
+  if (!normalized) return null
+  const { data, id, status } = normalized
+  const patch = { id: String(id), status }
+  const explicitFields = [
+    'progress',
+    'printerId',
+    'currentJobId',
+    'errorReason',
+    'completedAt',
+    'updatedAt',
+    'startedAt',
+    'fileName',
+    'printerName',
+    'machineNumber',
+    'creatorUsername',
+    'operatorUsername',
+    'materialType',
+    'nozzleSize'
+  ]
+  explicitFields.forEach(field => {
+    if (hasOwn(data, field)) patch[field] = data[field]
+  })
+  return patch
 }
 
 /**

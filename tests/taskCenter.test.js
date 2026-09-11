@@ -145,3 +145,11 @@ test('任务核对仍有重复提交保护并刷新任务、队列和打印机�
   assert.match(historySource, /活动任务列表刷新失败，请稍后手动刷新/)
   assert.match(historySource, /打印机状态刷新失败，请稍后手动刷新看板/)
 })
+
+test('TC-006 历史失效合并刷新并拒绝旧分页响应覆盖', () => {
+  assert.match(historySource, /historyRequestGuard = createLatestRequestGuard\(\)/)
+  assert.match(historySource, /historyRequestGuard\.isCurrent\(requestId\)/)
+  assert.match(historySource, /historyRefreshScheduled/)
+  assert.match(historySource, /queueMicrotask\(\(\) =>/)
+  assert.match(historySource, /onBeforeUnmount\(\(\) => historyRequestGuard\.invalidate\(\)\)/)
+})

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mockRequest } from '../src/mock/index.js'
-import { createMockWebSocketStream } from '../src/mock/websocket.js'
+import { createMockWebSocketStream, publishMockWebSocketEvent } from '../src/mock/websocket.js'
 import { mockState, resetMockState } from '../src/mock/data.js'
 
 const request = (method, url, data, headers, params) => mockRequest({
@@ -425,5 +425,52 @@ test('keeps Mock error scenarios aligned with HTTP and business codes', async ()
         return true
       }
     )
+  }
+})
+
+test('Mock 写操作按 ADMIN/owner/other 身份广播无打印机 JOB_STATUS', async () => {
+  resetMockState()
+  mockState.sessions['mock-owner'] = { userId: 2, username: 'operator', role: 'OPERATOR' }
+  mockState.sessions['mock-other'] = { userId: 3, username: 'other', role: 'OPERATOR' }
+  mockState.sessions['mock-admin'] = { userId: 1, username: 'admin', role: 'ADMIN' }
+  const previousWindow = globalThis.window
+  globalThis.window = { setInterval, clearInterval }
+  const ownerEvents = []
+  const otherEvents = []
+  const adminEvents = []
+  const ownerStream = createMockWebSocketStream({
+    identity: mockState.sessions['mock-owner'], onMessage: event => ownerEvents.push(event)
+  })
+  const otherStream = createMockWebSocketStream({
+    identity: mockState.sessions['mock-other'], onMessage: event => otherEvents.push(event)
+  })
+  const adminStream = createMockWebSocketStream({
+    identity: mockState.sessions['mock-admin'], onMessage: event => adminEvents.push(event)
+  })
+
+  try {
+    const file = mockState.files.find(item => !item.isFolder && Number(item.userId) === 2)
+    await request('POST', '/api/v1/print-jobs', {
+      fileId: file.id,
+      priority: 10
+    }, { Authorization: 'Bearer mock-owner' })
+
+    const ownerJob = ownerEvents.find(event => event.type === 'JOB_STATUS')
+    const adminJob = adminEvents.find(event => event.type === 'JOB_STATUS')
+    assert.equal(ownerJob.eventId, adminJob.eventId)
+    assert.equal(ownerJob.data.status, 'QUEUED')
+    assert.equal(ownerJob.data.currentJobId, null)
+    assert.equal(ownerJob.printerId, null)
+    assert.equal('audienceUserId' in ownerJob, false)
+    assert.equal(otherEvents.some(event => event.type === 'JOB_STATUS'), false)
+
+    publishMockWebSocketEvent({ type: 'PRINTER_STATUS', printerId: '403', data: { status: 'IDLE' } })
+    assert.equal(otherEvents.at(-1).sequence, 2)
+  } finally {
+    ownerStream.close()
+    otherStream.close()
+    adminStream.close()
+    if (previousWindow === undefined) delete globalThis.window
+    else globalThis.window = previousWindow
   }
 })

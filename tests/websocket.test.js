@@ -142,3 +142,39 @@ test('does not reconnect after an intentional close', async () => {
 
   client.destroy()
 })
+
+test('never logs token-bearing native events, socket objects or error details', async () => {
+  FakeWebSocket.instances.length = 0
+  const secret = 'jwt-super-secret-value'
+  const captured = []
+  const originalConsole = {
+    log: console.log,
+    warn: console.warn,
+    error: console.error
+  }
+  console.log = (...args) => captured.push(args)
+  console.warn = (...args) => captured.push(args)
+  console.error = (...args) => captured.push(args)
+
+  try {
+    const client = new WebSocketClient(`ws://farm.test/ws?token=${secret}`, {
+      autoConnect: false,
+      maxReconnectAttempts: 0
+    })
+    client.on('error', () => {
+      throw new Error(secret)
+    })
+    await client.connect()
+    const socket = FakeWebSocket.instances[0]
+    socket.emit('error', { type: 'error', target: socket, config: { token: secret } })
+    socket.serverClose(1000, `token=${secret}`)
+    client.destroy()
+  } finally {
+    console.log = originalConsole.log
+    console.warn = originalConsole.warn
+    console.error = originalConsole.error
+  }
+
+  assert.equal(JSON.stringify(captured).includes(secret), false)
+  assert.equal(captured.flat().some(value => typeof value === 'object' && value !== null), false)
+})

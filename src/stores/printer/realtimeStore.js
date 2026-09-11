@@ -1,6 +1,6 @@
 import { computed, shallowRef, markRaw, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { WebSocketClient } from '@/utils/websocket'
+import { getSafeWebSocketErrorCategory, WebSocketClient } from '@/utils/websocket'
 import { PRINTER_STATE } from '@/utils/constants'
 import { normalizeId } from '@/utils/dataAdapters'
 import { normalizeProgress } from '@/utils/formatters'
@@ -54,6 +54,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
   const isRealtimeStale = ref(false)
   const isRecovering = ref(false)
   let recoveryPromise = null
+  let recoveryEpoch = 0
   let lifecycleGeneration = 0
   let recoveryAbortController = null
   const userStore = useUserStore()
@@ -283,9 +284,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
 
   function refreshJobState(generation = lifecycleGeneration) {
     if (generation !== lifecycleGeneration) return Promise.resolve(null)
-    jobStore.refresh().catch(error => {
-      console.error('[RealtimeStore] 任务状态恢复失败:', error)
-    })
+    return jobStore.refresh()
   }
 
   function handleWebSocketMessage(message) {
@@ -293,7 +292,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
 
     if (!isSupportedRealtimeVersion(version)) {
       isRealtimeStale.value = true
-      recoverRealtimeSnapshot()
+      void recoverRealtimeSnapshot()
       return
     }
 
@@ -307,7 +306,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
     if (Number.isInteger(Number(sequence)) && Number(sequence) >= 0) {
       if (sequenceResult.gap) {
         isRealtimeStale.value = true
-        recoverRealtimeSnapshot()
+        void recoverRealtimeSnapshot()
       }
       lastSequence.value = sequenceResult.nextSequence
     }
@@ -323,7 +322,6 @@ export const useRealtimeStore = defineStore('realtime', () => {
     }
 
     if (type === 'SNAPSHOT') {
-      isRealtimeStale.value = false
       toRealtimeSnapshotEntries(data).forEach(entry => queueRealtimeUpdate(entry.printerId, entry.data, timestamp))
       return
     }
@@ -338,8 +336,17 @@ export const useRealtimeStore = defineStore('realtime', () => {
 
     if (type === 'JOB_STATUS') {
       jobStore.queueRealtimeJobStatus(message)
+      const hasCurrentJobId = Object.prototype.hasOwnProperty.call(data || {}, 'currentJobId')
+      const hasJobId = Object.prototype.hasOwnProperty.call(data || {}, 'jobId')
+      const currentJobId = hasCurrentJobId
+        ? data.currentJobId
+        : hasJobId
+          ? data.jobId
+          : Object.prototype.hasOwnProperty.call(message || {}, 'currentJobId')
+            ? message.currentJobId
+            : message.jobId
       queueRealtimeUpdate(printerId, {
-        currentJobId: data?.currentJobId ?? message.jobId,
+        currentJobId,
         currentJobStatus: data?.status ?? data?.currentJobStatus,
         progress: data?.progress
       }, timestamp)
@@ -356,7 +363,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
     }
 
     if (printerId === undefined || printerId === null || !data) {
-      console.warn('[RealtimeStore] 收到无效的 WebSocket 消息:', message)
+      console.warn('[RealtimeStore] 收到无效的 WebSocket 消息')
       return
     }
 
@@ -380,10 +387,18 @@ export const useRealtimeStore = defineStore('realtime', () => {
   async function recoverRealtimeSnapshot() {
     if (recoveryPromise) return recoveryPromise
     const generation = lifecycleGeneration
+    const recoveryId = ++recoveryEpoch
     const abortController = new AbortController()
     recoveryAbortController = abortController
-    const isCurrent = () => generation === lifecycleGeneration && !abortController.signal.aborted
+    const isCurrent = () => generation === lifecycleGeneration
+      && recoveryId === recoveryEpoch
+      && !abortController.signal.aborted
+    const isConnectionOpen = () => isMockEnabled
+      ? mockConnectionState.value === 'OPEN'
+      : connectionState.value === 'OPEN'
+    isRealtimeStale.value = true
     isRecovering.value = true
+    jobStore.beginRealtimeRecovery()
     recoveryPromise = getPrinterList({ pageNum: 1, pageSize: 100 }, { signal: abortController.signal })
       .then(firstPage => collectAllPages(
         (pageNum, pageSize) => getPrinterList({ pageNum, pageSize }, { signal: abortController.signal }),
@@ -403,16 +418,18 @@ export const useRealtimeStore = defineStore('realtime', () => {
             state: printer.status
           }, printer.updatedAt || Date.now())
         })
-        isRealtimeStale.value = false
-        return refreshJobState(generation)
+        return refreshJobState(generation).then(() => {
+          if (isCurrent() && isConnectionOpen()) isRealtimeStale.value = false
+          return records
+        })
       })
       .catch(error => {
         if (!isCurrent() || error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError') return null
-        console.error('[RealtimeStore] WebSocket 断档恢复失败:', error)
+        console.error(`[RealtimeStore] WebSocket 状态恢复失败 (${getSafeWebSocketErrorCategory(error)})`)
         isRealtimeStale.value = true
       })
       .finally(() => {
-        if (generation === lifecycleGeneration) {
+        if (isCurrent()) {
           isRecovering.value = false
           recoveryPromise = null
           recoveryAbortController = null
@@ -424,7 +441,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
   /**
    * 连接 WebSocket
    */
-  function connectWs() {
+  function connectWs(options = {}) {
     if (isMockEnabled && mockStream) return
     if (!isMockEnabled && wsClient) disconnectWs()
     const generation = ++lifecycleGeneration
@@ -432,10 +449,16 @@ export const useRealtimeStore = defineStore('realtime', () => {
       lastSequence.value = null
       mockConnectionState.value = 'OPEN'
       mockStream = createMockWebSocketStream({
+        identity: { userId: userStore.userInfo?.id, role: userStore.userInfo?.role },
         onOpen: () => {
           if (generation !== lifecycleGeneration) return
           resetSequenceBaseline()
-          refreshJobState(generation)
+          void refreshJobState(generation).catch(error => {
+            if (generation === lifecycleGeneration) {
+              console.error(`[RealtimeStore] Mock WebSocket 任务刷新失败 (${getSafeWebSocketErrorCategory(error)})`)
+              isRealtimeStale.value = true
+            }
+          })
         },
         onMessage: message => generation === lifecycleGeneration && handleWebSocketMessage(message),
         onClose: () => {
@@ -458,6 +481,8 @@ export const useRealtimeStore = defineStore('realtime', () => {
       return
     }
 
+    let hasOpenedConnection = false
+
     // 创建新的 WebSocket 客户端 - 使用 markRaw 避免响应式代理
     wsClient = markRaw(new WebSocketClient(wsUrl, {
       reconnectDelay: WS_CONFIG.reconnectDelay,
@@ -465,6 +490,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
       reconnectBackoffMultiplier: WS_CONFIG.reconnectBackoffMultiplier,
       maxReconnectAttempts: WS_CONFIG.maxReconnectAttempts,
       inactivityTimeout: WS_CONFIG.inactivityTimeout,
+      webSocketFactory: options.webSocketFactory || null,
       autoConnect: false
     }))
 
@@ -476,28 +502,34 @@ export const useRealtimeStore = defineStore('realtime', () => {
     // 订阅连接事件
     wsClient.on('open', () => {
       if (generation !== lifecycleGeneration) return
+      const isReconnect = hasOpenedConnection
+      hasOpenedConnection = true
       connectionState.value = 'OPEN'
       resetSequenceBaseline()
-      refreshJobState(generation)
+      if (isReconnect || isRealtimeStale.value) {
+        isRealtimeStale.value = true
+        void recoverRealtimeSnapshot()
+      } else {
+        void refreshJobState(generation).catch(error => {
+          console.error(`[RealtimeStore] 任务状态刷新失败 (${getSafeWebSocketErrorCategory(error)})`)
+        })
+      }
       console.log('[RealtimeStore] WebSocket 连接已建立')
     })
 
-    wsClient.on('close', event => {
+    wsClient.on('close', () => {
       if (generation !== lifecycleGeneration) return
       connectionState.value = wsClient?.getState() || 'CLOSED'
-      if (event?.code !== 1000) {
-        isRealtimeStale.value = true
-        // 保留当前 statusMap，以完整 REST 快照恢复；recoveryPromise
-        // 同时防止断档、断开和重连回调形成恢复风暴。
-        void recoverRealtimeSnapshot()
-      }
+      isRealtimeStale.value = true
+      cancelRecovery()
       console.log('[RealtimeStore] WebSocket 连接已关闭')
     })
 
-    wsClient.on('error', (error) => {
+    wsClient.on('error', () => {
       if (generation !== lifecycleGeneration) return
       connectionState.value = wsClient?.getState() || 'CLOSED'
-      console.error('[RealtimeStore] WebSocket 错误:', error)
+      isRealtimeStale.value = true
+      console.error('[RealtimeStore] WebSocket 错误 (CONNECTION_ERROR)')
     })
 
     wsClient.on('inactivityTimeout', () => {
@@ -507,8 +539,16 @@ export const useRealtimeStore = defineStore('realtime', () => {
     const connectPromise = wsClient.connect()
     connectionState.value = wsClient.getState() || 'CONNECTING'
     connectPromise.catch(error => {
-      console.error('[RealtimeStore] WebSocket 初次连接失败:', error)
+      console.error(`[RealtimeStore] WebSocket 初次连接失败 (${getSafeWebSocketErrorCategory(error)})`)
     })
+  }
+
+  function cancelRecovery() {
+    recoveryEpoch += 1
+    recoveryAbortController?.abort()
+    recoveryAbortController = null
+    recoveryPromise = null
+    isRecovering.value = false
   }
 
   /**
@@ -516,8 +556,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
    */
   function disconnectWs() {
     lifecycleGeneration += 1
-    recoveryAbortController?.abort()
-    recoveryAbortController = null
+    cancelRecovery()
     // 取消待处理的 RAF 更新
     cancelPendingUpdate()
 
@@ -538,7 +577,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
     connectionState.value = 'CLOSED'
 
     // 清空实时状态数据
-    jobStore.clearQueuedRealtimeStatuses()
+    jobStore.resetRealtimeOrdering()
     statusMap.value = new Map()
     alerts.value = []
     lastSequence.value = null
@@ -552,6 +591,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
 
   function resetSequenceBaseline() {
     lastSequence.value = null
+    jobStore.resetRealtimeSequence()
   }
 
   /**

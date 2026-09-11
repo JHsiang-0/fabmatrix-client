@@ -65,6 +65,65 @@ const waitFor = async predicate => {
   throw new Error('等待 Store 请求超时')
 }
 
+class RuntimeFakeWebSocket {
+  static instances = []
+  static CONNECTING = 0
+  static OPEN = 1
+  static CLOSING = 2
+  static CLOSED = 3
+
+  constructor(url) {
+    this.url = url
+    this.readyState = RuntimeFakeWebSocket.CONNECTING
+    this.listeners = new Map()
+    RuntimeFakeWebSocket.instances.push(this)
+    queueMicrotask(() => this.open())
+  }
+
+  addEventListener(type, handler) {
+    const handlers = this.listeners.get(type) || new Set()
+    handlers.add(handler)
+    this.listeners.set(type, handlers)
+  }
+
+  removeEventListener(type, handler) {
+    this.listeners.get(type)?.delete(handler)
+  }
+
+  emit(type, event = {}) {
+    this.listeners.get(type)?.forEach(handler => handler(event))
+  }
+
+  open() {
+    this.readyState = RuntimeFakeWebSocket.OPEN
+    this.emit('open', { type: 'open' })
+  }
+
+  message(message) {
+    this.emit('message', { data: JSON.stringify(message) })
+  }
+
+  serverClose(code = 1006, reason = 'network') {
+    this.readyState = RuntimeFakeWebSocket.CLOSED
+    this.emit('close', { code, reason, target: this })
+  }
+
+  close(code = 1000, reason = '') {
+    if (this.readyState === RuntimeFakeWebSocket.CLOSED) return
+    this.readyState = RuntimeFakeWebSocket.CLOSED
+    this.emit('close', { code, reason, target: this })
+  }
+}
+
+const memoryStorage = () => {
+  const values = new Map()
+  return {
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: key => values.delete(key)
+  }
+}
+
 let viteServer
 let service
 let originalAdapter
@@ -233,6 +292,78 @@ test('真实 job Pinia Store 活动页越界只补请求最后有效页，未知
   assert.equal(jobs.activeTotal, 25)
 })
 
+test('真实 job Pinia Store 收敛完整迁移、终态失效和未知任务合并刷新', async () => {
+  setActivePinia(createPinia())
+  let queueReads = 0
+  let activeReads = 0
+  let serverStatus = 'QUEUED'
+  service.defaults.adapter = config => {
+    if (config.url === '/api/v1/print-jobs/queue') {
+      queueReads += 1
+      const records = serverStatus === 'QUEUED'
+        ? [{ id: 'job-1', status: 'QUEUED', fileName: 'rest.gcode' }]
+        : []
+      return Promise.resolve(axiosResponse(config, records))
+    }
+    if (config.url === '/api/v1/print-jobs/page') {
+      activeReads += 1
+      const records = ['ASSIGNED', 'UPLOADING', 'READY', 'PRINTING', 'PAUSED', 'RECONCILING'].includes(serverStatus)
+        ? [{ id: 'job-1', status: serverStatus, fileName: 'rest.gcode' }]
+        : []
+      return Promise.resolve(axiosResponse(config, {
+        records, total: records.length, pageNum: 1, pageSize: 10, pages: records.length ? 1 : 0
+      }))
+    }
+    throw new Error(`未处理测试路由: ${config.url}`)
+  }
+
+  const jobs = useJobStore()
+  await jobs.fetchQueue()
+  await jobs.fetchActive()
+  const emit = async (sequence, status) => {
+    serverStatus = status
+    jobs.queueRealtimeJobStatus({
+      eventId: `job-event-${sequence}`,
+      sequence,
+      timestamp: 1789092000000 + sequence,
+      data: { jobId: 'job-1', status, progress: sequence * 10 }
+    })
+    await new Promise(resolve => setImmediate(resolve))
+  }
+
+  await emit(1, 'ASSIGNED')
+  assert.equal(jobs.activeJobs[0].fileName, 'rest.gcode')
+  await emit(2, 'PRINTING')
+  await emit(3, 'COMPLETED')
+  assert.deepEqual(jobs.queueJobs, [])
+  assert.deepEqual(jobs.activeJobs, [])
+  assert.deepEqual(jobs.terminalJobs, [])
+  assert.equal(jobs.activeTotal, 0)
+  assert.equal(jobs.historyInvalidationVersion, 1)
+
+  jobs.queueRealtimeJobStatus({
+    eventId: 'unknown-job-event', sequence: 4, data: { jobId: 'unknown-job', status: 'PRINTING' }
+  })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(jobs.queueJobs.some(job => job.id === 'unknown-job'), false)
+  assert.equal(queueReads, 4)
+  assert.equal(activeReads, 4)
+
+  jobs.queueRealtimeJobStatus({
+    eventId: 'unknown-terminal-event', sequence: 5, data: { jobId: 'history-only-job', status: 'COMPLETED' }
+  })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(jobs.historyInvalidationVersion, 2)
+
+  jobs.queueRealtimeJobStatus({
+    eventId: 'iso-timestamp-event', data: {
+      jobId: 'iso-history-only-job', status: 'FAILED', updatedAt: '2026-09-12T10:00:00Z'
+    }
+  })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(jobs.historyInvalidationVersion, 3)
+})
+
 test('真实 job Pinia Store 只接受最新活动页响应', async () => {
   setActivePinia(createPinia())
   const requests = []
@@ -260,6 +391,460 @@ test('真实 job Pinia Store 只接受最新活动页响应', async () => {
 
   assert.equal(jobs.activePage, 2)
   assert.deepEqual(jobs.activeJobs.map(job => job.id), ['new-page'])
+})
+
+test('跨集合迁移不向非第一页满页插入残缺行并由 REST 校准 total', async () => {
+  setActivePinia(createPinia())
+  const existingPage = Array.from({ length: 10 }, (_, index) => ({
+    id: `active-${index + 1}`, status: 'PRINTING', fileName: `active-${index + 1}.gcode`
+  }))
+  const refreshRequests = []
+  let refreshing = false
+  service.defaults.adapter = config => {
+    if (!refreshing && config.url === '/api/v1/print-jobs/queue') {
+      return Promise.resolve(axiosResponse(config, [{ id: 'queue-job', status: 'QUEUED', fileName: 'queued.gcode' }]))
+    }
+    if (!refreshing && config.url === '/api/v1/print-jobs/page') {
+      return Promise.resolve(axiosResponse(config, {
+        records: existingPage, total: 21, pageNum: 2, pageSize: 10, pages: 3
+      }))
+    }
+    const operation = deferred()
+    refreshRequests.push({ ...operation, config })
+    return operation.promise
+  }
+
+  const jobs = useJobStore()
+  await jobs.fetchQueue()
+  await jobs.fetchActive({ pageNum: 2, pageSize: 10 })
+  refreshing = true
+  jobs.queueRealtimeJobStatus({
+    eventId: 'queue-to-active', sequence: 1, timestamp: 100,
+    data: { jobId: 'queue-job', status: 'ASSIGNED', progress: 0 }
+  })
+  await waitFor(() => refreshRequests.length === 2)
+
+  assert.equal(jobs.queueJobs.some(job => job.id === 'queue-job'), false)
+  assert.equal(jobs.activeJobs.length, 10)
+  assert.equal(jobs.activeJobs.some(job => job.id === 'queue-job'), false)
+  assert.equal(jobs.activePage, 2)
+  assert.equal(jobs.activeTotal, 22)
+
+  const queueRequest = refreshRequests.find(request => request.config.url.endsWith('/queue'))
+  const activeRequest = refreshRequests.find(request => request.config.url.endsWith('/page'))
+  queueRequest.resolve(axiosResponse(queueRequest.config, []))
+  activeRequest.resolve(axiosResponse(activeRequest.config, {
+    records: [{ id: 'queue-job', status: 'ASSIGNED', fileName: 'queued.gcode' }, ...existingPage.slice(0, 9)],
+    total: 22, pageNum: 2, pageSize: 10, pages: 3
+  }))
+  await waitFor(() => jobs.activeJobs.some(job => job.id === 'queue-job'))
+  assert.equal(jobs.activeJobs.length, 10)
+  assert.equal(jobs.activeTotal, 22)
+  assert.equal(jobs.activeJobs[0].fileName, 'queued.gcode')
+})
+
+test('活动任务离开非第一页后立即移除并由分页回退恢复有效页', async () => {
+  setActivePinia(createPinia())
+  const refreshRequests = []
+  let refreshing = false
+  service.defaults.adapter = config => {
+    if (!refreshing && config.url === '/api/v1/print-jobs/queue') {
+      return Promise.resolve(axiosResponse(config, []))
+    }
+    if (!refreshing && config.url === '/api/v1/print-jobs/page') {
+      return Promise.resolve(axiosResponse(config, {
+        records: [{ id: 'last-on-page', status: 'PRINTING', fileName: 'last.gcode' }],
+        total: 11, pageNum: 2, pageSize: 10, pages: 2
+      }))
+    }
+    const operation = deferred()
+    const body = typeof config.data === 'string' ? JSON.parse(config.data) : config.data
+    refreshRequests.push({ ...operation, config, body })
+    return operation.promise
+  }
+
+  const jobs = useJobStore()
+  await jobs.fetchQueue()
+  await jobs.fetchActive({ pageNum: 2, pageSize: 10 })
+  refreshing = true
+  jobs.queueRealtimeJobStatus({
+    eventId: 'active-to-terminal', sequence: 1, timestamp: 100,
+    data: { jobId: 'last-on-page', status: 'COMPLETED', progress: 100 }
+  })
+  await waitFor(() => refreshRequests.length === 2)
+  assert.deepEqual(jobs.activeJobs, [])
+  assert.deepEqual(jobs.terminalJobs, [])
+  assert.equal(jobs.activeTotal, 10)
+  assert.equal(jobs.historyInvalidationVersion, 1)
+
+  const queueRequest = refreshRequests.find(request => request.config.url.endsWith('/queue'))
+  const activePageTwo = refreshRequests.find(request => request.config.url.endsWith('/page'))
+  queueRequest.resolve(axiosResponse(queueRequest.config, []))
+  activePageTwo.resolve(axiosResponse(activePageTwo.config, {
+    records: [], total: 10, pageNum: 2, pageSize: 10, pages: 1
+  }))
+  await waitFor(() => refreshRequests.length === 3)
+  const activePageOne = refreshRequests[2]
+  const pageOneRecords = Array.from({ length: 10 }, (_, index) => ({
+    id: `page-one-${index}`, status: 'PRINTING', fileName: `page-one-${index}.gcode`
+  }))
+  activePageOne.resolve(axiosResponse(activePageOne.config, {
+    records: pageOneRecords, total: 10, pageNum: 1, pageSize: 10, pages: 1
+  }))
+  await waitFor(() => jobs.activePage === 1 && jobs.activeJobs.length === 10)
+  assert.equal(jobs.activeTotal, 10)
+})
+
+test('恢复基线淘汰旧 overlay 且保留恢复期间到达的新事件', async () => {
+  setActivePinia(createPinia())
+  const activeRequests = []
+  service.defaults.adapter = config => {
+    if (config.url === '/api/v1/print-jobs/queue') return Promise.resolve(axiosResponse(config, []))
+    if (config.url === '/api/v1/print-jobs/page') {
+      const operation = deferred()
+      activeRequests.push({ ...operation, config })
+      return operation.promise
+    }
+    throw new Error(`未处理测试路由: ${config.url}`)
+  }
+
+  const jobs = useJobStore()
+  const initial = jobs.fetchActive()
+  await waitFor(() => activeRequests.length === 1)
+  activeRequests[0].resolve(axiosResponse(activeRequests[0].config, {
+    records: [{ id: 'race-job', status: 'PRINTING', fileName: 'race.gcode' }],
+    total: 1, pageNum: 1, pageSize: 10, pages: 1
+  }))
+  await initial
+  jobs.applyRealtimeJobStatus({
+    eventId: 'old-overlay', sequence: 1, timestamp: 100,
+    data: { jobId: 'race-job', status: 'PAUSED', progress: 40 }
+  })
+  assert.equal(jobs.activeJobs[0].status, 'PAUSED')
+
+  jobs.beginRealtimeRecovery()
+  const recovery = jobs.refresh()
+  await waitFor(() => activeRequests.length === 2)
+  jobs.applyRealtimeJobStatus({
+    eventId: 'during-recovery', sequence: 1, timestamp: 200,
+    data: { jobId: 'race-job', status: 'READY', progress: 60 }
+  })
+  activeRequests[1].resolve(axiosResponse(activeRequests[1].config, {
+    records: [{ id: 'race-job', status: 'PRINTING', fileName: 'race.gcode' }],
+    total: 1, pageNum: 1, pageSize: 10, pages: 1
+  }))
+  await recovery
+  assert.equal(jobs.activeJobs[0].status, 'READY')
+  assert.equal(jobs.activeJobs[0].progress, 60)
+
+  jobs.beginRealtimeRecovery()
+  const cleanRecovery = jobs.refresh()
+  await waitFor(() => activeRequests.length === 3)
+  activeRequests[2].resolve(axiosResponse(activeRequests[2].config, {
+    records: [{ id: 'race-job', status: 'PRINTING', fileName: 'race.gcode' }],
+    total: 1, pageNum: 1, pageSize: 10, pages: 1
+  }))
+  await cleanRecovery
+  assert.equal(jobs.activeJobs[0].status, 'PRINTING')
+})
+
+test('普通 queue 和 active REST 响应收敛请求前的同集合 overlay', async () => {
+  setActivePinia(createPinia())
+  service.defaults.adapter = config => {
+    if (config.url === '/api/v1/print-jobs/queue') {
+      return Promise.resolve(axiosResponse(config, [
+        { id: 'queued-overlay', status: 'QUEUED', progress: 0, fileName: 'queue-rest.gcode' }
+      ]))
+    }
+    if (config.url === '/api/v1/print-jobs/page') {
+      return Promise.resolve(axiosResponse(config, {
+        records: [{ id: 'active-overlay', status: 'PRINTING', progress: 20, fileName: 'active-rest.gcode' }],
+        total: 1, pageNum: 1, pageSize: 10, pages: 1
+      }))
+    }
+    throw new Error(`未处理测试路由: ${config.url}`)
+  }
+
+  const jobs = useJobStore()
+  await jobs.fetchQueue()
+  await jobs.fetchActive()
+  jobs.applyRealtimeJobStatus({
+    eventId: 'queued-old-overlay', sequence: 1, timestamp: 100,
+    data: { jobId: 'queued-overlay', status: 'QUEUED', progress: 40 }
+  })
+  jobs.applyRealtimeJobStatus({
+    eventId: 'active-old-overlay', sequence: 2, timestamp: 101,
+    data: { jobId: 'active-overlay', status: 'PAUSED', progress: 50 }
+  })
+  assert.equal(jobs.queueJobs[0].progress, 40)
+  assert.equal(jobs.activeJobs[0].status, 'PAUSED')
+
+  await jobs.fetchQueue()
+  await jobs.fetchActive()
+
+  assert.equal(jobs.queueJobs[0].progress, 0)
+  assert.equal(jobs.activeJobs[0].status, 'PRINTING')
+  assert.equal(jobs.activeJobs[0].progress, 20)
+})
+
+test('普通详情 REST 响应收敛详情缓存中的请求前 overlay', async () => {
+  setActivePinia(createPinia())
+  let detailReads = 0
+  service.defaults.adapter = config => {
+    if (config.url === '/api/v1/print-jobs/detail-overlay') {
+      detailReads += 1
+      return Promise.resolve(axiosResponse(config, {
+        id: 'detail-overlay', status: 'PRINTING', progress: 30,
+        fileName: detailReads === 1 ? 'initial.gcode' : 'authoritative.gcode'
+      }))
+    }
+    throw new Error(`未处理测试路由: ${config.url}`)
+  }
+
+  const jobs = useJobStore()
+  await jobs.fetchJobDetail('detail-overlay')
+  jobs.applyRealtimeJobStatus({
+    eventId: 'detail-old-overlay', sequence: 1, timestamp: 100,
+    data: { jobId: 'detail-overlay', status: 'PAUSED', progress: 70 }
+  })
+  assert.equal(jobs.jobDetails.get('detail-overlay').status, 'PAUSED')
+
+  const detail = await jobs.fetchJobDetail('detail-overlay')
+
+  assert.equal(detail.status, 'PRINTING')
+  assert.equal(detail.progress, 30)
+  assert.equal(jobs.jobDetails.get('detail-overlay').fileName, 'authoritative.gcode')
+})
+
+test('普通 REST 请求期间到达的 WS overlay 不被响应覆盖', async () => {
+  setActivePinia(createPinia())
+  const pending = deferred()
+  let deferActive = false
+  service.defaults.adapter = config => {
+    if (config.url !== '/api/v1/print-jobs/page') {
+      throw new Error(`未处理测试路由: ${config.url}`)
+    }
+    if (deferActive) return pending.promise
+    return Promise.resolve(axiosResponse(config, {
+      records: [{ id: 'concurrent-overlay', status: 'PRINTING', progress: 10, fileName: 'race.gcode' }],
+      total: 1, pageNum: 1, pageSize: 10, pages: 1
+    }))
+  }
+
+  const jobs = useJobStore()
+  await jobs.fetchActive()
+  deferActive = true
+  const refresh = jobs.fetchActive()
+  jobs.applyRealtimeJobStatus({
+    eventId: 'during-rest-overlay', sequence: 1, timestamp: 100,
+    data: { jobId: 'concurrent-overlay', status: 'PAUSED', progress: 80 }
+  })
+  pending.resolve(axiosResponse({ url: '/api/v1/print-jobs/page' }, {
+    records: [{ id: 'concurrent-overlay', status: 'PRINTING', progress: 20, fileName: 'race.gcode' }],
+    total: 1, pageNum: 1, pageSize: 10, pages: 1
+  }))
+  await refresh
+
+  assert.equal(jobs.activeJobs[0].status, 'PAUSED')
+  assert.equal(jobs.activeJobs[0].progress, 80)
+})
+
+test('JobStore 拒绝重复、乱序及无 sequence 对有序事件的覆盖', async () => {
+  setActivePinia(createPinia())
+  service.defaults.adapter = config => Promise.resolve(axiosResponse(config,
+    config.url.endsWith('/queue') ? [] : {
+      records: [{ id: 'ordered-job', status: 'PRINTING', progress: 10 }],
+      total: 1, pageNum: 1, pageSize: 10, pages: 1
+    }))
+  const jobs = useJobStore()
+  await jobs.fetchActive()
+
+  jobs.applyRealtimeJobStatus({
+    eventId: 'ordered-10', sequence: 10, timestamp: 100,
+    data: { jobId: 'ordered-job', status: 'PAUSED', progress: 20 }
+  })
+  jobs.applyRealtimeJobStatus({
+    eventId: 'ordered-10', sequence: 11, timestamp: 110,
+    data: { jobId: 'ordered-job', status: 'PRINTING', progress: 30 }
+  })
+  jobs.applyRealtimeJobStatus({
+    eventId: 'ordered-9', sequence: 9, timestamp: 120,
+    data: { jobId: 'ordered-job', status: 'PRINTING', progress: 40 }
+  })
+  jobs.applyRealtimeJobStatus({
+    eventId: 'unordered-newer-time', timestamp: 1000,
+    data: { jobId: 'ordered-job', status: 'PRINTING', progress: 50 }
+  })
+
+  assert.equal(jobs.activeJobs[0].status, 'PAUSED')
+  assert.equal(jobs.activeJobs[0].progress, 20)
+})
+
+test('终态成员离开历史集合时使历史失效并通过 REST 进入队列', async () => {
+  setActivePinia(createPinia())
+  let queued = false
+  service.defaults.adapter = config => {
+    if (config.url === '/api/v1/print-jobs/history-job') {
+      return Promise.resolve(axiosResponse(config, { id: 'history-job', status: 'FAILED', fileName: 'failed.gcode' }))
+    }
+    if (config.url === '/api/v1/print-jobs/queue') {
+      return Promise.resolve(axiosResponse(config, queued
+        ? [{ id: 'history-job', status: 'QUEUED', fileName: 'failed.gcode' }]
+        : []))
+    }
+    if (config.url === '/api/v1/print-jobs/page') {
+      return Promise.resolve(axiosResponse(config, { records: [], total: 0, pageNum: 1, pageSize: 10, pages: 0 }))
+    }
+    throw new Error(`未处理测试路由: ${config.url}`)
+  }
+  const jobs = useJobStore()
+  await jobs.fetchJobDetail('history-job')
+  queued = true
+  jobs.queueRealtimeJobStatus({
+    eventId: 'failed-to-queued', sequence: 1, timestamp: 100,
+    data: { jobId: 'history-job', status: 'QUEUED' }
+  })
+  await waitFor(() => jobs.queueJobs.some(job => job.id === 'history-job'))
+  assert.equal(jobs.historyInvalidationVersion, 1)
+  assert.equal(jobs.queueJobs[0].fileName, 'failed.gcode')
+})
+
+test('sequence gap 恢复仅在 printer、queue、active 同代成功后清除 stale', async () => {
+  setActivePinia(createPinia())
+  const previousWindow = globalThis.window
+  const previousRaf = globalThis.requestAnimationFrame
+  const previousCancelRaf = globalThis.cancelAnimationFrame
+  globalThis.window = {
+    location: { protocol: 'http:', host: 'farm.test' },
+    localStorage: memoryStorage(),
+    sessionStorage: memoryStorage()
+  }
+  globalThis.requestAnimationFrame = callback => setImmediate(callback)
+  globalThis.cancelAnimationFrame = handle => clearImmediate(handle)
+  RuntimeFakeWebSocket.instances.length = 0
+  const printerRecovery = deferred()
+  const queueRecovery = deferred()
+  const activeRecovery = deferred()
+  let recovering = false
+  service.defaults.adapter = config => {
+    if (!recovering && config.url === '/api/v1/print-jobs/queue') return Promise.resolve(axiosResponse(config, []))
+    if (!recovering && config.url === '/api/v1/print-jobs/page') {
+      return Promise.resolve(axiosResponse(config, { records: [], total: 0, pageNum: 1, pageSize: 10, pages: 0 }))
+    }
+    if (config.url === '/api/v1/printers/page') return printerRecovery.promise
+    if (config.url === '/api/v1/print-jobs/queue') return queueRecovery.promise
+    if (config.url === '/api/v1/print-jobs/page') return activeRecovery.promise
+    throw new Error(`未处理测试路由: ${config.url}`)
+  }
+
+  const realtime = useRealtimeStore()
+  const user = useUserStore()
+  user.token = 'gap-token'
+  user.userInfo = { id: '1', role: 'OPERATOR' }
+  try {
+    realtime.connectWs({ webSocketFactory: url => new RuntimeFakeWebSocket(url) })
+    await waitFor(() => realtime.wsConnectionState === 'OPEN')
+    const socket = RuntimeFakeWebSocket.instances[0]
+    socket.message({ version: '1', type: 'SNAPSHOT', eventId: 'snapshot-1', sequence: 1, timestamp: 1, data: { printers: [] } })
+    recovering = true
+    socket.message({
+      version: '1', type: 'PRINTER_STATUS', eventId: 'gap-3', sequence: 3, timestamp: 3,
+      printerId: '403', data: { status: 'IDLE' }
+    })
+    await waitFor(() => realtime.isRecovering)
+    assert.equal(realtime.isRealtimeStale, true)
+    socket.message({ version: '1', type: 'SNAPSHOT', eventId: 'snapshot-4', sequence: 4, timestamp: 4, data: { printers: [] } })
+    assert.equal(realtime.isRealtimeStale, true)
+
+    printerRecovery.resolve(axiosResponse({ url: '/api/v1/printers/page' }, page([{ id: '403', status: 'IDLE' }])))
+    await waitFor(() => queueRecovery.resolve && realtime.isRecovering)
+    queueRecovery.resolve(axiosResponse({ url: '/api/v1/print-jobs/queue' }, []))
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(realtime.isRealtimeStale, true)
+    activeRecovery.resolve(axiosResponse({ url: '/api/v1/print-jobs/page' }, {
+      records: [], total: 0, pageNum: 1, pageSize: 10, pages: 0
+    }))
+    await waitFor(() => !realtime.isRecovering)
+    assert.equal(realtime.isRealtimeStale, false)
+  } finally {
+    realtime.disconnectWs()
+    globalThis.window = previousWindow
+    globalThis.requestAnimationFrame = previousRaf
+    globalThis.cancelAnimationFrame = previousCancelRaf
+  }
+})
+
+test('意外 code 1000、重连恢复失败和原生错误日志均保持安全 stale 语义', async () => {
+  setActivePinia(createPinia())
+  const previousWindow = globalThis.window
+  const previousRaf = globalThis.requestAnimationFrame
+  const previousCancelRaf = globalThis.cancelAnimationFrame
+  globalThis.window = {
+    location: { protocol: 'http:', host: 'farm.test' },
+    localStorage: memoryStorage(),
+    sessionStorage: memoryStorage()
+  }
+  globalThis.requestAnimationFrame = callback => setImmediate(callback)
+  globalThis.cancelAnimationFrame = handle => clearImmediate(handle)
+  RuntimeFakeWebSocket.instances.length = 0
+  let reconnecting = false
+  let failureMode = 'printer'
+  service.defaults.adapter = config => {
+    if (config.url === '/api/v1/printers/page' && reconnecting) {
+      if (failureMode === 'printer') return Promise.reject(new Error('printer recovery unavailable'))
+      return Promise.resolve(axiosResponse(config, page([{ id: '403', status: 'IDLE' }])))
+    }
+    if (config.url === '/api/v1/print-jobs/queue') {
+      if (reconnecting && failureMode === 'job') return Promise.reject(new Error('job recovery unavailable'))
+      return Promise.resolve(axiosResponse(config, []))
+    }
+    if (config.url === '/api/v1/print-jobs/page') {
+      return Promise.resolve(axiosResponse(config, { records: [], total: 0, pageNum: 1, pageSize: 10, pages: 0 }))
+    }
+    throw new Error(`未处理测试路由: ${config.url}`)
+  }
+  const secret = 'realtime-jwt-secret'
+  const captured = []
+  const originalConsole = { log: console.log, warn: console.warn, error: console.error }
+  console.log = (...args) => captured.push(args)
+  console.warn = (...args) => captured.push(args)
+  console.error = (...args) => captured.push(args)
+
+  const realtime = useRealtimeStore()
+  const user = useUserStore()
+  user.token = secret
+  user.userInfo = { id: '1', role: 'OPERATOR' }
+  try {
+    realtime.connectWs({ webSocketFactory: url => new RuntimeFakeWebSocket(url) })
+    await waitFor(() => realtime.wsConnectionState === 'OPEN')
+    const socket = RuntimeFakeWebSocket.instances[0]
+    socket.message({ version: '1', type: 'SNAPSHOT', eventId: 'before-close', sequence: 10, timestamp: 10, data: { printers: [] } })
+    assert.equal(realtime.lastSequence, 10)
+    socket.emit('error', { target: socket, config: { token: secret } })
+    reconnecting = true
+    socket.serverClose(1000, `token=${secret}`)
+    assert.equal(realtime.isRealtimeStale, true)
+    socket.open()
+    socket.message({ version: '1', type: 'SNAPSHOT', eventId: 'after-reconnect', sequence: 1, timestamp: 11, data: { printers: [] } })
+    assert.equal(realtime.lastSequence, 1)
+    assert.equal(realtime.isRealtimeStale, true)
+    await waitFor(() => !realtime.isRecovering)
+    assert.equal(realtime.isRealtimeStale, true)
+    failureMode = 'job'
+    await realtime.refreshPrinterSnapshot()
+    assert.equal(realtime.isRealtimeStale, true)
+    assert.equal(JSON.stringify(captured).includes(secret), false)
+    const realtimeLogs = captured.filter(args => /^\[(WebSocket|RealtimeStore)\]/.test(String(args[0])))
+    assert.equal(realtimeLogs.flat().some(value => typeof value === 'object' && value !== null), false)
+  } finally {
+    realtime.disconnectWs()
+    console.log = originalConsole.log
+    console.warn = originalConsole.warn
+    console.error = originalConsole.error
+    globalThis.window = previousWindow
+    globalThis.requestAnimationFrame = previousRaf
+    globalThis.cancelAnimationFrame = previousCancelRaf
+  }
 })
 
 test('真实 grid Pinia Store 保存未完成时路由守卫拒绝放弃，完成后恢复导航', async () => {
