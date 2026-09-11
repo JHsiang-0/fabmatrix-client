@@ -8,7 +8,9 @@ const props = defineProps({
   data: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
   height: { type: [String, Number], default: undefined },
-  rowKey: { type: String, default: 'id' }
+  rowKey: { type: String, default: 'id' },
+  selectedRowKeys: { type: Array, default: undefined },
+  tableContentWidth: { type: String, default: undefined }
 })
 
 const emit = defineEmits(['row-click', 'selection-change'])
@@ -74,6 +76,8 @@ const tableAttrs = computed(() => {
     loading: props.loading,
     height: props.height,
     rowKey: props.rowKey,
+    ...(Array.isArray(props.selectedRowKeys) ? { selectedRowKeys: props.selectedRowKeys } : {}),
+    ...(props.tableContentWidth ? { tableContentWidth: props.tableContentWidth } : {}),
     rowClassName: rowClassName || legacyRowClassName,
     activeRowType: highlightCurrentRow || highlightCurrentRowCamel ? 'single' : undefined,
     bordered: bordered ?? border,

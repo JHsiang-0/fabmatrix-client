@@ -376,3 +376,106 @@ test('OPERATOR 看板不显示布局编辑入口', async ({ browser }) => {
     await context.close()
   }
 })
+
+test('UI-005 打印机选择不跨筛选分页且抽屉与扫描弹窗在 800x560 可用', async ({ browser }) => {
+  test.setTimeout(120000)
+  const context = await browser.newContext({ viewport: { width: 800, height: 560 } })
+  const page = await context.newPage()
+
+  try {
+    await page.goto('/login')
+    await page.evaluate(() => window.__FARM_RESET_MOCK__({
+      printers: Array.from({ length: 25 }, (_, index) => ({
+        id: 500 + index,
+        name: `UI005_Printer_${String(index + 1).padStart(2, '0')}`,
+        machineNumber: index === 0 ? null : `T-${String(index + 1).padStart(2, '0')}`,
+        ipAddress: `192.168.0.${index + 10}`,
+        macAddress: `AA:BB:CC:00:00:${String(index + 1).padStart(2, '0')}`,
+        firmwareType: index % 2 === 0 ? 'KLIPPER' : 'RRF',
+        status: 'IDLE',
+        monitorEnabled: true,
+        isSafeToPrint: false,
+        currentJobId: null,
+        currentMaterial: 'PLA',
+        nozzleSize: 0.4,
+        gridRow: index === 0 ? null : Math.floor(index / 6) + 1,
+        gridCol: index === 0 ? null : (index % 6) + 1,
+        createdAt: '2026-09-11T00:00:00',
+        updatedAt: '2026-09-11T00:00:00'
+      }))
+    }))
+    await page.getByLabel('用户名', { exact: true }).fill('admin')
+    await page.getByLabel('密码', { exact: true }).fill('Admin123')
+    await page.getByRole('button', { name: '登录', exact: true }).click()
+    await expect(page).toHaveURL(/\/dashboard$/)
+    await openSidebarItem(page, 800, '打印机管理')
+    await expect(page.getByRole('heading', { name: '打印机管理' })).toBeVisible()
+
+    const batchButton = page.getByRole('button', { name: /^(启用监控|停用监控) \(\d+\)$/ })
+    const firstRowCheckbox = page.locator('.printer-table tbody tr').first().getByRole('checkbox')
+    const selectFirstPrinter = async () => {
+      await firstRowCheckbox.locator('..').click({ force: true })
+      await expect(firstRowCheckbox).toBeChecked()
+    }
+    await expect(batchButton).toHaveCount(0)
+    await selectFirstPrinter()
+    await expect(batchButton).toHaveCount(1)
+
+    const idleFilter = page.getByRole('radio', { name: '待机', exact: true })
+    await idleFilter.locator('..').click()
+    await expect(idleFilter).toBeChecked()
+    await expect(batchButton).toHaveCount(0)
+    await expect(firstRowCheckbox).not.toBeChecked()
+    await page.waitForTimeout(350)
+
+    await selectFirstPrinter()
+    await expect(batchButton).toHaveCount(1)
+    await page.locator('.printer-management-table-footer .t-pagination__btn-next').click()
+    await expect(page.locator('.printer-management-table-footer .t-pagination__number.t-is-current')).toHaveText('2')
+    await expect(batchButton).toHaveCount(0)
+    await expect(page.locator('.printer-table tbody tr').first().getByRole('checkbox')).not.toBeChecked()
+
+    const mainTableMetrics = await page.locator('.printer-table .t-table__content').first().evaluate(element => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      overflowX: getComputedStyle(element).overflowX
+    }))
+    expect(mainTableMetrics.scrollWidth).toBeGreaterThanOrEqual(1180)
+    expect(mainTableMetrics.scrollWidth).toBeGreaterThan(mainTableMetrics.clientWidth)
+    expect(['auto', 'scroll']).toContain(mainTableMetrics.overflowX)
+
+    await page.getByRole('button', { name: '未分配设备', exact: true }).click()
+    const unallocatedDrawer = page.locator('.t-drawer').filter({ hasText: '未分配设备' })
+    await expect(unallocatedDrawer).toBeVisible()
+    await unallocatedDrawer.locator('.t-drawer__footer').getByRole('button', { name: '关闭', exact: true }).click()
+    await expect(unallocatedDrawer).toBeHidden()
+
+    await page.getByRole('button', { name: '扫描局域网设备', exact: true }).click()
+    const scanDialog = page.locator('.t-dialog').filter({ hasText: '扫描局域网设备' })
+    await expect(scanDialog).toBeVisible()
+    await scanDialog.getByRole('button', { name: '开始扫描', exact: true }).click()
+    await expect(scanDialog.getByText('共扫描到 12 台设备', { exact: false })).toBeVisible()
+    await expect(scanDialog.getByRole('columnheader', { name: '协议', exact: true })).toBeVisible()
+    await expect(scanDialog.getByText('Klipper', { exact: true }).first()).toBeVisible()
+    await expect(scanDialog.getByText('RRF', { exact: true }).first()).toBeVisible()
+
+    const scanScrollMetrics = await scanDialog.locator('.printer-scan-results__table .t-table__content').evaluate(element => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      overflowY: getComputedStyle(element).overflowY
+    }))
+    expect(scanScrollMetrics.scrollHeight).toBeGreaterThan(scanScrollMetrics.clientHeight)
+    expect(['auto', 'scroll']).toContain(scanScrollMetrics.overflowY)
+
+    const footerMetrics = await scanDialog.locator('.t-dialog__footer').evaluate(element => {
+      const box = element.getBoundingClientRect()
+      return { top: box.top, bottom: box.bottom, viewportHeight: window.innerHeight }
+    })
+    expect(footerMetrics.top).toBeGreaterThanOrEqual(0)
+    expect(footerMetrics.bottom).toBeLessThanOrEqual(footerMetrics.viewportHeight)
+    await expect(scanDialog.locator('.t-dialog__footer').getByRole('button', { name: '关闭', exact: true })).toBeVisible()
+    await expect(scanDialog.getByRole('button', { name: /批量导入\/同步/ })).toBeVisible()
+  } finally {
+    await context.close()
+  }
+})

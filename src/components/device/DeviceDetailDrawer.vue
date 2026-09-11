@@ -250,7 +250,7 @@
                 </div>
                 <t-descriptions :column="descriptionColumn" size="small" bordered>
                     <t-descriptions-item label="机器编号" :span="descriptionColumn">
-                        {{ device.machineNumber || `#${device.id}` }}
+                        {{ device.machineNumber || '-' }}
                     </t-descriptions-item>
                     <t-descriptions-item label="设备名称" :span="descriptionColumn">
                         {{ device.name || '-' }}

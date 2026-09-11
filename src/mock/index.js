@@ -818,16 +818,17 @@ const handleDeletePrinter = config => {
 const handleScanPrinters = config => {
   requireSession(config, ['ADMIN'])
   const subnet = getParams(config).subnet || '192.168.1'
-  return [
-    {
-      ipAddress: `${subnet}.90`,
-      macAddress: 'AA:BB:CC:DD:EE:90',
-      isNewDevice: true,
-      firmwareType: 'KLIPPER',
+  return Array.from({ length: 12 }, (_, index) => {
+    const host = 90 + index
+    return {
+      ipAddress: `${subnet}.${host}`,
+      macAddress: `AA:BB:CC:DD:EE:${String(host).padStart(2, '0')}`,
+      isNewDevice: index !== 1,
+      firmwareType: index % 2 === 0 ? 'KLIPPER' : 'RRF',
       status: 'UNKNOWN',
-      suggestedName: 'Mock_Scanned_Printer'
+      suggestedName: `Mock_Scanned_Printer_${index + 1}`
     }
-  ]
+  })
 }
 
 const handleBatchAddPrinters = config => {
@@ -2095,6 +2096,8 @@ const route = async config => {
   if (/^POST \/api\/v1\/auth\/[^/]+\/change-password$/.test(key)) return handleChangePassword(config)
   if (key === 'GET /api/v1/dashboard-layout' || key === 'PUT /api/v1/dashboard-layout') return handleDashboardLayout(config)
   if (key === 'GET /api/v1/printers/page') return handlePrinterPage(config)
+  if (key === 'GET /api/v1/printers/scan') return handleScanPrinters(config)
+  if (key === 'GET /api/v1/printers/unallocated') return handleUnallocatedPrinters(config)
   if (key === 'PUT /api/v1/printers/monitor/batch') return handleBatchUpdatePrinterMonitor(config)
   if (/^GET \/api\/v1\/printers\/[^/]+\/monitor$/.test(key)) return handleGetPrinterMonitor(config)
   if (/^PUT \/api\/v1\/printers\/[^/]+\/monitor$/.test(key)) return handleUpdatePrinterMonitor(config)
@@ -2103,9 +2106,7 @@ const route = async config => {
   if (/^GET \/api\/v1\/printers\/[^/]+$/.test(key)) return handlePrinterDetail(config)
   if (key === 'POST /api/v1/printers/add') return handleAddPrinter(config)
   if (key === 'PUT /api/v1/printers/update') return handleUpdatePrinter(config)
-  if (key === 'GET /api/v1/printers/scan') return handleScanPrinters(config)
   if (key === 'POST /api/v1/printers/batch-add') return handleBatchAddPrinters(config)
-  if (key === 'GET /api/v1/printers/unallocated') return handleUnallocatedPrinters(config)
   if (key === 'PUT /api/v1/printers/positions') return handlePositions(config)
   if (key === 'POST /api/v1/print-files/page') return handleFilePage(config)
   if (key === 'POST /api/v1/print-files/upload') return handleUpload(config)

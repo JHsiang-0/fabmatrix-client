@@ -1629,7 +1629,7 @@ Git 检查与提交：已执行 `git status --short`、`git diff --check`，仅�
 
 优先级：P1
 
-状态：已完成
+状态：已完成（含独立审查补丁）
 
 目标：在既有打印机列表、详情、监控、未分配设备和局域网扫描契约上，收敛交互入口与信息密度，确保 ADMIN/OPERATOR 权限、加载/空/错状态和响应式滚动语义保持一致。
 
@@ -1662,3 +1662,7 @@ lint：`npm run lint` 通过，Oxlint 和 ESLint 均无错误；检查 lint 自�
 build：`npm run build` 通过；保留既有 realtimeStore 动静态导入提示和大 chunk 警告，不影响退出码。
 
 Git 检查：提交前执行 `git status --short`、`git diff --check`，仅暂存本任务实际修改文件；不执行 `git push`。
+
+独立审查补丁：主表选择改为 TDesign 受控 `selected-row-keys`，批量按钮只统计当前页有效选择，并在筛选、实时搜索、分页、刷新和批量成功后清空；列表请求使用递增序号守卫，旧响应和卸载后的异步结果不再写回数据、错误或 loading。扫描结果恢复 RRF/Klipper 协议列并使用独立内部滚动，打印机详情缺失机器编号统一显示 `-`；主表通过正式 `table-content-width="1180px"` 生效横向滚动并保留固定首尾列。同步修正 Mock 静态扫描/未分配路由优先级，并提供 25 台分页种子及 12 台扫描结果的浏览器交互验证。
+
+审查补丁验证：`npm test`（264/264）、`npm run lint`、`npm run build`、`npm run test:e2e -- --reporter=line`（12/12）、`npm run test:electron -- --reporter=line`（3/3）和 `git diff --check` 均通过；构建仅保留既有 realtimeStore 动静态导入提示与大 chunk 警告。

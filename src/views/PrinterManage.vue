@@ -41,10 +41,10 @@
       </template>
       <template #actions>
       <div class="app-page-toolbar__actions printer-page-actions">
-        <t-button v-if="isAdmin && selectedPrinterIds.length > 0" :theme="batchMonitorTarget ? 'success' : 'warning'" variant="outline"
+        <t-button v-if="isAdmin && selectedPrinterRows.length > 0" :theme="batchMonitorTarget ? 'success' : 'warning'" variant="outline"
           :disabled="monitorActionLoading" :loading="monitorActionLoading"
           @click="handleBatchMonitorToggle">
-          {{ batchMonitorTarget ? '启用监控' : '停用监控' }}{{ selectedPrinterIds.length ? ` (${selectedPrinterIds.length})` : '' }}
+          {{ batchMonitorTarget ? '启用监控' : '停用监控' }} ({{ selectedPrinterRows.length }})
         </t-button>
         <t-button size="medium" theme="default" variant="base" :icon="renderIcon(Refresh)" :loading="loading" @click="fetchData">
           刷新
@@ -119,6 +119,8 @@
           v-if="tableData.length"
           :data="displayTableData"
           :loading="loading"
+          :selected-row-keys="selectedPrinterIds"
+          table-content-width="1180px"
           height="100%"
           style="width: 100%"
           class="printer-management-table printer-table"
@@ -268,7 +270,7 @@
             :total="total"
             :show-page-size="false"
             :total-content="false"
-            @change="fetchData"
+            @change="handlePaginationChange"
           />
         </div>
       </template>
@@ -416,18 +418,16 @@
 
         <!-- 结果表格 -->
         <div class="printer-scan-results__table">
-        <TdTable
-          ref="scanTableRef"
+        <t-table
           :data="scanResults"
-          height="240px"
+          :columns="scanColumns"
+          row-key="ipAddress"
+          height="100%"
           style="width: 100%"
           class="rounded-lg overflow-hidden"
-          @selection-change="handleSelectionChange"
+          @select-change="handleScanSelectionChange"
         >
-          <TdTableColumn type="selection" width="50" align="center" fixed="left" />
-
-          <TdTableColumn label="设备类型" width="120" align="center">
-            <template #default="scope">
+          <template #deviceType="scope">
               <t-tag
                 :theme="scope.row.isNewDevice ? 'success' : 'primary'"
                 variant="light"
@@ -435,49 +435,40 @@
               >
                 {{ scope.row.isNewDevice ? '全新设备' : '已知设备' }}
               </t-tag>
-            </template>
-          </TdTableColumn>
+          </template>
 
-          <TdTableColumn prop="status" label="设备状态" width="120" align="center">
-            <template #default="scope">
-              <StatusTag domain="printer" :status="scope.row.status" />
-            </template>
-          </TdTableColumn>
+          <template #status="scope">
+            <StatusTag domain="printer" :status="scope.row.status" />
+          </template>
 
-          <TdTableColumn label="MAC 地址" width="140" align="center">
-            <template #default="scope">
-              <span class="font-mono text-sm font-medium text-gray-700">{{ scope.row.macAddress }}</span>
-            </template>
-          </TdTableColumn>
+          <template #firmwareType="scope">{{ getFirmwareLabel(scope.row.firmwareType) }}</template>
 
-          <TdTableColumn label="IP 地址" width="130" align="center">
-            <template #default="scope">
-              <t-tag size="small" variant="light-outline" theme="default">
-                {{ scope.row.ipAddress }}
-              </t-tag>
-            </template>
-          </TdTableColumn>
+          <template #macAddress="scope">
+            <span class="font-mono text-sm font-medium text-gray-700">{{ scope.row.macAddress }}</span>
+          </template>
 
-          <TdTableColumn label="机器名称" min-width="150">
-            <template #default="scope">
-              <t-input
-                v-model="scope.row.name"
-                size="small"
-                placeholder="请输入机器名称"
-              >
-                <template #prefixIcon>
-                  <span><printer /></span>
-                </template>
-              </t-input>
-            </template>
-          </TdTableColumn>
+          <template #ipAddress="scope">
+            <t-tag size="small" variant="light-outline" theme="default">
+              {{ scope.row.ipAddress }}
+            </t-tag>
+          </template>
 
-          <TdTableColumn label="建议名称" width="120" align="center">
-            <template #default="scope">
-              <span class="text-sm text-gray-600">{{ scope.row.suggestedName }}</span>
-            </template>
-          </TdTableColumn>
-        </TdTable>
+          <template #name="scope">
+            <t-input
+              v-model="scope.row.name"
+              size="small"
+              placeholder="请输入机器名称"
+            >
+              <template #prefixIcon>
+                <span><printer /></span>
+              </template>
+            </t-input>
+          </template>
+
+          <template #suggestedName="scope">
+            <span class="text-sm text-gray-600">{{ scope.row.suggestedName }}</span>
+          </template>
+        </t-table>
         </div>
       </div>
 
@@ -549,6 +540,7 @@ import { useRealtimeStore } from '@/stores/printer/realtimeStore'
 import { PRINTER_STATUS, PRINTER_STATUS_MAP } from '@/utils/constants'
 import { normalizePrinterStatus } from '@/utils/dataAdapters'
 import { formatDateTime } from '@/utils/formatters'
+import { createLatestRequestGuard } from '@/utils/latestRequestGuard'
 import DeviceDetailDrawer from '@/components/device/DeviceDetailDrawer.vue'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
@@ -577,6 +569,7 @@ const queryParams = reactive({
 
 const keyword = ref('')
 let keywordDebounceTimer = null
+const printerListRequestGuard = createLatestRequestGuard()
 const statusFilter = ref('')
 const statusFilterConfig = Object.fromEntries(Object.entries(PRINTER_STATUS_MAP).map(([value, config]) => [value, {
     label: config.label,
@@ -650,7 +643,6 @@ const hasScanned = ref(false)
 const scanResults = ref([])
 const isBatchAdding = ref(false)
 const selectedDevices = ref([])
-const scanTableRef = ref(null)
 const unallocatedDialogVisible = ref(false)
 const unallocatedPrinters = ref([])
 const unallocatedLoading = ref(false)
@@ -660,6 +652,16 @@ const unallocatedColumns = [
   { colKey: 'ipAddress', title: 'IP 地址', width: 150 },
   { colKey: 'status', title: '状态', width: 100, cell: 'status' },
   { colKey: 'position', title: '位置', width: 140, cell: 'position' }
+]
+const scanColumns = [
+  { colKey: 'row-select', type: 'multiple', width: 50, fixed: 'left' },
+  { colKey: 'deviceType', title: '设备类型', width: 120, align: 'center', cell: 'deviceType' },
+  { colKey: 'status', title: '设备状态', width: 120, align: 'center', cell: 'status' },
+  { colKey: 'firmwareType', title: '协议', width: 100, align: 'center', cell: 'firmwareType' },
+  { colKey: 'macAddress', title: 'MAC 地址', width: 140, align: 'center', cell: 'macAddress' },
+  { colKey: 'ipAddress', title: 'IP 地址', width: 130, align: 'center', cell: 'ipAddress' },
+  { colKey: 'name', title: '机器名称', minWidth: 150, cell: 'name' },
+  { colKey: 'suggestedName', title: '建议名称', width: 120, align: 'center', cell: 'suggestedName' }
 ]
 
 // ===== 现场操作状态 =====
@@ -700,6 +702,8 @@ const selectedPrinterRows = computed(() => {
   return displayTableData.value.filter(printer => selectedIds.has(String(printer.id)))
 })
 
+const selectedVisiblePrinterIds = computed(() => selectedPrinterRows.value.map(printer => printer.id))
+
 // 混合选择时统一执行启用，全部已启用时执行停用。
 const batchMonitorTarget = computed(() => (
   selectedPrinterRows.value.length > 0
@@ -708,7 +712,7 @@ const batchMonitorTarget = computed(() => (
 ))
 
 const monitorActionLoading = computed(() => (
-  monitorBatchLoading.value || selectedPrinterIds.value.some(id => monitorUpdatingIds.value.includes(id))
+  monitorBatchLoading.value || selectedVisiblePrinterIds.value.some(id => monitorUpdatingIds.value.includes(id))
 ))
 
 const getConnectionLabel = status => ({
@@ -834,6 +838,10 @@ const handlePrinterSelectionChange = rows => {
     : []
 }
 
+const clearPrinterSelection = () => {
+  selectedPrinterIds.value = []
+}
+
 const handleRowClick = (row) => {
   selectedDevice.value = row
   sessionStorage.setItem(PRINTER_DETAIL_CONTEXT_KEY, String(row.id))
@@ -926,7 +934,7 @@ const updateMonitorForIds = async (ids, enabled, printer = null) => {
     if (printer && String(selectedDevice.value?.id) === String(printer.id)) {
       monitorConfig.value = { ...monitorConfig.value, monitorEnabled: enabled }
     }
-    selectedPrinterIds.value = []
+    clearPrinterSelection()
     message.success(enabled ? '监控已启用' : '监控已停用')
     await fetchData()
   } catch (error) {
@@ -941,7 +949,7 @@ const updateMonitorForIds = async (ids, enabled, printer = null) => {
   }
 }
 
-const handleBatchMonitorToggle = () => updateMonitorForIds([...selectedPrinterIds.value], batchMonitorTarget.value)
+const handleBatchMonitorToggle = () => updateMonitorForIds([...selectedVisiblePrinterIds.value], batchMonitorTarget.value)
 
 const handleDetailMonitorChange = enabled => {
   const printer = selectedDevice.value
@@ -1031,6 +1039,9 @@ const restorePrinterDetailContext = () => {
 
 // 加载分页数据
 const fetchData = async () => {
+  const requestId = printerListRequestGuard.begin()
+  if (requestId === null) return
+  clearPrinterSelection()
   loading.value = true
   loadError.value = ''
   try {
@@ -1039,13 +1050,15 @@ const fetchData = async () => {
       ...(activeStatusFilterKey.value ? { status: activeStatusFilterKey.value } : {}),
       ...(keyword.value.trim() ? { name: keyword.value.trim() } : {})
     })
+    if (!printerListRequestGuard.isCurrent(requestId)) return
     tableData.value = res.data?.records || []
     total.value = res.data?.total || 0
     restorePrinterDetailContext()
   } catch (error) {
+    if (!printerListRequestGuard.isCurrent(requestId)) return
     loadError.value = error?.message || '打印机列表加载失败，请重试'
   } finally {
-    loading.value = false
+    if (printerListRequestGuard.isCurrent(requestId)) loading.value = false
   }
 }
 
@@ -1058,6 +1071,7 @@ const clearKeywordDebounce = () => {
 
 const applyFilters = () => {
   clearKeywordDebounce()
+  clearPrinterSelection()
   queryParams.pageNum = 1
   const query = { ...route.query }
   if (statusFilter.value) query.status = statusFilter.value
@@ -1084,13 +1098,21 @@ const clearStatusFilter = () => {
   applyFilters()
 }
 
+const handlePaginationChange = () => {
+  clearPrinterSelection()
+  fetchData()
+}
+
 watch(() => route.query.status, value => {
   statusFilter.value = Array.isArray(value) ? value[0] || '' : value || ''
   queryParams.pageNum = 1
   fetchData()
 }, { immediate: true })
 
-onUnmounted(clearKeywordDebounce)
+onUnmounted(() => {
+  clearKeywordDebounce()
+  printerListRequestGuard.invalidate()
+})
 
 // 点击新增按钮
 const handleAdd = () => {
@@ -1202,8 +1224,8 @@ const openScanDialog = () => {
 }
 
 // 表格多选变化
-const handleSelectionChange = (selection) => {
-  selectedDevices.value = selection
+const handleScanSelectionChange = (_keys, context) => {
+  selectedDevices.value = context?.selectedRowData || []
 }
 
 const handleScan = async () => {
@@ -1406,11 +1428,6 @@ const handleBatchAdd = async () => {
   vertical-align: middle;
 }
 
-.printer-management-table :deep(.t-table__header table),
-.printer-management-table :deep(.t-table__body table) {
-  min-width: 1180px;
-}
-
 .printer-management-table :deep(.t-table__header th) {
   color: var(--app-text-secondary);
   font-weight: 500;
@@ -1560,8 +1577,8 @@ const handleBatchAdd = async () => {
 }
 
 .printer-scan-dialog :deep(.t-dialog__body) {
-  max-height: min(360px, calc(100vh - 220px));
-  overflow-y: auto;
+  max-height: min(360px, calc(100vh - 180px));
+  overflow: hidden;
 }
 
 .printer-scan-dialog :deep(.t-dialog__footer) {
@@ -1569,7 +1586,7 @@ const handleBatchAdd = async () => {
 }
 
 .printer-scan-results__table {
-  height: 240px;
+  height: clamp(140px, calc(100vh - 370px), 240px);
   max-height: 240px;
   overflow: hidden;
 }
