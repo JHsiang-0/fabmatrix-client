@@ -56,6 +56,8 @@ frontend gridStore（权威快照 + 编辑草稿）
 
 ## 3. API 契约
 
+本节是 `SYNC-002.0` 冻结的目标契约；在 `SYNC-002.2`、`SYNC-002.3` 完成前，运行中的后端尚不提供这些接口。字段名、枚举和限制在后续实现中不得自行漂移。
+
 ### 3.1 读取布局
 
 `GET /api/v1/dashboard-layout`
@@ -217,6 +219,7 @@ frontend gridStore（权威快照 + 编辑草稿）
 - 编辑状态收到更高版本时标记草稿已过期，不自动覆盖用户草稿；保存时由 409 阻止旧版本提交。
 - 此消息不得清空打印机状态、温度、进度、任务和通信健康字段。
 - 断线重连或序号缺口时通过 REST 快照收敛。
+- 协议版本继续使用 `version=1`；`LAYOUT_UPDATED` 是兼容性新增类型，`printerId` 固定为 null，`data.stateSource` 固定为 `LAYOUT`。
 
 ## 9. 迁移与兼容
 
