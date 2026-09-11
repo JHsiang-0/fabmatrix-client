@@ -52,7 +52,7 @@ SYNC-002.9 迁移交付与文档收口
 
 完成记录：已新增 MySQL 8.4/SQLite 独立只读坐标预检、MySQL 编号 16 幂等迁移、SQLite 新库约束和已有库启动迁移；追加修复后，MySQL 新库/增量脚本均由 `farm_printer` 表定义成对与正数 CHECK 及联合唯一索引，布局表和默认行仅由编号 16 在预检通过后创建。编号 16 会核对已有布局表的真实列、启用 CHECK、主键和时间列语义，并在失败/成功路径清理辅助例程；SQLite 严格核对 partial unique index，预检后安全重建项目自有坐标触发器并阻断同名伪对象。默认布局为 4×12、物理第 7 列后 100px 过道、版本 1。已补齐两份 Compose 的 MySQL 14、15、16 只读挂载，并新增备份、执行、验证、回滚及失败新卷处理说明。未进行真实 MySQL 数据卷验收，因当前没有安全隔离的 MySQL 容器环境。
 
-### [ ] SYNC-002.2 实现后端布局读取资源
+### [x] SYNC-002.2 实现后端布局读取资源
 
 - 新增 Layout Entity/Mapper/DTO/VO/Service/Controller。
 - 实现 `GET /api/v1/dashboard-layout`，返回规范化布局、版本、限制和更新时间。
@@ -60,6 +60,11 @@ SYNC-002.9 迁移交付与文档收口
 - 空库或缺失单例时在受控事务中创建默认布局，不依赖前端默认值。
 - 补充 OpenAPI、统一异常映射和 Controller/Service 测试。
 - 验收：ADMIN/OPERATOR 可读，匿名 401；返回结构在 MySQL/SQLite 一致。
+
+完成记录：后端已新增布局 Entity/Mapper/DTO/VO/Service/Controller，提供规范化的
+`GET /api/v1/dashboard-layout`。缺失单例时服务在事务内创建 4×12 默认布局，并返回固定限制、版本和更新时间；
+SecurityConfig 显式限制 GET 为 ADMIN/OPERATOR、PUT 为 ADMIN（PUT 保存逻辑留在 SYNC-002.3）。
+新增 Controller 安全测试和 Service 默认创建/规范化测试，后端专项与全量 Maven 测试通过。
 
 ### [ ] SYNC-002.3 实现原子布局保存与坐标约束
 
