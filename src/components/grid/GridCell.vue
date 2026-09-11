@@ -17,6 +17,7 @@
         class="flex items-center justify-center h-full bg-amber-50 border border-dashed border-amber-200 rounded"
         :class="{ 'min-h-[60px] sm:min-h-[80px] lg:min-h-[100px]': true }"
     >
+        <span class="hidden md:block max-w-[80%] truncate text-[10px] font-semibold text-amber-700">{{ aisleLabel }}</span>
         <div class="hidden sm:block w-1 h-4/5 bg-repeat-y bg-[length:4px_8px] bg-gradient-to-b from-gray-400 via-gray-400 to-transparent opacity-40"
              style="background-image: repeating-linear-gradient(to bottom, #9ca3af 0, #9ca3af 4px, transparent 4px, transparent 8px);"></div>
     </div>
@@ -145,6 +146,11 @@ const props = defineProps({
     device: {
         type: Object,
         default: null
+    },
+    /** 过道名称；交叉过道由 GridMap 组合两个名称 */
+    aisleLabel: {
+        type: String,
+        default: ''
     },
     /** 实时状态数据（仅 device 类型时有值） */
     realTimeData: {

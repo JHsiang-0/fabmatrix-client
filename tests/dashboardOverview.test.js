@@ -74,12 +74,12 @@ test('全屏运行时使用 30adedc 的 Header、告警、四卡和车间网格�
   assert.match(farmDashboardSource, /reconnectRealtime/)
 })
 
-test('看板固定传递 4×12 物理网格和现有事件链', () => {
+test('看板传递服务端布局和完整设备集合，并保留现有事件链', () => {
   assert.match(constantsSource, /ROWS: 4/)
   assert.match(constantsSource, /COLS: 12/)
-  assert.match(constantsSource, /TOTAL_COLS: 13/)
-  assert.match(constantsSource, /AISLE_COL: 8/)
   assert.match(farmDashboardSource, /:grid-config="store\.GRID_CONFIG"/)
+  assert.match(farmDashboardSource, /:devices="store\.rawDeviceList"/)
+  assert.match(farmDashboardSource, /store\.loadLayout\(\)/)
   assert.match(farmDashboardSource, /store\.deviceMatrix/)
   assert.match(farmDashboardSource, /store\.updateDevicePositions/)
   assert.match(farmDashboardSource, /@dragstart="handleDragStart"/)
@@ -88,8 +88,10 @@ test('看板固定传递 4×12 物理网格和现有事件链', () => {
   assert.match(farmDashboardSource, /@dragleave="handleDragLeave"/)
   assert.match(farmDashboardSource, /@drop="handleDrop"/)
   assert.match(farmDashboardSource, /@cell-click="handleCellClick"/)
-  assert.match(gridSource, /grid-template-columns: repeat\(13, 100px\)/)
-  assert.match(gridSource, /grid-template-rows: repeat\(4, 120px\)/)
+  assert.match(gridSource, /getVisualColumns/)
+  assert.match(gridSource, /getVisualRows/)
+  assert.match(gridSource, /overflow: auto/)
+  assert.doesNotMatch(gridSource, /repeat\(13, 100px\)|repeat\(4, 120px\)/)
 })
 
 test('全屏看板不引入动态布局、虚假车间或组件级 WebSocket 生命周期', () => {

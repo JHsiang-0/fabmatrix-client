@@ -1,228 +1,239 @@
 <template>
-    <div class="flex shrink-0 gap-2" :class="{ 'is-edit-mode': isEditMode }">
-        <!-- 行标签 -->
-        <div class="flex flex-col shrink-0">
-            <!-- 对齐填充层 - 与列标题高度一致 -->
-            <div class="h-7"></div>
-
-            <div class="grid gap-3" style="grid-template-rows: repeat(4, 120px);">
-                <div v-for="row in gridConfig.ROWS" :key="`label-${row}`"
-                    class="flex items-center justify-center w-10 bg-gray-100 border border-dashed border-gray-300 rounded text-sm font-medium text-gray-600"
-                    :class="{ 'bg-gray-50 border-gray-300 text-gray-700 font-bold': isEditMode }"
-                    style="writing-mode: vertical-rl; text-orientation: mixed; min-height: 120px;">
-                    {{ formatRowLabel(row) }}{{ rowSuffix }}
-                </div>
+  <div class="grid-map-shell" :class="{ 'is-edit-mode': isEditMode }">
+    <div class="grid-map-scroll" ref="scrollHost">
+      <div class="grid-map-content" :style="contentStyle">
+        <!-- 行标签与网格使用同一组视觉轨道，保证过道插入后仍然对齐。 -->
+        <div class="grid-map-row-rail">
+          <div class="grid-map-corner" aria-hidden="true"></div>
+          <div class="grid-map-row-header" :style="rowTemplateStyle">
+            <div v-for="(row, rowIndex) in visualRows" :key="`label-${rowIndex}`"
+              class="grid-map-row-label" :class="{ 'is-aisle': row.type === 'aisle' }">
+              {{ row.type === 'aisle' ? row.label : `${formatRowLabel(row.number)}${rowSuffix}` }}
             </div>
+          </div>
         </div>
 
-        <!-- 网格主体 -->
-        <div class="flex flex-col shrink-0 overflow-visible">
-            <!-- 列标题 -->
-            <div class="grid gap-3 mb-2" style="grid-template-columns: repeat(13, 100px);">
-                <div v-for="col in gridConfig.TOTAL_COLS" :key="`header-${col}`"
-                    class="flex items-center justify-center h-7 bg-gray-100 border border-dashed border-gray-300 rounded text-xs font-medium text-gray-600"
-                    :class="[
-                        col === gridConfig.AISLE_COL ? 'bg-amber-50 border-amber-300 text-amber-700 font-semibold' : '',
-                        isEditMode && col !== gridConfig.AISLE_COL ? 'bg-gray-50 border-gray-300 text-gray-700 font-bold' : '',
-                        isEditMode && col === gridConfig.AISLE_COL ? 'bg-amber-100 border-amber-400 text-amber-800' : ''
-                    ]">
-                    <template v-if="col === gridConfig.AISLE_COL">{{ aisleLabel }}</template>
-                    <template v-else>{{ getPhysicalCol(col) }}</template>
-                </div>
+        <div class="grid-map-body">
+          <div class="grid-map-column-header" :style="columnTemplateStyle">
+            <div v-for="(column, colIndex) in visualColumns" :key="`header-${colIndex}`"
+              class="grid-map-column-label" :class="{ 'is-aisle': column.type === 'aisle' }">
+              {{ column.type === 'aisle' ? column.label : column.number }}
             </div>
+          </div>
 
-            <!-- 设备网格 - 4行 x 13列 - 统一容器 -->
-            <div class="grid gap-3 shrink-0"
-                :class="{ 'bg-gray-100 rounded': isEditMode }"
-                style="grid-template-columns: repeat(13, 100px); grid-template-rows: repeat(4, 120px);">
-                <template v-for="(row, rowIndex) in deviceMatrix" :key="`row-${rowIndex}`">
-                    <GridCell v-for="(cell, colIndex) in row" :key="`cell-${rowIndex}-${colIndex}`"
-                        :cell-type="getCellType(cell, colIndex)" :device="getDevice(cell)"
-                        :real-time-data="getRealTimeData(cell)" :row-index="rowIndex" :col-index="colIndex"
-                        :slot-label="getSlotLabel(rowIndex, colIndex)" :is-dragging="isDragging(cell)"
-                        :is-drag-over="isDragOver(rowIndex, colIndex)" :is-edit-mode="isEditMode"
-                        @dragstart="handleDragStart" @dragend="handleDragEnd" @dragenter="handleDragEnter"
-                        @dragleave="handleDragLeave" @drop="handleDrop" @click="handleCellClick" />
-                </template>
-            </div>
+          <div class="grid-map-canvas" :class="{ 'is-edit-mode': isEditMode }" :style="gridStyle">
+            <template v-for="(row, rowIndex) in visualRows" :key="`row-${rowIndex}`">
+              <GridCell v-for="(column, colIndex) in visualColumns" :key="`cell-${rowIndex}-${colIndex}`"
+                :cell-type="getCellType(row, column)" :aisle-label="getAisleLabel(row, column)"
+                :device="getDevice(row, column)" :real-time-data="getRealTimeData(row, column)"
+                :row-index="rowIndex" :col-index="colIndex" :slot-label="getSlotLabel(row, column)"
+                :is-dragging="isDragging(row, column)" :is-drag-over="isDragOver(rowIndex, colIndex)"
+                :is-edit-mode="isEditMode" @dragstart="handleDragStart" @dragend="handleDragEnd"
+                @dragenter="handleDragEnter" @dragleave="handleDragLeave" @drop="handleDrop"
+                @click="handleCellClick" />
+            </template>
+          </div>
         </div>
+      </div>
     </div>
+  </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onBeforeUnmount, onMounted } from 'vue'
 import GridCell from './GridCell.vue'
-import { formatRowLabel } from '@/utils/formatters'
+import { formatGridRowLabel as formatRowLabel, getPhysicalColumn, getPhysicalRow, getVisualColumns, getVisualRows } from '@/utils/gridLayout'
 
 defineOptions({ name: 'GridMap' })
 
-// ============================================
-// Props
-// ============================================
-
 const props = defineProps({
-    /** 设备矩阵数据 */
-    deviceMatrix: {
-        type: Array,
-        required: true
-    },
-    /** 实时状态数据 Map */
-    realTimeStatus: {
-        type: Object,
-        default: () => ({})
-    },
-    /** 网格配置 */
-    gridConfig: {
-        type: Object,
-        required: true
-    },
-    /** 是否编辑模式 */
-    isEditMode: {
-        type: Boolean,
-        default: false
-    },
-    /** 行标签后缀 */
-    rowSuffix: {
-        type: String,
-        default: '排'
-    },
-    /** 过道标签 */
-    aisleLabel: {
-        type: String,
-        default: '过道'
-    },
-    /** 正在拖拽的设备 */
-    draggedDevice: {
-        type: Object,
-        default: null
-    },
-    /** 拖拽悬停位置 */
-    dragOverCell: {
-        type: Object,
-        default: null
-    }
+  deviceMatrix: { type: Array, required: true },
+  devices: { type: Array, default: () => [] },
+  realTimeStatus: { type: Object, default: () => ({}) },
+  gridConfig: { type: Object, required: true },
+  isEditMode: { type: Boolean, default: false },
+  rowSuffix: { type: String, default: '排' },
+  aisleLabel: { type: String, default: '过道' },
+  draggedDevice: { type: Object, default: null },
+  dragOverCell: { type: Object, default: null }
 })
 
-// ============================================
-// Emits
-// ============================================
+const emit = defineEmits(['dragstart', 'dragend', 'dragenter', 'dragleave', 'drop', 'cell-click'])
+const scrollHost = ref(null)
+const visualColumns = computed(() => getVisualColumns(props.gridConfig))
+const visualRows = computed(() => getVisualRows(props.gridConfig))
 
-const emit = defineEmits([
-    'dragstart',
-    'dragend',
-    'dragenter',
-    'dragleave',
-    'drop',
-    'cell-click'
-])
+const deviceByPosition = computed(() => {
+  const map = new Map()
+  if (props.devices.length) {
+    props.devices.forEach(device => {
+      const key = `${device?.gridRow},${device?.gridCol}`
+      if (device?.gridRow != null && device?.gridCol != null && !map.has(key)) map.set(key, device)
+    })
+    return map
+  }
+  props.deviceMatrix.forEach((row, rowIndex) => row.forEach((cell, colIndex) => {
+    const device = typeof cell === 'object' && cell !== null ? cell : null
+    const rowNumber = getPhysicalRow(rowIndex + 1, props.gridConfig)
+    const colNumber = getPhysicalColumn(colIndex + 1, props.gridConfig)
+    if (device && rowNumber && colNumber) map.set(`${rowNumber},${colNumber}`, device)
+  }))
+  return map
+})
 
-// ============================================
-// Computed
-// ============================================
+const columnTemplate = computed(() => visualColumns.value.map(column => (
+  column.type === 'aisle' ? `${column.width}px` : `${props.gridConfig.CELL_MIN_WIDTH}px`
+)).join(' '))
+const rowTemplate = computed(() => visualRows.value.map(row => (
+  row.type === 'aisle' ? `${row.height}px` : `${props.gridConfig.CELL_HEIGHT}px`
+)).join(' '))
+const columnTemplateStyle = computed(() => ({ gridTemplateColumns: columnTemplate.value }))
+const rowTemplateStyle = computed(() => ({ gridTemplateRows: rowTemplate.value }))
+const gridStyle = computed(() => ({ gridTemplateColumns: columnTemplate.value, gridTemplateRows: rowTemplate.value }))
+const contentStyle = computed(() => ({ minWidth: 'max-content', minHeight: 'max-content' }))
 
-/** 过道列索引（0-based） */
-const aisleColIndex = computed(() => props.gridConfig.AISLE_COL - 1)
-
-// ============================================
-// Methods
-// ============================================
-
-/**
- * 获取单元格类型
- */
-function getCellType(cell, colIndex) {
-    if (colIndex === aisleColIndex.value) return 'aisle'
-    if (cell === null) return 'empty'
-    return 'device'
+function getCellType(row, column) {
+  if (row.type === 'aisle' || column.type === 'aisle') return 'aisle'
+  return getDevice(row, column) ? 'device' : 'empty'
 }
 
-/**
- * 获取设备对象
- */
-function getDevice(cell) {
-    return typeof cell === 'object' && cell !== null ? cell : null
+function getAisleLabel(row, column) {
+  if (row.type === 'aisle' && column.type === 'aisle') return `${row.label}/${column.label}`
+  if (row.type === 'aisle') return row.label || props.aisleLabel
+  if (column.type === 'aisle') return column.label || props.aisleLabel
+  return ''
 }
 
-/**
- * 获取实时状态数据
- */
-function getRealTimeData(cell) {
-    const device = getDevice(cell)
-    if (!device) return null
-    return props.realTimeStatus[String(device.id)]
+function getDevice(row, column) {
+  if (row.type !== 'device' || column.type !== 'device') return null
+  return deviceByPosition.value.get(`${row.number},${column.number}`) || null
 }
 
-/**
- * 获取槽位标签
- */
-function getSlotLabel(rowIndex, colIndex) {
-    if (colIndex === aisleColIndex.value) return ''
-    const row = rowIndex + 1
-    const col = getPhysicalCol(colIndex + 1)
-    return formatRowLabel(row) + '-' + col.toString().padStart(2, '0')
+function getRealTimeData(row, column) {
+  const device = getDevice(row, column)
+  return device ? props.realTimeStatus[String(device.id)] : null
 }
 
-/**
- * 根据网格列号获取物理列号（排除过道）
- */
-function getPhysicalCol(gridCol) {
-    if (gridCol < props.gridConfig.AISLE_COL) {
-        return gridCol
-    }
-    return gridCol - 1
+function getSlotLabel(row, column) {
+  if (row.type !== 'device' || column.type !== 'device') return ''
+  return `${formatRowLabel(row.number)}-${String(column.number).padStart(2, '0')}`
 }
 
-/**
- * 判断设备是否正在拖拽中
- */
-function isDragging(cell) {
-    if (!props.draggedDevice || typeof cell !== 'object' || cell === null) return false
-    return cell.id === props.draggedDevice.id
+function isDragging(row, column) {
+  const device = getDevice(row, column)
+  return Boolean(device && props.draggedDevice && String(device.id) === String(props.draggedDevice.id))
 }
 
-/**
- * 判断指定单元格是否处于拖拽悬停状态
- */
 function isDragOver(rowIndex, colIndex) {
-    if (!props.dragOverCell) return false
-    return props.dragOverCell.row === rowIndex && props.dragOverCell.col === colIndex
+  return Boolean(props.dragOverCell
+    && props.dragOverCell.row === rowIndex
+    && props.dragOverCell.col === colIndex)
 }
 
-// ============================================
-// Event Handlers
-// ============================================
+function handleDragStart(device, rowIndex, colIndex) { emit('dragstart', device, rowIndex, colIndex) }
+function handleDragEnd() { emit('dragend') }
+function handleDragEnter(rowIndex, colIndex) { emit('dragenter', rowIndex, colIndex) }
+function handleDragLeave() { emit('dragleave') }
+function handleDrop(rowIndex, colIndex) { emit('drop', rowIndex, colIndex) }
+function handleCellClick(device, rowIndex, colIndex) { emit('cell-click', device, rowIndex, colIndex) }
 
-function handleDragStart(device, rowIndex, colIndex) {
-    emit('dragstart', device, rowIndex, colIndex)
+function handleScroll() {
+  // 保留可观测的内部滚动容器，避免大布局把页面宽度撑开。
 }
 
-function handleDragEnd() {
-    emit('dragend')
-}
-
-function handleDragEnter(rowIndex, colIndex) {
-    emit('dragenter', rowIndex, colIndex)
-}
-
-function handleDragLeave() {
-    emit('dragleave')
-}
-
-function handleDrop(rowIndex, colIndex) {
-    emit('drop', rowIndex, colIndex)
-}
-
-function handleCellClick(device, rowIndex, colIndex) {
-    emit('cell-click', device, rowIndex, colIndex)
-}
+onMounted(() => scrollHost.value?.addEventListener('scroll', handleScroll, { passive: true }))
+onBeforeUnmount(() => scrollHost.value?.removeEventListener('scroll', handleScroll))
 </script>
 
 <style scoped>
-/* 编辑模式网格背景 */
-.is-edit-mode :deep(.device-matrix) {
-    background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px),
-        linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
-    background-size: 20px 20px;
-    background-position: center center;
+.grid-map-shell {
+  width: 100%;
+  min-width: 0;
+}
+
+.grid-map-scroll {
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.grid-map-content {
+  display: flex;
+  gap: 0.75rem;
+  min-width: max-content;
+  padding-bottom: 0.25rem;
+}
+
+.grid-map-row-rail {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 2.5rem;
+  gap: 0.75rem;
+}
+
+.grid-map-corner {
+  height: 1.75rem;
+}
+
+.grid-map-row-header,
+.grid-map-canvas,
+.grid-map-column-header {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.grid-map-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.grid-map-column-header {
+  margin-bottom: 0.125rem;
+}
+
+.grid-map-row-label,
+.grid-map-column-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 1.75rem;
+  overflow: hidden;
+  border: 1px dashed #d1d5db;
+  border-radius: 0.375rem;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.grid-map-row-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.grid-map-row-label.is-aisle,
+.grid-map-column-label.is-aisle {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #b45309;
+}
+
+.grid-map-canvas {
+  flex: 0 0 auto;
+}
+
+.grid-map-canvas.is-edit-mode {
+  padding: 0.25rem;
+  border-radius: 0.375rem;
+  background-color: #f3f4f6;
+  background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px),
+    linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
+  background-position: center;
+  background-size: 20px 20px;
 }
 </style>

@@ -60,7 +60,7 @@
       <!-- 厂房网格布局 - 与DashboardHeader保持相同最大宽度 -->
       <div class="farm-dashboard__workshop-surface w-full max-w-[1920px] mx-auto bg-gray-100 border border-gray-200 rounded-xl shadow-sm p-4">
         <!-- 使用 GridMap 组件 -->
-        <grid-map :device-matrix="store.deviceMatrix" :real-time-status="store.realTimeStatus"
+        <grid-map :device-matrix="store.deviceMatrix" :devices="store.rawDeviceList" :real-time-status="store.realTimeStatus"
           :grid-config="store.GRID_CONFIG" :is-edit-mode="isEditMode" :dragged-device="draggedDevice"
           :drag-over-cell="dragOverCell" @dragstart="handleDragStart" @dragend="handleDragEnd"
           @dragenter="handleDragEnter" @dragleave="handleDragLeave" @drop="handleDrop" @cell-click="handleCellClick" />
@@ -671,10 +671,15 @@ function reconnectRealtime() {
 // ============================================
 
 onMounted(() => {
-  // 获取设备数据；实时连接由应用根部统一维护
-  store.fetchDeviceData()
-  fetchHistory()
+  // 先取得服务端布局，再取得完整设备快照；实时连接由应用根部统一维护
+  initializeDashboard()
 })
+
+async function initializeDashboard() {
+  await store.loadLayout()
+  await store.fetchDeviceData()
+  fetchHistory()
+}
 </script>
 
 <style scoped>
