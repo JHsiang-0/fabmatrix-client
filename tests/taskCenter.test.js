@@ -27,7 +27,7 @@ test('任务中心动作受正式状态限制且历史查询不发送未定义 k
   assert.match(queueSource, /handleResume/)
   assert.match(queueSource, /pausePrinter\(job\.printerId\)/)
   assert.match(queueSource, /resumePrinter\(job\.printerId\)/)
-  assert.match(queueSource, /\['QUEUED', 'ASSIGNED', 'UPLOADING', 'READY', 'PRINTING', 'PAUSED', 'RECONCILING'\]/)
+  assert.match(queueSource, /activePageData/)
   assert.doesNotMatch(historySource, /params\.keyword|queryForm\.keyword/)
   assert.match(historySource, /hasValue\(scope\.row\.progress\)/)
 })

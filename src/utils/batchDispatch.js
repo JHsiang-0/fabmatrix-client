@@ -1,12 +1,15 @@
-import { normalizePrintJob } from './dataAdapters.js'
-
 const PREVIEW_STRATEGIES = Object.freeze(['ONE_TO_ONE', 'ROUND_ROBIN', 'AUTO_MATCH'])
 const PREVIEW_ACTIONS = Object.freeze(['UPLOAD_ONLY', 'QUEUE', 'START_AFTER_CONFIRM'])
+const SUCCESS_STATUSES = Object.freeze(['ASSIGNED', 'UPLOADING', 'READY', 'SUCCEEDED'])
 
 function normalizeIds(ids) {
   return (Array.isArray(ids) ? ids : [])
     .map(id => String(id).trim())
     .filter(Boolean)
+}
+
+function normalizeOptionalId(value) {
+  return value == null ? null : String(value)
 }
 
 function createRequestId() {
@@ -68,31 +71,33 @@ export function toBatchPreviewPayload(previewRequest) {
   }
 }
 
+export function isBatchConfirmItemSuccessful(item) {
+  return SUCCESS_STATUSES.includes(String(item?.status || '').toUpperCase())
+}
+
 export function normalizeBatchConfirmResult(data = {}) {
   return {
     planId: data.planId ?? null,
-    version: data.version ?? null,
-    planStatus: data.planStatus || data.status || null,
-    idempotent: data.idempotent === true || data.repeated === true,
-    repeated: data.repeated === true || data.idempotent === true,
+    status: data.status ?? null,
+    repeated: data.repeated === true,
     items: (Array.isArray(data.items) ? data.items : []).map(item => {
-      const status = String(item?.status || (item?.success ? 'SUCCESS' : 'FAILED')).toUpperCase()
       return {
         itemId: item?.itemId ?? null,
-        fileId: item?.fileId ?? null,
-        printerId: item?.printerId ?? null,
+        fileId: normalizeOptionalId(item?.fileId),
+        fileName: item?.fileName ?? null,
+        printerId: normalizeOptionalId(item?.printerId),
+        printerName: item?.printerName ?? null,
+        printerStatus: item?.printerStatus ?? null,
+        canExecute: item?.canExecute ?? null,
+        status: item?.status ?? null,
+        reasonCode: item?.reasonCode ?? null,
+        message: item?.message ?? null,
         jobId: item?.jobId == null ? null : String(item.jobId),
-        status,
-        errorCode: item?.errorCode ?? null,
-        message: item?.message || '',
-        attemptCount: Number.isInteger(item?.attemptCount) ? item.attemptCount : 1,
-        retryable: item?.retryable === true,
-        success: item?.success === true || (item?.success !== false
-          && ['ASSIGNED', 'UPLOADING', 'READY', 'SUCCEEDED', 'STARTED'].includes(status)),
         sourcePlanId: item?.sourcePlanId ?? null,
         sourceItemId: item?.sourceItemId ?? null,
         recoveryAction: item?.recoveryAction ?? null,
-        job: item?.job ? normalizePrintJob(item.job) : null
+        attemptCount: item?.attemptCount ?? null,
+        retryable: item?.retryable ?? null
       }
     })
   }

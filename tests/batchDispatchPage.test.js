@@ -48,7 +48,8 @@ test('批量预览和确认只展示后端字段，并保留幂等回放与恢�
   assert.match(source, /retryPreviewBatchDispatch/)
   assert.match(source, /sourcePlanId/)
   assert.match(source, /confirmationToken: previewData\.value\.confirmationToken/)
-  assert.match(source, /errorCode.*错误码/)
+  assert.match(source, /reasonCode.*原因码/)
+  assert.doesNotMatch(source, /item\.success|item\.errorCode|item\.job(?:[^A-Za-z0-9_$]|$)/)
   assert.match(source, /#recovery/)
   assert.doesNotMatch(adapterSource, /item-\$\{index\}/)
 })
@@ -60,6 +61,16 @@ test('批量确认在确认框前占用锁，并在取消或请求完成后释�
   assert.ok(confirmBlock.indexOf('acquireBatchConfirmLock') < confirmBlock.indexOf('await confirmMessage'))
   assert.match(confirmBlock, /catch \{[\s\S]*releaseBatchConfirmLock\(\{ confirming, actionLoadingKey \}\)/)
   assert.match(confirmBlock, /finally \{[\s\S]*releaseBatchConfirmLock\(\{ confirming, actionLoadingKey \}\)/)
+  assert.match(source, /jobStore\.refresh\(\)/)
+  assert.match(source, /jobStore\.invalidateHistory\(\)/)
+})
+
+test('批量确认真实点击不把 DOM Event 当作回放参数', () => {
+  assert.match(source, /@click="confirm\(\)"/)
+  assert.match(source, /@click="replayConfirm"/)
+  const confirmBlock = source.slice(source.indexOf('async function confirm'), source.indexOf('function replayConfirm'))
+  assert.match(confirmBlock, /if \(replay !== true\) \{/)
+  assert.doesNotMatch(confirmBlock, /if \(!replay\) \{/)
 })
 
 test('批量派发视觉区域使用 TDesign 密度并保留独立滚动和响应式状态', () => {

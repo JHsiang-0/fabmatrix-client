@@ -90,6 +90,35 @@ const assertNoViewportOverflow = async page => {
   expect(metrics.bodyWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1)
 }
 
+const createTc008HistoryJobs = () => Array.from({ length: 12 }, (_, index) => {
+  const failed = index === 5
+  const minute = String(59 - index).padStart(2, '0')
+  return {
+    id: failed ? 1005 : 5000 + index,
+    fileId: 20,
+    printerId: 403,
+    userId: 1,
+    operatorId: 2,
+    priority: failed ? 10 : 0,
+    idempotencyKey: null,
+    status: failed ? 'FAILED' : 'COMPLETED',
+    progress: failed ? 42 : 100,
+    startedAt: `2026-09-12T09:${minute}:00`,
+    completedAt: `2026-09-12T10:${minute}:00`,
+    errorReason: failed ? '喷头温度异常，请核对现场状态后重试。'.repeat(18) : null,
+    fileNameSnapshot: 'gearbox.gcode',
+    printerNameSnapshot: 'Printer_C0DA',
+    machineNumberSnapshot: 'A-01',
+    creatorUsernameSnapshot: 'admin',
+    operatorUsernameSnapshot: 'operator',
+    retryOfJobId: null,
+    rootJobId: failed ? 1005 : 5000 + index,
+    attemptNumber: 1,
+    createdAt: `2026-09-12T08:${minute}:00`,
+    updatedAt: `2026-09-12T10:${minute}:00`
+  }
+})
+
 for (const viewport of viewports) {
   test(`四视口逐页检查业务界面 ${viewport.width}px`, async ({ browser }, testInfo) => {
     test.setTimeout(120000)
@@ -135,6 +164,36 @@ for (const viewport of viewports) {
   })
 }
 
+const batchConfirmRequest = request => request.method() === 'POST'
+  && new URL(request.url()).pathname === '/api/v1/print-jobs/batch/confirm'
+
+const batchConfirmDialog = page => page.locator('.t-dialog:visible').filter({ hasText: '确认批量派发' })
+
+const isMockBrowser = page => page.evaluate(() => typeof window.__FARM_RESET_MOCK__ === 'function')
+
+const mockRequestCount = (page, requestKey) => page.evaluate(key => {
+  const debug = window.__FARM_GET_MOCK_DEBUG__?.()
+  return debug?.requestCounts?.[key] || 0
+}, requestKey)
+
+const mockBatchConfirmRequestCount = page => mockRequestCount(page, 'POST /api/v1/print-jobs/batch/confirm')
+
+const expectMockBatchConfirmRequestCount = async (page, expected) => {
+  expect(await isMockBrowser(page)).toBe(true)
+  await expect.poll(() => mockBatchConfirmRequestCount(page)).toBe(expected)
+}
+
+const confirmBatchFromDialog = async (page, dialog) => {
+  const resultPromise = page.getByText(/执行完成：计划状态 COMPLETED/).waitFor({ state: 'visible' })
+  const confirmClickPromise = dialog.getByRole('button', { name: '确认执行', exact: true }).click()
+  if (await isMockBrowser(page)) {
+    await Promise.all([resultPromise, confirmClickPromise])
+    return
+  }
+  const responsePromise = page.waitForResponse(response => batchConfirmRequest(response.request()), { timeout: 5000 })
+  await Promise.all([responsePromise, resultPromise, confirmClickPromise])
+}
+
 test('批量派发页面完成真实预览确认流程', async ({ browser }) => {
   test.setTimeout(120000)
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
@@ -150,10 +209,250 @@ test('批量派发页面完成真实预览确认流程', async ({ browser }) => 
     await page.getByRole('button', { name: '生成派发预览', exact: true }).click()
     await expect(page.getByText('无副作用预览', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: /确认执行（\d+项）/ }).click()
-    await page.waitForTimeout(500)
-    await expect(page.getByText(/执行完成：计划状态 CONFIRMED/)).toBeVisible()
+    await expectMockBatchConfirmRequestCount(page, 0)
+    const dialog = batchConfirmDialog(page)
+    await expect(dialog).toHaveCount(1)
+    await confirmBatchFromDialog(page, dialog)
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByText(/执行完成：计划状态 COMPLETED/)).toBeVisible()
     await expect(page.getByText(/成功 1 项，失败 0 项/)).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: '原因码' })).toBeVisible()
     await expect(page.getByRole('button', { name: '再次获取执行结果', exact: true })).toBeVisible()
+    await expectMockBatchConfirmRequestCount(page, 1)
+  } finally {
+    await context.close()
+  }
+})
+
+const prepareBatchPreview = async page => {
+  await page.goto('/login')
+  await page.evaluate(() => window.__FARM_RESET_MOCK__())
+  await page.getByLabel('用户名', { exact: true }).fill('admin')
+  await page.getByLabel('密码', { exact: true }).fill('Admin123')
+  await page.getByRole('button', { name: '登录', exact: true }).click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await openSidebarItem(page, 1440, '批量派发')
+  await expect(page.locator('.batch-dispatch-page')).toBeVisible()
+  await page.getByRole('checkbox', { name: /gearbox\.gcode/ }).check({ force: true })
+  await page.getByRole('checkbox', { name: /Printer_A12F/ }).check({ force: true })
+  await page.getByRole('button', { name: '下一步：配置策略', exact: true }).click({ force: true })
+  await page.getByRole('button', { name: '生成派发预览', exact: true }).click()
+  await expect(page.getByText('无副作用预览', { exact: true })).toBeVisible()
+}
+
+test('批量派发组件真实点击先显示一个确认框并只确认一次', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const page = await context.newPage()
+
+  try {
+    await prepareBatchPreview(page)
+    const confirmButton = page.getByRole('button', { name: /确认执行（\d+项）/ })
+    await confirmButton.click()
+    const dialog = batchConfirmDialog(page)
+    await expect(dialog).toHaveCount(1)
+    await expectMockBatchConfirmRequestCount(page, 0)
+
+    await confirmBatchFromDialog(page, dialog)
+    await expect(page.getByText(/执行完成：计划状态 COMPLETED/)).toBeVisible()
+    await expectMockBatchConfirmRequestCount(page, 1)
+  } finally {
+    await context.close()
+  }
+})
+
+test('批量派发组件真实点击取消后释放锁并允许再次点击', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const page = await context.newPage()
+
+  try {
+    await prepareBatchPreview(page)
+    const confirmButton = page.getByRole('button', { name: /确认执行（\d+项）/ })
+    await confirmButton.click()
+    let dialog = batchConfirmDialog(page)
+    await expect(dialog).toHaveCount(1)
+    await dialog.getByRole('button', { name: '返回检查', exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+    await expectMockBatchConfirmRequestCount(page, 0)
+    await expect(confirmButton).toBeEnabled()
+
+    await confirmButton.click()
+    dialog = batchConfirmDialog(page)
+    await expect(dialog).toHaveCount(1)
+    await dialog.getByRole('button', { name: '返回检查', exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+    await expectMockBatchConfirmRequestCount(page, 0)
+  } finally {
+    await context.close()
+  }
+})
+
+test('批量派发组件真实快速双击只显示一个确认框并只确认一次', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const page = await context.newPage()
+
+  try {
+    await prepareBatchPreview(page)
+    const confirmButton = page.getByRole('button', { name: /确认执行（\d+项）/ })
+    await confirmButton.dblclick()
+    const dialog = batchConfirmDialog(page)
+    await expect(dialog).toHaveCount(1)
+    await expectMockBatchConfirmRequestCount(page, 0)
+
+    await confirmBatchFromDialog(page, dialog)
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByText(/执行完成：计划状态 COMPLETED/)).toBeVisible()
+    await expectMockBatchConfirmRequestCount(page, 1)
+  } finally {
+    await context.close()
+  }
+})
+
+test('JobQueue 暂停确认只发送一次可观测 Mock 请求', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const page = await context.newPage()
+
+  try {
+    await page.goto('/login')
+    await page.evaluate(() => {
+      window.__FARM_RESET_MOCK__()
+      window.__FARM_RESET_MOCK_DEBUG__()
+    })
+    await login(page)
+    await openSidebarItem(page, 1440, '任务队列')
+    await page.locator('.t-tabs__nav-item').filter({ hasText: '活动任务' }).click()
+
+    const activeRow = page.locator('.t-tab-panel:visible .job-queue-table .t-table__body tr')
+      .filter({ hasText: '#1001' })
+      .first()
+    await expect(activeRow).toBeVisible()
+    await activeRow.getByRole('button', { name: '更多', exact: true }).click()
+    await page.getByText('暂停打印', { exact: true }).last().click()
+
+    const dialog = page.locator('.t-dialog:visible').filter({ hasText: '暂停打印确认' })
+    await expect(dialog).toHaveCount(1)
+    await expect.poll(() => mockRequestCount(page, 'POST /api/v1/control/403/pause')).toBe(0)
+    await dialog.getByRole('button', { name: '暂停打印', exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect.poll(() => mockRequestCount(page, 'POST /api/v1/control/403/pause')).toBe(1)
+  } finally {
+    await context.close()
+  }
+})
+
+test('TC-008 任务历史在三个桌面尺寸下保持表格滚动、详情抽屉和 FAILED 重试', async ({ browser }) => {
+  test.setTimeout(120000)
+  const context = await browser.newContext({ viewport: { width: 800, height: 560 } })
+  const page = await context.newPage()
+
+  try {
+    await page.goto('/login')
+    await page.evaluate(jobs => window.__FARM_RESET_MOCK__({ jobs }), createTc008HistoryJobs())
+    await page.getByLabel('用户名', { exact: true }).fill('admin')
+    await page.getByLabel('密码', { exact: true }).fill('Admin123')
+    await page.getByRole('button', { name: '登录', exact: true }).click()
+    await expect(page).toHaveURL(/\/dashboard$/)
+
+    for (const viewport of [
+      { width: 800, height: 560 },
+      { width: 1024, height: 640 },
+      { width: 1200, height: 760 }
+    ]) {
+      await page.setViewportSize(viewport)
+      await openSidebarItem(page, viewport.width, '打印历史')
+      await expect(page.getByRole('heading', { name: '打印历史记录', exact: true })).toBeVisible()
+      await expect(page.getByText('#1005', { exact: true })).toBeVisible()
+
+      const tableContent = page.locator('.history-management-table .t-table__content')
+      await expect(tableContent).toBeVisible()
+      const tableStart = await tableContent.evaluate(element => {
+        element.scrollLeft = 0
+        element.scrollTop = 0
+        return {
+          clientWidth: element.clientWidth,
+          clientHeight: element.clientHeight,
+          scrollWidth: element.scrollWidth,
+          scrollHeight: element.scrollHeight,
+          scrollLeft: element.scrollLeft,
+          scrollTop: element.scrollTop,
+          overflowX: getComputedStyle(element).overflowX,
+          overflowY: getComputedStyle(element).overflowY
+        }
+      })
+      expect(tableStart.scrollWidth).toBeGreaterThan(tableStart.clientWidth)
+      expect(tableStart.scrollHeight).toBeGreaterThan(tableStart.clientHeight)
+      expect(tableStart.scrollLeft).toBe(0)
+      expect(tableStart.scrollTop).toBe(0)
+      expect(['auto', 'scroll']).toContain(tableStart.overflowX)
+      expect(['auto', 'scroll']).toContain(tableStart.overflowY)
+      await expect(page.getByRole('columnheader', { name: '任务 ID' })).toBeVisible()
+
+      const tableEnd = await tableContent.evaluate(element => {
+        element.scrollLeft = element.scrollWidth
+        element.scrollTop = element.scrollHeight
+        return {
+          scrollLeft: element.scrollLeft,
+          maxScrollLeft: element.scrollWidth - element.clientWidth,
+          scrollTop: element.scrollTop,
+          maxScrollTop: element.scrollHeight - element.clientHeight
+        }
+      })
+      expect(tableEnd.scrollLeft).toBeGreaterThan(0)
+      expect(tableEnd.scrollLeft).toBeGreaterThanOrEqual(tableEnd.maxScrollLeft - 1)
+      expect(tableEnd.scrollTop).toBeGreaterThan(0)
+      expect(tableEnd.scrollTop).toBeGreaterThanOrEqual(tableEnd.maxScrollTop - 1)
+      await expect(page.getByRole('columnheader', { name: '操作' })).toBeVisible()
+      await expect(page.locator('.history-management-table .t-table__body tr').last()).toBeVisible()
+
+      await tableContent.evaluate(element => {
+        element.scrollLeft = element.scrollWidth
+        element.scrollTop = 0
+      })
+      const failedRow = page.locator('.history-management-table .t-table__body tr').filter({ hasText: '#1005' })
+      await failedRow.evaluate(element => element.scrollIntoView({ block: 'center', inline: 'nearest' }))
+      const retryButton = failedRow.getByRole('button', { name: '重试', exact: true })
+      await expect(retryButton).toBeVisible()
+      await failedRow.getByRole('button', { name: '详情', exact: true }).click()
+      const drawerBody = page.locator('.task-detail-drawer .t-drawer__body')
+      await expect(drawerBody).toBeVisible()
+      await page.locator('.task-detail-drawer__technical').getByText('技术信息', { exact: true }).click()
+      const drawerStart = await drawerBody.evaluate(element => {
+        element.scrollTop = 0
+        return {
+          clientHeight: element.clientHeight,
+          scrollHeight: element.scrollHeight,
+          scrollTop: element.scrollTop,
+          overflowY: getComputedStyle(element).overflowY
+        }
+      })
+      expect(drawerStart.scrollHeight).toBeGreaterThan(drawerStart.clientHeight)
+      expect(drawerStart.scrollTop).toBe(0)
+      expect(['auto', 'scroll']).toContain(drawerStart.overflowY)
+      const drawerEnd = await drawerBody.evaluate(element => {
+        element.scrollTop = element.scrollHeight
+        return {
+          scrollTop: element.scrollTop,
+          maxScrollTop: element.scrollHeight - element.clientHeight
+        }
+      })
+      expect(drawerEnd.scrollTop).toBeGreaterThan(0)
+      expect(drawerEnd.scrollTop).toBeGreaterThanOrEqual(drawerEnd.maxScrollTop - 1)
+      await expect(page.getByText('尝试次数', { exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: '关闭任务详情', exact: true })).toBeVisible()
+      await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
+
+      await retryButton.click()
+      await expect(retryButton).toBeDisabled()
+      await expect(retryButton).toHaveClass(/t-is-loading/)
+      const successMessage = page.getByText(/已创建重试任务 #(\d+)/).first()
+      await expect(successMessage).toBeVisible()
+      const retryId = (await successMessage.textContent()).match(/#(\d+)/)?.[1]
+      expect(retryId).toBeTruthy()
+      await openSidebarItem(page, viewport.width, '任务队列')
+      await expect(page.getByText(`#${retryId}`, { exact: true })).toBeVisible()
+      await openSidebarItem(page, viewport.width, '打印历史')
+      await expect(page.getByText('#1005', { exact: true })).toBeVisible()
+      await assertNoViewportOverflow(page)
+    }
   } finally {
     await context.close()
   }

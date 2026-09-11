@@ -176,8 +176,14 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
     { printerId: '404' },
     sessionHeaders
   ))
-  assert.equal(safetyConfirmation.id, '404')
-  assert.equal(safetyConfirmation.isSafeToPrint, true)
+  assert.equal(safetyConfirmation, null)
+  const confirmedPrinter = assertSuccessEnvelope(await request(
+    'GET',
+    '/api/v1/printers/404',
+    undefined,
+    sessionHeaders
+  ))
+  assert.equal(confirmedPrinter.isSafeToPrint, true)
 
   const startedResponse = await request(
     'POST',
@@ -262,13 +268,15 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
     },
     sessionHeaders
   ))
-  assert.equal(batchConfirm.planStatus, 'PARTIAL_SUCCESS')
-  assert.deepEqual(batchConfirm.items.map(item => item.success), [true, false])
+  assert.equal(batchConfirm.status, 'PARTIAL_FAILED')
+  assert.deepEqual(batchConfirm.items.map(item => item.status), ['ASSIGNED', 'RETRYABLE'])
   assert.equal(batchConfirm.items[0].status, 'ASSIGNED')
-  assert.equal(batchConfirm.items[1].errorCode, 'PRINTER_BUSY')
+  assert.equal(batchConfirm.items[1].reasonCode, 'PRINTER_STATE_CHANGED')
   assert.equal(batchConfirm.items[1].retryable, true)
   assert.equal(mockState.jobs.length, initialBatchJobCount + 1)
-  assertPublicJob(batchConfirm.items[0].job)
+  assert.equal(batchConfirm.items[0].fileName, 'gearbox.gcode')
+  assert.equal(batchConfirm.items[0].printerName, 'Printer_CLEAN')
+  assert.equal(batchConfirm.items[0].printerStatus, 'IDLE')
 
   const occupiedBatchJobId = batchConfirm.items[0].jobId
   assertSuccessEnvelope(await request(
@@ -304,7 +312,7 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
     },
     sessionHeaders
   ))
-  assert.equal(recoveryConfirm.items[0].success, true)
+  assert.equal(recoveryConfirm.items[0].status, 'ASSIGNED')
   assert.equal(recoveryConfirm.items[0].status, 'ASSIGNED')
   assert.equal(mockState.jobs.length, initialBatchJobCount + 2)
 

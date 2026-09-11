@@ -658,8 +658,8 @@
 
       <template #footer>
         <div class="create-job-dialog__footer">
-          <t-button @click="createJobDialogVisible = false">取消</t-button>
-          <t-button theme="primary" @click="handleSubmitCreateJob" :loading="submittingJob">
+          <t-button @click="createJobDialogVisible = false" :disabled="actionLoadingKey !== ''">取消</t-button>
+          <t-button theme="primary" @click="handleSubmitCreateJob" :loading="isActionLoading('create')" :disabled="actionLoadingKey !== ''">
             确认提交
           </t-button>
         </div>
@@ -750,6 +750,7 @@ let searchTimer = null
 // 打印任务对话框状态
 const createJobDialogVisible = ref(false)
 const submittingJob = ref(false)
+const actionLoadingKey = ref('')
 const availablePrinters = ref([])
 const loadingPrinters = ref(false)
 const jobForm = reactive({
@@ -1796,12 +1797,14 @@ const loadAssignablePrinters = async () => {
 }
 
 const handleSubmitCreateJob = async () => {
+  if (actionLoadingKey.value) return
   if (!jobForm.file) {
     message.error('未选择文件')
     return
   }
 
   submittingJob.value = true
+  actionLoadingKey.value = `create:${jobForm.file.id}`
   let successCount = 0
   try {
     // 构建请求数据 - 直接使用数字优先级 (0-普通, 50-优先, 100-加急)
@@ -1830,8 +1833,13 @@ const handleSubmitCreateJob = async () => {
     }
   } finally {
     submittingJob.value = false
+    actionLoadingKey.value = ''
   }
 }
+
+const isActionLoading = (action, id = null) => id === null
+  ? actionLoadingKey.value.startsWith(`${action}:`)
+  : actionLoadingKey.value === `${action}:${id}`
 
 /**
  * 打开上传对话框

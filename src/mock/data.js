@@ -438,6 +438,13 @@ const createSeedData = ({
       startedAt: '2026-09-02T17:10:00',
       completedAt: null,
       errorReason: null,
+      fileNameSnapshot: 'gearbox.gcode',
+      printerNameSnapshot: 'Printer_C0DA',
+      machineNumberSnapshot: 'A-01',
+      creatorUsernameSnapshot: 'admin',
+      operatorUsernameSnapshot: 'operator',
+      rootJobId: 1001,
+      attemptNumber: 1,
       createdAt: '2026-09-02T17:00:00',
       updatedAt: '2026-09-02T17:10:30'
     },
@@ -453,6 +460,13 @@ const createSeedData = ({
       startedAt: '2026-09-02T16:10:00',
       completedAt: null,
       errorReason: null,
+      fileNameSnapshot: 'enclosure.gcode',
+      printerNameSnapshot: 'Printer_B07E',
+      machineNumberSnapshot: 'A-03',
+      creatorUsernameSnapshot: 'admin',
+      operatorUsernameSnapshot: 'operator',
+      rootJobId: 1002,
+      attemptNumber: 1,
       createdAt: '2026-09-02T16:00:00',
       updatedAt: '2026-09-02T16:50:00'
     },
@@ -468,6 +482,10 @@ const createSeedData = ({
       startedAt: null,
       completedAt: null,
       errorReason: null,
+      fileNameSnapshot: 'bracket.gcode',
+      creatorUsernameSnapshot: 'admin',
+      rootJobId: 1003,
+      attemptNumber: 1,
       createdAt: '2026-09-02T15:30:00',
       updatedAt: '2026-09-02T15:30:00'
     },
@@ -483,6 +501,10 @@ const createSeedData = ({
       startedAt: '2026-09-02T14:20:00',
       completedAt: '2026-09-02T14:35:00',
       errorReason: null,
+      fileNameSnapshot: 'calibration.bgcode',
+      creatorUsernameSnapshot: 'operator',
+      rootJobId: 1004,
+      attemptNumber: 1,
       createdAt: '2026-09-02T14:15:00',
       updatedAt: '2026-09-02T14:35:00'
     },
@@ -498,6 +520,10 @@ const createSeedData = ({
       startedAt: '2026-09-01T18:00:00',
       completedAt: null,
       errorReason: '喷嘴温度异常',
+      fileNameSnapshot: 'gearbox.gcode',
+      creatorUsernameSnapshot: 'admin',
+      rootJobId: 1005,
+      attemptNumber: 1,
       createdAt: '2026-09-01T17:50:00',
       updatedAt: '2026-09-01T18:20:00'
     },
@@ -513,6 +539,10 @@ const createSeedData = ({
       startedAt: null,
       completedAt: null,
       errorReason: null,
+      fileNameSnapshot: 'enclosure.gcode',
+      creatorUsernameSnapshot: 'operator',
+      rootJobId: 1006,
+      attemptNumber: 1,
       createdAt: '2026-09-01T16:00:00',
       updatedAt: '2026-09-01T16:10:00'
     }
@@ -562,6 +592,9 @@ const createSeedData = ({
     }
   ] : [],
   batchPlans: [],
+  mockDebug: {
+    requestCounts: {}
+  },
   lastBatchAddPayload: null,
   batchAddFailures: clone(batchAddFailures),
   dashboardLayoutError: clone(dashboardLayoutError),
@@ -584,6 +617,16 @@ export function resetMockState(options = {}) {
   Object.keys(mockState).forEach(key => {
     mockState[key] = clone(seed[key])
   })
+}
+
+export function resetMockDebugState() {
+  mockState.mockDebug = { requestCounts: {} }
+}
+
+export function recordMockRequest(requestKey) {
+  const requestCounts = mockState.mockDebug?.requestCounts || {}
+  requestCounts[requestKey] = (requestCounts[requestKey] || 0) + 1
+  mockState.mockDebug = { requestCounts }
 }
 
 export const normalizeMockId = value => value == null ? null : String(value).trim()

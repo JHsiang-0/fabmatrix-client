@@ -120,9 +120,19 @@ test('mock trims fileName before enforcing its length limit', async () => {
 
 test('enforces legal recovery and priority actions for job history', async () => {
   setupSession()
-  await request('POST', '/api/v1/print-jobs/1005/retry', undefined, headers)
-  assert.equal(mockState.jobs.find(job => job.id === 1005).status, 'QUEUED')
-  assert.equal(mockState.jobs.find(job => job.id === 1005).printerId, null)
+  const source = mockState.jobs.find(job => job.id === 1005)
+  const sourceSnapshot = { ...source }
+  const firstRetry = await request('POST', '/api/v1/print-jobs/1005/retry', undefined, headers)
+  const secondRetry = await request('POST', '/api/v1/print-jobs/1005/retry', undefined, headers)
+  assert.equal(typeof firstRetry.data, 'string')
+  assert.equal(secondRetry.data, firstRetry.data)
+  assert.equal(mockState.jobs.filter(job => job.retryOfJobId === 1005).length, 1)
+  assert.deepEqual(source, sourceSnapshot)
+  const child = mockState.jobs.find(job => String(job.id) === firstRetry.data)
+  assert.equal(child.status, 'QUEUED')
+  assert.equal(child.rootJobId, 1005)
+  assert.equal(child.attemptNumber, 2)
+  assert.equal(child.retryOfJobId, 1005)
 
   await request('PUT', '/api/v1/print-jobs/1003/priority', { priority: 100 }, headers)
   assert.equal(mockState.jobs.find(job => job.id === 1003).priority, 100)
@@ -131,6 +141,83 @@ test('enforces legal recovery and priority actions for job history', async () =>
     request('POST', '/api/v1/print-jobs/1004/retry', undefined, headers),
     error => error.response.status === 422
   )
+})
+
+test('retry idempotency rejects a child whose lineage was changed before replay', async () => {
+  for (const [field, conflictingValue] of [
+    ['rootJobId', 9999],
+    ['attemptNumber', 9],
+    ['userId', 2],
+    ['fileId', 21]
+  ]) {
+    setupSession()
+    const firstRetry = await request('POST', '/api/v1/print-jobs/1005/retry', undefined, headers)
+    const child = mockState.jobs.find(job => String(job.id) === firstRetry.data)
+    child[field] = conflictingValue
+
+    await assert.rejects(
+      request('POST', '/api/v1/print-jobs/1005/retry', undefined, headers),
+      error => error.response.status === 409
+        && error.response.data.code === 409
+    )
+  }
+})
+
+test('history filename filter uses current relation until removal, then falls back to snapshot', async () => {
+  setupSession()
+  const printer = mockState.printers.find(item => item.id === 403)
+  const file = mockState.files.find(item => item.id === 20)
+  const historyJob = mockState.jobs.find(item => item.id === 1005)
+  historyJob.printerId = printer.id
+  historyJob.printerNameSnapshot = 'Printer_C0DA'
+  historyJob.machineNumberSnapshot = 'A-01'
+
+  const beforeRename = await request('POST', '/api/v1/print-jobs/page', {
+    pageNum: 1,
+    pageSize: 10,
+    status: 'FAILED',
+    fileName: 'gearbox',
+    timeField: 'COMPLETED_AT'
+  }, headers)
+  assert.deepEqual(beforeRename.data.records.map(item => item.id), ['1005'])
+
+  file.originalName = 'renamed-after-print.gcode'
+  printer.name = 'renamed-printer'
+  printer.machineNumber = 'renamed-machine'
+
+  const renamed = await request('POST', '/api/v1/print-jobs/page', {
+    pageNum: 1,
+    pageSize: 10,
+    status: 'FAILED',
+    fileName: 'renamed-after-print',
+    timeField: 'COMPLETED_AT'
+  }, headers)
+  const oldNameWhileRelated = await request('POST', '/api/v1/print-jobs/page', {
+    pageNum: 1,
+    pageSize: 10,
+    status: 'FAILED',
+    fileName: 'gearbox',
+    timeField: 'COMPLETED_AT'
+  }, headers)
+  assert.deepEqual(renamed.data.records.map(item => item.id), ['1005'])
+  assert.equal(oldNameWhileRelated.data.total, 0)
+
+  const job = renamed.data.records[0]
+  assert.equal(job.fileName, 'renamed-after-print.gcode')
+  assert.equal(job.fileNameSnapshot, 'gearbox.gcode')
+  assert.equal(job.printerNameSnapshot, 'Printer_C0DA')
+
+  mockState.files = mockState.files.filter(item => item.id !== 20)
+  const afterRemoval = await request('POST', '/api/v1/print-jobs/page', {
+    pageNum: 1,
+    pageSize: 10,
+    status: 'FAILED',
+    fileName: 'gearbox',
+    timeField: 'COMPLETED_AT'
+  }, headers)
+  assert.deepEqual(afterRemoval.data.records.map(item => item.id), ['1005'])
+  assert.equal(afterRemoval.data.records[0].fileName, null)
+  assert.equal(afterRemoval.data.records[0].fileNameSnapshot, 'gearbox.gcode')
 })
 
 test('rejects an inverted history time range', async () => {

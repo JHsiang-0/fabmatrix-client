@@ -420,22 +420,8 @@ export const useJobStore = defineStore('job', () => {
     activeLoading.value = false
   }
 
-  function applyBatchConfirmResults(result = {}) {
-    const jobs = (result.items || [])
-      .map(item => item.job)
-      .filter(Boolean)
-    if (!jobs.length) return []
-
-    const jobsById = new Map(activeJobs.value.map(job => [String(job.id), job]))
-    jobs.forEach(job => {
-      const key = String(job.id)
-      if (jobsById.has(key)) jobsById.set(key, job)
-    })
-    activeJobs.value = selectActiveJobs([...jobsById.values()]).sort(sortByUpdatedAt)
-    const details = new Map(jobDetails.value)
-    jobs.forEach(job => details.set(String(job.id), job))
-    jobDetails.value = details
-    return jobs
+  function invalidateHistory() {
+    historyInvalidationVersion.value += 1
   }
 
   async function refresh() {
@@ -473,7 +459,7 @@ export const useJobStore = defineStore('job', () => {
     resetRealtimeOrdering,
     resetRealtimeSequence,
     beginRealtimeRecovery,
-    applyBatchConfirmResults,
+    invalidateHistory,
     refresh
   }
 })

@@ -1,7 +1,7 @@
 # FabMatrix 前后端接口交接与契约文档
 
 版本：v2.2
-更新时间：2026-09-11
+更新时间：2026-09-12
 适用范围：FabMatrix 本地 3D 打印生产管理服务端与浏览器/客户端
 
 > 本文以当前 Java 源码、`SecurityConfig` 和当前 OpenAPI 注解为准。第 4 节列出的正式 Farm API 均已有对应 Controller；开发环境兼容用路由单独列在第 4.6 节。v2 不提供后台自动派单接口，相关能力延期到 v3。SYNC-002 收口：布局坐标按服务端当前动态布局校验，布局上限为 30×60 且物理槽位总数不超过 1800；Long 语义 ID 的 JSON 值为十进制字符串，非 ID 数值保持 number。
@@ -22,7 +22,7 @@ fileName, printerName, machineNumber, creatorUsername, operatorUsername, materia
 
 历史快照字段为 `fileNameSnapshot`、`printerNameSnapshot`、`machineNumberSnapshot`、`creatorUsernameSnapshot`、`operatorUsernameSnapshot`；重试字段为 `retryOfJobId`、`rootJobId`、`attemptNumber`。
 
-TC-002 已将 queue/page/detail 切换为独立的 `PrintJobSummaryVO`/`PrintJobDetailVO`，并通过一次 LEFT JOIN 查询提供当前文件、打印机和用户摘要；TC-003 已实施多状态/完成时间分页、文件名筛选、历史终态调用约定和旧状态迁移。TC-004–TC-008 仍未完成，桌面端和其他后续契约不在本任务范围。
+TC-002 已将 queue/page/detail 切换为独立的 `PrintJobSummaryVO`/`PrintJobDetailVO`，并通过一次 LEFT JOIN 查询提供当前文件、打印机和用户摘要；TC-003 已实施多状态/完成时间分页、文件名筛选、历史终态调用约定和旧状态迁移；TC-007 已实施快照、重试子任务、谱系冲突检查和旧 assign 410，并通过后端自动化验证。TC-008 的前端交互、Mock 契约及测试环境 RustFS 隔离见独立验收记录。
 
 ### 2. 查询集合和排序
 
@@ -42,7 +42,7 @@ ADMIN 可查询全部任务；OPERATOR 仅可查询本人任务。请求中的 `
 | 操作 | 当前状态边界 | 成功 data / 错误 |
 |---|---|---|
 | cancel | QUEUED、ASSIGNED、UPLOADING、READY、PRINTING、PAUSED | 进入 CANCELLED；设备命令失败 503，非法状态 422 |
-| retry | 仅 FAILED | TC-001 目标为新任务 ID 字符串；原失败任务不可变 |
+| retry | 仅 FAILED | TC-007 已实施新任务 ID 字符串；原失败任务不可变 |
 | requeue | 仅 ASSIGNED、READY | 解绑并进入 QUEUED；非法状态 422 |
 | reconcile | 仅 RECONCILING | 到 COMPLETED/FAILED/CANCELLED/QUEUED；参数 400，状态 422 |
 | priority | 仅 QUEUED | 成功 data=null |
@@ -51,17 +51,17 @@ ADMIN 可查询全部任务；OPERATOR 仅可查询本人任务。请求中的 `
 
 除 create/retry 的新任务 ID 字符串外，safe assign/start、cancel、requeue、reconcile、priority 等写操作 data 均为 null；前端成功后刷新详情和列表。统一错误语义为：400 参数格式/互斥/时间范围，401 未登录，403 已认证但角色或操作无权，404 不存在或不可访问，409 并发/幂等冲突，422 状态机/业务前置条件，503 设备或外部依赖失败。
 
-retry 采用新建任务记录，不使用 attempt 表。新任务为 QUEUED，无 printer/operator/start/completed/error，保留原 user/file/priority 及文件和创建人快照；`retryOfJobId` 指向直接来源，`rootJobId` 指向首次任务，`attemptNumber` 为原值加一。
+retry 采用新建任务记录，不使用 attempt 表。新任务为 QUEUED，无 printer/operator/start/completed/error，保留原 user/file/priority 及文件和创建人快照；`retryOfJobId` 指向直接来源，`rootJobId` 指向首次任务，`attemptNumber` 为原值加一。对同一 FAILED 来源重复请求返回同一子任务 ID，来源任务保持不可变。
 
 ### 4. 快照和旧接口
 
 创建写入文件名与创建人快照，分配写入打印机名与机器编号快照，启动写入操作员名快照。快照一旦非空不得因改名覆盖。列表使用 current-first；history 使用 snapshot-first，缺失时回退当前可读字段，最后回退 ID。
 
-旧 `POST /print-jobs/{jobId}/assign` 已标记 deprecated，前端禁止调用。当前后端仍保留兼容实现；后续实施任务的目标是拒绝旧直启链路并返回 410。本目标错误码尚未在 TC-001 实现。
+旧 `POST /print-jobs/{jobId}/assign` 已标记 deprecated，无必填请求参数；额外 `printerId` query 被忽略，固定返回 HTTP 410/业务码 410，前端禁止调用。
 
 ### 5. 当前实现与实施任务
 
-TC-001 只冻结契约；TC-002 已上线 queue/page/detail 的目标读模型和摘要 JOIN 查询，safe assign、safe start、safe confirm、reconcile 的成功 `data` 类型均为 null。TC-003 已上线多状态/文件名/创建与完成时间分页及旧状态迁移；TC-007 的快照、retry 新任务记录及旧 assign 的 410 仍未实施。
+TC-001 只冻结契约；TC-002 已上线 queue/page/detail 的目标读模型和摘要 JOIN 查询，safe assign、safe start、safe confirm、reconcile 的成功 `data` 类型均为 null。TC-003 已上线多状态/文件名/创建与完成时间分页及旧状态迁移；TC-007 已上线历史快照、retry 新任务记录、谱系冲突检查、重试审计和旧 assign 410，并已通过自动化验证。
 
 ## 1. 产品边界
 
@@ -331,10 +331,10 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 | POST | `/print-jobs` | ADMIN/OPERATOR | `fileId,priority,printerId?,idempotencyKey?` | 新任务 ID；同一用户同一幂等键重复请求返回原任务 |
 | POST | `/print-jobs/create` | ADMIN/OPERATOR | `fileId,priority,printerId?,idempotencyKey?` | 新任务 ID（兼容，deprecated） |
 | DELETE | `/print-jobs/{id}` | ADMIN/OPERATOR | Path ID | 取消任务（Service 统一校验、设备控制和解绑） |
-| POST | `/print-jobs/{id}/retry` | ADMIN/OPERATOR | Path ID，仅 FAILED | 当前重新入队；目标创建新任务并返回新 ID 字符串（未实施） |
+| POST | `/print-jobs/{id}/retry` | ADMIN/OPERATOR | Path ID，仅 FAILED | TC-007 已实施：创建新 QUEUED 任务并返回新 ID 字符串 |
 | POST | `/print-jobs/{id}/requeue` | ADMIN/OPERATOR | Path ID | 已派发任务重新入队 |
 | PUT | `/print-jobs/{id}/priority` | ADMIN/OPERATOR | JSON：`priority` | 更新排队优先级 |
-| POST | `/print-jobs/{jobId}/assign` | ADMIN/OPERATOR | Query：`printerId` | deprecated；当前兼容实现，后续目标拒绝并返回 410 |
+| POST | `/print-jobs/{jobId}/assign` | ADMIN/OPERATOR | 无必填请求参数；额外 `printerId` query 被忽略 | deprecated；固定 HTTP 410/业务码 410，不产生服务或设备调用 |
 | POST | `/print-jobs/safe/assign` | ADMIN/OPERATOR | `jobId,printerId` | 安全派发 |
 | POST | `/print-jobs/safe/confirm` | ADMIN/OPERATOR | `printerId,operatorId?` | 安全确认 |
 | POST | `/print-jobs/safe/start` | ADMIN/OPERATOR | `jobId,operatorId?,action?` | 启动或仅上传 |
@@ -524,7 +524,7 @@ HTTP 422，设备离线返回 `code=10001`。恢复时任务和打印机状态�
 | 方法 | 目标地址 | 权限 | 请求 | 返回 | 状态 |
 |---|---|---|---|---|---|
 | POST | `/print-jobs` | ADMIN/OPERATOR | `fileId,priority,printerId?` | 新任务 ID | 已完成 |
-| POST | `/print-jobs/{id}/retry` | ADMIN/OPERATOR | Path ID | `Result<null>` | 已完成 |
+| POST | `/print-jobs/{id}/retry` | ADMIN/OPERATOR | Path ID | `Result<string>`（服务端 `Result<String>`；JSON 字符串 ID） | 已完成（TC-007） |
 | POST | `/print-jobs/{id}/requeue` | ADMIN/OPERATOR | Path ID | `Result<null>` | 已完成 |
 | PUT | `/print-jobs/{id}/priority` | ADMIN/OPERATOR | JSON：`priority`，范围 `0-100` | `Result<null>` | 已完成 |
 
@@ -532,7 +532,7 @@ HTTP 422，设备离线返回 `code=10001`。恢复时任务和打印机状态�
 
 T6.2 的 `printerId` 规则：不传时任务为 `QUEUED` 且不绑定设备；传入时先创建任务，再复用安全派发逻辑校验设备存在、为 `IDLE` 且 `currentJobId=null`，成功后任务为 `ASSIGNED`、打印机绑定任务且 `isSafeToPrint=false`，不会直接开始打印。任务记录插入影响 0 行时直接返回业务错误，不返回任务 ID；设备忙碌、设备不存在、已有任务绑定或派发状态校验失败时整体创建事务回滚；手动接口对已有绑定返回 `409`。
 
-TC-001 已冻结 retry 目标：`POST /print-jobs/{id}/retry` 仅允许当前用户可见且状态为 `FAILED` 的任务；原任务不可变，创建新的 `QUEUED` 任务并返回新 ID 字符串，保存 `retryOfJobId`、`rootJobId`、`attemptNumber` 及规定快照。当前实现仍返回 null 并复用原记录，目标由后续实施任务完成。非失败状态目标返回 HTTP 422，任务不存在或无权访问统一返回 HTTP 404。
+TC-007 已实现 retry：`POST /print-jobs/{id}/retry` 仅允许当前用户可见且状态为 `FAILED` 的任务；原任务不可变，创建新的 `QUEUED` 任务并返回新 ID 字符串，保存 `retryOfJobId`、`rootJobId`、`attemptNumber` 及规定快照。重复/并发请求按直接来源回放同一 child；非失败状态返回 HTTP 422，任务不存在或无权访问统一返回 HTTP 404，首次源文件不可用返回 HTTP 422，lineage 冲突返回 HTTP 409。
 
 T6.4 重新排队规则：`POST /print-jobs/{id}/requeue` 仅允许 `ASSIGNED` 或 `READY` 任务；成功后解除打印机绑定、清除运行字段、进度归零，状态变为 `QUEUED`。由于解除绑定后没有 `printerId`，不构造无设备 ID 的 `JOB_STATUS`；前端以任务列表/队列数据为准。关联设备存在时清除其 `currentJobId` 和安全确认，`PREPARING` 设备恢复为 `IDLE`；不调用设备协议。`PRINTING`、`PAUSED`、`FAILED`、`COMPLETED`、`CANCELLED` 均返回 HTTP 422，任务或设备不存在/无权访问返回 HTTP 404。
 
@@ -550,7 +550,7 @@ T6.6 取消规则已统一收敛到 `PrintJobService.cancelJob`：Controller 不
 
 文件夹创建和单文件删除以数据库实际写入结果为准；目录记录插入或文件记录删除影响 0 行时返回业务错误。对象存储删除发生在数据库删除之前，若数据库删除失败，服务端不会返回成功，残留对象需按运维清理流程处理。
 
-TC-002 已实施任务读模型：queue/page 使用 `PrintJobSummaryVO`，detail 使用 `PrintJobDetailVO`，列表和详情通过固定 LEFT JOIN 直接返回当前可读摘要；关联缺失保留任务并返回 null。TC-003 已完成多状态、文件名、创建/完成时间范围、稳定排序、SQL 权限下推和旧状态独立迁移；快照和重试关联字段仍由 TC-007 实施。
+TC-002 已实施任务读模型：queue/page 使用 `PrintJobSummaryVO`，detail 使用 `PrintJobDetailVO`，列表和详情通过固定 LEFT JOIN 直接返回当前可读摘要；关联缺失保留任务并返回 null。TC-003 已完成多状态、文件名、创建/完成时间范围、稳定排序、SQL 权限下推和旧状态独立迁移；TC-007 已补齐快照与重试关联字段、创建/分配/启动写入、失败父任务不可变、重试审计和 410 旧 assign，并已通过后端自动化验证。
 
 T6.8 当前已完成任务 Service 的状态/归属/设备调用测试、任务路由认证测试，以及持久化成功后绑定设备任务的 `JOB_STATUS` 事件测试。由于队列任务没有设备 ID，重试、重新排队和优先级修改不发送 `JOB_STATUS`；真实 MySQL/Redis/RustFS/打印机的端到端链路仍需在现场环境验收。
 
@@ -946,6 +946,10 @@ src/main/resources/db/migration/10-v2-dispatch-resource-fingerprint.sql
 ```bash
 mvn test
 ```
+
+测试 profile 将 RustFS endpoint 设为不可路由的测试占位值并设置 `rustfs.startup-check-enabled=false`，因此测试上下文不会执行 `HeadBucket` 外部探测；生产默认值仍开启启动 bucket 检查。
+
+TC-008 自动化范围与真实环境验收分开记录：自动化覆盖前端 API/Mock/页面交互、Browser 和 Electron 三尺寸、构建/静态检查，以及后端定向/全量 Maven 与无 RustFS `HeadBucket` 探测；真实 Java API/RustFS/打印机/生产数据库迁移为 **NOT RUN**。实际自动化结果见 [TC-008-ACCEPTANCE.md](./TC-008-ACCEPTANCE.md)。
 
 测试使用 H2 随机端口，关闭定时任务和 WebSocket；MockMvc 已覆盖核心路由的 401/403/400/404/500 响应和管理员委托路径，文件/任务/打印机 Service 归属与异常测试、WebSocket 生命周期/事件/Ping 测试均已增加。2026-09-03 已使用真实 Docker MySQL、Redis、RustFS 启动 dev 应用完成一次冒烟验证：`/actuator/health` 返回 `UP`，管理员登录、`/auth/me`、打印机分页、文件分页和任务队列均返回 200，分页总数与数据库记录一致；临时 G-code 的上传、预览、预签名下载 URL 和删除也均返回 200，清理后文件记录数量恢复。该验证未连接真实 Klipper/RRF 打印机，也未完成上传到打印完成的完整链路。
 

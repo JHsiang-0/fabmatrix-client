@@ -111,9 +111,16 @@ export function cancelJob(id) {
   })
 }
 
-/** 将失败任务重试；当前实现返回 null，TC-001 目标为新建任务 ID 字符串且原任务不可变。 */
+/**
+ * 将失败任务重试为新的 QUEUED 子任务。
+ * @param {number|string} id - FAILED 来源任务 ID
+ * @returns {Promise<{code: number, message: string, data: string}>} 新子任务 ID；Long ID 保持十进制字符串，重复请求幂等返回同一 ID
+ */
 export function retryJob(id) {
-  return request({ url: `/api/v1/print-jobs/${id}/retry`, method: 'post' })
+  return request({
+    url: `/api/v1/print-jobs/${id}/retry`,
+    method: 'post'
+  }).then(response => mapResponseData(response, normalizePrintJob))
 }
 
 /** 将 ASSIGNED/READY 任务重新放回队列；当前/目标契约 data 均为 null。 */

@@ -12,6 +12,7 @@ const historySource = fs.readFileSync(new URL('../src/views/JobHistory.vue', imp
 const storeSource = fs.readFileSync(new URL('../src/stores/jobStore.js', import.meta.url), 'utf8')
 const jobApiSource = fs.readFileSync(new URL('../src/api/job.js', import.meta.url), 'utf8')
 const jobQuerySource = fs.readFileSync(new URL('../src/utils/jobQuery.js', import.meta.url), 'utf8')
+const actionLockSource = fs.readFileSync(new URL('../src/utils/jobAction.js', import.meta.url), 'utf8')
 
 const request = (method, url, data, headers) => mockRequest({ method, url, data, headers })
 const activeSessionHeaders = { Authorization: 'Bearer tc003-active-session' }
@@ -33,11 +34,32 @@ test('任务刷新失败保留已有服务端数据并提供页面内重试', ()
   assert.match(historySource, /loadError && tableData\.length/)
 })
 
-test('任务操作失败后重新读取服务端状态，历史页不暴露活动控制', () => {
+test('任务操作失败后重新读取服务端状态，历史页仅允许 FAILED 重试', () => {
   assert.match(queueSource, /message\.error\(error\?\.message \|\| `\$\{successText\}失败`\)[\s\S]*?await fetchQueue\(\)/)
-  assert.match(queueSource, /重新读取服务端状态/)
+  assert.match(queueSource, /await fetchQueue\(\)/)
   assert.match(historySource, /@click\.stop="openTaskDetail\(scope\.row\)"/)
-  assert.doesNotMatch(historySource, /handleRetry|handleRequeue|handleCancel|handlePriority/)
+  assert.match(historySource, /handleRetry/)
+  assert.doesNotMatch(historySource, /handleRequeue|handleCancel|handlePriority/)
+})
+
+test('JobQueue 所有确认型设备写操作在弹窗前复用 action+job 锁', () => {
+  assert.match(queueSource, /import \{ acquireJobActionLock, releaseJobActionLock \} from '@\/utils\/jobAction'/)
+  assert.match(queueSource, /const runConfirmedJobAction = async/)
+  assert.match(queueSource, /runConfirmedJobAction\(job, 'pause'/)
+  assert.match(queueSource, /runConfirmedJobAction\(job, 'resume'/)
+  assert.match(queueSource, /runConfirmedJobAction\(job, 'cancel'/)
+  assert.match(queueSource, /runConfirmedJobAction\(job, 'confirm-safe'/)
+  assert.match(queueSource, /runConfirmedJobAction\(job, 'start'/)
+  assert.ok(queueSource.indexOf('acquireJobActionLock') < queueSource.indexOf('await confirmMessage'))
+  assert.match(actionLockSource, /actionLoadingKey\.value = getJobActionKey\(action, jobId\)/)
+  assert.match(actionLockSource, /if \(actionLoadingKey\.value === key\) actionLoadingKey\.value = ''/)
+})
+
+test('历史重试成功或失败都并行刷新 history queue active 并提示部分失败', () => {
+  assert.match(historySource, /const refreshRetryCollections = async retryCreated => \{[\s\S]*?Promise\.allSettled\(\[[\s\S]*?fetchData\(\{ rethrow: true \}\)[\s\S]*?jobStore\.fetchQueue\(\)[\s\S]*?jobStore\.fetchActive\(\)/)
+  assert.match(historySource, /await refreshRetryCollections\(true\)/)
+  assert.match(historySource, /catch \(error\) \{[\s\S]*?await refreshRetryCollections\(false\)/)
+  assert.match(historySource, /重试失败，且部分任务列表刷新失败/)
 })
 
 test('TC-003 活动任务一次发送多状态服务端分页并保留服务端页元数据', async () => {

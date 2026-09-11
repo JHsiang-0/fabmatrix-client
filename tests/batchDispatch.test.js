@@ -5,6 +5,7 @@ import { getNavigationItem } from '../src/config/navigation.js'
 import {
   acquireBatchConfirmLock,
   createBatchPreviewRequest,
+  isBatchConfirmItemSuccessful,
   normalizeBatchConfirmResult,
   releaseBatchConfirmLock,
   toBatchPreviewPayload
@@ -65,9 +66,48 @@ test('does not treat recovery-required results as successful jobs', () => {
     }]
   }).items
 
-  assert.equal(item.success, false)
+  assert.equal(isBatchConfirmItemSuccessful(item), false)
   assert.equal(item.jobId, 'job-1')
   assert.equal(item.recoveryAction, 'OPEN_EXISTING_JOB')
+})
+
+test('批量确认适配严格保留 Java DispatchPlanItemVO，并由 status 推导成功', () => {
+  const [item] = normalizeBatchConfirmResult({
+    planId: 'plan-1',
+    items: [{
+      itemId: 'item-1',
+      fileId: 101,
+      fileName: 'gearbox.gcode',
+      printerId: 201,
+      printerName: 'Printer_A12F',
+      printerStatus: 'IDLE',
+      canExecute: false,
+      status: 'ASSIGNED',
+      reasonCode: null,
+      message: '已派发到打印机，未启动',
+      jobId: 1007,
+      sourcePlanId: null,
+      sourceItemId: null,
+      recoveryAction: null,
+      attemptCount: 1,
+      retryable: false,
+      success: true,
+      errorCode: null,
+      job: { id: 1007 }
+    }]
+  }).items
+
+  assert.deepEqual(Object.keys(item).sort(), [
+    'attemptCount', 'canExecute', 'fileId', 'fileName', 'itemId', 'jobId',
+    'message', 'printerId', 'printerName', 'printerStatus', 'reasonCode',
+    'recoveryAction', 'retryable', 'sourceItemId', 'sourcePlanId', 'status'
+  ])
+  assert.equal(item.fileId, '101')
+  assert.equal(item.printerId, '201')
+  assert.equal(isBatchConfirmItemSuccessful(item), true)
+  assert.equal('success' in item, false)
+  assert.equal('errorCode' in item, false)
+  assert.equal('job' in item, false)
 })
 
 test('批量确认快速双击只打开一个确认框并只发送一个确认请求', async () => {

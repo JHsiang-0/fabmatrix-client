@@ -207,7 +207,7 @@ test('JobQueue 行内控件阻止冒泡，静态护栏覆盖选择、分配和�
   assert.match(queueSource, /@click\.stop="openTaskDetail\(scope\.row\)"/)
 })
 
-test('历史列表只保留详情入口，不渲染活动控制操作', () => {
+test('历史列表保留详情入口，并只为 FAILED 提供重试操作', () => {
   assert.match(historySource, /<t-button size="small" variant="text" @click\.stop="openTaskDetail\(scope\.row\)">详情<\/t-button>/)
   assert.match(historySource, /TaskTimeIcon as Timer/)
   assert.match(historySource, /<timer \/>/)
@@ -216,12 +216,14 @@ test('历史列表只保留详情入口，不渲染活动控制操作', () => {
     />\s*暂停打印\s*</,
     />\s*恢复打印\s*</,
     />\s*取消\s*</,
-    /handleRetry|handleRequeue|handleCancel|handlePriority/,
-    /retryJob|requeueJob|cancelJob|updateJobPriority/,
+    /handleRequeue|handleCancel|handlePriority/,
+    /requeueJob|cancelJob|updateJobPriority/,
     /<t-popconfirm/
   ]) {
     assert.doesNotMatch(historySource, pattern)
   }
+  assert.match(historySource, /v-if="scope\.row\.status === 'FAILED'"/)
+  assert.match(historySource, /retryJob\(job\.id\)/)
 })
 
 test('Mock 任务响应包含 TC-002 可读摘要字段，并对缺失关联返回 null', async () => {

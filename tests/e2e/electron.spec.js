@@ -6,6 +6,35 @@ import { expect, test } from '@playwright/test'
 
 const E2E_DESKTOP_URL = 'http://127.0.0.1:5177'
 
+const createTc008HistoryJobs = () => Array.from({ length: 12 }, (_, index) => {
+  const failed = index === 5
+  const minute = String(59 - index).padStart(2, '0')
+  return {
+    id: failed ? 1005 : 5000 + index,
+    fileId: 20,
+    printerId: 403,
+    userId: 1,
+    operatorId: 2,
+    priority: failed ? 10 : 0,
+    idempotencyKey: null,
+    status: failed ? 'FAILED' : 'COMPLETED',
+    progress: failed ? 42 : 100,
+    startedAt: `2026-09-12T09:${minute}:00`,
+    completedAt: `2026-09-12T10:${minute}:00`,
+    errorReason: failed ? '喷头温度异常，请核对现场状态后重试。'.repeat(18) : null,
+    fileNameSnapshot: 'gearbox.gcode',
+    printerNameSnapshot: 'Printer_C0DA',
+    machineNumberSnapshot: 'A-01',
+    creatorUsernameSnapshot: 'admin',
+    operatorUsernameSnapshot: 'operator',
+    retryOfJobId: null,
+    rootJobId: failed ? 1005 : 5000 + index,
+    attemptNumber: 1,
+    createdAt: `2026-09-12T08:${minute}:00`,
+    updatedAt: `2026-09-12T10:${minute}:00`
+  }
+})
+
 test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', async () => {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fabmatrix-electron-e2e-'))
   const electronApp = await electron.launch({
@@ -216,6 +245,129 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     await page.getByRole('button', { name: '打印', exact: true }).first().click()
     await expect(page.getByText('创建打印任务', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: '取消', exact: true }).last().click()
+  } finally {
+    await electronApp.close()
+    fs.rmSync(userDataDir, { recursive: true, force: true })
+  }
+})
+
+test('Electron TC-008 三尺寸历史详情可滚动且 FAILED 重试会刷新队列', async () => {
+  test.setTimeout(180000)
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fabmatrix-electron-tc008-e2e-'))
+  const electronApp = await electron.launch({
+    args: [path.resolve('.')],
+    env: {
+      ...process.env,
+      FARM_ELECTRON_E2E: '1',
+      FARM_ELECTRON_E2E_USER_DATA: userDataDir,
+      FARM_ELECTRON_DEV_SERVER_URL: E2E_DESKTOP_URL
+    }
+  })
+
+  try {
+    const page = await electronApp.firstWindow()
+    await page.waitForLoadState('domcontentloaded')
+    await page.evaluate(jobs => window.__FARM_RESET_MOCK__({ jobs }), createTc008HistoryJobs())
+    await page.getByLabel('用户名', { exact: true }).fill('admin')
+    await page.getByLabel('密码', { exact: true }).fill('Admin123')
+    await page.getByRole('button', { name: '登录', exact: true }).click()
+    await expect(page).toHaveURL(/127\.0\.0\.1:5177\/#\/dashboard/)
+
+    for (const size of [[800, 560], [1024, 640], [1200, 760]]) {
+      await electronApp.evaluate(({ BrowserWindow }, nextSize) => {
+        BrowserWindow.getAllWindows()[0]?.setContentSize(nextSize[0], nextSize[1])
+      }, size)
+      await expect.poll(() => page.evaluate(() => [window.innerWidth, window.innerHeight])).toEqual(size)
+      await page.evaluate(() => { window.location.hash = '#/tasks/history' })
+      await expect(page).toHaveURL(/127\.0\.0\.1:5177\/#\/tasks\/history/)
+      await expect(page.getByRole('heading', { name: '打印历史记录', exact: true })).toBeVisible()
+
+      const table = page.locator('.history-management-table')
+      const tableContent = table.locator('.t-table__content')
+      await expect(tableContent).toBeVisible()
+      const tableStart = await tableContent.evaluate(element => {
+        element.scrollLeft = 0
+        element.scrollTop = 0
+        return {
+          clientWidth: element.clientWidth,
+          clientHeight: element.clientHeight,
+          scrollWidth: element.scrollWidth,
+          scrollHeight: element.scrollHeight,
+          scrollLeft: element.scrollLeft,
+          scrollTop: element.scrollTop
+        }
+      })
+      expect(tableStart.scrollWidth).toBeGreaterThan(tableStart.clientWidth)
+      expect(tableStart.scrollHeight).toBeGreaterThan(tableStart.clientHeight)
+      expect(tableStart.scrollLeft).toBe(0)
+      expect(tableStart.scrollTop).toBe(0)
+      await expect(page.getByRole('columnheader', { name: '任务 ID' })).toBeVisible()
+
+      const tableEnd = await tableContent.evaluate(element => {
+        element.scrollLeft = element.scrollWidth
+        element.scrollTop = element.scrollHeight
+        return {
+          scrollLeft: element.scrollLeft,
+          maxScrollLeft: element.scrollWidth - element.clientWidth,
+          scrollTop: element.scrollTop,
+          maxScrollTop: element.scrollHeight - element.clientHeight
+        }
+      })
+      expect(tableEnd.scrollLeft).toBeGreaterThan(0)
+      expect(tableEnd.scrollLeft).toBeGreaterThanOrEqual(tableEnd.maxScrollLeft - 1)
+      expect(tableEnd.scrollTop).toBeGreaterThan(0)
+      expect(tableEnd.scrollTop).toBeGreaterThanOrEqual(tableEnd.maxScrollTop - 1)
+      await expect(page.getByRole('columnheader', { name: '操作' })).toBeVisible()
+      await expect(table.locator('.t-table__body tr').last()).toBeVisible()
+
+      await tableContent.evaluate(element => {
+        element.scrollLeft = element.scrollWidth
+        element.scrollTop = 0
+      })
+      const failedRow = table.locator('.t-table__body tr').filter({ hasText: '#1005' })
+      await failedRow.evaluate(element => element.scrollIntoView({ block: 'center', inline: 'nearest' }))
+      const retryButton = failedRow.getByRole('button', { name: '重试', exact: true })
+      await expect(retryButton).toBeVisible()
+      await failedRow.getByRole('button', { name: '详情', exact: true }).click()
+      const drawerBody = page.locator('.task-detail-drawer .t-drawer__body')
+      await expect(drawerBody).toBeVisible()
+      await page.locator('.task-detail-drawer__technical').getByText('技术信息', { exact: true }).click()
+      const drawerEnd = await drawerBody.evaluate(element => {
+        element.scrollTop = 0
+        const start = element.scrollTop
+        const maxScrollTop = element.scrollHeight - element.clientHeight
+        element.scrollTop = element.scrollHeight
+        return {
+          start,
+          scrollTop: element.scrollTop,
+          maxScrollTop,
+          overflowY: getComputedStyle(element).overflowY
+        }
+      })
+      expect(drawerEnd.maxScrollTop).toBeGreaterThan(0)
+      expect(drawerEnd.start).toBe(0)
+      expect(drawerEnd.scrollTop).toBeGreaterThan(0)
+      expect(drawerEnd.scrollTop).toBeGreaterThanOrEqual(drawerEnd.maxScrollTop - 1)
+      expect(['auto', 'scroll']).toContain(drawerEnd.overflowY)
+      await expect(page.getByText('尝试次数', { exact: true })).toBeVisible()
+      await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
+
+      await retryButton.click()
+      await expect(retryButton).toBeDisabled()
+      await expect(retryButton).toHaveClass(/t-is-loading/)
+      const successMessage = page.getByText(/已创建重试任务 #(\d+)/).first()
+      await expect(successMessage).toBeVisible()
+      const retryId = (await successMessage.textContent()).match(/#(\d+)/)?.[1]
+      expect(retryId).toBeTruthy()
+      await page.evaluate(() => { window.location.hash = '#/tasks/queue' })
+      await expect(page).toHaveURL(/127\.0\.0\.1:5177\/#\/tasks\/queue/)
+      await expect(page.getByText(`#${retryId}`, { exact: true })).toBeVisible()
+      const viewportMetrics = await page.evaluate(() => ({
+        viewportWidth: window.innerWidth,
+        documentWidth: document.documentElement.scrollWidth
+      }))
+      expect(viewportMetrics.documentWidth).toBeLessThanOrEqual(viewportMetrics.viewportWidth + 1)
+    }
   } finally {
     await electronApp.close()
     fs.rmSync(userDataDir, { recursive: true, force: true })

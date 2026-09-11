@@ -198,9 +198,22 @@
           </template>
         </TdTableColumn>
 
-        <TdTableColumn label="操作" width="100" align="center" fixed="right">
+        <TdTableColumn label="操作" width="160" align="center" fixed="right">
           <template #default="scope">
-            <t-button size="small" variant="text" @click.stop="openTaskDetail(scope.row)">详情</t-button>
+            <t-space size="small" class="task-action-group" @mousedown.stop @click.stop>
+              <t-button size="small" variant="text" @click.stop="openTaskDetail(scope.row)">详情</t-button>
+              <t-button
+                v-if="scope.row.status === 'FAILED'"
+                size="small"
+                variant="text"
+                theme="warning"
+                :loading="isActionLoading('retry', scope.row)"
+                :disabled="actionLoadingKey !== ''"
+                @click.stop="handleRetry(scope.row)"
+              >
+                重试
+              </t-button>
+            </t-space>
           </template>
         </TdTableColumn>
           </TdTable>
@@ -241,7 +254,7 @@ import {
   TaskTimeIcon as Timer
 } from 'tdesign-icons-vue-next'
 import { getAdminUsers } from '@/api/user'
-import { getJobPage, reconcilePrintJob } from '@/api/job'
+import { getJobPage, reconcilePrintJob, retryJob } from '@/api/job'
 import { message } from '@/utils/message'
 import { formatDateTime } from '@/utils/formatters'
 import { renderIcon } from '@/utils/tdesign'
@@ -275,6 +288,7 @@ const selectedJob = ref(null)
 const reconcileSubmitting = ref(false)
 const reconcileSuccessKey = ref(0)
 const reconcileStale = ref(false)
+const actionLoadingKey = ref('')
 const JOB_HISTORY_DETAIL_CONTEXT_KEY = 'farm-ui:job-history-detail'
 const getHistoryDisplay = getHistoryJobDisplay
 const historyRequestGuard = createLatestRequestGuard()
@@ -338,6 +352,7 @@ const handleReconcile = async payload => {
   if (reconcileSubmitting.value || reconcileStale.value || !job || job.status !== 'RECONCILING') return
 
   reconcileSubmitting.value = true
+  actionLoadingKey.value = `reconcile:${job.id}`
   try {
     await reconcilePrintJob(job.id, payload)
     message.success('人工核对已提交')
@@ -349,6 +364,42 @@ const handleReconcile = async payload => {
     await refreshReconcileContext(job)
   } finally {
     reconcileSubmitting.value = false
+    actionLoadingKey.value = ''
+  }
+}
+
+const isActionLoading = (action, job = null) => (
+  actionLoadingKey.value === `${action}:${job?.id ?? ''}`
+)
+
+const refreshRetryCollections = async retryCreated => {
+  const refreshResults = await Promise.allSettled([
+    fetchData({ rethrow: true }),
+    jobStore.fetchQueue(),
+    jobStore.fetchActive()
+  ])
+  if (refreshResults.some(result => result.status === 'rejected')) {
+    message.warning(retryCreated
+      ? '重试已创建，但部分任务列表刷新失败，请手动刷新'
+      : '重试失败，且部分任务列表刷新失败，请手动刷新后确认是否已创建重试任务')
+  }
+  return refreshResults
+}
+
+const handleRetry = async job => {
+  if (actionLoadingKey.value || !job || job.status !== 'FAILED') return
+
+  actionLoadingKey.value = `retry:${job.id}`
+  try {
+    const response = await retryJob(job.id)
+    if (!hasValue(response?.data)) throw new Error('服务端未返回重试任务 ID')
+    message.success(`已创建重试任务 #${response.data}`)
+    await refreshRetryCollections(true)
+  } catch (error) {
+    if (!error?.toastShown) message.error(error?.message || '任务重试失败')
+    await refreshRetryCollections(false)
+  } finally {
+    actionLoadingKey.value = ''
   }
 }
 
@@ -658,6 +709,35 @@ loadCreatorOptions()
   .history-filter-toolbar :deep(.t-input),
   .history-filter-toolbar :deep(.t-date-range-picker) {
     max-width: 100%;
+  }
+}
+
+@media (max-height: 600px) and (min-width: 641px) {
+  .job-history-page {
+    gap: var(--app-spacing-2);
+  }
+
+  .history-workspace,
+  .history-filter-toolbar {
+    padding: var(--app-spacing-2);
+  }
+
+  .history-filter-toolbar {
+    margin-bottom: var(--app-spacing-2);
+  }
+
+  .history-filter-toolbar :deep(.app-query-toolbar__fields),
+  .history-filter-toolbar :deep(.flex.flex-wrap.items-center.gap-4) {
+    gap: var(--app-spacing-2);
+  }
+
+  .history-filter-toolbar :deep(.t-date-range-picker) {
+    width: 220px !important;
+  }
+
+  .history-pagination-footer {
+    margin-top: var(--app-spacing-2);
+    padding-top: 0;
   }
 }
 

@@ -79,6 +79,7 @@ export function confirmMessage(content, title = '提示', options = {}) {
       theme: options.type === 'danger' ? 'danger' : options.type === 'warning' ? 'warning' : 'default',
       confirmBtn: options.confirmButtonText || '确定',
       cancelBtn: options.cancelButtonText || '取消',
+      closeOnOverlayClick: options.closeOnOverlayClick ?? true,
       onConfirm: () => closeDialog(resolve),
       onCancel: () => closeDialog(() => reject('cancel')),
       onClose: () => closeDialog(() => reject('cancel'))

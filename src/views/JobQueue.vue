@@ -93,6 +93,8 @@
         <TdTableColumn prop="priority" label="优先级" width="100" align="center">
           <template #default="scope">
             <t-select v-if="scope.row.status === 'QUEUED'" :value="scope.row.priority" size="small"
+              :loading="isActionLoading('priority', scope.row)"
+              :disabled="actionLoadingKey !== ''"
               @mousedown.stop
               @click.stop
               @change="value => handlePriority(scope.row, value)" style="width: 88px">
@@ -133,7 +135,8 @@
               <t-button
                 size="small"
                 theme="primary"
-                :disabled="scope.row.status !== 'QUEUED'"
+                :loading="isActionLoading('assign', scope.row)"
+                :disabled="scope.row.status !== 'QUEUED' || actionLoadingKey !== ''"
                 @click.stop="openAssignDialog(scope.row)"
               >
                 <span><promotion /></span>
@@ -142,10 +145,11 @@
               <t-dropdown
                 trigger="click"
                 :options="getQueueActionOptions(scope.row)"
+                :disabled="actionLoadingKey !== ''"
                 @mousedown.stop
                 @click="item => handleQueueAction(scope.row, item)"
               >
-                <t-button size="small" variant="text" @mousedown.stop @click.stop>更多</t-button>
+                <t-button size="small" variant="text" :disabled="actionLoadingKey !== ''" @mousedown.stop @click.stop>更多</t-button>
               </t-dropdown>
             </t-space>
           </template>
@@ -248,10 +252,11 @@
               <t-dropdown
                 trigger="click"
                 :options="getActiveActionOptions(scope.row)"
+                :disabled="actionLoadingKey !== ''"
                 @mousedown.stop
                 @click="item => handleActiveAction(scope.row, item)"
               >
-                <t-button size="small" variant="text" @mousedown.stop @click.stop>更多</t-button>
+                <t-button size="small" variant="text" :disabled="actionLoadingKey !== ''" @mousedown.stop @click.stop>更多</t-button>
               </t-dropdown>
             </t-space>
           </template>
@@ -316,11 +321,11 @@
 
       <template #footer>
         <div class="flex justify-end gap-3">
-          <t-button @click="assignDialogVisible = false">取消</t-button>
+          <t-button @click="assignDialogVisible = false" :disabled="actionLoadingKey !== ''">取消</t-button>
           <t-button theme="success"
             @click="submitAssign"
-            :disabled="!selectedPrinterId"
-            :loading="assigning"
+            :disabled="!selectedPrinterId || actionLoadingKey !== ''"
+            :loading="isActionLoading('assign', currentJob)"
           >
             <span><check /></span>
             确认分配
@@ -415,12 +420,13 @@
       </div>
       <template #footer>
         <div class="flex justify-end gap-3">
-          <t-button @click="createTaskDialogVisible = false">关闭</t-button>
+          <t-button @click="createTaskDialogVisible = false" :disabled="actionLoadingKey !== ''">关闭</t-button>
           <t-button
             v-if="createTaskResults.some(result => result.status === 'FAILED' && result.retryable)"
             variant="outline"
             theme="warning"
-            :loading="createTaskSubmitting"
+            :loading="isActionLoading('create')"
+            :disabled="actionLoadingKey !== ''"
             @click="retryFailedTaskCreations"
           >
             重试失败项
@@ -428,8 +434,8 @@
           <t-button
             v-else
             theme="primary"
-            :loading="createTaskSubmitting"
-            :disabled="taskFilesLoading || taskFiles.length === 0"
+            :loading="isActionLoading('create')"
+            :disabled="taskFilesLoading || taskFiles.length === 0 || actionLoadingKey !== ''"
             @click="submitCreateTask"
           >
             创建任务
@@ -468,6 +474,7 @@ import { message, confirmMessage } from '@/utils/message'
 import { formatDateTime } from '@/utils/formatters'
 import { renderIcon } from '@/utils/tdesign'
 import { getActiveJobDisplay, getQueueJobDisplay } from '@/utils/jobDisplay'
+import { acquireJobActionLock, releaseJobActionLock } from '@/utils/jobAction'
 import TdTable from '@/components/TdTable.vue'
 import TdTableColumn from '@/components/TdTableColumn.vue'
 import AsyncState from '@/components/AsyncState.vue'
@@ -606,6 +613,7 @@ const handleReconcile = async payload => {
   if (reconcileSubmitting.value || reconcileStale.value || !job || job.status !== 'RECONCILING') return
 
   reconcileSubmitting.value = true
+  actionLoadingKey.value = `reconcile:${job.id}`
   try {
     await reconcilePrintJob(job.id, payload)
     message.success('人工核对已提交')
@@ -617,6 +625,7 @@ const handleReconcile = async payload => {
     await refreshReconcileContext(job)
   } finally {
     reconcileSubmitting.value = false
+    actionLoadingKey.value = ''
   }
 }
 
@@ -698,7 +707,7 @@ const isRetryableCreateTaskError = error => {
 }
 
 const submitCreateTask = async (retryOnly = false) => {
-  if (createTaskSubmitting.value) return
+  if (createTaskSubmitting.value || actionLoadingKey.value) return
   try {
     await createTaskFormRef.value?.validate()
   } catch {
@@ -712,6 +721,7 @@ const submitCreateTask = async (retryOnly = false) => {
     : Array.from({ length: createTaskForm.value.copies }, (_, index) => index)
   if (!indexes.length) return
 
+  actionLoadingKey.value = `create:${createTaskBatchKey.value}`
   createTaskSubmitting.value = true
   const nextResults = retryOnly ? createTaskResults.value.slice() : []
   try {
@@ -752,6 +762,7 @@ const submitCreateTask = async (retryOnly = false) => {
     else message.error('任务创建失败，请检查失败项')
   } finally {
     createTaskSubmitting.value = false
+    actionLoadingKey.value = ''
   }
 }
 
@@ -773,7 +784,7 @@ const getProgressStatus = (status, progress) => {
 
 // 判断任务是否可以取消
 const canCancel = (status) => {
-  const cancelableStatuses = ['QUEUED', 'ASSIGNED', 'UPLOADING', 'READY', 'PRINTING', 'PAUSED', 'RECONCILING']
+  const cancelableStatuses = ['QUEUED', 'ASSIGNED', 'UPLOADING', 'READY', 'PRINTING', 'PAUSED']
   return cancelableStatuses.includes(status)
 }
 
@@ -799,19 +810,6 @@ const getActiveActionOptions = job => {
   if (job.status === 'PAUSED' && job.printerId) options.push({ content: '恢复打印', value: 'resume', theme: 'success' })
   if (canCancel(job.status)) options.push({ content: '取消任务', value: 'cancel', theme: 'error' })
   return options.length ? options : [{ content: '暂无可用操作', value: 'none', disabled: true }]
-}
-
-const confirmCancel = async job => {
-  try {
-    await confirmMessage(
-      `确定取消任务 #${job.id}？取消后将无法继续当前任务。`,
-      '取消任务确认',
-      { confirmButtonText: '确认取消', cancelButtonText: '返回', type: 'danger' }
-    )
-    await handleCancel(job)
-  } catch (error) {
-    if (error !== 'cancel') console.error('取消任务失败:', error)
-  }
 }
 
 const handleQueueAction = async (job, item) => {
@@ -846,15 +844,16 @@ const fetchQueue = async () => {
   }
 }
 
+const isActionLoading = (action, job = null) => job
+  ? actionLoadingKey.value === `${action}:${job.id}`
+  : actionLoadingKey.value.startsWith(`${action}:`)
+
 const handleActivePageChange = ({ current }) => {
   activePage.value = current
   return jobStore.fetchActive({ pageNum: current })
 }
 
-const runJobAction = async (job, action, requestAction, successText) => {
-  const key = `${action}:${job.id}`
-  if (actionLoadingKey.value) return
-  actionLoadingKey.value = key
+const executeLockedJobAction = async (job, requestAction, successText) => {
   try {
     await requestAction()
     message.success(successText)
@@ -863,51 +862,61 @@ const runJobAction = async (job, action, requestAction, successText) => {
     console.error(`${successText}失败:`, error)
     message.error(error?.message || `${successText}失败`)
     await fetchQueue()
-  } finally {
-    actionLoadingKey.value = ''
   }
 }
 
-const handleCancel = job => runJobAction(job, 'cancel', () => cancelJob(job.id), '任务已取消')
+const runJobAction = async (job, action, requestAction, successText) => {
+  if (!acquireJobActionLock({ actionLoadingKey, action, jobId: job.id })) return false
+  try {
+    return await executeLockedJobAction(job, requestAction, successText)
+  } finally {
+    releaseJobActionLock({ actionLoadingKey, action, jobId: job.id })
+  }
+}
 
-const handlePause = job => confirmMessage(
-  `确认暂停任务 #${job.id}？设备将收到暂停请求。`,
-  '暂停打印确认',
-  { confirmButtonText: '暂停打印', cancelButtonText: '取消', type: 'warning' }
-).then(() => runJobAction(job, 'pause', () => pausePrinter(job.printerId), '暂停请求已发送'))
-  .catch(error => {
-    if (error !== 'cancel') console.error('暂停打印失败:', error)
-  })
+const runConfirmedJobAction = async (job, action, prompt, requestAction, successText) => {
+  if (!acquireJobActionLock({ actionLoadingKey, action, jobId: job.id })) return false
+  try {
+    await confirmMessage(prompt.message, prompt.title, prompt.options)
+    return await executeLockedJobAction(job, requestAction, successText)
+  } catch (error) {
+    if (error !== 'cancel') console.error(`${successText}失败:`, error)
+    return false
+  } finally {
+    releaseJobActionLock({ actionLoadingKey, action, jobId: job.id })
+  }
+}
 
-const handleResume = job => confirmMessage(
-  `确认恢复任务 #${job.id}？设备将继续执行当前打印。`,
-  '恢复打印确认',
-  { confirmButtonText: '恢复打印', cancelButtonText: '取消', type: 'warning' }
-).then(() => runJobAction(job, 'resume', () => resumePrinter(job.printerId), '恢复请求已发送'))
-  .catch(error => {
-    if (error !== 'cancel') console.error('恢复打印失败:', error)
-  })
+const confirmCancel = job => runConfirmedJobAction(job, 'cancel', {
+  message: `确定取消任务 #${job.id}？取消后将无法继续当前任务。`,
+  title: '取消任务确认',
+  options: { confirmButtonText: '确认取消', cancelButtonText: '返回', type: 'danger' }
+}, () => cancelJob(job.id), '任务已取消')
+
+const handlePause = job => runConfirmedJobAction(job, 'pause', {
+  message: `确认暂停任务 #${job.id}？设备将收到暂停请求。`,
+  title: '暂停打印确认',
+  options: { confirmButtonText: '暂停打印', cancelButtonText: '取消', type: 'warning' }
+}, () => pausePrinter(job.printerId), '暂停请求已发送')
+
+const handleResume = job => runConfirmedJobAction(job, 'resume', {
+  message: `确认恢复任务 #${job.id}？设备将继续执行当前打印。`,
+  title: '恢复打印确认',
+  options: { confirmButtonText: '恢复打印', cancelButtonText: '取消', type: 'warning' }
+}, () => resumePrinter(job.printerId), '恢复请求已发送')
 
 const handleRequeue = async id => {
-  try {
-    await requeueJob(id)
-    message.success('任务已重新排队')
-    fetchQueue()
-  } catch {
-    // 错误在拦截器处理，重新读取服务端状态，覆盖可能已过期的列表数据。
-    await fetchQueue()
-  }
+  const job = [...queueData.value, ...activePageData.value].find(item => String(item.id) === String(id))
+  if (!job) return
+  return runJobAction(job, 'requeue', () => requeueJob(id), '任务已重新排队')
 }
 
 const handlePriority = async (job, value) => {
   const priority = Number(value)
-  try {
+  return runJobAction(job, 'priority', async () => {
     await updateJobPriority(job.id, priority)
     job.priority = priority
-    message.success('优先级已更新')
-  } catch {
-    await fetchQueue()
-  }
+  }, '优先级已更新')
 }
 
 const openAssignDialog = async (job) => {
@@ -928,56 +937,35 @@ const openAssignDialog = async (job) => {
 }
 
 const submitAssign = async () => {
-  if (!selectedPrinterId.value) return
+  if (!selectedPrinterId.value || !currentJob.value || actionLoadingKey.value) return
+  const job = currentJob.value
+  if (!acquireJobActionLock({ actionLoadingKey, action: 'assign', jobId: job.id })) return
   assigning.value = true
   try {
-    await assignJobToPrinter(currentJob.value.id, selectedPrinterId.value)
+    await assignJobToPrinter(job.id, selectedPrinterId.value)
     message.success('任务分配成功！请等待操作员确认安全后启动打印')
     assignDialogVisible.value = false
-    fetchQueue()
+    await fetchQueue()
   } catch {
     // 报错信息会被拦截器弹窗，同时恢复服务端任务状态。
     await fetchQueue()
   } finally {
     assigning.value = false
+    releaseJobActionLock({ actionLoadingKey, action: 'assign', jobId: job.id })
   }
 }
 
-const handleConfirmSafe = async job => {
-  try {
-    await confirmMessage(
-      `请确认打印机 #${job.printerId} 的热床已清理且可以安全打印。`,
-      '现场安全确认',
-      { confirmButtonText: '确认安全', cancelButtonText: '返回检查', type: 'warning' }
-    )
-    await confirmSafe(job.printerId)
-    message.success('已确认安全，可以启动打印')
-    await fetchQueue()
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('确认打印安全失败:', error)
-      await fetchQueue()
-    }
-  }
-}
+const handleConfirmSafe = job => runConfirmedJobAction(job, 'confirm-safe', {
+  message: `请确认打印机 #${job.printerId} 的热床已清理且可以安全打印。`,
+  title: '现场安全确认',
+  options: { confirmButtonText: '确认安全', cancelButtonText: '返回检查', type: 'warning' }
+}, () => confirmSafe(job.printerId), '已确认安全，可以启动打印')
 
-const handleStart = async job => {
-  try {
-    await confirmMessage(
-      `确认启动任务 #${job.id}？这会向打印机发送上传并启动请求。`,
-      '启动打印确认',
-      { confirmButtonText: '启动打印', cancelButtonText: '取消', type: 'danger' }
-    )
-    await startJob(job.id, 'START_PRINT')
-    message.success('启动请求已发送，请观察设备状态')
-    await fetchQueue()
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('启动打印失败:', error)
-      await fetchQueue()
-    }
-  }
-}
+const handleStart = job => runConfirmedJobAction(job, 'start', {
+  message: `确认启动任务 #${job.id}？这会向打印机发送上传并启动请求。`,
+  title: '启动打印确认',
+  options: { confirmButtonText: '启动打印', cancelButtonText: '取消', type: 'danger' }
+}, () => startJob(job.id, 'START_PRINT'), '启动请求已发送，请观察设备状态')
 
 onMounted(() => {
   fetchQueue()

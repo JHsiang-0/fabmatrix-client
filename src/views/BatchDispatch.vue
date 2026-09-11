@@ -135,7 +135,7 @@
       </t-alert>
       <div class="step-actions">
         <t-button variant="outline" :disabled="confirming || actionLoadingKey !== ''" @click="goToStrategy">返回配置</t-button>
-        <t-button theme="primary" :disabled="previewExpired || confirming || actionLoadingKey !== '' || confirmData || !executableItemIds.length" :loading="isActionLoading('confirm')" @click="confirm">
+        <t-button theme="primary" :disabled="previewExpired || confirming || actionLoadingKey !== '' || confirmData || !executableItemIds.length" :loading="isActionLoading('confirm')" @click="confirm()">
         {{ confirming ? '执行中…' : `确认执行（${executableItemIds.length}项）` }}
         </t-button>
       </div>
@@ -143,7 +143,7 @@
 
     <section v-else class="dispatch-panel" aria-labelledby="dispatch-result-title">
       <div class="dispatch-panel__heading"><h2 id="dispatch-result-title">逐项结果</h2></div>
-      <t-alert class="mb-3" theme="info" :title="`执行完成：计划状态 ${confirmData.planStatus || confirmData.status || '—'}`" :close-btn="false">
+      <t-alert class="mb-3" theme="info" :title="`执行完成：计划状态 ${confirmData.status || '—'}`" :close-btn="false">
         成功 {{ confirmSuccessCount }} 项，失败 {{ confirmFailureCount }} 项
         <span v-if="confirmData.repeated">（重复确认已返回原结果）</span>
         <t-space class="mt-2">
@@ -209,6 +209,7 @@ import { previewBatchDispatch, confirmBatchDispatch, retryPreviewBatchDispatch }
 import {
   acquireBatchConfirmLock,
   createBatchPreviewRequest,
+  isBatchConfirmItemSuccessful,
   normalizeBatchConfirmResult,
   releaseBatchConfirmLock
 } from '@/utils/batchDispatch'
@@ -270,11 +271,11 @@ const retryableUploadFiles = computed(() => (uploadResult.value?.items || [])
 const uploadSuccessCount = computed(() => (uploadResult.value?.items || []).filter(isBatchUploadSuccess).length)
 const uploadFailureCount = computed(() => (uploadResult.value?.items || []).filter(item => !isBatchUploadSuccess(item)).length)
 const uploadUnknownCount = computed(() => (uploadResult.value?.items || []).filter(item => item.requiresRefresh).length)
-const confirmSuccessCount = computed(() => (confirmData.value?.items || []).filter(item => item.success).length)
-const confirmFailureCount = computed(() => (confirmData.value?.items || []).filter(item => !item.success).length)
+const confirmSuccessCount = computed(() => (confirmData.value?.items || []).filter(isBatchConfirmItemSuccessful).length)
+const confirmFailureCount = computed(() => (confirmData.value?.items || []).filter(item => !isBatchConfirmItemSuccessful(item)).length)
 const visibleConfirmItems = computed(() => {
   const items = confirmData.value?.items || []
-  if (resultTab.value === 'success') return items.filter(item => item.success)
+  if (resultTab.value === 'success') return items.filter(isBatchConfirmItemSuccessful)
   if (resultTab.value === 'retryable') return retryableConfirmItems.value
   if (resultTab.value === 'existing') return existingJobItems.value
   return items
@@ -283,12 +284,19 @@ const retryableConfirmItems = computed(() => (confirmData.value?.items || [])
   .filter(item => item.itemId && item.retryable && !item.jobId && !item.recoveryAction))
 const existingJobItems = computed(() => (confirmData.value?.items || [])
   .filter(item => item.jobId && item.recoveryAction === 'OPEN_EXISTING_JOB'))
+
+function isActionLoading(key) {
+  if (key === 'confirm' && confirming.value) return true
+  if (!actionLoadingKey.value) return false
+  return actionLoadingKey.value === key || actionLoadingKey.value.startsWith(`${key}:`)
+}
+
 const confirmColumns = [
   { colKey: 'fileId', title: '文件 ID', width: 120 },
   { colKey: 'printerId', title: '打印机 ID', width: 120 },
   { colKey: 'jobId', title: '任务 ID', width: 120 },
   { colKey: 'status', title: '状态', width: 120 },
-  { colKey: 'errorCode', title: '错误码', width: 120 },
+  { colKey: 'reasonCode', title: '原因码', width: 150 },
   { colKey: 'message', title: '说明' },
   { colKey: 'retryable', title: '可重试', width: 100 },
   { colKey: 'source', title: '恢复来源' },
@@ -304,7 +312,9 @@ function collectFolderIds(nodes, result = []) {
 }
 
 function resultTheme(item) {
-  return item.success ? 'success' : 'danger'
+  if (isBatchConfirmItemSuccessful(item)) return 'success'
+  if (item.status === 'RETRYABLE' || item.status === 'RECOVERY_REQUIRED') return 'warning'
+  return 'danger'
 }
 
 function stopPreviewExpiryTimer() {
@@ -521,12 +531,17 @@ async function confirm(replay = false) {
     return
   }
   if (!acquireBatchConfirmLock({ confirming, actionLoadingKey, planId: previewData.value.planId })) return
-  if (!replay) {
+  if (replay !== true) {
     try {
       await confirmMessage(
         '确认后将按预览结果创建任务或上传/启动，请确认打印机和文件均正确。',
         '确认批量派发',
-        { confirmButtonText: '确认执行', cancelButtonText: '返回检查', type: 'warning' }
+        {
+          confirmButtonText: '确认执行',
+          cancelButtonText: '返回检查',
+          type: 'warning',
+          closeOnOverlayClick: false
+        }
       )
     } catch {
       releaseBatchConfirmLock({ confirming, actionLoadingKey })
@@ -542,9 +557,15 @@ async function confirm(replay = false) {
       confirmationToken: previewData.value.confirmationToken
     })
     confirmData.value = normalizeBatchConfirmResult(response?.data)
-    jobStore.applyBatchConfirmResults(confirmData.value)
     message.success('批量派发已处理')
-    await loadResources()
+    const refreshResults = await Promise.allSettled([
+      jobStore.refresh(),
+      loadResources()
+    ])
+    if (refreshResults[0].status === 'rejected') {
+      message.warning('批量派发已处理，但任务队列刷新失败，请手动刷新确认状态')
+    }
+    jobStore.invalidateHistory()
   } catch (error) {
     console.error('确认批量派发失败:', error)
     message.error(error?.message || '确认执行失败，请刷新预览')
