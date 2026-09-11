@@ -10,6 +10,14 @@ export const JOB_DISPLAY_MODE = Object.freeze({
   HISTORY: 'history'
 })
 
+export const JOB_DISPLAY_SOURCE = Object.freeze({
+  CURRENT: '当前资源',
+  SNAPSHOT: '任务快照',
+  DELETED: '关联已删除',
+  UNASSIGNED: '未分配',
+  UNKNOWN: '未关联'
+})
+
 const isHistoryMode = mode => mode === JOB_DISPLAY_MODE.HISTORY || mode === 'snapshot-first'
 
 const hasDisplayValue = value => value !== undefined
@@ -90,5 +98,63 @@ export const getQueueJobDisplay = job => getJobDisplay(job, JOB_DISPLAY_MODE.CUR
 export const getActiveJobDisplay = job => getJobDisplay(job, JOB_DISPLAY_MODE.CURRENT)
 
 export const getHistoryJobDisplay = job => getJobDisplay(job, JOB_DISPLAY_MODE.HISTORY)
+
+const getDetailField = (job, mode, currentField, snapshotField, idField, missingValue, unassignedValue = missingValue) => {
+  const fields = isHistoryMode(mode)
+    ? [[snapshotField, JOB_DISPLAY_SOURCE.SNAPSHOT], [currentField, JOB_DISPLAY_SOURCE.CURRENT]]
+    : [[currentField, JOB_DISPLAY_SOURCE.CURRENT], [snapshotField, JOB_DISPLAY_SOURCE.SNAPSHOT]]
+  const selected = fields.find(([field]) => hasDisplayValue(job?.[field]))
+
+  if (selected) {
+    return { value: displayText(job[selected[0]]), source: selected[1] }
+  }
+  if (!hasDisplayValue(job?.[idField])) {
+    return {
+      value: unassignedValue,
+      source: unassignedValue === '未分配' ? JOB_DISPLAY_SOURCE.UNASSIGNED : JOB_DISPLAY_SOURCE.UNKNOWN
+    }
+  }
+  return { value: missingValue(job?.[idField]), source: JOB_DISPLAY_SOURCE.DELETED }
+}
+
+const detailMissingFile = id => missingResource('文件', id)
+const detailMissingPrinter = id => missingResource('打印机', id)
+const detailMissingUser = id => unknownUser(id)
+
+/**
+ * 任务详情可读摘要适配器。
+ *
+ * 终态任务默认按 history 展示执行时快照，活动任务默认按 current 展示当前关联资源。
+ * 每个可读字段同时返回来源，避免用户通过技术 ID 推断关联是否仍然存在。
+ * @param {Object} job PrintJobSummaryVO/PrintJobDetailVO
+ * @param {'current'|'history'|'snapshot-first'} [mode]
+ * @returns {{fileName: string, printerName: string, machineNumber: string, creatorUsername: string, operatorUsername: string, sources: Object, mode: string}}
+ */
+export function getJobDetailDisplay(job = {}, mode = JOB_DISPLAY_MODE.CURRENT) {
+  const normalizedMode = isHistoryMode(mode) ? JOB_DISPLAY_MODE.HISTORY : JOB_DISPLAY_MODE.CURRENT
+  const base = getJobDisplay(job, normalizedMode)
+  const fileName = getDetailField(job, normalizedMode, 'fileName', 'fileNameSnapshot', 'fileId', detailMissingFile, '未知文件')
+  const printerName = getDetailField(job, normalizedMode, 'printerName', 'printerNameSnapshot', 'printerId', detailMissingPrinter, '未分配')
+  const machineNumber = getDetailField(job, normalizedMode, 'machineNumber', 'machineNumberSnapshot', 'printerId', detailMissingPrinter, '未分配')
+  const creatorUsername = getDetailField(job, normalizedMode, 'creatorUsername', 'creatorUsernameSnapshot', 'userId', detailMissingUser, '未知用户')
+  const operatorUsername = getDetailField(job, normalizedMode, 'operatorUsername', 'operatorUsernameSnapshot', 'operatorId', detailMissingUser, '未分配')
+
+  return {
+    ...base,
+    fileName: fileName.value,
+    printerName: printerName.value,
+    machineNumber: machineNumber.value,
+    creatorUsername: creatorUsername.value,
+    operatorUsername: operatorUsername.value,
+    sources: {
+      fileName: fileName.source,
+      printerName: printerName.source,
+      machineNumber: machineNumber.source,
+      creatorUsername: creatorUsername.source,
+      operatorUsername: operatorUsername.source
+    },
+    mode: normalizedMode
+  }
+}
 
 export { hasDisplayValue }

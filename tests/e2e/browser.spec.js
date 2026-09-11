@@ -294,6 +294,35 @@ test('任务中心通过真实点击打开详情并可用 Escape 关闭', async 
   }
 })
 
+test('TC-005 800x560 任务详情使用内部滚动且技术信息可达', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 800, height: 560 } })
+  const page = await context.newPage()
+  try {
+    await login(page)
+    await openSidebarItem(page, 800, '任务队列')
+    await expect(page.getByRole('heading', { name: '生产调度队列' })).toBeVisible()
+    await page.getByText('活动任务', { exact: true }).click()
+    await page.locator('.job-queue-table').getByRole('button', { name: '详情', exact: true }).first().click()
+
+    const drawer = page.locator('.task-detail-drawer')
+    await expect(drawer).toContainText('资源与人员')
+    const body = drawer.locator('.t-drawer__body')
+    const metrics = await body.evaluate(element => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      overflowY: getComputedStyle(element).overflowY
+    }))
+    expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight)
+    expect(['auto', 'scroll']).toContain(metrics.overflowY)
+
+    await body.evaluate(element => { element.scrollTop = element.scrollHeight })
+    await expect(drawer.getByText('技术信息', { exact: true })).toBeVisible()
+    await expect(drawer.getByRole('button', { name: '关闭任务详情', exact: true })).toBeVisible()
+  } finally {
+    await context.close()
+  }
+})
+
 test('移动端在表格页面通过真实点击打开侧栏并导航', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 375, height: 812 } })
   const page = await context.newPage()

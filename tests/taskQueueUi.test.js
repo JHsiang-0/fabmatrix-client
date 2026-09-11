@@ -143,6 +143,16 @@ test('TC-003 任务分页 API 在发送前拒绝 status 与 statuses 混用', ()
   assert.throws(() => validateJobPageParams({ status: 'COMPLETED', statuses: [] }), /不能同时使用/)
 })
 
+test('TC-005 详情请求只允许最新任务响应提交详情状态', () => {
+  const detailRequestSource = storeSource.slice(storeSource.indexOf('async function fetchJobDetail'))
+  assert.match(storeSource, /const detailRequestGuard = createLatestRequestGuard\(\)/)
+  assert.match(detailRequestSource, /const requestId = detailRequestGuard\.begin\(\)/)
+  assert.match(detailRequestSource, /!detailRequestGuard\.isCurrent\(requestId\)/)
+  assert.match(detailRequestSource, /cacheJobDetail\(id, detail\)/)
+  assert.match(detailRequestSource, /if \(detailRequestGuard\.isCurrent\(requestId\)\) detailLoading\.value = false/)
+  assert.match(detailRequestSource, /if \(!detailRequestGuard\.isCurrent\(requestId\)\) return null/)
+})
+
 test('TC-003 历史页固定终态和完成时间字段，并在重置时恢复默认分页条件', () => {
   assert.match(historySource, /HISTORY_STATUSES = Object\.freeze\(\['COMPLETED', 'FAILED', 'CANCELLED'\]\)/)
   assert.match(historySource, /timeField: 'COMPLETED_AT'/)

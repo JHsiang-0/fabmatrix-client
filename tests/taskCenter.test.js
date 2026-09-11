@@ -33,12 +33,43 @@ test('任务中心动作受正式状态限制且历史查询不发送未定义 k
 })
 
 test('任务详情只展示后端任务字段并对缺失值使用占位', () => {
+  assert.match(detailSource, /资源与人员/)
+  assert.match(detailSource, /打印机名称/)
+  assert.match(detailSource, /机器编号/)
+  assert.match(detailSource, /创建人/)
+  assert.match(detailSource, /操作员/)
   assert.match(detailSource, /发起用户 ID/)
   assert.match(detailSource, /现场操作员 ID/)
   assert.match(detailSource, /已知时间线/)
   assert.match(detailSource, /formatDateTime\(task\.startedAt\)/)
   assert.match(detailSource, /v-if="hasValue\(task\.progress\)"/)
   assert.doesNotMatch(detailSource, /task\.progress \|\| 0/)
+})
+
+test('任务详情标题和技术信息遵循可读优先、默认折叠与长文本安全契约', () => {
+  assert.match(detailSource, /<t-tooltip[^>]+task-detail-drawer__name-tooltip/)
+  assert.match(detailSource, /detailDisplay\.fileName/)
+  assert.match(detailSource, /<StatusTag domain="job" :status="task\.status" \/>/)
+  assert.match(detailSource, /<t-collapse[^>]+task-detail-drawer__technical/)
+  assert.match(detailSource, /:default-value="\[\]"/)
+  assert.match(detailSource, /技术信息/)
+  for (const field of ['task.id', 'task.fileId', 'task.printerId', 'task.userId', 'task.operatorId', 'task.retryOfJobId', 'task.rootJobId', 'task.attemptNumber']) {
+    assert.match(detailSource, new RegExp(`format(?:Technical)?Value\\(${field}\\)`))
+  }
+  assert.match(detailSource, /text-overflow: ellipsis/)
+  assert.match(detailSource, /overflow-wrap: anywhere/)
+  assert.match(detailSource, /\.task-detail-drawer :deep\(\.t-drawer__body\)[\s\S]*overflow-y: auto/)
+})
+
+test('任务详情加载、错误、空状态与核对链路均有显式回归护栏', () => {
+  assert.match(detailSource, /任务详情加载中/)
+  assert.match(detailSource, /v-else-if="error"[^>]*theme="error"/)
+  assert.match(detailSource, /description="未选择任务"/)
+  assert.match(detailSource, /设备状态无法自动确认，请人工核对打印结果。/)
+  assert.match(detailSource, /reconcileLoading/)
+  assert.match(detailSource, /核对原因最多 255 个字符/)
+  assert.match(detailSource, /resetReconcile\(\)/)
+  assert.match(detailSource, /watch\(\(\) => props\.task\?\.id/)
 })
 
 test('任务中心使用统一工作区并让详情 Drawer 受控关闭', () => {

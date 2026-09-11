@@ -549,7 +549,7 @@ const openTaskDetail = async job => {
 
   try {
     const detail = await jobStore.fetchJobDetail(job.id)
-    if (selectedJob.value && String(selectedJob.value.id) === jobId) {
+    if (detail && selectedJob.value && String(selectedJob.value.id) === jobId) {
       selectedJob.value = detail
     }
   } catch {
@@ -580,7 +580,7 @@ const handleReconcile = async payload => {
       realtimeStore.refreshPrinterSnapshot()
     ])
     const detailResult = refreshResults[0]
-    if (detailResult.status === 'fulfilled' && selectedJob.value && String(selectedJob.value.id) === String(job.id)) {
+    if (detailResult.status === 'fulfilled' && detailResult.value && selectedJob.value && String(selectedJob.value.id) === String(job.id)) {
       selectedJob.value = detailResult.value
     }
   } catch (error) {

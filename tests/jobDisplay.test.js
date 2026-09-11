@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import test from 'node:test'
-import { getJobDisplay } from '../src/utils/jobDisplay.js'
+import { getJobDetailDisplay, getJobDisplay } from '../src/utils/jobDisplay.js'
 import { mockRequest } from '../src/mock/index.js'
 import { mockState, resetMockState } from '../src/mock/data.js'
 
@@ -75,6 +75,53 @@ test('显示适配器按集合选择当前值或历史快照，并统一处理�
   assert.equal(missing.operatorUsername, '未分配')
   assert.equal(getJobDisplay({}).printerName, '未分配')
   assert.equal(getJobDisplay({}).fileName, '未知文件')
+})
+
+test('详情适配器按活动当前资源优先、历史任务快照优先并返回来源', () => {
+  const job = {
+    id: '9007199254740993',
+    fileId: '9007199254740995',
+    printerId: '9007199254740997',
+    userId: '9007199254740999',
+    operatorId: '9007199254741001',
+    fileName: '当前文件.gcode',
+    fileNameSnapshot: '执行时文件.gcode',
+    printerName: '当前设备',
+    printerNameSnapshot: '执行时设备',
+    machineNumber: 'NOW-01',
+    machineNumberSnapshot: 'THEN-01',
+    creatorUsername: 'current-creator',
+    creatorUsernameSnapshot: 'snapshot-creator',
+    operatorUsername: 'current-operator',
+    operatorUsernameSnapshot: 'snapshot-operator'
+  }
+
+  const active = getJobDetailDisplay(job, 'current')
+  assert.equal(active.fileName, '当前文件.gcode')
+  assert.equal(active.printerName, '当前设备')
+  assert.equal(active.sources.fileName, '当前资源')
+  assert.equal(active.sources.printerName, '当前资源')
+
+  const history = getJobDetailDisplay(job, 'history')
+  assert.equal(history.fileName, '执行时文件.gcode')
+  assert.equal(history.printerName, '执行时设备')
+  assert.equal(history.machineNumber, 'THEN-01')
+  assert.equal(history.sources.fileName, '任务快照')
+  assert.equal(history.sources.operatorUsername, '任务快照')
+
+  const missing = getJobDetailDisplay({
+    id: '9007199254740993',
+    fileId: '9007199254740995',
+    printerId: '9007199254740997',
+    userId: '9007199254740999',
+    operatorId: null
+  }, 'current')
+  assert.equal(missing.fileName, '已删除文件 #9007199254740995')
+  assert.equal(missing.printerName, '已删除打印机 #9007199254740997')
+  assert.equal(missing.sources.fileName, '关联已删除')
+  assert.equal(missing.sources.printerName, '关联已删除')
+  assert.equal(missing.operatorUsername, '未分配')
+  assert.equal(missing.sources.operatorUsername, '未分配')
 })
 
 test('800×560 窄视口保留组件视口、内部横向滚动和固定操作列（静态 DOM/CSS 护栏）', () => {
@@ -168,4 +215,10 @@ test('Mock 任务响应包含 TC-002 可读摘要字段，并对缺失关联返�
   assert.equal(missing.creatorUsername, null)
   assert.equal(missing.operatorUsername, null)
   assert.equal(typeof missing.id, 'string')
+
+  const detail = await request('GET', '/api/v1/print-jobs/9007199254740993', undefined, headers)
+  assert.equal(detail.data.fileName, null)
+  assert.equal(detail.data.printerName, null)
+  assert.equal(detail.data.creatorUsername, null)
+  assert.equal(detail.data.operatorUsername, null)
 })

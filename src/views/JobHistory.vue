@@ -278,7 +278,7 @@ const openTaskDetail = job => {
   sessionStorage.setItem(JOB_HISTORY_DETAIL_CONTEXT_KEY, String(job.id))
   detailDrawerVisible.value = true
   jobStore.fetchJobDetail(job.id).then(detail => {
-    if (selectedJob.value && String(selectedJob.value.id) === String(job.id)) selectedJob.value = detail
+    if (detail && selectedJob.value && String(selectedJob.value.id) === String(job.id)) selectedJob.value = detail
   }).catch(() => {
     // 保留列表中的真实任务数据，详情请求错误由请求层统一提示。
   })
@@ -307,7 +307,7 @@ const handleReconcile = async payload => {
       realtimeStore.refreshPrinterSnapshot()
     ])
     const detailResult = refreshResults[0]
-    if (detailResult.status === 'fulfilled' && selectedJob.value && String(selectedJob.value.id) === String(job.id)) {
+    if (detailResult.status === 'fulfilled' && detailResult.value && selectedJob.value && String(selectedJob.value.id) === String(job.id)) {
       selectedJob.value = detailResult.value
     }
   } catch (error) {

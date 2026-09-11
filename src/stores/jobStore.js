@@ -29,6 +29,7 @@ export const useJobStore = defineStore('job', () => {
   const activePageSize = ref(10)
   const pendingRealtimeStatuses = new Map()
   const activeRequestGuard = createLatestRequestGuard()
+  const detailRequestGuard = createLatestRequestGuard()
   let realtimeFlushScheduled = false
 
   function cacheJobDetail(id, detail) {
@@ -90,18 +91,22 @@ export const useJobStore = defineStore('job', () => {
   }
 
   async function fetchJobDetail(id) {
+    const requestId = detailRequestGuard.begin()
+    if (requestId === null) return null
     detailLoading.value = true
     detailError.value = null
     try {
       const response = await getJobDetail(id)
       const detail = response.data
+      if (!detailRequestGuard.isCurrent(requestId)) return null
       cacheJobDetail(id, detail)
       return detail
     } catch (error) {
+      if (!detailRequestGuard.isCurrent(requestId)) return null
       detailError.value = error
       throw error
     } finally {
-      detailLoading.value = false
+      if (detailRequestGuard.isCurrent(requestId)) detailLoading.value = false
     }
   }
 

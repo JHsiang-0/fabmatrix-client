@@ -4,13 +4,23 @@
     :destroy-on-close="true"
     :close-btn="false"
     :close-on-esc-keydown="true"
+    :footer="false"
     size="460px"
     class="task-detail-drawer"
     @close="handleClose"
   >
     <template #header>
       <div class="task-detail-drawer__header">
-        <span class="task-detail-drawer__title">任务详情</span>
+        <div class="task-detail-drawer__identity">
+          <div v-if="task" class="task-detail-drawer__title-row">
+            <t-tooltip :content="detailDisplay.fileName" class="task-detail-drawer__name-tooltip">
+              <span class="task-detail-drawer__title">{{ detailDisplay.fileName }}</span>
+            </t-tooltip>
+            <StatusTag domain="job" :status="task.status" />
+          </div>
+          <span v-else class="task-detail-drawer__title">任务详情</span>
+          <span v-if="task" class="task-detail-drawer__status-description">{{ statusView.description }}</span>
+        </div>
         <t-button variant="text" shape="square" aria-label="关闭任务详情" @click="handleClose">
           <Close />
         </t-button>
@@ -18,8 +28,9 @@
     </template>
 
     <div class="task-detail-drawer__body">
-      <div v-if="loading" class="task-detail-drawer__loading">
+      <div v-if="loading" class="task-detail-drawer__loading" role="status" aria-live="polite">
         <t-skeleton :loading="true" theme="article" />
+        <span class="task-detail-drawer__loading-text">任务详情加载中...</span>
       </div>
       <template v-else-if="task">
         <t-alert v-if="error" theme="error" :title="error" :close-btn="false" class="task-detail-drawer__error-alert" />
@@ -40,26 +51,77 @@
           </template>
         </t-alert>
 
-        <t-descriptions class="task-detail-drawer__descriptions" bordered :column="1" size="small">
-          <t-descriptions-item label="任务 ID">#{{ task.id }}</t-descriptions-item>
-          <t-descriptions-item label="文件 ID">{{ formatValue(task.fileId) }}</t-descriptions-item>
-          <t-descriptions-item label="打印机 ID">{{ formatValue(task.printerId) }}</t-descriptions-item>
-          <t-descriptions-item label="发起用户 ID">{{ formatValue(task.userId) }}</t-descriptions-item>
-          <t-descriptions-item label="现场操作员 ID">{{ formatValue(task.operatorId) }}</t-descriptions-item>
-          <t-descriptions-item label="状态"><StatusTag domain="job" :status="task.status" /></t-descriptions-item>
-          <t-descriptions-item label="优先级">{{ formatValue(task.priority) }}</t-descriptions-item>
-          <t-descriptions-item label="进度">
-            <t-progress v-if="hasValue(task.progress)" :percentage="task.progress" />
-            <span v-else>-</span>
-          </t-descriptions-item>
-          <t-descriptions-item label="创建时间">{{ formatDateTime(task.createdAt) }}</t-descriptions-item>
-          <t-descriptions-item label="开始时间">{{ formatDateTime(task.startedAt) }}</t-descriptions-item>
-          <t-descriptions-item label="完成时间">{{ formatDateTime(task.completedAt) }}</t-descriptions-item>
-          <t-descriptions-item label="更新时间">{{ formatDateTime(task.updatedAt) }}</t-descriptions-item>
-          <t-descriptions-item v-if="hasValue(task.errorReason)" label="失败/核对原因">
-            <span class="task-detail-drawer__error" :title="task.errorReason">{{ task.errorReason }}</span>
-          </t-descriptions-item>
-        </t-descriptions>
+        <section class="task-detail-drawer__section" aria-labelledby="task-detail-resources">
+          <h2 id="task-detail-resources">资源与人员</h2>
+          <t-descriptions class="task-detail-drawer__descriptions" bordered :column="1" size="small">
+            <t-descriptions-item label="文件">
+              <div class="task-detail-drawer__value">
+                <t-tooltip :content="detailDisplay.fileName" class="task-detail-drawer__value-tooltip">
+                  <span class="task-detail-drawer__value-text">{{ detailDisplay.fileName }}</span>
+                </t-tooltip>
+                <t-tag size="small" variant="outline" :theme="sourceTagTheme(detailDisplay.sources.fileName)">{{ detailDisplay.sources.fileName }}</t-tag>
+              </div>
+            </t-descriptions-item>
+            <t-descriptions-item label="打印机名称">
+              <div class="task-detail-drawer__value">
+                <t-tooltip :content="detailDisplay.printerName" class="task-detail-drawer__value-tooltip">
+                  <span class="task-detail-drawer__value-text">{{ detailDisplay.printerName }}</span>
+                </t-tooltip>
+                <t-tag size="small" variant="outline" :theme="sourceTagTheme(detailDisplay.sources.printerName)">{{ detailDisplay.sources.printerName }}</t-tag>
+              </div>
+            </t-descriptions-item>
+            <t-descriptions-item label="机器编号">
+              <div class="task-detail-drawer__value">
+                <t-tooltip :content="detailDisplay.machineNumber" class="task-detail-drawer__value-tooltip">
+                  <span class="task-detail-drawer__value-text">{{ detailDisplay.machineNumber }}</span>
+                </t-tooltip>
+                <t-tag size="small" variant="outline" :theme="sourceTagTheme(detailDisplay.sources.machineNumber)">{{ detailDisplay.sources.machineNumber }}</t-tag>
+              </div>
+            </t-descriptions-item>
+            <t-descriptions-item label="创建人">
+              <div class="task-detail-drawer__value">
+                <t-tooltip :content="detailDisplay.creatorUsername" class="task-detail-drawer__value-tooltip">
+                  <span class="task-detail-drawer__value-text">{{ detailDisplay.creatorUsername }}</span>
+                </t-tooltip>
+                <t-tag size="small" variant="outline" :theme="sourceTagTheme(detailDisplay.sources.creatorUsername)">{{ detailDisplay.sources.creatorUsername }}</t-tag>
+              </div>
+            </t-descriptions-item>
+            <t-descriptions-item label="操作员">
+              <div class="task-detail-drawer__value">
+                <t-tooltip :content="detailDisplay.operatorUsername" class="task-detail-drawer__value-tooltip">
+                  <span class="task-detail-drawer__value-text">{{ detailDisplay.operatorUsername }}</span>
+                </t-tooltip>
+                <t-tag size="small" variant="outline" :theme="sourceTagTheme(detailDisplay.sources.operatorUsername)">{{ detailDisplay.sources.operatorUsername }}</t-tag>
+              </div>
+            </t-descriptions-item>
+          </t-descriptions>
+        </section>
+
+        <section class="task-detail-drawer__section" aria-labelledby="task-detail-execution">
+          <h2 id="task-detail-execution">执行信息</h2>
+          <t-descriptions class="task-detail-drawer__descriptions" bordered :column="1" size="small">
+            <t-descriptions-item label="状态">
+              <div class="task-detail-drawer__status-value">
+                <StatusTag domain="job" :status="task.status" />
+                <span class="task-detail-drawer__status-description">{{ statusView.description }}</span>
+              </div>
+            </t-descriptions-item>
+            <t-descriptions-item label="优先级">{{ formatValue(task.priority) }}</t-descriptions-item>
+            <t-descriptions-item label="进度">
+              <t-progress v-if="hasValue(task.progress)" :percentage="task.progress" />
+              <span v-else>-</span>
+            </t-descriptions-item>
+            <t-descriptions-item label="创建时间">{{ formatDateTime(task.createdAt) }}</t-descriptions-item>
+            <t-descriptions-item label="开始时间">{{ formatDateTime(task.startedAt) }}</t-descriptions-item>
+            <t-descriptions-item label="完成时间">{{ formatDateTime(task.completedAt) }}</t-descriptions-item>
+            <t-descriptions-item label="更新时间">{{ formatDateTime(task.updatedAt) }}</t-descriptions-item>
+            <t-descriptions-item label="失败/核对原因">
+              <t-tooltip :content="formatValue(task.errorReason)" class="task-detail-drawer__value-tooltip">
+                <span class="task-detail-drawer__long-text task-detail-drawer__error">{{ formatValue(task.errorReason) }}</span>
+              </t-tooltip>
+            </t-descriptions-item>
+          </t-descriptions>
+        </section>
 
         <section class="task-detail-drawer__timeline" aria-labelledby="task-detail-timeline">
           <h2 id="task-detail-timeline">已知时间线</h2>
@@ -74,7 +136,30 @@
             description="暂无时间记录"
           />
         </section>
+
+        <t-collapse class="task-detail-drawer__technical" :default-value="[]">
+          <t-collapse-panel value="technical" header="技术信息">
+            <t-descriptions class="task-detail-drawer__descriptions" bordered :column="1" size="small">
+              <t-descriptions-item label="任务 ID">{{ formatTechnicalValue(task.id) }}</t-descriptions-item>
+              <t-descriptions-item label="文件 ID">{{ formatTechnicalValue(task.fileId) }}</t-descriptions-item>
+              <t-descriptions-item label="打印机 ID">{{ formatTechnicalValue(task.printerId) }}</t-descriptions-item>
+              <t-descriptions-item label="发起用户 ID">{{ formatTechnicalValue(task.userId) }}</t-descriptions-item>
+              <t-descriptions-item label="现场操作员 ID">{{ formatTechnicalValue(task.operatorId) }}</t-descriptions-item>
+              <t-descriptions-item label="重试来源任务 ID">{{ formatTechnicalValue(task.retryOfJobId) }}</t-descriptions-item>
+              <t-descriptions-item label="根任务 ID">{{ formatTechnicalValue(task.rootJobId) }}</t-descriptions-item>
+              <t-descriptions-item label="尝试次数">{{ formatValue(task.attemptNumber) }}</t-descriptions-item>
+              <t-descriptions-item v-if="hasValue(task.idempotencyKey)" label="幂等键">{{ formatTechnicalValue(task.idempotencyKey) }}</t-descriptions-item>
+              <t-descriptions-item v-if="hasValue(task.eventId)" label="事件 ID">{{ formatTechnicalValue(task.eventId) }}</t-descriptions-item>
+              <t-descriptions-item v-if="hasValue(task.sequence)" label="事件序号">{{ formatTechnicalValue(task.sequence) }}</t-descriptions-item>
+            </t-descriptions>
+          </t-collapse-panel>
+        </t-collapse>
       </template>
+      <t-alert v-else-if="error" theme="error" :title="error" :close-btn="false" class="task-detail-drawer__error-alert">
+        <template #operation>
+          <span>任务详情暂时不可用，请稍后重试。</span>
+        </template>
+      </t-alert>
       <t-empty v-else description="未选择任务" />
     </div>
   </t-drawer>
@@ -114,9 +199,11 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { CloseIcon as Close } from 'tdesign-icons-vue-next'
 import { formatDateTime } from '@/utils/formatters'
+import { getJobDetailDisplay, JOB_DISPLAY_SOURCE } from '@/utils/jobDisplay'
+import { getStatusView } from '@/utils/statusView'
 import StatusTag from './StatusTag.vue'
 
 const props = defineProps({
@@ -134,12 +221,25 @@ const drawerVisible = computed({
   set: value => emit('update:modelValue', value)
 })
 
+const isTerminal = computed(() => ['COMPLETED', 'FAILED', 'CANCELLED'].includes(props.task?.status))
+const detailDisplay = computed(() => getJobDetailDisplay(props.task || {}, isTerminal.value ? 'history' : 'current'))
+const statusView = computed(() => getStatusView('job', props.task?.status))
+
+const sourceTagTheme = source => {
+  if (source === JOB_DISPLAY_SOURCE.CURRENT) return 'primary'
+  if (source === JOB_DISPLAY_SOURCE.SNAPSHOT) return 'warning'
+  if (source === JOB_DISPLAY_SOURCE.DELETED) return 'danger'
+  return 'default'
+}
+
 const handleClose = () => {
+  resetReconcile()
   if (props.modelValue) emit('update:modelValue', false)
 }
 
 const hasValue = value => value !== undefined && value !== null && value !== ''
-const formatValue = value => hasValue(value) ? value : '-'
+const formatValue = value => hasValue(value) ? String(value) : '-'
+const formatTechnicalValue = value => formatValue(value)
 
 const reconcileDialogVisible = ref(false)
 const reconcileFormRef = ref(null)
@@ -154,6 +254,19 @@ const reconcileRules = {
     { max: 255, message: '核对原因最多 255 个字符', trigger: 'blur' }
   ]
 }
+
+function resetReconcile() {
+  reconcileDialogVisible.value = false
+  reconcileForm.value = { result: 'COMPLETED', reason: '' }
+}
+
+watch(() => props.modelValue, visible => {
+  if (!visible) resetReconcile()
+})
+
+watch(() => props.task?.id, () => {
+  resetReconcile()
+})
 
 const openReconcile = result => {
   if (props.reconcileLoading || props.task?.status !== 'RECONCILING') return
@@ -178,31 +291,95 @@ const submitReconcile = async () => {
 </script>
 
 <style scoped>
+.task-detail-drawer :deep(.t-drawer__body) {
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .task-detail-drawer__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   width: 100%;
+  min-width: 0;
+  gap: var(--app-spacing-3);
+}
+
+.task-detail-drawer__identity {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--app-spacing-1);
+}
+
+.task-detail-drawer__title-row,
+.task-detail-drawer__status-value {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--app-spacing-2);
+}
+
+.task-detail-drawer__name-tooltip {
+  display: block;
+  min-width: 0;
+  flex: 1;
 }
 
 .task-detail-drawer__title {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
   color: var(--app-text-primary);
   font-size: var(--td-font-size-title-medium);
   font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-detail-drawer__status-description {
+  min-width: 0;
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+  overflow-wrap: anywhere;
 }
 
 .task-detail-drawer__body {
   display: flex;
   box-sizing: border-box;
   width: 100%;
-  padding-bottom: var(--app-spacing-2);
   min-height: 100%;
+  padding-bottom: var(--app-spacing-6);
   flex-direction: column;
   gap: var(--app-spacing-4);
 }
 
 .task-detail-drawer__loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-spacing-3);
   padding: var(--app-spacing-2);
+}
+
+.task-detail-drawer__loading-text {
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+}
+
+.task-detail-drawer__section,
+.task-detail-drawer__timeline {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--app-spacing-3);
+}
+
+.task-detail-drawer__section h2,
+.task-detail-drawer__timeline h2 {
+  margin: 0;
+  color: var(--app-text-primary);
+  font-size: var(--td-font-size-title-small);
 }
 
 .task-detail-drawer__reconcile-alert {
@@ -212,18 +389,61 @@ const submitReconcile = async () => {
 }
 
 .task-detail-drawer__reconcile-actions {
-  flex-wrap: wrap;
+  width: 100%;
   max-width: 100%;
+  flex-wrap: wrap;
 }
 
 .task-detail-drawer__descriptions {
+  min-width: 0;
   overflow: hidden;
   border-radius: var(--app-radius-medium);
 }
 
 .task-detail-drawer__descriptions :deep(.t-descriptions__label),
 .task-detail-drawer__descriptions :deep(.t-descriptions__content) {
+  min-width: 0;
+  max-width: 100%;
   vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.task-detail-drawer__value,
+.task-detail-drawer__status-value {
+  max-width: 100%;
+}
+
+.task-detail-drawer__value {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--app-spacing-2);
+}
+
+.task-detail-drawer__value-tooltip {
+  display: block;
+  min-width: 0;
+  flex: 1;
+}
+
+.task-detail-drawer__value-text,
+.task-detail-drawer__long-text {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-detail-drawer__long-text {
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.task-detail-drawer__status-value {
+  flex-wrap: wrap;
 }
 
 .task-detail-drawer__error-alert {
@@ -231,28 +451,26 @@ const submitReconcile = async () => {
 }
 
 .task-detail-drawer__timeline {
-  display: flex;
-  flex-direction: column;
-  gap: var(--app-spacing-3);
   padding-top: var(--app-spacing-2);
   border-top: 1px solid var(--app-border);
 }
 
-.task-detail-drawer__timeline h2 {
-  margin: 0;
-  color: var(--app-text-primary);
-  font-size: var(--td-font-size-title-small);
+.task-detail-drawer__technical {
+  flex-shrink: 0;
 }
 
 .task-detail-drawer__error {
   color: var(--td-error-color);
-  overflow-wrap: anywhere;
-  word-break: break-word;
 }
 
 @media (max-width: 600px) {
   .task-detail-drawer__body {
     gap: var(--app-spacing-3);
+  }
+
+  .task-detail-drawer__value {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .task-detail-drawer__reconcile-actions {
