@@ -137,7 +137,13 @@ test('UI-006 看板允许双方查看未分配设备且仅 ADMIN 可以进入布
   assert.match(farmDashboardSource, /@enter-layout-edit="enterLayoutEditFromUnallocated"/)
   assert.match(unallocatedDrawerSource, /v-if="isAdmin"[\s\S]*进入布局编辑/)
   assert.match(unallocatedDrawerSource, /v-else theme="info" title="只读查看"/)
-  assert.match(farmDashboardSource, /if \(!canManageLayout\.value\) return/)
+  assert.match(farmDashboardSource, /:enter-layout-loading="store\.layoutLoading"/)
+  assert.match(farmDashboardSource, /:enter-layout-error="unallocatedLayoutError"/)
+  assert.match(farmDashboardSource, /if \(!entered \|\| !isEditMode\.value \|\| !store\.layoutDraft\)/)
+  assert.match(farmDashboardSource, /unallocatedDrawerVisible\.value = false[\s\S]*点击空槽位选择并绑定设备/)
+  assert.match(farmDashboardSource, /if \(store\.layoutLoading \|\| store\.layoutError \|\| !store\.layoutSnapshot\)/)
+  assert.match(farmDashboardSource, /return Boolean\(isEditMode\.value && store\.layoutDraft/)
+  assert.doesNotMatch(unallocatedDrawerSource, /function requestLayoutEdit\(\) \{[\s\S]*closeDrawer\(\)/)
 })
 
 test('实时连接不使用业务消息不活跃超时，避免误判协议级 Ping 保活连接', () => {

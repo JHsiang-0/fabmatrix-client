@@ -820,15 +820,25 @@ const handleScanPrinters = config => {
   const subnet = getParams(config).subnet || '192.168.1'
   return Array.from({ length: 12 }, (_, index) => {
     const host = 90 + index
+    const discoveryStatus = index === 1 ? 'EXISTING' : index === 2 ? 'UNKNOWN_MAC' : 'NEW'
     return {
       ipAddress: `${subnet}.${host}`,
       macAddress: `AA:BB:CC:DD:EE:${String(host).padStart(2, '0')}`,
-      isNewDevice: index !== 1,
+      isNewDevice: discoveryStatus === 'NEW',
       firmwareType: index % 2 === 0 ? 'KLIPPER' : 'RRF',
-      status: 'UNKNOWN',
+      status: discoveryStatus,
       suggestedName: `Mock_Scanned_Printer_${index + 1}`
     }
   })
+}
+
+const findBatchAddFailure = (device, index) => {
+  const failures = Array.isArray(mockState.batchAddFailures) ? mockState.batchAddFailures : []
+  return failures.find(item => item?.index !== null && item?.index !== ''
+      && Number.isInteger(Number(item.index)) && Number(item.index) === index)
+    || failures.find(item => item?.ipAddress && item.ipAddress === device?.ipAddress)
+    || failures.find(item => item?.macAddress
+      && String(item.macAddress).toUpperCase() === String(device?.macAddress || '').toUpperCase())
 }
 
 const handleBatchAddPrinters = config => {
@@ -837,12 +847,30 @@ const handleBatchAddPrinters = config => {
   mockState.lastBatchAddPayload = cloneMockData(devices)
   let insertedCount = 0
   let updatedCount = 0
-  const items = devices.map(device => {
+  let failedCount = 0
+  const items = devices.map((device, index) => {
+    const configuredFailure = findBatchAddFailure(device, index)
+    if (configuredFailure) {
+      failedCount += 1
+      return {
+        index,
+        ipAddress: device?.ipAddress || null,
+        macAddress: device?.macAddress || null,
+        success: false,
+        reason: configuredFailure.reason || '模拟设备导入失败'
+      }
+    }
     const existing = mockState.printers.find(item => item.ipAddress === device.ipAddress)
     if (existing) {
       Object.assign(existing, device, { updatedAt: now() })
       updatedCount += 1
-      return existing
+      return {
+        index,
+        ipAddress: device.ipAddress,
+        macAddress: device.macAddress || null,
+        success: true,
+        reason: '处理成功'
+      }
     }
 
     const printer = {
@@ -863,14 +891,21 @@ const handleBatchAddPrinters = config => {
     }
     mockState.printers.push(printer)
     insertedCount += 1
-    return printer
+    return {
+      index,
+      ipAddress: device.ipAddress,
+      macAddress: device.macAddress || null,
+      success: true,
+      reason: '处理成功'
+    }
   })
   return {
     totalCount: items.length,
     insertedCount,
     updatedCount,
-    failedCount: 0,
-    items: items.map(toPublicPrinter)
+    failedCount,
+    message: `批量处理完成：新增 ${insertedCount} 台，更新 ${updatedCount} 台，失败 ${failedCount} 台`,
+    items
   }
 }
 
@@ -947,7 +982,13 @@ const validateMockLayout = body => {
 
 const handleDashboardLayout = config => {
   const session = requireSession(config, ['ADMIN', 'OPERATOR'])
-  if (config.method?.toLowerCase() === 'get') return cloneMockData(mockState.dashboardLayout)
+  if (config.method?.toLowerCase() === 'get') {
+    if (mockState.dashboardLayoutError) {
+      const failure = mockState.dashboardLayoutError
+      fail(failure.status || 503, failure.code || 503, failure.message || '模拟布局加载失败')
+    }
+    return cloneMockData(mockState.dashboardLayout)
+  }
   if (session.role !== 'ADMIN') fail(403, 403, '没有权限执行此操作')
 
   const body = getBody(config)
@@ -2153,6 +2194,9 @@ export const isMockEnabled = runtimeEnv.VITE_USE_MOCK === 'true' || [
 if ((runtimeEnv.DEV || runtimeEnv.MODE === 'mock' || String(runtimeEnv.MODE || '').startsWith('desktop')) && typeof window !== 'undefined') {
   window.__FARM_RESET_MOCK__ = resetMockState
   window.__FARM_GET_LAST_BATCH_ADD_PAYLOAD__ = () => cloneMockData(mockState.lastBatchAddPayload || [])
+  window.__FARM_SET_DASHBOARD_LAYOUT_ERROR__ = failure => {
+    mockState.dashboardLayoutError = cloneMockData(failure)
+  }
 }
 
 export async function mockRequest(config) {

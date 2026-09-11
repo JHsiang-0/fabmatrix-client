@@ -384,6 +384,75 @@ test('OPERATOR 看板不显示布局编辑入口', async ({ browser }) => {
   }
 })
 
+test('UI-006 布局加载失败时未分配 Drawer 保持打开且不虚假进入编辑', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 800, height: 560 } })
+  const page = await context.newPage()
+  try {
+    await page.goto('/login')
+    await page.evaluate(() => window.__FARM_RESET_MOCK__())
+    await page.getByLabel('用户名', { exact: true }).fill('admin')
+    await page.getByLabel('密码', { exact: true }).fill('Admin123')
+    await page.getByRole('button', { name: '登录', exact: true }).click()
+    await page.getByRole('button', { name: '设备看板', exact: true }).click()
+    await expect(page).toHaveURL(/\/dashboard\/fullscreen$/)
+    await expect(page.getByRole('button', { name: '查看打印机总数' }).locator('.stat-card__value')).toHaveText(/[1-9]/)
+    await page.evaluate(() => window.__FARM_SET_DASHBOARD_LAYOUT_ERROR__({
+      status: 503,
+      code: 503,
+      message: '布局服务暂不可用，请稍后重试'
+    }))
+    await page.getByRole('button', { name: '刷新', exact: true }).click()
+    await page.waitForTimeout(350)
+    await page.getByRole('button', { name: '未分配设备', exact: true }).click()
+    const unallocatedDrawer = page.locator('.t-drawer').filter({ hasText: '未分配设备' }).last()
+    await expect(unallocatedDrawer).toBeVisible()
+    await unallocatedDrawer.getByRole('button', { name: '进入布局编辑', exact: true }).click()
+    await expect(unallocatedDrawer).toContainText('布局服务暂不可用，请稍后重试')
+    await expect(unallocatedDrawer).toBeVisible()
+    await expect(page.getByText('点击空槽位选择并绑定设备', { exact: true })).toHaveCount(0)
+  } finally {
+    await context.close()
+  }
+})
+
+test('UI-006 批量导入部分失败时保留 Drawer、失败选择和逐项原因', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 800, height: 560 } })
+  const page = await context.newPage()
+  const failureReason = '设备认证失败：API Key 无效，请检查设备管理后台配置后重试'
+  try {
+    await page.goto('/login')
+    await page.evaluate(reason => window.__FARM_RESET_MOCK__({
+      batchAddFailures: [{ ipAddress: '192.168.0.94', reason }]
+    }), failureReason)
+    await page.getByLabel('用户名', { exact: true }).fill('admin')
+    await page.getByLabel('密码', { exact: true }).fill('Admin123')
+    await page.getByRole('button', { name: '登录', exact: true }).click()
+    await openSidebarItem(page, 800, '打印机管理')
+    await page.getByRole('button', { name: '扫描局域网设备', exact: true }).click()
+    const scanDrawer = page.locator('.t-drawer').filter({ hasText: '扫描局域网设备' })
+    await scanDrawer.getByRole('button', { name: '开始扫描', exact: true }).click()
+    await expect(scanDrawer).toContainText('10 台新设备，1 台已知设备，1 台未知 MAC')
+    await scanDrawer.getByRole('checkbox').first().locator('..').click({ force: true })
+    await expect(scanDrawer).toContainText('已选择 12 台')
+    await scanDrawer.getByRole('button', { name: /批量导入\/同步/ }).click()
+
+    await expect(scanDrawer).toBeVisible()
+    await expect(scanDrawer).toContainText('已选择 1 台')
+    const failedCard = scanDrawer.locator('.printer-scan-card').filter({ hasText: '192.168.0.94' })
+    await failedCard.scrollIntoViewIfNeeded()
+    await expect(failedCard.getByText('导入失败', { exact: true })).toBeVisible()
+    await expect(failedCard.locator('.printer-scan-card__failure-reason')).toHaveText(failureReason)
+    await expect(failedCard.locator('.printer-scan-card__failure-reason')).toHaveCSS('text-overflow', 'ellipsis')
+    const failureMetrics = await failedCard.evaluate(element => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth
+    }))
+    expect(failureMetrics.scrollWidth).toBeLessThanOrEqual(failureMetrics.clientWidth + 1)
+  } finally {
+    await context.close()
+  }
+})
+
 test('UI-006 打印机选择不跨筛选分页且两个抽屉在 800x560 可用', async ({ browser }) => {
   test.setTimeout(120000)
   const context = await browser.newContext({ viewport: { width: 800, height: 560 } })
@@ -473,6 +542,8 @@ test('UI-006 打印机选择不跨筛选分页且两个抽屉在 800x560 可用'
     await expect(scanDrawer.getByText('协议 RRF', { exact: true }).first()).toBeVisible()
     await expect(scanDrawer.getByText('新', { exact: true }).first()).toBeVisible()
     await expect(scanDrawer.getByText('已知', { exact: true }).first()).toBeVisible()
+    await expect(scanDrawer.getByText('未知 MAC', { exact: true }).first()).toBeVisible()
+    await expect(scanDrawer).toContainText('10 台新设备，1 台已知设备，1 台未知 MAC')
 
     const scanScrollMetrics = await scanDrawer.locator('.printer-scan-drawer__list').evaluate(element => ({
       clientHeight: element.clientHeight,
@@ -506,6 +577,7 @@ test('UI-006 打印机选择不跨筛选分页且两个抽屉在 800x560 可用'
     expect(batchPayload[0]).toMatchObject({ suggestedName: '编辑后的设备名称' })
     expect(batchPayload[0]).not.toHaveProperty('name')
     expect(Object.keys(batchPayload[0]).sort()).toEqual(['firmwareType', 'ipAddress', 'isNewDevice', 'macAddress', 'suggestedName'].sort())
+    await expect(scanDrawer).toBeHidden()
   } finally {
     await context.close()
   }

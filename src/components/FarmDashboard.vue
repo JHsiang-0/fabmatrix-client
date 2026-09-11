@@ -203,6 +203,8 @@
     <unallocated-printer-drawer
       v-model:visible="unallocatedDrawerVisible"
       :is-admin="canManageLayout"
+      :enter-layout-loading="store.layoutLoading"
+      :enter-layout-error="unallocatedLayoutError"
       @enter-layout-edit="enterLayoutEditFromUnallocated"
     />
 
@@ -332,6 +334,7 @@ watch(canManageLayout, canManage => {
 const bindDialogVisible = ref(false)
 const targetSlot = ref({ row: null, col: null }) // 目标槽位坐标（物理坐标）
 const unallocatedDrawerVisible = ref(false)
+const unallocatedLayoutError = ref('')
 
 /** 设备详情抽屉相关状态 */
 const drawerVisible = ref(false)
@@ -512,13 +515,23 @@ function goTo(path) {
 }
 
 function openUnallocatedDrawer() {
+  unallocatedLayoutError.value = ''
   unallocatedDrawerVisible.value = true
 }
 
 function enterLayoutEditFromUnallocated() {
-  if (!canManageLayout.value) return
-  if (!isEditMode.value) toggleEditMode()
+  unallocatedLayoutError.value = ''
+  const entered = isEditMode.value
+    ? Boolean(store.layoutDraft && layoutEditOwner.value === store.draftOwner
+      && store.layoutConflict?.reason !== 'STALE_DRAFT')
+    : toggleEditMode({ notify: false })
+  if (!entered || !isEditMode.value || !store.layoutDraft) {
+    unallocatedLayoutError.value = getLayoutEditUnavailableMessage()
+    return false
+  }
+  unallocatedDrawerVisible.value = false
   message.info('点击空槽位选择并绑定设备')
+  return true
 }
 
 async function fetchHistory() {
@@ -808,14 +821,29 @@ function handleDrawerClosed() {
 // Layout Edit Mode Functions
 // ============================================
 
-function toggleEditMode() {
-  if (!canManageLayout.value) {
-    message.error('当前账号没有维护网格布局的权限')
-    return
+function getLayoutEditUnavailableMessage() {
+  if (!canManageLayout.value) return '当前账号没有维护网格布局的权限'
+  if (store.layoutLoading) return '布局正在加载，请等待布局快照加载完成后重试'
+  if (store.layoutError) return store.layoutError?.message || '布局加载失败，请刷新看板后重试'
+  if (store.layoutConflict?.reason === 'STALE_DRAFT') return '布局草稿已过期，请取消编辑并重新加载后重试'
+  if (!store.layoutSnapshot) return '布局快照尚未加载完成，请稍后重试'
+  return '布局草稿未能创建，请刷新看板后重试'
+}
+
+function toggleEditMode(options = {}) {
+  const notify = options.notify !== false
+  const reject = content => {
+    if (notify) message.error(content)
+    return false
   }
-  if (!store.beginLayoutEdit()) {
-    message.error('布局快照尚未加载完成，请稍后重试')
-    return
+  if (!canManageLayout.value) {
+    return reject('当前账号没有维护网格布局的权限')
+  }
+  if (store.layoutLoading || store.layoutError || !store.layoutSnapshot) {
+    return reject(getLayoutEditUnavailableMessage())
+  }
+  if (!store.beginLayoutEdit() || !store.layoutDraft) {
+    return reject('布局草稿未能创建，请刷新看板后重试')
   }
   layoutEditOwner.value = store.draftOwner
   layoutForm.value = {
@@ -826,7 +854,8 @@ function toggleEditMode() {
   store.setPositionDraft([])
   overflowPolicy.value = 'REJECT'
   isEditMode.value = true
-  message.info('已进入编辑模式，现在可以拖拽设备调整位置')
+  if (notify) message.info('已进入编辑模式，现在可以拖拽设备调整位置')
+  return Boolean(isEditMode.value && store.layoutDraft && layoutEditOwner.value === store.draftOwner)
 }
 
 async function cancelLayoutEdit() {

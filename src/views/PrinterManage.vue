@@ -423,6 +423,14 @@
                 <t-tag :theme="getDiscoveryStatus(device).theme" variant="light" size="small">
                   {{ getDiscoveryStatus(device).label }}
                 </t-tag>
+                <t-tag
+                  v-if="device.batchResult?.success"
+                  theme="success"
+                  variant="light"
+                  size="small"
+                >
+                  导入成功
+                </t-tag>
               </div>
               <div class="printer-scan-card__meta">
                 <t-tooltip :content="device.ipAddress || '-'">
@@ -433,6 +441,17 @@
                   <span>MAC {{ device.macAddress || '-' }}</span>
                 </t-tooltip>
               </div>
+              <t-alert
+                v-if="device.batchResult && !device.batchResult.success"
+                class="printer-scan-card__failure"
+                theme="error"
+                title="导入失败"
+                :close-btn="false"
+              >
+                <t-tooltip :content="device.batchResult.reason">
+                  <span class="printer-scan-card__failure-reason">{{ device.batchResult.reason }}</span>
+                </t-tooltip>
+              </t-alert>
             </article>
           </div>
         </div>
@@ -496,6 +515,12 @@ import { PRINTER_STATUS, PRINTER_STATUS_MAP } from '@/utils/constants'
 import { normalizePrinterStatus } from '@/utils/dataAdapters'
 import { formatDateTime } from '@/utils/formatters'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard'
+import {
+  applyBatchUpsertResult,
+  createScanDeviceKey,
+  getDiscoveryStats,
+  getDiscoveryStatus
+} from '@/utils/printerDiscovery'
 import DeviceDetailDrawer from '@/components/device/DeviceDetailDrawer.vue'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
@@ -682,23 +707,9 @@ const getFirmwareLabel = firmwareType => String(firmwareType || '').toUpperCase(
 
 // 扫描统计文案
 const scanStatsText = computed(() => {
-  const total = scanResults.value.length
-  const newCount = scanResults.value.filter(d => getDiscoveryStatus(d).label === '新').length
-  const existingCount = total - newCount
-  return `共扫描到 ${total} 台设备，其中 ${newCount} 台新设备，${existingCount} 台已知设备`
+  const stats = getDiscoveryStats(scanResults.value)
+  return `共扫描到 ${stats.total} 台设备：${stats.newCount} 台新设备，${stats.existingCount} 台已知设备，${stats.unknownCount} 台未知 MAC`
 })
-
-const getDiscoveryStatus = device => {
-  const rawStatus = String(device?.discoveryStatus || device?.discoveryState || device?.status || '')
-    .toUpperCase()
-    .replace(/-/g, '_')
-  if (rawStatus === 'UNKNOWN_MAC') return { label: '未知 MAC', theme: 'warning' }
-  if (rawStatus === 'NEW' || device?.isNewDevice === true) return { label: '新', theme: 'success' }
-  if (rawStatus === 'EXISTING' || rawStatus === 'KNOWN' || device?.isNewDevice === false) {
-    return { label: '已知', theme: 'primary' }
-  }
-  return { label: '未知 MAC', theme: 'warning' }
-}
 
 // 获取状态标签类型
 const getStatusLabel = (status) => {
@@ -1189,7 +1200,8 @@ const handleScan = async () => {
     scanResults.value = (Array.isArray(devices) ? devices : []).map((device, index) => ({
       ...device,
       suggestedName: device.suggestedName || '',
-      scanKey: `${device.ipAddress || 'device'}-${device.macAddress || 'unknown'}-${index}`
+      scanKey: createScanDeviceKey(device, index),
+      batchResult: null
     }))
     hasScanned.value = true
   } catch (error) {
@@ -1204,7 +1216,8 @@ const handleScan = async () => {
 const handleBatchAdd = async () => {
   if (selectedDevices.value.length === 0 || isBatchAdding.value || isScanning.value) return
 
-  const devicesToSubmit = selectedDevices.value.map(device => {
+  const submittedDevices = [...selectedDevices.value]
+  const devicesToSubmit = submittedDevices.map(device => {
     const payload = {
       ipAddress: device.ipAddress,
       firmwareType: device.firmwareType,
@@ -1225,13 +1238,18 @@ const handleBatchAdd = async () => {
     const res = await batchAddPrinters(devicesToSubmit)
     const result = res.data || {}
     const resultMessage = res.message || result.message || '批量处理完成'
-    if (result.failedCount > 0) {
-      message.warning(`${resultMessage}：新增 ${result.insertedCount || 0} 台，更新 ${result.updatedCount || 0} 台，失败 ${result.failedCount} 台`)
-    } else {
-      message.success(`${resultMessage}：新增 ${result.insertedCount || 0} 台，更新 ${result.updatedCount || 0} 台`)
+    const batchOutcome = applyBatchUpsertResult(scanResults.value, submittedDevices, result)
+    scanResults.value = batchOutcome.devices
+    selectedScanKeys.value = batchOutcome.failedKeys
+    const failedCount = Math.max(Number(result.failedCount || 0), batchOutcome.failedKeys.length)
+    const hasFailures = failedCount > 0
+    if (hasFailures) {
+      message.warning(`${resultMessage}：新增 ${result.insertedCount || 0} 台，更新 ${result.updatedCount || 0} 台，失败 ${failedCount} 台`)
+      return
     }
+    message.success(`${resultMessage}：新增 ${result.insertedCount || 0} 台，更新 ${result.updatedCount || 0} 台`)
+    await fetchData()
     scanDialogVisible.value = false
-    fetchData()
   } catch (error) {
     const errorMsg = error.response?.data?.message || error?.message || '批量处理失败'
     message.error(errorMsg)
@@ -1581,6 +1599,26 @@ const handleBatchAdd = async () => {
   min-width: 0;
   align-items: center;
   gap: var(--app-spacing-2);
+}
+
+.printer-scan-card__failure {
+  min-width: 0;
+  margin-top: var(--app-spacing-2);
+}
+
+.printer-scan-card__failure :deep(.t-alert__content),
+.printer-scan-card__failure :deep(.t-alert__description) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.printer-scan-card__failure-reason {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .printer-scan-drawer__selection-bar {

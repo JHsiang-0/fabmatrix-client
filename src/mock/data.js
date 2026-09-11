@@ -5,7 +5,13 @@ const mockFileUrl = name => {
   return `data:text/plain;charset=utf-8,${encodeURIComponent(content)}`
 }
 
-const createSeedData = ({ initialized = true, dashboardLayout: layoutOverride = null, printers: printersOverride = null } = {}) => ({
+const createSeedData = ({
+  initialized = true,
+  dashboardLayout: layoutOverride = null,
+  dashboardLayoutError = null,
+  printers: printersOverride = null,
+  batchAddFailures = []
+} = {}) => ({
   users: initialized ? [
     {
       id: 1,
@@ -556,6 +562,8 @@ const createSeedData = ({ initialized = true, dashboardLayout: layoutOverride = 
   ] : [],
   batchPlans: [],
   lastBatchAddPayload: null,
+  batchAddFailures: clone(batchAddFailures),
+  dashboardLayoutError: clone(dashboardLayoutError),
   nextIds: {
     users: '3',
     file: '25',

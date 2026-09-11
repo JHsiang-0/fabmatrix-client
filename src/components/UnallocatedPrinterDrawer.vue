@@ -19,6 +19,20 @@
       <t-alert v-else theme="info" title="只读查看" :close-btn="false">
         当前账号可以查看未分配设备，但没有布局编辑或绑定设备权限。
       </t-alert>
+      <t-alert
+        v-if="isAdmin && enterLayoutLoading"
+        theme="info"
+        title="布局正在加载"
+        message="请等待布局快照加载完成后再进入编辑。"
+        :close-btn="false"
+      />
+      <t-alert
+        v-else-if="isAdmin && enterLayoutError"
+        theme="error"
+        title="暂时无法进入布局编辑"
+        :message="enterLayoutError"
+        :close-btn="false"
+      />
 
       <div v-if="loading" class="unallocated-printer-drawer__state" role="status" aria-live="polite">
         <t-loading text="正在加载未分配设备..." />
@@ -64,7 +78,13 @@
         <span v-if="isAdmin" class="unallocated-printer-drawer__footer-hint">
           进入布局编辑后，点击空槽位选择并绑定设备
         </span>
-        <t-button v-if="isAdmin" theme="primary" @click="enterLayoutEdit">
+        <t-button
+          v-if="isAdmin"
+          theme="primary"
+          :loading="enterLayoutLoading"
+          :disabled="enterLayoutLoading"
+          @click="requestLayoutEdit"
+        >
           进入布局编辑
         </t-button>
         <t-button @click="closeDrawer">关闭</t-button>
@@ -74,8 +94,9 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { getUnallocatedPrinters } from '@/api/printer'
+import { createLatestRequestGuard } from '@/utils/latestRequestGuard'
 import StatusTag from './StatusTag.vue'
 
 defineOptions({ name: 'UnallocatedPrinterDrawer' })
@@ -88,17 +109,30 @@ const props = defineProps({
   isAdmin: {
     type: Boolean,
     default: false
+  },
+  enterLayoutLoading: {
+    type: Boolean,
+    default: false
+  },
+  enterLayoutError: {
+    type: String,
+    default: ''
   }
 })
 
 const emit = defineEmits(['update:visible', 'enter-layout-edit'])
 const drawerVisible = computed({
   get: () => props.visible,
-  set: value => emit('update:visible', value)
+  set: value => {
+    if (!value) invalidateLoad()
+    emit('update:visible', value)
+  }
 })
 const printers = ref([])
 const loading = ref(false)
 const error = ref('')
+let requestGuard = createLatestRequestGuard()
+let componentUnmounted = false
 
 const unwrapPrinters = response => {
   const data = response?.data ?? response
@@ -107,30 +141,46 @@ const unwrapPrinters = response => {
 }
 
 async function loadPrinters() {
+  const guard = requestGuard
+  const requestId = guard.begin()
+  if (requestId === null) return
   loading.value = true
   error.value = ''
   try {
     const response = await getUnallocatedPrinters()
+    if (!guard.isCurrent(requestId) || componentUnmounted) return
     printers.value = unwrapPrinters(response)
   } catch (requestError) {
+    if (!guard.isCurrent(requestId) || componentUnmounted) return
     error.value = requestError?.message || '未分配设备加载失败，请重试'
     printers.value = []
   } finally {
-    loading.value = false
+    if (guard.isCurrent(requestId) && !componentUnmounted) loading.value = false
   }
+}
+
+function invalidateLoad(reactivate = true) {
+  requestGuard.invalidate()
+  if (reactivate) requestGuard = createLatestRequestGuard()
+  loading.value = false
 }
 
 function closeDrawer() {
   drawerVisible.value = false
 }
 
-function enterLayoutEdit() {
-  closeDrawer()
+function requestLayoutEdit() {
   emit('enter-layout-edit')
 }
 
 watch(() => props.visible, visible => {
   if (visible) loadPrinters()
+  else invalidateLoad()
+}, { flush: 'sync' })
+
+onBeforeUnmount(() => {
+  componentUnmounted = true
+  invalidateLoad(false)
 })
 </script>
 

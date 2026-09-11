@@ -211,7 +211,7 @@ export function scanPrinters(subnet, options = {}) {
  * @param {string} devices[].firmwareType - 设备协议（RRF/KLIPPER）
  * @param {boolean} devices[].isNewDevice - 是否为新设备
  * @param {string} [devices[].apiKey] - 设备 API Key（后端返回时才发送）
- * @returns {Promise<{code: number, message: string, data: Array<Printer>}>} 批量添加结果
+ * @returns {Promise<{code: number, message: string, data: {totalCount: number, insertedCount: number, updatedCount: number, failedCount: number, message: string, items: Array<{index: number, ipAddress: string, macAddress: string|null, success: boolean, reason: string}>}}>} 批量添加结果
  */
 export function batchAddPrinters(devices) {
   return request({
