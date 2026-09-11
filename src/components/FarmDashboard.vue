@@ -5,13 +5,19 @@
       <dashboard-header :last-update-time="lastUpdateTime" @refresh="handleRefresh">
       <!-- 布局锁定/编辑模式切换按钮 -->
       <template #actions>
-        <t-button v-if="canManageLayout && !isEditMode" class="dashboard-action-button" theme="default" variant="outline"
+        <div v-if="canManageLayout && isEditMode" class="dashboard-layout-actions">
+          <t-button class="dashboard-action-button" theme="default" variant="outline" size="small"
+            @click="openLayoutSettings">布局设置</t-button>
+          <t-button class="dashboard-action-button" theme="default" variant="outline" size="small"
+            @click="openAisleDialog">过道管理</t-button>
+          <t-button class="dashboard-action-button" theme="default" variant="outline" size="small"
+            @click="cancelLayoutEdit">取消</t-button>
+          <t-button class="dashboard-action-button" theme="primary" variant="base" size="small"
+            :loading="store.layoutSaving" @click="saveLayout">保存布局</t-button>
+        </div>
+        <t-button v-else-if="canManageLayout" class="dashboard-action-button" theme="default" variant="outline"
           size="small" :icon="renderIcon(Lock)" @click="toggleEditMode">
           布局设置
-        </t-button>
-        <t-button v-else-if="canManageLayout" class="dashboard-action-button" theme="primary" variant="base"
-          size="small" :icon="renderIcon(Unlock)" @click="saveLayout">
-          完成布局
         </t-button>
       </template>
       <template #fullscreen-action>
@@ -60,12 +66,56 @@
       <!-- 厂房网格布局 - 与DashboardHeader保持相同最大宽度 -->
       <div class="farm-dashboard__workshop-surface w-full max-w-[1920px] mx-auto bg-gray-100 border border-gray-200 rounded-xl shadow-sm p-4">
         <!-- 使用 GridMap 组件 -->
-        <grid-map :device-matrix="store.deviceMatrix" :devices="store.rawDeviceList" :real-time-status="store.realTimeStatus"
+        <grid-map :device-matrix="store.deviceMatrix" :devices="displayDevices" :real-time-status="store.realTimeStatus"
           :grid-config="store.GRID_CONFIG" :is-edit-mode="isEditMode" :dragged-device="draggedDevice"
           :drag-over-cell="dragOverCell" @dragstart="handleDragStart" @dragend="handleDragEnd"
           @dragenter="handleDragEnter" @dragleave="handleDragLeave" @drop="handleDrop" @cell-click="handleCellClick" />
       </div>
     </div>
+
+    <t-dialog v-model:visible="layoutDialogVisible" header="布局设置" :confirm-btn="{ content: '应用' }"
+      @confirm="applyLayoutSettings">
+      <t-form :data="layoutForm" layout="vertical">
+        <t-form-item label="物理行数">
+          <t-input-number v-model="layoutForm.rowCount" :min="layoutLimits.minRows" :max="layoutLimits.maxRows" />
+        </t-form-item>
+        <t-form-item label="物理列数">
+          <t-input-number v-model="layoutForm.columnCount" :min="layoutLimits.minColumns" :max="layoutLimits.maxColumns" />
+        </t-form-item>
+      </t-form>
+    </t-dialog>
+
+    <t-dialog v-model:visible="aisleDialogVisible" :header="editingAisleId ? '编辑过道' : '新增过道'"
+      :confirm-btn="{ content: '应用' }" @confirm="applyAisleSettings">
+      <t-form :data="aisleForm" layout="vertical">
+        <t-form-item label="方向">
+          <t-select v-model="aisleForm.axis" :options="aisleAxisOptions" />
+        </t-form-item>
+        <t-form-item label="插入位置">
+          <t-input-number v-model="aisleForm.afterIndex" :min="0" :max="aislePositionMax" />
+        </t-form-item>
+        <t-form-item label="名称">
+          <t-input v-model="aisleForm.label" maxlength="12" show-word-limit />
+        </t-form-item>
+        <t-form-item label="尺寸">
+          <t-input-number v-model="aisleForm.size" :min="layoutLimits.minAisleSize" :max="layoutLimits.maxAisleSize" />
+        </t-form-item>
+      </t-form>
+    </t-dialog>
+
+    <t-dialog v-model:visible="aisleListVisible" header="过道管理" :footer="false">
+      <div class="dashboard-aisle-list">
+        <div v-for="aisle in draftAisles" :key="aisle.id" class="dashboard-aisle-list__item">
+          <span>{{ aisle.label }}（{{ aisle.axis === 'ROW' ? '横向' : '纵向' }}，{{ aisle.afterIndex }}）</span>
+          <t-space>
+            <t-button variant="text" size="small" @click="openAisleDialog(aisle)">编辑</t-button>
+            <t-button theme="danger" variant="text" size="small" @click="removeAisle(aisle)">删除</t-button>
+          </t-space>
+        </div>
+        <t-empty v-if="!draftAisles.length" description="暂未配置过道" />
+        <t-button theme="primary" variant="outline" block @click="openNewAisleDialog">新增过道</t-button>
+      </div>
+    </t-dialog>
 
     <!-- 绑定设备弹窗 -->
     <bind-device-dialog v-model:visible="bindDialogVisible" :target-slot-label="targetSlotLabel"
@@ -80,7 +130,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   CheckCircleIcon,
@@ -88,7 +138,6 @@ import {
   DashboardIcon,
   ErrorCircleIcon,
   LockOnIcon as Lock,
-  LockOffIcon as Unlock,
   PrintIcon
 } from 'tdesign-icons-vue-next'
 import { message, confirmMessage } from '@/utils/message'
@@ -99,6 +148,7 @@ import { emergencyStopPrinter, pausePrinter, resumePrinter, cancelPrinter } from
 import { getJobPage } from '@/api/job'
 import { PRINTER_STATUS } from '@/utils/constants'
 import { normalizePrinterStatus } from '@/utils/dataAdapters'
+import { analyzeDevicePositions, formatGridRowLabel } from '@/utils/gridLayout'
 import DashboardHeader from './DashboardHeader.vue'
 import GridMap from './grid/GridMap.vue'
 import BindDeviceDialog from './BindDeviceDialog.vue'
@@ -142,6 +192,18 @@ watch(canManageLayout, canManage => {
 const draggedDevice = ref(null)
 const draggedFrom = ref(null)
 const dragOverCell = ref(null)
+const positionChanges = ref([])
+const layoutDialogVisible = ref(false)
+const aisleListVisible = ref(false)
+const aisleDialogVisible = ref(false)
+const editingAisleId = ref('')
+const overflowPolicy = ref('REJECT')
+const layoutForm = ref({ rowCount: 4, columnCount: 12 })
+const aisleForm = ref({ axis: 'COLUMN', afterIndex: 0, label: '过道', size: 100 })
+const aisleAxisOptions = [
+  { label: '纵向过道', value: 'COLUMN' },
+  { label: '横向过道', value: 'ROW' }
+]
 
 /** 绑定设备弹窗相关状态 */
 const bindDialogVisible = ref(false)
@@ -177,9 +239,32 @@ updateLastUpdateTime()
  */
 const targetSlotLabel = computed(() => {
   if (targetSlot.value.row === null || targetSlot.value.col === null) return ''
-  const rowLabel = String.fromCharCode(65 + targetSlot.value.row - 1)
+  const rowLabel = formatGridRowLabel(targetSlot.value.row)
   return `${rowLabel}-${targetSlot.value.col.toString().padStart(2, '0')}`
 })
+
+const layoutLimits = computed(() => store.layoutLimits || {
+  minRows: 1,
+  maxRows: 30,
+  minColumns: 1,
+  maxColumns: 60,
+  maxAisles: 20,
+  minAisleSize: 48,
+  maxAisleSize: 240
+})
+
+const draftAisles = computed(() => store.layoutDraft?.aisles || [])
+const aislePositionMax = computed(() => aisleForm.value.axis === 'ROW'
+  ? layoutForm.value.rowCount
+  : layoutForm.value.columnCount)
+const displayDevices = computed(() => {
+  const changes = new Map(positionChanges.value.map(change => [String(change.printerId), change]))
+  return store.rawDeviceList.map(device => {
+    const change = changes.get(String(device.id))
+    return change ? { ...device, gridRow: change.gridRow, gridCol: change.gridCol } : device
+  })
+})
+const draftPositionIssues = computed(() => analyzeDevicePositions(displayDevices.value, store.GRID_CONFIG))
 
 /** 当前设备的实时状态数据 */
 const activeRealTimeData = computed(() => {
@@ -304,8 +389,8 @@ function handleDragStart(device, rowIndex, colIndex) {
  * @param {number} colIndex - 目标列索引
  */
 function handleDragEnter(rowIndex, colIndex) {
-  // 不能放置到过道
-  if (store.isAisleCell(colIndex)) return
+  // 不能放置到横向或纵向过道
+  if (store.isAisleCell(colIndex) || store.isAisleRowCell(rowIndex)) return
   dragOverCell.value = { row: rowIndex, col: colIndex }
 }
 
@@ -330,9 +415,9 @@ function handleDragEnd() {
  * @param {number} targetRowIndex - 目标行索引
  * @param {number} targetColIndex - 目标列索引
  */
-async function handleDrop(targetRowIndex, targetColIndex) {
+function handleDrop(targetRowIndex, targetColIndex) {
   // 防止放置到过道
-  if (store.isAisleCell(targetColIndex)) return
+  if (store.isAisleCell(targetColIndex) || store.isAisleRowCell(targetRowIndex)) return
 
   // 如果没有拖拽的设备，不处理
   if (!draggedDevice.value || !draggedFrom.value) return
@@ -346,38 +431,23 @@ async function handleDrop(targetRowIndex, targetColIndex) {
     return
   }
 
-  // 计算新的物理坐标
-  const newGridRow = targetRowIndex + 1
-  const newGridCol = store.getPhysicalColByIndex(targetColIndex)
+  const targetPosition = getPhysicalSlot(targetRowIndex, targetColIndex)
+  if (!targetPosition) return
 
-  // 获取目标位置的设备（如果有）
-  const targetDevice = store.deviceMatrix[targetRowIndex][targetColIndex]
+  // 获取草稿目标位置的设备（如果有）
+  const targetDevice = displayDevices.value.find(device => (
+    device.gridRow === targetPosition.row && device.gridCol === targetPosition.col
+  ))
 
-  try {
-    if (targetDevice && typeof targetDevice === 'object') {
-      // 放置到已有设备位置 - 交换位置
-      await swapDevicesPosition(
-        draggedDevice.value,
-        { row: fromRow, col: fromCol },
-        targetDevice,
-        { row: targetRowIndex, col: targetColIndex }
-      )
-    } else {
-      // 放置到空位置 - 移动设备
-      await moveDeviceToEmptySlot(
-        draggedDevice.value,
-        { row: fromRow, col: fromCol },
-        { row: newGridRow, col: newGridCol }
-      )
-    }
-
-  message.success('设备位置已更新')
-  } catch (error) {
-    console.error('更新设备位置失败:', error)
-  message.error('更新设备位置失败，请重试')
-  } finally {
-    handleDragEnd()
+  const sourcePosition = getPhysicalSlot(fromRow, fromCol)
+  if (!sourcePosition) return
+  if (targetDevice && String(targetDevice.id) !== String(draggedDevice.value.id)) {
+    swapDevicesPosition(draggedDevice.value, sourcePosition, targetDevice, targetPosition)
+  } else {
+    moveDeviceToEmptySlot(draggedDevice.value, targetPosition)
   }
+  message.info('位置变更已加入布局草稿，保存后生效')
+  handleDragEnd()
 }
 
 // ============================================
@@ -387,17 +457,10 @@ async function handleDrop(targetRowIndex, targetColIndex) {
 /**
  * 移动设备到空位置
  * @param {Object} device - 要移动的设备
- * @param {Object} from - 原位置 {row, col}
  * @param {Object} to - 新位置 {row, col}
  */
-async function moveDeviceToEmptySlot(device, from, to) {
-  const payload = [{
-    id: device.id,
-    gridRow: to.row,
-    gridCol: to.col
-  }]
-
-  await store.updateDevicePositions(payload)
+function moveDeviceToEmptySlot(device, to) {
+  recordPositionChange(device.id, to.row, to.col)
 }
 
 /**
@@ -407,28 +470,22 @@ async function moveDeviceToEmptySlot(device, from, to) {
  * @param {Object} device2 - 第二台设备
  * @param {Object} pos2 - 第二台设备原位置 {row, col}
  */
-async function swapDevicesPosition(device1, pos1, device2, pos2) {
-  // 计算物理坐标
-  const device1NewRow = pos2.row + 1
-  const device1NewCol = store.getPhysicalColByIndex(pos2.col)
-  const device2NewRow = pos1.row + 1
-  const device2NewCol = store.getPhysicalColByIndex(pos1.col)
+function swapDevicesPosition(device1, pos1, device2, pos2) {
+  recordPositionChange(device1.id, pos2.row, pos2.col)
+  recordPositionChange(device2.id, pos1.row, pos1.col)
+}
 
-  // 批量更新两个设备的位置
-  const payload = [
-    {
-      id: device1.id,
-      gridRow: device1NewRow,
-      gridCol: device1NewCol
-    },
-    {
-      id: device2.id,
-      gridRow: device2NewRow,
-      gridCol: device2NewCol
-    }
-  ]
+function getPhysicalSlot(rowIndex, colIndex) {
+  const row = store.getPhysicalRowByIndex(rowIndex)
+  const col = store.getPhysicalColByIndex(colIndex)
+  return row && col ? { row, col } : null
+}
 
-  await store.updateDevicePositions(payload)
+function recordPositionChange(printerId, gridRow, gridCol) {
+  const next = positionChanges.value.filter(change => String(change.printerId) !== String(printerId))
+  next.push({ printerId: String(printerId), gridRow, gridCol })
+  positionChanges.value = next
+  store.setPositionDraft(next)
 }
 
 /**
@@ -449,10 +506,9 @@ function handleCellClick(device, rowIndex, colIndex) {
     drawerVisible.value = true
   } else {
     // 点击空槽位 - 打开绑定弹窗（仅在编辑模式下）
-    targetSlot.value = {
-      row: rowIndex + 1,
-      col: store.getPhysicalColByIndex(colIndex)
-    }
+    const slot = getPhysicalSlot(rowIndex, colIndex)
+    if (!slot) return
+    targetSlot.value = slot
     bindDialogVisible.value = true
   }
 }
@@ -467,28 +523,9 @@ async function performBind(deviceId) {
     return
   }
 
-  try {
-    // 先调用位置更新 API
-    const positionPayload = [{
-      id: deviceId,
-      gridRow: targetSlot.value.row,
-      gridCol: targetSlot.value.col
-    }]
-
-    await store.updateDevicePositions(positionPayload)
-
-    // 再调用打印机更新 API 设置 machineNumber
-    await store.updateDevice({
-      id: deviceId,
-      machineNumber: targetSlotLabel.value
-    })
-
-  message.success('设备绑定成功')
-    bindDialogVisible.value = false
-  } catch (error) {
-    console.error('绑定设备失败:', error)
-  message.error('绑定设备失败，请重试')
-  }
+  recordPositionChange(deviceId, targetSlot.value.row, targetSlot.value.col)
+  message.info('设备绑定已加入布局草稿，保存后生效')
+  bindDialogVisible.value = false
 }
 
 // ============================================
@@ -559,26 +596,31 @@ async function handleEmergencyStop(device) {
 }
 
 /**
- * 处理从看板下架设备
+ * 处理从看板下架设备；下架只写入布局草稿。
  * @param {Object} device - 设备对象
  */
 async function handleRemoveFromBoard(device) {
-  if (!canManageLayout.value) {
-    message.error('当前账号没有下架设备的权限')
+  if (!canManageLayout.value || !isEditMode.value) {
+    message.error('请先进入布局编辑模式')
     return
   }
 
   try {
-    await store.removeDeviceFromBoard(device.id)
-
-  message.success(`设备 ${device.machineNumber} 已从看板下架`)
-
+    await confirmMessage(`确定将设备 ${device.machineNumber || device.name} 从看板下架吗？`, '确认下架', {
+      confirmButtonText: '下架',
+      cancelButtonText: '返回',
+      type: 'danger'
+    })
+    recordPositionChange(device.id, null, null)
+    message.info('下架变更已加入布局草稿，保存后生效')
     // 关闭抽屉
     drawerVisible.value = false
     activeDevice.value = null
   } catch (error) {
-    console.error('下架设备失败:', error)
-  message.error('下架设备失败，请重试')
+    if (error !== 'cancel') {
+      console.error('下架设备失败:', error)
+      message.error('下架设备失败，请重试')
+    }
   }
 }
 
@@ -594,43 +636,175 @@ function handleDrawerClosed() {
 // Layout Edit Mode Functions
 // ============================================
 
-/**
- * 切换编辑模式
- */
 function toggleEditMode() {
   if (!canManageLayout.value) {
     message.error('当前账号没有维护网格布局的权限')
     return
   }
+  if (!store.beginLayoutEdit()) {
+    message.error('布局快照尚未加载完成，请稍后重试')
+    return
+  }
+  positionChanges.value = []
+  store.setPositionDraft([])
+  overflowPolicy.value = 'REJECT'
   isEditMode.value = true
   message.info('已进入编辑模式，现在可以拖拽设备调整位置')
 }
 
-/**
- * 保存布局位置
- * 预留函数桩，用于后续对接保存到数据库的 API
- */
-async function saveLayoutPositions() {
-  if (!canManageLayout.value) return
-  // 拖拽时已经通过 /printers/positions 持久化，这里只负责结束编辑状态。
-}
-
-/**
- * 保存布局并退出编辑模式
- */
-async function saveLayout() {
-  if (!canManageLayout.value) {
+async function cancelLayoutEdit() {
+  if (!store.layoutDirty && !positionChanges.value.length) {
+    store.cancelLayoutEdit()
     isEditMode.value = false
     return
   }
+  try {
+    await confirmMessage('当前布局草稿尚未保存，确定放弃修改吗？', '取消布局编辑', {
+      confirmButtonText: '放弃修改',
+      cancelButtonText: '继续编辑',
+      type: 'warning'
+    })
+    store.cancelLayoutEdit()
+    positionChanges.value = []
+    isEditMode.value = false
+  } catch (error) {
+    if (error !== 'cancel') console.error('取消布局编辑失败:', error)
+  }
+}
+
+function openLayoutSettings() {
+  if (!store.layoutDraft) return
+  layoutForm.value = {
+    rowCount: store.layoutDraft.rowCount,
+    columnCount: store.layoutDraft.columnCount
+  }
+  layoutDialogVisible.value = true
+}
+
+function applyLayoutSettings() {
+  const rowCount = Number(layoutForm.value.rowCount)
+  const columnCount = Number(layoutForm.value.columnCount)
+  if (rowCount * columnCount > (layoutLimits.value.maxCells || 1800)) {
+    message.error('行列乘积不能超过布局槽位上限')
+    return
+  }
+  store.updateLayoutDraft({ rowCount, columnCount })
+  layoutDialogVisible.value = false
+}
+
+function openAisleDialog(aisle = null) {
+  if (!aisle) {
+    aisleListVisible.value = true
+    return
+  }
+  editingAisleId.value = aisle.id
+  aisleForm.value = { axis: aisle.axis, afterIndex: aisle.afterIndex, label: aisle.label, size: aisle.size }
+  aisleDialogVisible.value = true
+  aisleListVisible.value = false
+}
+
+function openNewAisleDialog() {
+  editingAisleId.value = ''
+  aisleForm.value = { axis: 'COLUMN', afterIndex: 0, label: '过道', size: 100 }
+  aisleDialogVisible.value = true
+  aisleListVisible.value = false
+}
+
+function applyAisleSettings() {
+  const label = String(aisleForm.value.label || '').trim()
+  const afterIndex = Number(aisleForm.value.afterIndex)
+  const size = Number(aisleForm.value.size)
+  const positionMax = aisleForm.value.axis === 'ROW'
+    ? layoutForm.value.rowCount
+    : layoutForm.value.columnCount
+  if (!label || label.length > 12 || !Number.isInteger(afterIndex) || afterIndex < 0 || afterIndex > positionMax
+    || !Number.isInteger(size) || size < layoutLimits.value.minAisleSize || size > layoutLimits.value.maxAisleSize) {
+    message.error('请填写合法的过道方向、位置、名称和尺寸')
+    return
+  }
+  const current = [...draftAisles.value]
+  const duplicate = current.find(aisle => aisle.id !== editingAisleId.value
+    && aisle.axis === aisleForm.value.axis && aisle.afterIndex === afterIndex)
+  if (duplicate) {
+    message.error('同方向同位置只能配置一条过道')
+    return
+  }
+  const next = {
+    id: editingAisleId.value || `aisle-${aisleForm.value.axis.toLowerCase()}-${Date.now()}`,
+    axis: aisleForm.value.axis,
+    afterIndex,
+    label,
+    size
+  }
+  const aisles = editingAisleId.value
+    ? current.map(aisle => aisle.id === editingAisleId.value ? next : aisle)
+    : [...current, next]
+  if (aisles.length > layoutLimits.value.maxAisles) {
+    message.error(`过道数量不能超过 ${layoutLimits.value.maxAisles} 条`)
+    return
+  }
+  store.updateLayoutDraft({ aisles })
+  aisleDialogVisible.value = false
+  aisleListVisible.value = true
+}
+
+async function removeAisle(aisle) {
+  try {
+    await confirmMessage(`确定删除过道“${aisle.label}”吗？`, '删除过道', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'danger'
+    })
+    store.updateLayoutDraft({ aisles: draftAisles.value.filter(item => item.id !== aisle.id) })
+  } catch (error) {
+    if (error !== 'cancel') console.error('删除过道失败:', error)
+  }
+}
+
+async function saveLayout() {
+  if (!canManageLayout.value || store.layoutSaving) return
+
+  if (draftPositionIssues.value.outOfBounds.length && overflowPolicy.value === 'REJECT') {
+    const names = draftPositionIssues.value.outOfBounds.map(item => item.name || item.id).join('、')
+    try {
+      await confirmMessage(`缩容后以下设备越界：${names}。确认下架这些设备并保存吗？`, '确认缩容下架', {
+        confirmButtonText: '下架并保存',
+        cancelButtonText: '返回调整',
+        type: 'danger'
+      })
+      overflowPolicy.value = 'UNALLOCATE'
+    } catch (error) {
+      if (error !== 'cancel') console.error('缩容确认失败:', error)
+      return
+    }
+  }
 
   try {
-    await saveLayoutPositions()
+    await store.saveLayoutDraft(positionChanges.value, overflowPolicy.value)
+    await store.fetchDeviceData()
+    positionChanges.value = []
     isEditMode.value = false
-  message.success('布局已保存')
+    message.success('布局已保存')
   } catch (error) {
     console.error('保存布局失败:', error)
-  message.error('保存布局失败，请重试')
+    if (Number(error?.status || error?.code) === 409) {
+      message.error('布局已被其他管理员修改，请重新载入后再保存')
+    } else if (Number(error?.status || error?.code) === 422) {
+      const outOfBounds = error.data?.outOfBoundsPrinters || []
+      const names = outOfBounds.map(item => item.name || item.printerId).join('、')
+      message.error(names
+        ? `布局存在越界设备：${names}，请调整布局或选择下架后重试`
+        : '布局存在越界设备，请调整布局或选择下架后重试')
+    } else {
+      message.error(error?.message || '保存布局失败，请重试')
+    }
+  }
+}
+
+function handleBeforeUnload(event) {
+  if (isEditMode.value && (store.layoutDirty || positionChanges.value.length)) {
+    event.preventDefault()
+    event.returnValue = ''
   }
 }
 
@@ -673,10 +847,19 @@ function reconnectRealtime() {
 onMounted(() => {
   // 先取得服务端布局，再取得完整设备快照；实时连接由应用根部统一维护
   initializeDashboard()
+  window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
+onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnload))
+
 async function initializeDashboard() {
-  await store.loadLayout()
+  try {
+    await store.loadLayout()
+  } catch (error) {
+    console.error('加载看板布局失败:', error)
+    message.error(error?.message || '加载看板布局失败，请重试')
+    return
+  }
   await store.fetchDeviceData()
   fetchHistory()
 }
@@ -739,6 +922,38 @@ async function initializeDashboard() {
   min-width: 0;
   background: var(--app-page-background);
   color: var(--app-text-primary);
+}
+
+.dashboard-layout-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.dashboard-aisle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dashboard-aisle-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.5rem;
+  color: var(--app-text-primary);
+}
+
+.dashboard-aisle-list__item > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .farm-dashboard__workshop {

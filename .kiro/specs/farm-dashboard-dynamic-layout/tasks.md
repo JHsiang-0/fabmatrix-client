@@ -104,7 +104,7 @@ SecurityConfig 显式限制 GET 为 ADMIN/OPERATOR、PUT 为 ADMIN（PUT 保存�
 
 完成记录：GridMap 已改为依据服务端布局生成动态行列头、设备轨道、横纵过道及交叉格，GridCell 展示过道语义并保留原有设备状态与拖放事件；看板初始化先加载布局再加载完整设备快照，30×60 大布局使用网格内部双向滚动。已更新固定 4×12 回归护栏为动态布局断言；前端全量测试 217/217、lint 和 build 均通过。
 
-### [ ] SYNC-002.6 实现 ADMIN 布局编辑工作流
+### [x] SYNC-002.6 实现 ADMIN 布局编辑工作流
 
 - 改造 `FarmDashboard.vue`，进入编辑时创建草稿；拖拽、绑定、交换、下架不再立即请求后端。
 - 使用 TDesign 完成行列设置、过道新增/编辑/删除、变更摘要、取消和保存交互。
@@ -113,6 +113,8 @@ SecurityConfig 显式限制 GET 为 ADMIN/OPERATOR、PUT 为 ADMIN（PUT 保存�
 - OPERATOR 隐藏编辑入口并阻止通过事件或路由触发写操作。
 - 绑定槽位时不再二次更新 `machineNumber`。
 - 验收：保存前刷新/关闭提示未保存变更；取消无服务端写入；成功后刷新页面布局不丢失。
+
+完成记录：ADMIN 布局编辑已改为快照加草稿工作流，行列/过道设置、拖拽移动与交换、绑定、下架均只修改草稿；保存时携带 `expectedVersion` 一次提交，成功后刷新设备快照，失败保留草稿。已加入 TDesign 布局/过道 Dialog、保存 loading、防重复提交、取消确认、缩容越界下架二次确认、409/422 提示、OPERATOR 写入保护和 beforeunload 未保存保护；绑定不再改写 `machineNumber`。前端全量测试 219/219、lint 和 build 均通过。
 
 ### [ ] SYNC-002.7 实现多客户端同步与 Mock 契约
 
