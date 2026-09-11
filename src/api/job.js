@@ -15,7 +15,7 @@ import { toBatchPreviewPayload } from '@/utils/batchDispatch'
 /**
  * 获取排队中的任务列表
  * 仅返回 QUEUED 状态的待派发任务
- * @returns {Promise<{code: number, message: string, data: Array<PrintJob>}>} 任务队列
+ * @returns {Promise<{code: number, message: string, data: Array<PrintJobSummary>}>} 当前实现为 PrintJobVO 数组；TC-001 目标为 PrintJobSummaryVO[]
  */
 export function getJobQueue() {
   return request({
@@ -27,7 +27,7 @@ export function getJobQueue() {
   ))
 }
 
-/** 获取任务详情，返回完整 PrintJobVO。 */
+/** 获取任务详情；当前实现返回 PrintJobVO，TC-001 目标为 PrintJobDetailVO。 */
 export function getJobDetail(id) {
   return request({
     url: `/api/v1/print-jobs/${id}`,
@@ -44,7 +44,7 @@ export function getJobDetail(id) {
  * @param {number} [data.priority=0] - 优先级（0-100）
  * @param {number|string} [data.printerId] - 指定打印机，仅进入 ASSIGNED，不直接启动
  * @param {string} [data.idempotencyKey] - 幂等键
- * @returns {Promise<{code: number, message: string, data: string}>} 创建结果，data 为新任务 ID
+ * @returns {Promise<{code: number, message: string, data: string}>} 当前/目标契约均为新任务 ID 字符串
  */
 export function createPrintJob(data, options = {}) {
   return request({
@@ -72,7 +72,7 @@ export function createPrintJobLegacy(data) {
  * 指派任务给指定打印机（仅分配，不触发打印）- 安全模式第一步
  * @param {number|string} jobId - 任务ID
  * @param {number|string} printerId - 打印机ID
- * @returns {Promise<{code: number, message: string, data: PrintJob}>} 指派结果
+ * @returns {Promise<{code: number, message: string, data: null}>} 当前/目标契约均为 null；成功后由前端刷新详情和列表
  */
 export function assignJobToPrinter(jobId, printerId) {
   return request({
@@ -86,7 +86,7 @@ export function assignJobToPrinter(jobId, printerId) {
  * 启动任务打印（现场启动打印）- 安全模式第二步之二
  * @param {number|string} jobId - 任务ID
  * @param {string} [action='START_PRINT'] - 操作类型：'START_PRINT' 或 'UPLOAD_ONLY'
- * @returns {Promise<{code: number, message: string, data: PrintJob}>} 启动结果
+ * @returns {Promise<{code: number, message: string, data: null}>} 当前/目标契约均为 null；成功后由前端刷新详情和列表
  */
 export function startJob(jobId, action = 'START_PRINT') {
   return request({
@@ -108,17 +108,17 @@ export function cancelJob(id) {
   })
 }
 
-/** 将失败任务重新放回队列。 */
+/** 将失败任务重试；当前实现返回 null，TC-001 目标为新建任务 ID 字符串且原任务不可变。 */
 export function retryJob(id) {
   return request({ url: `/api/v1/print-jobs/${id}/retry`, method: 'post' })
 }
 
-/** 将已分配或待机任务重新放回队列。 */
+/** 将 ASSIGNED/READY 任务重新放回队列；当前/目标契约 data 均为 null。 */
 export function requeueJob(id) {
   return request({ url: `/api/v1/print-jobs/${id}/requeue`, method: 'post' })
 }
 
-/** 人工核对 RECONCILING 任务结果。 */
+/** 人工核对 RECONCILING 任务结果；当前/目标契约 data 均为 null。 */
 export function reconcilePrintJob(id, data) {
   return request({
     url: `/api/v1/print-jobs/${id}/reconcile`,
@@ -127,7 +127,7 @@ export function reconcilePrintJob(id, data) {
   }).then(response => mapResponseData(response, normalizePrintJob))
 }
 
-/** 调整排队任务优先级，范围 0-100。 */
+/** 调整 QUEUED 任务优先级，范围 0-100；当前/目标契约 data 均为 null。 */
 export function updateJobPriority(id, priority) {
   return request({
     url: `/api/v1/print-jobs/${id}/priority`,
@@ -169,10 +169,13 @@ export function retryPreviewBatchDispatch(data) {
  * @param {number} params.pageNum - 页码
  * @param {number} params.pageSize - 每页大小
  * @param {string} [params.status] - 任务状态
+ * @param {string[]} [params.statuses] - 多状态筛选；与 status 互斥（TC-001 目标字段，当前后端尚未实现）
  * @param {number} [params.printerId] - 打印机ID
- * @param {string} [params.startTime] - 开始时间（ISO格式）
- * @param {string} [params.endTime] - 结束时间（ISO格式）
- * @returns {Promise<{code: number, message: string, data: {records: Array<PrintJob>, total: number}}>} 分页结果
+ * @param {string} [params.fileName] - 文件名筛选（TC-001 目标字段，当前后端尚未实现）
+ * @param {'CREATED_AT'|'COMPLETED_AT'} [params.timeField] - 时间字段（TC-001 目标字段，当前后端尚未实现）
+ * @param {string} [params.startTime] - 开始时间，yyyy-MM-dd'T'HH:mm:ss local datetime
+ * @param {string} [params.endTime] - 结束时间，yyyy-MM-dd'T'HH:mm:ss local datetime
+ * @returns {Promise<{code: number, message: string, data: {records: Array<PrintJobSummary>, total: number}}>} 当前实现为 PrintJobVO 分页；TC-001 目标为 PageResult<PrintJobSummaryVO>
  */
 export function getJobPage(params = {}) {
   return request({
@@ -190,7 +193,37 @@ export function getJobPage(params = {}) {
 // ============================================
 
 /**
- * @typedef {Object} PrintJob
+ * @typedef {Object} PrintJobSummary
+ * @property {string} id - 任务ID（JSON 十进制字符串）
+ * @property {string} fileId - 关联文件ID（JSON 十进制字符串）
+ * @property {string} [printerId] - 分配的打印机ID（JSON 十进制字符串）
+ * @property {string} userId - 创建人用户ID（JSON 十进制字符串）
+ * @property {string} [operatorId] - 操作员用户ID（JSON 十进制字符串）
+ * @property {string} fileName - 当前文件名称；TC-001 目标字段
+ * @property {string} [printerName] - 当前打印机名称；TC-001 目标字段
+ * @property {string} [machineNumber] - 当前机器编号；TC-001 目标字段
+ * @property {string} [creatorUsername] - 创建人用户名；TC-001 目标字段
+ * @property {string} [operatorUsername] - 操作员用户名；TC-001 目标字段
+ * @property {string} [materialType] - 耗材类型；TC-001 目标字段
+ * @property {string} [nozzleSize] - 喷嘴尺寸；TC-001 目标字段
+ * @property {string} [fileNameSnapshot] - 历史文件名快照；TC-001 目标字段
+ * @property {string} [printerNameSnapshot] - 历史打印机名称快照；TC-001 目标字段
+ * @property {string} [machineNumberSnapshot] - 历史机器编号快照；TC-001 目标字段
+ * @property {string} [creatorUsernameSnapshot] - 历史创建人快照；TC-001 目标字段
+ * @property {string} [operatorUsernameSnapshot] - 历史操作员快照；TC-001 目标字段
+ * @property {string} [retryOfJobId] - 直接来源任务 ID；TC-001 目标字段
+ * @property {string} [rootJobId] - 首次任务 ID；TC-001 目标字段
+ * @property {number} [attemptNumber] - 尝试序号；TC-001 目标字段
+ * @property {number} priority - 优先级（0-100）
+ * @property {string} status - 任务状态
+ * @property {number} progress - 打印进度（0-100）
+ * @property {string} createdAt - 创建时间
+ * @property {string} updatedAt - 更新时间
+ */
+
+/**
+ * 当前后端兼容的 PrintJobVO；未来由 PrintJobSummaryVO/PrintJobDetailVO 替代。
+ * @typedef {PrintJobSummary} PrintJob
  * @property {string} id - 任务ID（JSON 十进制字符串）
  * @property {string} fileId - 关联文件ID（JSON 十进制字符串）
  * @property {string} fileName - 文件名称

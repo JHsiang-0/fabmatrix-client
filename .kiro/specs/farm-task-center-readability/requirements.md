@@ -1,9 +1,9 @@
 # FabMatrix 任务中心可读性与可靠性改造需求
 
-版本：v1.0
+版本：v1.1
 任务标识：TC-001 ～ TC-008
 任务类型：前后端联合整改
-状态：待实施
+状态：TC-001 已冻结；TC-002 ～ TC-008 待实施
 涉及项目：`fabmatrix-client`、`fabmatrix-server`
 
 ## 1. 背景
@@ -34,6 +34,8 @@
 - `machineNumber`
 - `creatorUsername`
 - `operatorUsername`
+- `materialType`
+- `nozzleSize`
 
 要求：
 
@@ -42,12 +44,14 @@
 - 关联资源已删除或无权限读取时，仍保留任务记录并使用名称快照或 ID 回退。
 - 禁止前端逐任务调用文件、打印机或用户详情接口补名称。
 
+目标读模型固定为 `PrintJobSummaryVO` 和 `PrintJobDetailVO`。详情至少包含摘要全集并保留技术 ID。新增字段还包括 `fileNameSnapshot`、`printerNameSnapshot`、`machineNumberSnapshot`、`creatorUsernameSnapshot`、`operatorUsernameSnapshot`、`retryOfJobId`、`rootJobId` 和 `attemptNumber`。所有 ID 在 JSON 中均为十进制字符串；TC-001 未完成后端实施前，当前接口未返回的字段不得由前端伪造。
+
 ### R-TC-002 队列语义
 
 - 待派发队列只包含规范化后的 `QUEUED`。
 - 排序固定为 `priority DESC, createdAt ASC, id ASC`。
 - OPERATOR 只查询本人任务，权限条件必须在数据库查询阶段生效。
-- GET 查询不得迁移状态或写数据库；遗留 `PENDING/MANUAL/CANCELED` 通过独立迁移处理。
+- GET 查询不得迁移状态或写数据库；遗留 `PENDING/MANUAL/CANCELED` 只通过独立迁移规范化为 `QUEUED/CANCELLED`。
 
 ### R-TC-003 活动任务完整分页
 
@@ -74,7 +78,9 @@
 
 - 支持按终态、打印机、文件名、创建人和完成时间筛选。
 - 时间筛选必须明确区分 `createdAt` 与 `completedAt`，历史页默认使用完成时间。
-- 分页排序固定为 `completedAt DESC, id DESC`，避免同一时间数据跨页漂移。
+- 请求兼容单值 `status`，新增 `statuses`、`fileName` 和 `timeField(CREATED_AT|COMPLETED_AT)`；`status/statuses` 同时传递返回 400。
+- `startTime/endTime` 使用 `yyyy-MM-dd'T'HH:mm:ss` 的 ISO-8601 local datetime，按农场配置时区解释，默认 `Asia/Shanghai`；`startTime>endTime` 返回 400。
+- 历史分页排序固定为 `completedAt DESC,id DESC` 且 null last；其他集合固定为 `createdAt DESC,id DESC`。
 
 ### R-TC-005 历史名称与执行快照
 
@@ -91,8 +97,8 @@
 ### R-TC-006 重试与尝试记录
 
 - 重试不得清除原失败记录的打印机、操作员、开始时间、完成时间和错误原因。
-- 采用新的任务记录并保存 `retryOfJobId`，或增加 `farm_print_job_attempt` 执行尝试表。
-- 每次尝试保留状态、设备、操作员、开始/结束时间、进度和失败原因。
+- 固定采用新的任务记录并保存 `retryOfJobId`、`rootJobId`、`attemptNumber`，不增加 `farm_print_job_attempt` 执行尝试表。
+- 新任务为 `QUEUED`，无打印机、操作员、开始/完成时间和错误原因，保留原 user/file/priority 及文件和创建人快照；原任务不可变。
 
 ### R-TC-007 实时状态收敛
 
@@ -108,6 +114,10 @@
 - `RECONCILING` 只能通过人工核对接口完成、失败、取消或重新排队，不能调用设备控制代替核对。
 - 统一处理 400/401/403/404/409/422/503，失败后保留上下文并重新同步服务端状态。
 - 所有写操作防重复点击并展示 loading。
+
+任务操作边界固定为：cancel 允许 `QUEUED/ASSIGNED/UPLOADING/READY/PRINTING/PAUSED`，`RECONCILING` 必须 reconcile，终态不可取消；retry 仅允许 `FAILED`；requeue 仅允许 `ASSIGNED/READY`；reconcile 仅允许 `RECONCILING` 并可到 `COMPLETED/FAILED/CANCELLED/QUEUED`；priority 仅允许 `QUEUED`；safe assign 为 `QUEUED→ASSIGNED`，safe start 经安全确认后按 action 进入现有流程。设备失败返回 503，状态错误返回 422，reconcile 参数错误返回 400。旧 `/{jobId}/assign` deprecated，后续实施目标为 410。
+
+错误码语义固定为：400 参数格式/互斥/时间范围，401 未登录，403 已认证但角色或操作无权，404 不存在或不可访问，409 并发/幂等冲突，422 状态机/业务前置条件，503 设备或外部依赖失败。queue/page/detail 的目标 data 类型分别为 `PrintJobSummaryVO[]`、`PageResult<PrintJobSummaryVO>`、`PrintJobDetailVO`；create/retry 为新 ID 字符串，其余写操作为 null。
 
 ## 4. 非功能要求
 
