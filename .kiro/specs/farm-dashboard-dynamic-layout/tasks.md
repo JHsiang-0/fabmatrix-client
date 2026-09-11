@@ -41,7 +41,7 @@ SYNC-002.9 迁移交付与文档收口
 
 完成记录：已冻结单农场共享布局、4×12 默认值、1–30 行、1–60 列、最多 20 条横纵过道、`GET/PUT /api/v1/dashboard-layout`、乐观版本、原子坐标变更、REJECT/UNALLOCATE 缩容、ADMIN/OPERATOR 权限、结构化错误和 `version=1` 的 `LAYOUT_UPDATED` 扩展。前后端交接文档均明确标记为目标契约、尚未实现；后端新增独立 OpenAPI 设计文档，未修改业务代码、数据库或运行时协议。
 
-### [ ] SYNC-002.1 完成数据预检与 MySQL/SQLite 迁移
+### [x] SYNC-002.1 完成数据预检与 MySQL/SQLite 迁移
 
 - 为 MySQL 和 SQLite 提供只读预检，列出半空坐标、重复槽位、非正数和超出默认 4×12 的设备。
 - 新增并初始化 `farm_dashboard_layout` 单例表和默认布局。
@@ -49,6 +49,8 @@ SYNC-002.9 迁移交付与文档收口
 - 更新 `farm.sql`、`02-current-schema.sql`、`local-schema.sql`、`LocalSchemaMigration` 和两份 Compose 挂载。
 - 提供已有 MySQL 数据卷和已有 SQLite 文件的备份、执行、验证、回滚说明。
 - 验收：MySQL/SQLite 新库与已有库均可重复执行迁移；异常数据时迁移安全停止并给出清单。
+
+完成记录：已新增 MySQL 8.4/SQLite 独立只读坐标预检、MySQL 编号 16 幂等迁移、SQLite 新库约束和已有库启动迁移。迁移会在布局 DDL 前重复预检，异常或同名错误结构均明确阻断；默认布局为 4×12、物理第 7 列后 100px 过道、版本 1。已补齐两份 Compose 的 MySQL 14、15、16 只读挂载，并新增备份、执行、验证、回滚及失败新卷处理说明。未进行真实 MySQL 数据卷验收，因当前没有安全隔离的 MySQL 容器环境。
 
 ### [ ] SYNC-002.2 实现后端布局读取资源
 
