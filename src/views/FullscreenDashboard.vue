@@ -43,10 +43,11 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { isNavigationFailure, useRouter } from 'vue-router'
 import FarmDashboard from '@/components/FarmDashboard.vue'
 import { usePrinterStore } from '@/stores/printer'
 import { exitAppFullscreen } from '@/utils/fullscreen'
+import { createFullscreenLeaveHandler } from '@/utils/fullscreenNavigation'
 
 defineOptions({ name: 'FullscreenDashboard' })
 
@@ -56,8 +57,8 @@ const viewportWidth = ref(window.innerWidth)
 const fullscreenSupported = ref(true)
 const retrying = ref(false)
 const reconnecting = ref(false)
-let leaving = false
 let removeDesktopFullscreenListener = null
+let fullscreenExitPromise = null
 
 const snapshotLoading = computed(() => store.loading && !store.rawDeviceList.length)
 const snapshotError = computed(() => store.deviceError)
@@ -70,16 +71,21 @@ const realtimeNotice = computed(() => {
   return ''
 })
 
-const leaveFullscreenDashboard = () => {
-  if (leaving) return
-  leaving = true
-
-  // 不等待全屏 API 的异步结果，确保按钮点击后立即恢复普通页面。
-  void exitAppFullscreen().catch(error => {
+const exitFullscreenOnce = () => {
+  if (!fullscreenExitPromise) fullscreenExitPromise = exitAppFullscreen().catch(error => {
     console.warn('退出全屏失败，将继续返回普通监控页:', error)
   })
-  void router.replace({ name: 'printers' })
+  return fullscreenExitPromise
 }
+
+const fullscreenLeave = createFullscreenLeaveHandler({
+  navigate: () => router.replace({ name: 'printers' }),
+  isNavigationFailure,
+  exitFullscreen: exitFullscreenOnce,
+  onError: error => console.warn('返回普通监控页失败:', error)
+})
+
+const leaveFullscreenDashboard = () => fullscreenLeave.leave()
 
 const handleBrowserFullscreenChange = () => {
   if (window.farmDesktop?.isDesktop) return
@@ -141,7 +147,7 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('resize', handleViewportResize)
   removeDesktopFullscreenListener?.()
-  void exitAppFullscreen().catch(() => {})
+  void exitFullscreenOnce()
 })
 </script>
 

@@ -181,3 +181,30 @@ test('旧 positions 路由复用布局原子校验、回滚和版本事件且保
   stream.close()
   globalThis.window = previousWindow
 })
+
+test('旧 positions 路由只接受 1-100 项数组，非法请求不改版本且不发布局事件', async () => {
+  const previousWindow = globalThis.window
+  globalThis.window = { setInterval, clearInterval }
+  const events = []
+  const stream = createMockWebSocketStream({ onMessage: event => events.push(event) })
+  const before = JSON.stringify({ layout: mockState.dashboardLayout, printers: mockState.printers })
+  const invalidBodies = [
+    [],
+    null,
+    { id: '408', gridRow: 4, gridCol: 12 },
+    Array.from({ length: 101 }, (_, index) => ({ id: String(index + 1), gridRow: null, gridCol: null }))
+  ]
+
+  for (const body of invalidBodies) {
+    await assert.rejects(() => positionsRequest(body), error => {
+      assert.equal(error.response.status, 400)
+      assert.equal(error.response.data.code, 400)
+      return true
+    })
+    assert.equal(JSON.stringify({ layout: mockState.dashboardLayout, printers: mockState.printers }), before)
+  }
+  assert.equal(mockState.dashboardLayout.version, 1)
+  assert.equal(events.some(event => event.type === 'LAYOUT_UPDATED'), false)
+  stream.close()
+  globalThis.window = previousWindow
+})

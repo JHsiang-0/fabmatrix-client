@@ -883,7 +883,10 @@ const handleUnallocatedPrinters = config => {
 
 const handlePositions = config => {
   requireSession(config, ['ADMIN'])
-  const positions = Array.isArray(config.data) ? config.data : []
+  const positions = config.data
+  if (!Array.isArray(positions) || positions.length < 1 || positions.length > 100) {
+    fail(400, 400, '位置更新请求体必须是包含 1-100 项的数组')
+  }
   handleDashboardLayout({
     ...config,
     method: 'put',

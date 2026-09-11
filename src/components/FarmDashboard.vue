@@ -11,7 +11,7 @@
           <t-button class="dashboard-action-button" theme="default" variant="outline" size="small"
             @click="openAisleDialog">过道管理</t-button>
           <t-button class="dashboard-action-button" theme="default" variant="outline" size="small"
-            @click="cancelLayoutEdit">取消</t-button>
+            :disabled="store.layoutSaving" @click="cancelLayoutEdit">取消</t-button>
           <t-button class="dashboard-action-button" theme="primary" variant="base" size="small"
             :loading="store.layoutSaving" @click="saveLayout">保存布局</t-button>
         </div>
@@ -48,7 +48,8 @@
             </li>
           </ul>
           <div class="dashboard-position-alert__actions">
-            <t-button v-if="isEditMode" size="small" variant="outline" @click="cancelLayoutEdit">
+            <t-button v-if="isEditMode" size="small" variant="outline" :disabled="store.layoutSaving"
+              @click="cancelLayoutEdit">
               撤销布局修改
             </t-button>
             <t-button v-else size="small" variant="outline" :loading="store.layoutLoading"
@@ -215,6 +216,7 @@ import {
   PrintIcon
 } from 'tdesign-icons-vue-next'
 import { message, confirmMessage } from '@/utils/message'
+import { guardDashboardRouteLeave } from '@/utils/dashboardRouteGuard'
 import { renderIcon } from '@/utils/tdesign'
 import { useUserStore } from '@/stores/user'
 import { usePrinterStore } from '@/stores/printer'
@@ -284,6 +286,7 @@ const aisleAxisOptions = [
 
 const hasUnsavedLayoutChanges = computed(() => Boolean(store.layoutDraft)
   && (store.layoutDirty || positionChanges.value.length > 0))
+let cleanupAfterSave = false
 
 function clearLayoutEditingState() {
   store.discardLayoutEdit()
@@ -796,6 +799,10 @@ function toggleEditMode() {
 }
 
 async function cancelLayoutEdit() {
+  if (store.layoutSaving) {
+    message.warning('保存中请稍候')
+    return
+  }
   try {
     if (hasUnsavedLayoutChanges.value) {
       await confirmMessage('当前布局草稿尚未保存，确定放弃修改吗？', '取消布局编辑', {
@@ -975,6 +982,8 @@ async function executeSaveLayout() {
     } else {
       message.error(error?.message || '保存布局失败，请重试')
     }
+  } finally {
+    if (cleanupAfterSave) clearLayoutEditingState()
   }
 }
 
@@ -991,7 +1000,7 @@ async function reloadLatestLayout() {
 }
 
 function handleBeforeUnload(event) {
-  if (hasUnsavedLayoutChanges.value) {
+  if (store.layoutSaving || hasUnsavedLayoutChanges.value) {
     event.preventDefault()
     event.returnValue = ''
   }
@@ -1039,28 +1048,22 @@ onMounted(() => {
   window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
-onBeforeRouteLeave(async () => {
-  if (!hasUnsavedLayoutChanges.value) {
-    clearLayoutEditingState()
-    return true
-  }
-  try {
-    await confirmMessage('当前布局草稿尚未保存，确定离开并放弃修改吗？', '离开布局编辑', {
+onBeforeRouteLeave(() => guardDashboardRouteLeave({
+  isSaving: () => store.layoutSaving,
+  hasUnsavedChanges: () => hasUnsavedLayoutChanges.value,
+  confirmDiscard: () => confirmMessage('当前布局草稿尚未保存，确定离开并放弃修改吗？', '离开布局编辑', {
       confirmButtonText: '放弃并离开',
       cancelButtonText: '继续编辑',
       type: 'warning'
-    })
-    clearLayoutEditingState()
-    return true
-  } catch (error) {
-    if (error !== 'cancel') console.error('离开布局编辑确认失败:', error)
-    return false
-  }
-})
+  }),
+  clearEditingState: clearLayoutEditingState,
+  notifySaving: content => message.warning(content)
+}))
 
 onBeforeUnmount(() => {
   if (typeof window !== 'undefined') window.removeEventListener('beforeunload', handleBeforeUnload)
-  clearLayoutEditingState()
+  if (store.layoutSaving) cleanupAfterSave = true
+  else clearLayoutEditingState()
 })
 
 async function initializeDashboard() {

@@ -6,6 +6,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 import { createServer } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { guardDashboardRouteLeave } from '../src/utils/dashboardRouteGuard.js'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const limits = {
@@ -174,4 +175,61 @@ test('真实 device Pinia Store 的旧设备请求被取消后不能覆盖最新
 
   assert.deepEqual(devices.rawDeviceList.map(device => device.id), ['9007199254740995'])
   assert.equal(devices.version, 1)
+})
+
+test('真实 grid Pinia Store 保存未完成时路由守卫拒绝放弃，完成后恢复导航', async () => {
+  setActivePinia(createPinia())
+  const pendingSave = deferred()
+  let saveConfig
+  service.defaults.adapter = config => {
+    if (config.url === '/api/v1/dashboard-layout' && config.method === 'get') {
+      return Promise.resolve(axiosResponse(config, layout(1)))
+    }
+    if (config.url === '/api/v1/dashboard-layout' && config.method === 'put') {
+      saveConfig = config
+      return pendingSave.promise
+    }
+    return Promise.reject(new Error(`未处理测试路由: ${config.method} ${config.url}`))
+  }
+
+  const grid = useGridStore()
+  await grid.loadLayout()
+  grid.startLayoutEdit()
+  grid.updateLayoutDraft({ rowCount: 5 })
+  const savePromise = grid.saveLayoutDraft()
+  await waitFor(() => grid.layoutSaving)
+
+  let confirmCount = 0
+  let clearCount = 0
+  const notices = []
+  const blocked = await guardDashboardRouteLeave({
+    isSaving: () => grid.layoutSaving,
+    hasUnsavedChanges: () => Boolean(grid.layoutDraft),
+    confirmDiscard: async () => { confirmCount += 1 },
+    clearEditingState: () => { clearCount += 1 },
+    notifySaving: content => notices.push(content)
+  })
+  assert.equal(blocked, false)
+  assert.equal(confirmCount, 0)
+  assert.equal(clearCount, 0)
+  assert.deepEqual(notices, ['保存中请稍候'])
+  assert.equal(grid.layoutDraft.rowCount, 5)
+
+  pendingSave.resolve(axiosResponse(saveConfig, {
+    layout: layout(2, 5),
+    changedPositions: [],
+    unallocatedPrinters: []
+  }))
+  await savePromise
+  assert.equal(grid.layoutSaving, false)
+  const allowed = await guardDashboardRouteLeave({
+    isSaving: () => grid.layoutSaving,
+    hasUnsavedChanges: () => Boolean(grid.layoutDraft),
+    confirmDiscard: async () => { confirmCount += 1 },
+    clearEditingState: () => { clearCount += 1 },
+    notifySaving: content => notices.push(content)
+  })
+  assert.equal(allowed, true)
+  assert.equal(confirmCount, 0)
+  assert.equal(clearCount, 1)
 })
