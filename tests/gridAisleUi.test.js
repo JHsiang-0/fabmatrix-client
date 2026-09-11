@@ -44,6 +44,8 @@ test('大布局使用内部双向滚动，过道轨道与表头共用模板', ()
   assert.match(gridMapSource, /:style="rowTemplateStyle"/)
   assert.match(gridMapSource, /gridTemplateColumns: columnTemplate\.value/)
   assert.doesNotMatch(gridMapSource, /dimension-change|emitDimensionChange/)
+  assert.match(gridMapSource, /\.grid-map-corner \{\s*height: 1\.75rem;/)
+  assert.match(gridMapSource, /\.grid-map-column-header \{\s*height: 1\.75rem;\s*margin-bottom: 0;/)
   assert.doesNotMatch(gridMapSource, /repeat\(13, 100px\)|repeat\(4, 120px\)/)
 })
 

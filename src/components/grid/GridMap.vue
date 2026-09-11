@@ -258,7 +258,8 @@ onBeforeUnmount(() => {
 }
 
 .grid-map-column-header {
-  margin-bottom: 0.125rem;
+  height: 1.75rem;
+  margin-bottom: 0;
 }
 
 .grid-map-row-label,
