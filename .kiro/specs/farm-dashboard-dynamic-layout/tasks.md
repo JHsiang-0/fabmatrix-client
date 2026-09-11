@@ -143,13 +143,18 @@ WebSocket 回归护栏。前端全量测试 227/227、lint、生产/desktop/desk
 Electron E2E 3/3、Electron-dist E2E 1/1 通过；后端 `mvn test` 通过。真实 MySQL/SQLite 数据卷验收未执行，
 因当前任务明确禁止连接真实数据库或数据卷，待具备隔离环境后补做，故本任务暂不标记 DONE。
 
-### [ ] SYNC-002.9 完成迁移交付与文档收口
+### [x] SYNC-002.9 完成迁移交付与文档收口
 
 - 更新部署、升级、回滚、数据库预检、API handoff 和管理员操作说明。
 - 明确部署顺序为“数据库迁移 → 后端 → 前端”，并记录旧 positions API 的弃用窗口。
 - 检查前后端 diff、敏感信息、锁文件、备份文件和无关工作区改动。
 - 前后端按子任务独立创建 Conventional Commit，不 push、不覆盖已有提交。
 - 验收：新环境和升级环境均可按文档复现；规格、接口、迁移和实际实现一致。
+
+完成记录：后端已更新 `OPERATIONS.md`、`API_HANDOFF.md`、`docs/DASHBOARD_LAYOUT_MIGRATION.md` 和
+`docs/DASHBOARD_LAYOUT_CONTRACT.md`，明确“预检 → 数据库迁移 → 后端 → 前端”顺序、MySQL 16 号迁移入口、
+SQLite `LocalSchemaMigration`/partial index/触发器职责、备份回滚、管理员缩容操作及旧 positions 弃用窗口；
+后端文档提交为 `6af0a6c`，前端任务记录随本提交更新。真实数据库验收仍按 002.8 的安全限制单独保留未完成。
 
 ## 实施纪律
 
