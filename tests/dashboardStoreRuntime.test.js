@@ -35,10 +35,26 @@ const axiosResponse = (config, data) => ({
   headers: {},
   config
 })
+const unauthorized = config => {
+  const error = new Error('Unauthorized')
+  error.config = config
+  error.response = {
+    status: 401,
+    statusText: 'Unauthorized',
+    data: { code: 401, message: '登录已过期', data: null, timestamp: 1789092000000 },
+    headers: {},
+    config
+  }
+  return error
+}
 const deferred = () => {
   let resolve
-  const promise = new Promise(done => { resolve = done })
-  return { promise, resolve }
+  let reject
+  const promise = new Promise((done, fail) => {
+    resolve = done
+    reject = fail
+  })
+  return { promise, resolve, reject }
 }
 const waitFor = async predicate => {
   for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -54,6 +70,9 @@ let originalAdapter
 let useGridStore
 let useDeviceStore
 let useRealtimeStore
+let useUserStore
+let request
+let router
 
 test.before(async () => {
   viteServer = await createServer({
@@ -62,9 +81,11 @@ test.before(async () => {
     appType: 'custom',
     plugins: [vue()],
     resolve: { alias: { '@': path.resolve(root, 'src') } },
-    server: { middlewareMode: true }
+    server: { middlewareMode: true, hmr: false }
   })
-  ;({ service } = await viteServer.ssrLoadModule('/src/utils/request.js'))
+  ;({ default: request, service } = await viteServer.ssrLoadModule('/src/utils/request.js'))
+  ;({ default: router } = await viteServer.ssrLoadModule('/src/router/index.js'))
+  ;({ useUserStore } = await viteServer.ssrLoadModule('/src/stores/user.js'))
   ;({ useGridStore } = await viteServer.ssrLoadModule('/src/stores/printer/gridStore.js'))
   ;({ useDeviceStore } = await viteServer.ssrLoadModule('/src/stores/printer/deviceStore.js'))
   ;({ useRealtimeStore } = await viteServer.ssrLoadModule('/src/stores/printer/realtimeStore.js'))
@@ -236,4 +257,166 @@ test('真实 grid Pinia Store 保存未完成时路由守卫拒绝放弃，完�
   assert.equal(allowed, true)
   assert.equal(confirmCount, 0)
   assert.equal(clearCount, 1)
+})
+
+test('旧会话 deferred 保存成功与 cleanup 不能覆盖快速重登后的新草稿', async () => {
+  setActivePinia(createPinia())
+  const pendingSave = deferred()
+  let saveConfig
+  service.defaults.adapter = config => {
+    if (config.url === '/api/v1/dashboard-layout' && config.method === 'get') {
+      return Promise.resolve(axiosResponse(config, layout(1)))
+    }
+    if (config.url === '/api/v1/dashboard-layout' && config.method === 'put') {
+      saveConfig = config
+      return pendingSave.promise
+    }
+    return Promise.reject(new Error(`未处理测试路由: ${config.method} ${config.url}`))
+  }
+
+  const grid = useGridStore()
+  await grid.loadLayout()
+  grid.startLayoutEdit()
+  const oldOwner = grid.draftOwner
+  grid.updateLayoutDraft({ rowCount: 5 })
+  const oldSave = grid.saveLayoutDraft([], 'REJECT', oldOwner)
+  await waitFor(() => grid.layoutSaving)
+  assert.equal(grid.layoutSavingOwner, oldOwner)
+
+  // 模拟旧组件离开后快速重新登录，新组件基于当前快照开启独立草稿。
+  grid.startLayoutEdit()
+  const newOwner = grid.draftOwner
+  grid.updateLayoutDraft({ rowCount: 7 })
+  grid.setPositionDraft([{ printerId: '408', gridRow: 4, gridCol: 12 }])
+  assert.notEqual(newOwner, oldOwner)
+
+  pendingSave.resolve(axiosResponse(saveConfig, {
+    layout: layout(2, 5),
+    changedPositions: [],
+    unallocatedPrinters: []
+  }))
+  const result = await oldSave
+  assert.equal(result.operationApplied, false)
+  assert.equal(grid.layoutSnapshot.version, 1)
+  assert.equal(grid.layoutDraft.rowCount, 7)
+  assert.equal(grid.draftOwner, newOwner)
+  assert.deepEqual(grid.positionDraft, [{ printerId: '408', gridRow: 4, gridCol: 12 }])
+  assert.equal(grid.discardLayoutEdit(oldOwner), false)
+  assert.equal(grid.layoutDraft.rowCount, 7)
+  assert.equal(grid.layoutSaving, false)
+  assert.equal(grid.layoutSavingOwner, null)
+})
+
+test('旧会话 deferred 保存失败与 finally 不能污染新草稿错误状态', async () => {
+  setActivePinia(createPinia())
+  const pendingSave = deferred()
+  service.defaults.adapter = config => {
+    if (config.url === '/api/v1/dashboard-layout' && config.method === 'get') {
+      return Promise.resolve(axiosResponse(config, layout(1)))
+    }
+    if (config.url === '/api/v1/dashboard-layout' && config.method === 'put') return pendingSave.promise
+    return Promise.reject(new Error(`未处理测试路由: ${config.method} ${config.url}`))
+  }
+
+  const grid = useGridStore()
+  await grid.loadLayout()
+  grid.startLayoutEdit()
+  const oldOwner = grid.draftOwner
+  grid.updateLayoutDraft({ rowCount: 5 })
+  const oldSave = grid.saveLayoutDraft([], 'REJECT', oldOwner).catch(error => error)
+  await waitFor(() => grid.layoutSaving)
+  grid.startLayoutEdit()
+  const newOwner = grid.draftOwner
+  grid.updateLayoutDraft({ rowCount: 8 })
+
+  const canceled = new Error('旧会话请求已取消')
+  canceled.code = 'ERR_CANCELED'
+  pendingSave.reject(canceled)
+  assert.equal(await oldSave, canceled)
+  assert.equal(grid.layoutDraft.rowCount, 8)
+  assert.equal(grid.draftOwner, newOwner)
+  assert.equal(grid.layoutError, null)
+  assert.equal(grid.layoutConflict, null)
+  assert.equal(grid.layoutSaving, false)
+  assert.equal(grid.layoutSavingOwner, null)
+})
+
+const authenticate = (userStore, token) => {
+  userStore.token = token
+  userStore.userInfo = { id: '1', username: 'admin', role: 'ADMIN' }
+  userStore.restoreState = 'authenticated'
+}
+
+test('旧会话请求的 401 只 reject，不清除或跳转快速重登后的新会话', async () => {
+  setActivePinia(createPinia())
+  const userStore = useUserStore()
+  authenticate(userStore, 'old-session-secret')
+  await router.push('/printers')
+  const pending = []
+  service.defaults.adapter = config => new Promise((resolve, reject) => {
+    pending.push({ config, resolve, reject })
+  })
+
+  const originalConsoleError = console.error
+  const errorLogs = []
+  console.error = (...args) => errorLogs.push(args)
+  try {
+    const resultPromise = request({ url: '/api/v1/session-race/old', method: 'get', dedupe: false })
+      .catch(error => error)
+    await waitFor(() => pending.length === 1)
+    authenticate(userStore, 'new-session-secret')
+    pending[0].reject(unauthorized(pending[0].config))
+    const error = await resultPromise
+    await new Promise(resolve => setImmediate(resolve))
+
+    assert.equal(error.context, 'unauthorized')
+    assert.equal(error.toastShown, false)
+    assert.equal(userStore.token, 'new-session-secret')
+    assert.equal(userStore.isAuthenticated, true)
+    assert.equal(router.currentRoute.value.path, '/printers')
+    assert.equal(Object.prototype.hasOwnProperty.call(error.config || {}, 'headers'), false)
+    assert.equal(JSON.stringify(errorLogs).includes('old-session-secret'), false)
+    assert.equal(JSON.stringify(errorLogs).includes('new-session-secret'), false)
+  } finally {
+    console.error = originalConsoleError
+  }
+})
+
+test('当前会话请求的 401 正常清除认证并导航登录页', async () => {
+  setActivePinia(createPinia())
+  const userStore = useUserStore()
+  authenticate(userStore, 'current-session-secret')
+  await router.push('/printers')
+  const originalRouterPush = router.push
+  const navigations = []
+  router.push = target => {
+    navigations.push(target)
+    return Promise.resolve()
+  }
+  const pending = []
+  service.defaults.adapter = config => new Promise((resolve, reject) => {
+    pending.push({ config, resolve, reject })
+  })
+
+  const originalConsoleError = console.error
+  const errorLogs = []
+  console.error = (...args) => errorLogs.push(args)
+  try {
+    const resultPromise = request({ url: '/api/v1/session-race/current', method: 'get', dedupe: false })
+      .catch(error => error)
+    await waitFor(() => pending.length === 1)
+    pending[0].reject(unauthorized(pending[0].config))
+    const error = await resultPromise
+
+    assert.equal(error.context, 'unauthorized')
+    assert.equal(error.toastShown, true)
+    assert.equal(userStore.token, '')
+    assert.equal(userStore.isAuthenticated, false)
+    assert.deepEqual(navigations, [{ name: 'login' }])
+    assert.equal(Object.prototype.hasOwnProperty.call(error.response?.config || {}, 'headers'), false)
+    assert.equal(JSON.stringify(errorLogs).includes('current-session-secret'), false)
+  } finally {
+    console.error = originalConsoleError
+    router.push = originalRouterPush
+  }
 })

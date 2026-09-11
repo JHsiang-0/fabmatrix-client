@@ -64,6 +64,8 @@ export function usePrinterStore() {
     layoutDirty,
     positionDraft,
     draftBaseVersion,
+    draftOwner,
+    layoutSavingOwner,
     gridConfig,
     invalidPositionDevices
   } = storeToRefs(grid)
@@ -114,6 +116,8 @@ export function usePrinterStore() {
     layoutDirty,
     positionDraft,
     draftBaseVersion,
+    draftOwner,
+    layoutSavingOwner,
     gridConfig,
     invalidPositionDevices,
 

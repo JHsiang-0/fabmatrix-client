@@ -35,12 +35,28 @@ export const service = axios.create({
 
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete'])
 const pendingRequests = new Map()
-let handledAuthToken
-let authFailureHandled = false
+// Session credentials stay private to this module and are never attached to
+// Axios config/error objects that may be logged or returned to callers.
+const requestAuthSessions = new WeakMap()
 
 const isCanceledError = error => (
   error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError'
 )
+
+const rememberRequestSession = (config, token) => {
+  if (config && typeof config === 'object') requestAuthSessions.set(config, token || '')
+  return config
+}
+
+const sanitizeRequestConfig = config => {
+  if (!config || typeof config !== 'object') return undefined
+  return {
+    method: config.method,
+    url: config.url,
+    responseType: config.responseType,
+    timeout: config.timeout
+  }
+}
 
 const isUnsupportedBody = value => {
   if (value == null) return false
@@ -84,13 +100,29 @@ export const getRequestLockKey = config => {
 const withAuthHeader = config => {
   const userStore = useUserStore()
   const headers = { ...config.headers }
+  const requestToken = userStore.token || ''
 
-  if (userStore.token) headers.Authorization = `Bearer ${userStore.token}`
-  return { ...config, headers }
+  if (requestToken) headers.Authorization = `Bearer ${requestToken}`
+  return rememberRequestSession({ ...config, headers }, requestToken)
 }
 
 const createErrorFromFailure = (error, config) => {
-  if (error instanceof RequestError) return error
+  const requestConfig = config || error?.config || error?.response?.config
+  const safeConfig = sanitizeRequestConfig(requestConfig)
+  if (error instanceof RequestError) {
+    error.config = safeConfig
+    error.request = undefined
+    error.originalError = undefined
+    if (error.response) {
+      error.response = {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        config: safeConfig
+      }
+    }
+    return error
+  }
 
   const response = error?.response
   const responsePayload = response?.data
@@ -107,9 +139,13 @@ const createErrorFromFailure = (error, config) => {
     originalMessage: error?.message,
     responseMessage
   })
-  const requestConfig = config || error?.config
   const normalizedResponse = response
-    ? { ...response, data: envelope || responsePayload }
+    ? {
+        status: response.status,
+        statusText: response.statusText,
+        data: envelope || responsePayload,
+        config: safeConfig
+      }
     : undefined
 
   return new RequestError({
@@ -124,38 +160,41 @@ const createErrorFromFailure = (error, config) => {
     url: requestConfig?.url,
     axiosCode: error?.code,
     response: normalizedResponse,
-    request: error?.request,
-    config: requestConfig,
-    originalError: error
+    config: safeConfig
   })
 }
 
-const handleUnauthorized = error => {
-  if (error.context !== 'unauthorized') return
+const handleUnauthorized = (error, requestConfig) => {
+  if (error.context !== 'unauthorized') return false
 
   const userStore = useUserStore()
+  const requestToken = requestAuthSessions.get(requestConfig)
   const currentToken = userStore.token || ''
-  if (authFailureHandled && (!currentToken || handledAuthToken === currentToken)) return
+  if (requestToken === undefined || requestToken !== currentToken) return true
 
-  authFailureHandled = true
-  handledAuthToken = currentToken
   userStore.logout()
 
   const currentPath = router.currentRoute?.value?.path
   if (currentPath !== '/login') {
     void router.push({ name: 'login' }).catch(() => {})
   }
+  return false
 }
 
-export const handleRequestError = error => {
+export const handleRequestError = (error, config) => {
   if (isCanceledError(error)) return Promise.reject(error)
 
-  const requestError = createErrorFromFailure(error)
-  handleUnauthorized(requestError)
+  const requestConfig = config || error?.config || error?.response?.config
+  const requestError = createErrorFromFailure(error, requestConfig)
+  const staleUnauthorized = handleUnauthorized(requestError, requestConfig)
 
-  if (!requestError.toastShown) {
+  if (!staleUnauthorized && !requestError.toastShown) {
     requestError.toastShown = true
-    notifyRequestError(requestError)
+    try {
+      notifyRequestError(requestError)
+    } catch {
+      // SSR/测试环境可能没有可用的消息挂载点；请求仍须 reject 原始脱敏错误。
+    }
   }
 
   console.error('[Request Error]', requestError)
@@ -198,10 +237,11 @@ const validateAxiosResponse = response => {
 service.interceptors.request.use(
   config => {
     const userStore = useUserStore()
+    const requestToken = userStore.token || ''
     config.baseURL = getApiBaseUrl()
     config.headers = { ...config.headers }
-    if (userStore.token) config.headers.Authorization = `Bearer ${userStore.token}`
-    return config
+    if (requestToken) config.headers.Authorization = `Bearer ${requestToken}`
+    return rememberRequestSession(config, requestToken)
   },
   error => Promise.reject(error)
 )
@@ -211,9 +251,10 @@ service.interceptors.response.use(validateAxiosResponse, handleRequestError)
 const executeRequest = config => {
   if (!isMockEnabled) return service(config)
 
-  return mockRequest(withAuthHeader(config))
-    .then(response => normalizeSuccess(response, config, 200))
-    .catch(handleRequestError)
+  const requestConfig = withAuthHeader(config)
+  return mockRequest(requestConfig)
+    .then(response => normalizeSuccess(response, requestConfig, 200))
+    .catch(error => handleRequestError(error, requestConfig))
 }
 
 const request = config => {

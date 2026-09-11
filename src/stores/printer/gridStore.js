@@ -29,10 +29,14 @@ export const useGridStore = defineStore('grid', () => {
   const layoutConflict = ref(null)
   const positionDraft = ref([])
   const draftBaseVersion = ref(null)
+  const draftOwner = ref(null)
+  const layoutSavingOwner = ref(null)
   let layoutLoadGeneration = 0
   let layoutLoadController = null
   let editGeneration = 0
   let refreshGeneration = 0
+  let saveGeneration = 0
+  let activeSaveGeneration = 0
 
   const activeLayout = computed(() => layoutDraft.value || layoutSnapshot.value)
   const layoutVersion = computed(() => layoutSnapshot.value?.version ?? null)
@@ -117,6 +121,7 @@ export const useGridStore = defineStore('grid', () => {
       layoutDraft.value = null
       positionDraft.value = []
       draftBaseVersion.value = null
+      draftOwner.value = null
       layoutConflict.value = null
       return layoutSnapshot.value
     } catch (error) {
@@ -187,6 +192,7 @@ export const useGridStore = defineStore('grid', () => {
   function startLayoutEdit() {
     if (!layoutSnapshot.value) return null
     editGeneration++
+    draftOwner.value = editGeneration
     layoutDraft.value = clone(layoutSnapshot.value)
     draftBaseVersion.value = layoutSnapshot.value.version
     layoutConflict.value = null
@@ -208,25 +214,34 @@ export const useGridStore = defineStore('grid', () => {
     return positionDraft.value
   }
 
-  function discardLayoutEdit() {
+  function discardLayoutEdit(owner = draftOwner.value) {
+    if (owner !== draftOwner.value) return false
     editGeneration++
     layoutDraft.value = null
     positionDraft.value = []
     draftBaseVersion.value = null
+    draftOwner.value = null
     layoutConflict.value = null
     layoutError.value = null
+    return true
   }
 
   async function cancelLayoutEdit(options = {}) {
+    const owner = Object.prototype.hasOwnProperty.call(options, 'owner')
+      ? options.owner
+      : draftOwner.value
+    if (owner !== draftOwner.value) return layoutSnapshot.value
     const shouldReload = options.reloadStale !== false
       && layoutConflict.value?.reason === 'STALE_DRAFT'
-    discardLayoutEdit()
+    discardLayoutEdit(owner)
     if (shouldReload) return refreshLayout()
     return layoutSnapshot.value
   }
 
-  async function saveLayoutDraft(changes = positionDraft.value, overflowPolicy = 'REJECT') {
-    if (!layoutSnapshot.value || !layoutDraft.value || draftBaseVersion.value === null) return null
+  async function saveLayoutDraft(changes = positionDraft.value, overflowPolicy = 'REJECT', owner = draftOwner.value) {
+    if (owner !== draftOwner.value || !layoutSnapshot.value || !layoutDraft.value || draftBaseVersion.value === null) {
+      return { operationApplied: false }
+    }
     if (layoutConflict.value?.reason === 'STALE_DRAFT') {
       const staleError = new Error('布局草稿已过期，请重新载入后再保存')
       staleError.code = 409
@@ -234,8 +249,14 @@ export const useGridStore = defineStore('grid', () => {
       staleError.data = layoutConflict.value
       throw staleError
     }
+    const operationGeneration = ++saveGeneration
+    activeSaveGeneration = operationGeneration
+    layoutSavingOwner.value = owner
     layoutSaving.value = true
     layoutError.value = null
+    const ownsOperation = () => (
+      draftOwner.value === owner && activeSaveGeneration === operationGeneration
+    )
     try {
       const draft = normalizeDraftForRequest(activeLayout.value)
       const response = await saveDashboardLayout({
@@ -248,20 +269,27 @@ export const useGridStore = defineStore('grid', () => {
           gridCol: change?.gridCol ?? null
         }))
       })
+      if (!ownsOperation()) return { ...response.data, operationApplied: false }
       layoutSnapshot.value = response.data.layout
       layoutDraft.value = null
       positionDraft.value = []
       draftBaseVersion.value = null
+      draftOwner.value = null
       layoutConflict.value = null
-      return response.data
+      return { ...response.data, operationApplied: true }
     } catch (error) {
-      layoutError.value = error
-      if (Number(error?.status || error?.code) === 409) {
-        layoutConflict.value = error.data || error.response?.data?.data || null
+      if (ownsOperation()) {
+        layoutError.value = error
+        if (Number(error?.status || error?.code) === 409) {
+          layoutConflict.value = error.data || error.response?.data?.data || null
+        }
       }
       throw error
     } finally {
-      layoutSaving.value = false
+      if (activeSaveGeneration === operationGeneration) {
+        layoutSaving.value = false
+        layoutSavingOwner.value = null
+      }
     }
   }
 
@@ -283,10 +311,12 @@ export const useGridStore = defineStore('grid', () => {
     layoutSnapshot,
     layoutDraft,
     draftBaseVersion,
+    draftOwner,
     layoutVersion,
     layoutLimits,
     layoutLoading,
     layoutSaving,
+    layoutSavingOwner,
     layoutError,
     layoutConflict,
     layoutDirty,

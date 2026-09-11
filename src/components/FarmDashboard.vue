@@ -11,9 +11,9 @@
           <t-button class="dashboard-action-button" theme="default" variant="outline" size="small"
             @click="openAisleDialog">过道管理</t-button>
           <t-button class="dashboard-action-button" theme="default" variant="outline" size="small"
-            :disabled="store.layoutSaving" @click="cancelLayoutEdit">取消</t-button>
+            :disabled="ownedLayoutSaving" @click="cancelLayoutEdit">取消</t-button>
           <t-button class="dashboard-action-button" theme="primary" variant="base" size="small"
-            :loading="store.layoutSaving" @click="saveLayout">保存布局</t-button>
+            :loading="ownedLayoutSaving" @click="saveLayout">保存布局</t-button>
         </div>
         <t-button v-else-if="canManageLayout" class="dashboard-action-button" theme="default" variant="outline"
           size="small" :icon="renderIcon(Lock)" @click="toggleEditMode">
@@ -48,7 +48,7 @@
             </li>
           </ul>
           <div class="dashboard-position-alert__actions">
-            <t-button v-if="isEditMode" size="small" variant="outline" :disabled="store.layoutSaving"
+            <t-button v-if="isEditMode" size="small" variant="outline" :disabled="ownedLayoutSaving"
               @click="cancelLayoutEdit">
               撤销布局修改
             </t-button>
@@ -155,7 +155,7 @@
     </t-dialog>
 
     <t-dialog v-model:visible="summaryDialogVisible" header="确认保存布局"
-      :confirm-btn="{ content: '确认保存', theme: 'primary', loading: store.layoutSaving }"
+      :confirm-btn="{ content: '确认保存', theme: 'primary', loading: ownedLayoutSaving }"
       :cancel-btn="{ content: '返回调整' }" @confirm="confirmSaveLayout">
       <t-alert theme="warning" title="保存将一次性提交布局和设备坐标" :close-btn="false" />
       <ul class="dashboard-change-summary">
@@ -164,7 +164,7 @@
     </t-dialog>
 
     <t-dialog v-model:visible="shrinkDialogVisible" header="缩容将下架设备"
-      :confirm-btn="{ content: '下架并保存', theme: 'danger', loading: store.layoutSaving }"
+      :confirm-btn="{ content: '下架并保存', theme: 'danger', loading: ownedLayoutSaving }"
       :cancel-btn="{ content: '返回调整' }" @confirm="confirmShrinkAndSave">
       <p>以下设备超出新的行列范围。确认后会在同一事务中保留原坐标清单并将其下架：</p>
       <ul class="dashboard-position-issues">
@@ -259,6 +259,10 @@ const reconnecting = ref(false)
 /** 编辑模式状态 - 默认锁定监控模式 */
 const isEditMode = ref(false)
 const canManageLayout = computed(() => userStore.isAdmin)
+const layoutEditOwner = ref(null)
+const ownedLayoutSaving = computed(() => (
+  store.layoutSaving && store.layoutSavingOwner === layoutEditOwner.value
+))
 
 /** 拖拽相关状态 */
 const draggedDevice = ref(null)
@@ -290,7 +294,8 @@ let cleanupAfterSave = false
 let componentUnmounted = false
 
 function clearLayoutEditingState() {
-  store.discardLayoutEdit()
+  store.discardLayoutEdit(layoutEditOwner.value)
+  layoutEditOwner.value = null
   positionChanges.value = []
   isEditMode.value = false
   layoutDialogVisible.value = false
@@ -308,7 +313,7 @@ function clearLayoutEditingState() {
 
 watch(canManageLayout, canManage => {
   if (canManage) return
-  if (store.layoutSaving) cleanupAfterSave = true
+  if (ownedLayoutSaving.value) cleanupAfterSave = true
   else clearLayoutEditingState()
 })
 
@@ -790,6 +795,7 @@ function toggleEditMode() {
     message.error('布局快照尚未加载完成，请稍后重试')
     return
   }
+  layoutEditOwner.value = store.draftOwner
   layoutForm.value = {
     rowCount: store.layoutDraft.rowCount,
     columnCount: store.layoutDraft.columnCount
@@ -802,7 +808,7 @@ function toggleEditMode() {
 }
 
 async function cancelLayoutEdit() {
-  if (store.layoutSaving) {
+  if (ownedLayoutSaving.value) {
     message.warning('保存中请稍候')
     return
   }
@@ -815,7 +821,8 @@ async function cancelLayoutEdit() {
       })
     }
     const wasStale = store.layoutConflict?.reason === 'STALE_DRAFT'
-    const refreshPromise = store.cancelLayoutEdit()
+    const refreshPromise = store.cancelLayoutEdit({ owner: layoutEditOwner.value })
+    layoutEditOwner.value = null
     positionChanges.value = []
     isEditMode.value = false
     await refreshPromise
@@ -938,7 +945,7 @@ async function removeAisle(aisle) {
 }
 
 function saveLayout() {
-  if (!canManageLayout.value || store.layoutSaving) return
+  if (!canManageLayout.value || ownedLayoutSaving.value) return
   if (!store.layoutDirty && !positionChanges.value.length) {
     message.info('当前没有需要保存的布局变更')
     return
@@ -968,13 +975,16 @@ async function confirmShrinkAndSave() {
 }
 
 async function executeSaveLayout() {
+  const saveOwner = layoutEditOwner.value
   try {
-    await store.saveLayoutDraft(positionChanges.value, overflowPolicy.value)
+    const saveResult = await store.saveLayoutDraft(positionChanges.value, overflowPolicy.value, saveOwner)
+    if (!saveResult?.operationApplied) return
     if (componentUnmounted || !userStore.isAuthenticated || !canManageLayout.value) return
     await store.fetchDeviceData()
     if (componentUnmounted || !userStore.isAuthenticated || !canManageLayout.value) return
     positionChanges.value = []
     isEditMode.value = false
+    layoutEditOwner.value = null
     message.success('布局已保存')
   } catch (error) {
     if (componentUnmounted || !userStore.isAuthenticated || !canManageLayout.value) return
@@ -990,7 +1000,8 @@ async function executeSaveLayout() {
     }
   } finally {
     if (cleanupAfterSave) {
-      store.discardLayoutEdit()
+      store.discardLayoutEdit(saveOwner)
+      if (layoutEditOwner.value === saveOwner) layoutEditOwner.value = null
       cleanupAfterSave = false
     }
   }
@@ -1009,7 +1020,7 @@ async function reloadLatestLayout() {
 }
 
 function handleBeforeUnload(event) {
-  if (store.layoutSaving || hasUnsavedLayoutChanges.value) {
+  if (ownedLayoutSaving.value || hasUnsavedLayoutChanges.value) {
     event.preventDefault()
     event.returnValue = ''
   }
@@ -1059,7 +1070,7 @@ onMounted(() => {
 
 onBeforeRouteLeave(to => guardDashboardRouteLeave({
   to,
-  isSaving: () => store.layoutSaving,
+  isSaving: () => ownedLayoutSaving.value,
   isAuthenticated: () => userStore.isAuthenticated,
   hasUnsavedChanges: () => hasUnsavedLayoutChanges.value,
   confirmDiscard: () => confirmMessage('当前布局草稿尚未保存，确定离开并放弃修改吗？', '离开布局编辑', {
@@ -1074,7 +1085,7 @@ onBeforeRouteLeave(to => guardDashboardRouteLeave({
 onBeforeUnmount(() => {
   componentUnmounted = true
   if (typeof window !== 'undefined') window.removeEventListener('beforeunload', handleBeforeUnload)
-  if (store.layoutSaving) cleanupAfterSave = true
+  if (ownedLayoutSaving.value) cleanupAfterSave = true
   else clearLayoutEditingState()
 })
 
