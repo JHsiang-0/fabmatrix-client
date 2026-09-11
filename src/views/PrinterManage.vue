@@ -348,149 +348,149 @@
       destroy-on-close
     >
       <div class="printer-scan-drawer__content">
-        <t-form class="printer-scan-drawer__form">
-          <t-form-item class="printer-scan-subnet-form-item">
-            <div class="printer-scan-subnet-section">
-              <div class="printer-scan-subnet-heading">
-                <span class="printer-scan-subnet-title">扫描网段</span>
-                <t-tag
-                  class="printer-scan-subnet-range"
-                  size="small"
-                  theme="default"
-                  variant="light"
-                  :aria-label="scanSubnetRangeLabel"
-                  :title="scanSubnetRangeLabel"
-                >
-                  {{ scanSubnetRangeLabel }}
-                </t-tag>
-              </div>
-              <div class="printer-scan-subnet-control">
-              <div class="printer-scan-subnet-segments" role="group" aria-label="扫描网段前三段">
-                <template v-for="(segment, index) in subnetSegments" :key="`subnet-segment-${index}`">
-                  <t-input
-                    v-model="subnetSegments[index]"
-                    class="printer-scan-subnet-segment"
-                    size="medium"
-                    inputmode="numeric"
-                    maxlength="3"
-                    autocomplete="off"
-                    :aria-label="`网段第${index + 1}段`"
-                    :disabled="isScanning || isBatchAdding"
-                    @input="value => handleSubnetSegmentInput(index, value)"
-                    @enter="handleScan"
-                  />
-                  <span v-if="index < subnetSegments.length - 1" class="printer-scan-subnet-separator" aria-hidden="true">.</span>
-                </template>
-              </div>
-              <t-button
-                class="printer-scan-subnet-button"
-                size="medium"
-                theme="primary"
-                :loading="isScanning"
-                :disabled="isScanning || isBatchAdding"
-                @click="handleScan"
-              >
-                <span><search /></span>
-                {{ isScanning ? '扫描中...' : '开始扫描' }}
-              </t-button>
-              </div>
-              <p
-                v-if="!subnetIsValid"
-                class="printer-scan-subnet-hint printer-scan-subnet-hint--error"
-                role="alert"
-                aria-live="polite"
-              >
-                {{ subnetValidationMessage }}
-              </p>
-            </div>
-          </t-form-item>
-        </t-form>
-
-        <div v-if="isScanning" class="printer-scan-drawer__state" role="status" aria-live="polite">
-          <t-loading text="正在扫描局域网设备，请稍候..." />
-        </div>
-        <t-alert v-else-if="scanError" theme="error" :close-btn="false">
-          <template #default>{{ scanError }}</template>
-          <template #operation>
-            <t-button size="small" variant="outline" @click="handleScan">重试</t-button>
-          </template>
-        </t-alert>
-        <t-empty v-else-if="hasScanned && !scanResults.length" description="该网段未发现设备">
-          <template #description>
-            <p>该网段未发现设备</p>
-            <p class="mt-2 text-sm text-gray-400">请检查网段是否正确或设备是否在线</p>
-          </template>
-        </t-empty>
-        <div v-else-if="scanResults.length" class="printer-scan-drawer__results">
-          <t-alert :title="scanStatsText" theme="info" :close-btn="false" />
-          <div class="printer-scan-drawer__selection-bar">
-            <t-checkbox
-              :checked="allScanSelected"
-              :indeterminate="scanSelectionIndeterminate"
-              :disabled="isBatchAdding"
-              @change="handleScanSelectAll"
+        <div class="printer-scan-subnet-section">
+          <div class="printer-scan-subnet-heading">
+            <span class="printer-scan-subnet-title">扫描网段</span>
+            <t-tag
+              class="printer-scan-subnet-range"
+              size="small"
+              theme="default"
+              variant="light"
+              :aria-label="scanSubnetRangeLabel"
+              :title="scanSubnetRangeLabel"
             >
-              全选
-            </t-checkbox>
-            <span aria-live="polite">已选择 {{ selectedDevices.length }} 台</span>
+              {{ scanSubnetRangeLabel }}
+            </t-tag>
           </div>
-          <div class="printer-scan-drawer__list" aria-label="扫描结果">
-            <article v-for="device in scanResults" :key="device.scanKey" class="printer-scan-card">
-              <div class="printer-scan-card__primary">
-                <t-checkbox
-                  :checked="isScanDeviceSelected(device)"
-                  :disabled="isBatchAdding"
-                  :aria-label="`选择 ${device.suggestedName || device.ipAddress || '设备'}`"
-                  @click.stop
-                  @change="checked => toggleScanDevice(device, checked)"
+          <div class="printer-scan-subnet-control">
+            <div class="printer-scan-subnet-segments" role="group" aria-label="扫描网段前三段">
+              <template v-for="(segment, index) in subnetSegments" :key="`subnet-segment-${index}`">
+                <t-input
+                  v-model="subnetSegments[index]"
+                  class="printer-scan-subnet-segment"
+                  size="medium"
+                  inputmode="numeric"
+                  maxlength="3"
+                  autocomplete="off"
+                  :aria-label="`网段第${index + 1}段`"
+                  :disabled="isScanning || isBatchAdding"
+                  @input="value => handleSubnetSegmentInput(index, value)"
+                  @enter="handleScan"
                 />
-                <t-tooltip :content="device.suggestedName || '未命名设备'">
-                  <t-input
-                    v-model="device.suggestedName"
-                    class="printer-scan-card__name"
-                    size="small"
-                    borderless
-                    :disabled="isBatchAdding"
-                    placeholder="请输入设备名称"
-                    @click.stop
-                  />
-                </t-tooltip>
-                <t-tag :theme="getDiscoveryStatus(device).theme" variant="light" size="small">
-                  {{ getDiscoveryStatus(device).label }}
-                </t-tag>
-                <t-tag
-                  v-if="device.batchResult?.success"
-                  theme="success"
-                  variant="light"
-                  size="small"
-                >
-                  导入成功
-                </t-tag>
-              </div>
-              <div class="printer-scan-card__meta">
-                <t-tooltip :content="device.ipAddress || '-'">
-                  <span>IP {{ device.ipAddress || '-' }}</span>
-                </t-tooltip>
-                <span>协议 {{ getFirmwareLabel(device.firmwareType) }}</span>
-                <t-tooltip :content="device.macAddress || '-'">
-                  <span>MAC {{ device.macAddress || '-' }}</span>
-                </t-tooltip>
-              </div>
-              <t-alert
-                v-if="device.batchResult && !device.batchResult.success"
-                class="printer-scan-card__failure"
-                theme="error"
-                title="导入失败"
-                :close-btn="false"
-              >
-                <t-tooltip :content="device.batchResult.reason">
-                  <span class="printer-scan-card__failure-reason">{{ device.batchResult.reason }}</span>
-                </t-tooltip>
-              </t-alert>
-            </article>
+                <span v-if="index < subnetSegments.length - 1" class="printer-scan-subnet-separator" aria-hidden="true">.</span>
+              </template>
+            </div>
+            <t-button
+              class="printer-scan-subnet-button"
+              size="medium"
+              theme="primary"
+              :loading="isScanning"
+              :disabled="isScanning || isBatchAdding"
+              @click="handleScan"
+            >
+              <span><search /></span>
+              {{ isScanning ? '扫描中...' : '开始扫描' }}
+            </t-button>
           </div>
+          <p
+            v-if="!subnetIsValid"
+            class="printer-scan-subnet-hint printer-scan-subnet-hint--error"
+            role="alert"
+            aria-live="polite"
+          >
+            {{ subnetValidationMessage }}
+          </p>
         </div>
-        <t-empty v-else description="输入网段后开始扫描" />
+
+        <t-divider class="printer-scan-drawer__divider" />
+
+        <div class="printer-scan-drawer__result-region">
+          <div v-if="isScanning" class="printer-scan-drawer__state" role="status" aria-live="polite">
+            <t-loading text="正在扫描局域网设备，请稍候..." />
+          </div>
+          <t-alert v-else-if="scanError" theme="error" :close-btn="false">
+            <template #default>{{ scanError }}</template>
+            <template #operation>
+              <t-button size="small" variant="outline" @click="handleScan">重试</t-button>
+            </template>
+          </t-alert>
+          <t-empty v-else-if="hasScanned && !scanResults.length" class="printer-scan-drawer__empty" description="该网段未发现设备">
+            <template #description>
+              <p>该网段未发现设备</p>
+              <p class="mt-2 text-sm text-gray-400">请检查网段是否正确或设备是否在线</p>
+            </template>
+          </t-empty>
+          <div v-else-if="scanResults.length" class="printer-scan-drawer__results">
+            <t-alert :title="scanStatsText" theme="info" :close-btn="false" />
+            <div class="printer-scan-drawer__selection-bar">
+              <t-checkbox
+                :checked="allScanSelected"
+                :indeterminate="scanSelectionIndeterminate"
+                :disabled="isBatchAdding"
+                @change="handleScanSelectAll"
+              >
+                全选
+              </t-checkbox>
+              <span aria-live="polite">已选择 {{ selectedDevices.length }} 台</span>
+            </div>
+            <div class="printer-scan-drawer__list" aria-label="扫描结果">
+              <article v-for="device in scanResults" :key="device.scanKey" class="printer-scan-card">
+                <div class="printer-scan-card__primary">
+                  <t-checkbox
+                    :checked="isScanDeviceSelected(device)"
+                    :disabled="isBatchAdding"
+                    :aria-label="`选择 ${device.suggestedName || device.ipAddress || '设备'}`"
+                    @click.stop
+                    @change="checked => toggleScanDevice(device, checked)"
+                  />
+                  <t-tooltip :content="device.suggestedName || '未命名设备'">
+                    <t-input
+                      v-model="device.suggestedName"
+                      class="printer-scan-card__name"
+                      size="small"
+                      borderless
+                      :disabled="isBatchAdding"
+                      placeholder="请输入设备名称"
+                      @click.stop
+                    />
+                  </t-tooltip>
+                  <t-tag :theme="getDiscoveryStatus(device).theme" variant="light" size="small">
+                    {{ getDiscoveryStatus(device).label }}
+                  </t-tag>
+                  <t-tag
+                    v-if="device.batchResult?.success"
+                    theme="success"
+                    variant="light"
+                    size="small"
+                  >
+                    导入成功
+                  </t-tag>
+                </div>
+                <div class="printer-scan-card__meta">
+                  <t-tooltip :content="device.ipAddress || '-'">
+                    <span>IP {{ device.ipAddress || '-' }}</span>
+                  </t-tooltip>
+                  <span>协议 {{ getFirmwareLabel(device.firmwareType) }}</span>
+                  <t-tooltip :content="device.macAddress || '-'">
+                    <span>MAC {{ device.macAddress || '-' }}</span>
+                  </t-tooltip>
+                </div>
+                <t-alert
+                  v-if="device.batchResult && !device.batchResult.success"
+                  class="printer-scan-card__failure"
+                  theme="error"
+                  title="导入失败"
+                  :close-btn="false"
+                >
+                  <t-tooltip :content="device.batchResult.reason">
+                    <span class="printer-scan-card__failure-reason">{{ device.batchResult.reason }}</span>
+                  </t-tooltip>
+                </t-alert>
+              </article>
+            </div>
+          </div>
+          <t-empty v-else class="printer-scan-drawer__empty" description="输入网段后开始扫描" />
+        </div>
       </div>
 
       <template #footer>
@@ -1631,14 +1631,6 @@ const handleBatchAdd = async () => {
   overflow: hidden;
 }
 
-.printer-scan-drawer__form {
-  flex: 0 0 auto;
-}
-
-.printer-scan-subnet-form-item :deep(.t-form__controls-content) {
-  width: 100%;
-}
-
 .printer-scan-subnet-section {
   display: flex;
   min-width: 0;
@@ -1726,9 +1718,33 @@ const handleBatchAdd = async () => {
   text-align: left;
 }
 
+.printer-scan-drawer__divider {
+  flex: 0 0 auto;
+  margin: var(--app-spacing-1) 0;
+}
+
+.printer-scan-drawer__result-region {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--app-spacing-3);
+  overflow: hidden;
+}
+
 .printer-scan-drawer__state {
   display: flex;
-  min-height: 220px;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.printer-scan-drawer__empty {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
   align-items: center;
   justify-content: center;
 }

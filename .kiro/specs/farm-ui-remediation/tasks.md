@@ -1782,3 +1782,21 @@ git status --short、`git diff --check`：提交前执行并仅暂存本任务�
 验证：专项测试、`npm test`、`npm run lint`、`npm run build`、Browser E2E、Electron E2E 和 `git diff --check`。
 
 提交：完成最终验证后创建独立本地 Conventional Commit，不执行 push。
+
+### [x] UI-010 扫描抽屉区域对齐与空状态居中
+
+状态：DONE（2026-09-11）
+
+优先级：P1
+
+目标：在不改变 UI-009 扫描输入、校验、扫描 API、结果选择和批量导入行为的前提下，移除扫描配置区无字段表单 gutter，增加配置与结果之间的 TDesign 分割线，并让扫描结果区域的初始/无结果空态占满剩余空间居中。
+
+范围：`src/views/PrinterManage.vue`、`tests/printerCenter.test.js`、`tests/e2e/browser.spec.js` 和本任务记录；不修改后端、依赖锁、环境文件或 `src/stores/printerStore.js.backup`。
+
+完成记录：扫描配置区改为直接布局，标题、范围 Tag 和输入组统一从 Drawer 内容区左边缘开始，扫描按钮保持右对齐；配置区与扫描状态之间使用 TDesign `t-divider`。loading、错误、扫描无结果、结果列表和初始 Empty 统一置于独立结果区域，结果区域使用 flex 收缩约束，loading/两类 Empty 居中，结果列表继续内部滚动且 Drawer footer 保持可达。
+
+验收：800×560 与 375×812 浏览器视口验证配置元素相对左边缘、divider 层级、默认 TDesign “暂无数据”空态居中及 Drawer 无横向溢出；静态专项测试覆盖无 `t-form` gutter 结构、`t-divider` 和 result region。
+
+验证：专项 `node --test tests/printerCenter.test.js`（17/17）、UI-010 Browser E2E（1/1）、全量 `npm test`（273/273）、`npm run lint`、`npm run build`、完整 Browser E2E（17/17）、Electron E2E（3/3）和 `git diff --check` 均通过；构建保留既有 realtimeStore 动静态导入与大 chunk 警告，不影响退出码。
+
+提交：完成最终验证后创建独立本地 Conventional Commit，不执行 push。

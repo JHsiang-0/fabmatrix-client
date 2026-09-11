@@ -566,6 +566,83 @@ test('UI-009 扫描网段标题与操作分层在桌面和窄屏保持可用', a
   }
 })
 
+test('UI-010 扫描抽屉配置区对齐、结果分隔和初始空态居中', async ({ browser }) => {
+  const viewports = [
+    { width: 800, height: 560 },
+    { width: 375, height: 812 }
+  ]
+
+  for (const viewport of viewports) {
+    const context = await browser.newContext({ viewport })
+    const page = await context.newPage()
+
+    try {
+      await page.goto('/login')
+      await page.getByLabel('用户名', { exact: true }).fill('admin')
+      await page.getByLabel('密码', { exact: true }).fill('Admin123')
+      await page.getByRole('button', { name: '登录', exact: true }).click()
+      await openSidebarItem(page, viewport.width, '打印机管理')
+      await page.getByRole('button', { name: '扫描局域网设备', exact: true }).click()
+
+      const scanDrawer = page.locator('.t-drawer').filter({ hasText: '扫描局域网设备' })
+      await expect(scanDrawer.getByText('暂无数据', { exact: true })).toBeVisible()
+      const metrics = await scanDrawer.evaluate(drawer => {
+        const box = element => {
+          const rect = element.getBoundingClientRect()
+          return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+        }
+        const body = box(drawer.querySelector('.t-drawer__body'))
+        const section = box(drawer.querySelector('.printer-scan-subnet-section'))
+        const heading = box(drawer.querySelector('.printer-scan-subnet-heading'))
+        const control = box(drawer.querySelector('.printer-scan-subnet-control'))
+        const firstSegment = box(drawer.querySelector('.printer-scan-subnet-segment'))
+        const divider = box(drawer.querySelector('.printer-scan-drawer__divider'))
+        const resultRegion = box(drawer.querySelector('.printer-scan-drawer__result-region'))
+        const empty = box(drawer.querySelector('.printer-scan-drawer__empty'))
+        const footer = box(drawer.querySelector('.t-drawer__footer'))
+        const bodyElement = drawer.querySelector('.t-drawer__body')
+        const wrapperElement = drawer.querySelector('.t-drawer__content-wrapper')
+        return {
+          body,
+          section,
+          heading,
+          control,
+          firstSegment,
+          divider,
+          resultRegion,
+          empty,
+          footer,
+          bodyScrollWidth: bodyElement.scrollWidth,
+          bodyClientWidth: bodyElement.clientWidth,
+          wrapperScrollWidth: wrapperElement.scrollWidth,
+          wrapperClientWidth: wrapperElement.clientWidth,
+          documentWidth: document.documentElement.scrollWidth,
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight
+        }
+      })
+
+      const leftEdges = [metrics.heading.x, metrics.control.x, metrics.firstSegment.x]
+      expect(Math.max(...leftEdges) - Math.min(...leftEdges)).toBeLessThanOrEqual(3)
+      expect(metrics.heading.x).toBeGreaterThanOrEqual(metrics.body.x)
+      expect(metrics.heading.x).toBeLessThan(metrics.body.x + metrics.body.width)
+      expect(metrics.divider.y).toBeGreaterThanOrEqual(metrics.section.y + metrics.section.height - 2)
+      expect(metrics.divider.y + metrics.divider.height).toBeLessThanOrEqual(metrics.resultRegion.y + 2)
+      expect(Math.abs(
+        metrics.empty.y + metrics.empty.height / 2
+          - (metrics.resultRegion.y + metrics.resultRegion.height / 2)
+      )).toBeLessThanOrEqual(16)
+      expect(metrics.bodyScrollWidth).toBeLessThanOrEqual(metrics.bodyClientWidth + 1)
+      expect(metrics.wrapperScrollWidth).toBeLessThanOrEqual(metrics.wrapperClientWidth + 1)
+      expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1)
+      expect(metrics.footer.y + metrics.footer.height).toBeLessThanOrEqual(metrics.viewportHeight + 1)
+      await expect(scanDrawer.getByRole('button', { name: '关闭', exact: true })).toBeVisible()
+    } finally {
+      await context.close()
+    }
+  }
+})
+
 test('UI-006 打印机选择不跨筛选分页且两个抽屉在 800x560 可用', async ({ browser }) => {
   test.setTimeout(120000)
   const context = await browser.newContext({ viewport: { width: 800, height: 560 } })

@@ -125,7 +125,6 @@ test('UI-007 扫描网段使用可访问的三段输入并把扫描按钮移出 
 })
 
 test('UI-009 扫描网段标题、范围 Tag 和操作行分层布局', () => {
-  assert.match(source, /class="printer-scan-subnet-form-item"/)
   assert.match(source, /class="printer-scan-subnet-heading"[\s\S]*class="printer-scan-subnet-title">扫描网段<\/span>[\s\S]*class="printer-scan-subnet-range"/)
   assert.match(source, /class="printer-scan-subnet-range"[\s\S]*size="small"[\s\S]*theme="default"[\s\S]*variant="light"/)
   assert.match(source, /:aria-label="scanSubnetRangeLabel"[\s\S]*:title="scanSubnetRangeLabel"/)
@@ -140,6 +139,19 @@ test('UI-009 扫描网段标题、范围 Tag 和操作行分层布局', () => {
   assert.match(source, /\.printer-scan-subnet-hint[\s\S]*text-align: left/)
   assert.doesNotMatch(source, /scanSubnetHint/)
   assert.match(source, /@media \(max-width: 768px\)[\s\S]*\.printer-scan-subnet-button \{[\s\S]*flex: 0 0 auto;[\s\S]*width: auto;/)
+})
+
+test('UI-010 扫描抽屉移除表单 gutter 并让分割线和结果区承担布局', () => {
+  assert.doesNotMatch(source, /<t-form class="printer-scan-drawer__form">/)
+  assert.doesNotMatch(source, /<t-form-item class="printer-scan-subnet-form-item">/)
+  assert.doesNotMatch(source, /printer-scan-subnet-form-item|printer-scan-drawer__form/)
+  assert.match(source, /<t-divider class="printer-scan-drawer__divider"\s*\/>/)
+  assert.match(source, /<div class="printer-scan-drawer__result-region">[\s\S]*v-if="isScanning"[\s\S]*v-else-if="scanError"[\s\S]*v-else-if="hasScanned && !scanResults\.length"[\s\S]*v-else-if="scanResults\.length"[\s\S]*v-else class="printer-scan-drawer__empty"/)
+  assert.match(source, /\.printer-scan-drawer__result-region[\s\S]*flex: 1 1 auto;[\s\S]*min-height: 0;/)
+  assert.match(source, /\.printer-scan-drawer__state[\s\S]*flex: 1 1 auto;[\s\S]*align-items: center[\s\S]*justify-content: center/)
+  assert.match(source, /\.printer-scan-drawer__empty[\s\S]*flex: 1 1 auto;[\s\S]*align-items: center[\s\S]*justify-content: center/)
+  assert.match(source, /<t-empty v-else class="printer-scan-drawer__empty" description="输入网段后开始扫描" \/>/)
+  assert.match(source, /<t-empty v-else-if="hasScanned && !scanResults\.length" class="printer-scan-drawer__empty" description="该网段未发现设备">/)
 })
 
 test('UI-006 看板未分配 Drawer 覆盖角色、错误重试、关闭和设备字段', () => {
