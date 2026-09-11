@@ -3,6 +3,7 @@ import test from 'node:test'
 import fs from 'node:fs'
 
 const source = fs.readFileSync(new URL('../src/components/FarmDashboard.vue', import.meta.url), 'utf8')
+const requestSource = fs.readFileSync(new URL('../src/utils/request.js', import.meta.url), 'utf8')
 
 test('ADMIN 布局编辑使用草稿，保存才提交布局资源', () => {
   assert.match(source, /store\.beginLayoutEdit\(\)/)
@@ -38,17 +39,29 @@ test('编辑工作流覆盖取消确认、缩容下架确认、冲突提示和�
   assert.match(source, /onBeforeUnmount\(/)
 })
 
-test('未保存草稿在路由离开时确认，保存中阻止离开并延后卸载清理', () => {
+test('未保存草稿在路由离开时确认，保存中一般导航阻断但认证退出优先', () => {
   assert.match(source, /import \{ onBeforeRouteLeave, useRouter \} from 'vue-router'/)
   assert.match(source, /guardDashboardRouteLeave/)
   assert.match(source, /const hasUnsavedLayoutChanges = computed/)
   assert.match(source, /isSaving: \(\) => store\.layoutSaving/)
+  assert.match(source, /onBeforeRouteLeave\(to => guardDashboardRouteLeave\(\{[\s\S]*to,[\s\S]*isAuthenticated: \(\) => userStore\.isAuthenticated/)
   assert.match(source, /保存中请稍候/)
   assert.match(source, /放弃并离开/)
-  assert.match(source, /watch\(canManageLayout,[\s\S]*clearLayoutEditingState\(\)/)
+  assert.match(source, /watch\(canManageLayout,[\s\S]*if \(store\.layoutSaving\) cleanupAfterSave = true/)
   assert.match(source, /if \(store\.layoutSaving\) cleanupAfterSave = true[\s\S]*else clearLayoutEditingState\(\)/)
-  assert.match(source, /finally \{[\s\S]*if \(cleanupAfterSave\) clearLayoutEditingState\(\)/)
+  assert.match(source, /componentUnmounted = true/)
+  assert.match(source, /if \(componentUnmounted \|\| !userStore\.isAuthenticated \|\| !canManageLayout\.value\) return/)
+  assert.match(source, /finally \{[\s\S]*store\.discardLayoutEdit\(\)[\s\S]*cleanupAfterSave = false/)
   assert.match(source, /store\.discardLayoutEdit\(\)/)
+})
+
+test('401 先清除认证再触发登录导航，使看板守卫进入认证退出分支', () => {
+  const unauthorizedBranch = requestSource.slice(
+    requestSource.indexOf('const handleUnauthorized'),
+    requestSource.indexOf('export const handleRequestError')
+  )
+  assert.ok(unauthorizedBranch.indexOf('userStore.logout()') < unauthorizedBranch.indexOf("router.push({ name: 'login' })"))
+  assert.match(source, /isAuthenticated: \(\) => userStore\.isAuthenticated/)
 })
 
 test('手动刷新协调获取布局、设备和历史快照', () => {

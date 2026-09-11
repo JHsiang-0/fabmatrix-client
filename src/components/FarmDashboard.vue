@@ -287,6 +287,7 @@ const aisleAxisOptions = [
 const hasUnsavedLayoutChanges = computed(() => Boolean(store.layoutDraft)
   && (store.layoutDirty || positionChanges.value.length > 0))
 let cleanupAfterSave = false
+let componentUnmounted = false
 
 function clearLayoutEditingState() {
   store.discardLayoutEdit()
@@ -306,7 +307,9 @@ function clearLayoutEditingState() {
 }
 
 watch(canManageLayout, canManage => {
-  if (!canManage) clearLayoutEditingState()
+  if (canManage) return
+  if (store.layoutSaving) cleanupAfterSave = true
+  else clearLayoutEditingState()
 })
 
 /** 绑定设备弹窗相关状态 */
@@ -967,11 +970,14 @@ async function confirmShrinkAndSave() {
 async function executeSaveLayout() {
   try {
     await store.saveLayoutDraft(positionChanges.value, overflowPolicy.value)
+    if (componentUnmounted || !userStore.isAuthenticated || !canManageLayout.value) return
     await store.fetchDeviceData()
+    if (componentUnmounted || !userStore.isAuthenticated || !canManageLayout.value) return
     positionChanges.value = []
     isEditMode.value = false
     message.success('布局已保存')
   } catch (error) {
+    if (componentUnmounted || !userStore.isAuthenticated || !canManageLayout.value) return
     console.error('保存布局失败:', error)
     if (Number(error?.status || error?.code) === 409) {
       conflictDetails.value = error.data || {}
@@ -983,7 +989,10 @@ async function executeSaveLayout() {
       message.error(error?.message || '保存布局失败，请重试')
     }
   } finally {
-    if (cleanupAfterSave) clearLayoutEditingState()
+    if (cleanupAfterSave) {
+      store.discardLayoutEdit()
+      cleanupAfterSave = false
+    }
   }
 }
 
@@ -1048,8 +1057,10 @@ onMounted(() => {
   window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
-onBeforeRouteLeave(() => guardDashboardRouteLeave({
+onBeforeRouteLeave(to => guardDashboardRouteLeave({
+  to,
   isSaving: () => store.layoutSaving,
+  isAuthenticated: () => userStore.isAuthenticated,
   hasUnsavedChanges: () => hasUnsavedLayoutChanges.value,
   confirmDiscard: () => confirmMessage('当前布局草稿尚未保存，确定离开并放弃修改吗？', '离开布局编辑', {
       confirmButtonText: '放弃并离开',
@@ -1061,6 +1072,7 @@ onBeforeRouteLeave(() => guardDashboardRouteLeave({
 }))
 
 onBeforeUnmount(() => {
+  componentUnmounted = true
   if (typeof window !== 'undefined') window.removeEventListener('beforeunload', handleBeforeUnload)
   if (store.layoutSaving) cleanupAfterSave = true
   else clearLayoutEditingState()

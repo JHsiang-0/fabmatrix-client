@@ -203,7 +203,9 @@ test('真实 grid Pinia Store 保存未完成时路由守卫拒绝放弃，完�
   let clearCount = 0
   const notices = []
   const blocked = await guardDashboardRouteLeave({
+    to: { name: 'files', path: '/files' },
     isSaving: () => grid.layoutSaving,
+    isAuthenticated: () => true,
     hasUnsavedChanges: () => Boolean(grid.layoutDraft),
     confirmDiscard: async () => { confirmCount += 1 },
     clearEditingState: () => { clearCount += 1 },
@@ -223,7 +225,9 @@ test('真实 grid Pinia Store 保存未完成时路由守卫拒绝放弃，完�
   await savePromise
   assert.equal(grid.layoutSaving, false)
   const allowed = await guardDashboardRouteLeave({
+    to: { name: 'files', path: '/files' },
     isSaving: () => grid.layoutSaving,
+    isAuthenticated: () => true,
     hasUnsavedChanges: () => Boolean(grid.layoutDraft),
     confirmDiscard: async () => { confirmCount += 1 },
     clearEditingState: () => { clearCount += 1 },
