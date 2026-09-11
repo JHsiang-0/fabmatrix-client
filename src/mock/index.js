@@ -1570,28 +1570,78 @@ const handleBatchMoveFiles = config => {
 
 const handleJobPage = config => {
   const session = requireSession(config, ['ADMIN', 'OPERATOR'])
-  const params = getBody(config)
-  let records = mockState.jobs
+  const params = getBody(config) || {}
+  const hasStatus = params.status !== undefined && params.status !== null
+    && String(params.status).trim() !== ''
+  const hasStatuses = Array.isArray(params.statuses)
+  if (hasStatus && hasStatuses) fail(400, 400, 'status 与 statuses 不能同时使用')
+  if (hasStatuses && params.statuses.length === 0) fail(400, 400, 'statuses 不能为空')
+
+  const normalizeStatus = status => {
+    const normalized = String(status || '').trim().toUpperCase()
+    const aliases = { PENDING: 'QUEUED', MANUAL: 'QUEUED', CANCELED: 'CANCELLED' }
+    const canonical = aliases[normalized] || normalized
+    if (![
+      'QUEUED', 'ASSIGNED', 'UPLOADING', 'READY', 'PRINTING', 'PAUSED',
+      'RECONCILING', 'COMPLETED', 'FAILED', 'CANCELLED'
+    ].includes(canonical)) {
+      fail(400, 400, `未知任务状态: ${status}`)
+    }
+    return canonical
+  }
+
+  const requestedStatuses = hasStatus
+    ? [params.status]
+    : (params.statuses || [])
+  if (requestedStatuses.length > 10) fail(400, 400, '任务状态最多选择10项')
+  const statuses = new Set(requestedStatuses.map(normalizeStatus))
+  const timeField = params.timeField === undefined || params.timeField === null || params.timeField === ''
+    ? 'CREATED_AT'
+    : String(params.timeField).trim().toUpperCase()
+  if (!['CREATED_AT', 'COMPLETED_AT'].includes(timeField)) {
+    fail(400, 400, '时间字段必须为 CREATED_AT 或 COMPLETED_AT')
+  }
+
+  const fileName = params.fileName == null ? null : String(params.fileName).trim()
+  if (fileName && fileName.length > 255) fail(400, 400, '文件名筛选最多255个字符')
+  const isLocalDateTime = value => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(String(value))
+  if (params.startTime && !isLocalDateTime(params.startTime)) fail(400, 400, '开始时间格式无效')
+  if (params.endTime && !isLocalDateTime(params.endTime)) fail(400, 400, '结束时间格式无效')
+  if (params.startTime && params.endTime && String(params.startTime) > String(params.endTime)) {
+    fail(400, 400, '开始时间不能晚于结束时间')
+  }
+
+  let records = [...mockState.jobs]
   const filesById = new Map(mockState.files.map(file => [String(file.id), file]))
   if (session.role !== 'ADMIN') {
     records = records.filter(item => String(item.userId) === String(session.userId))
   }
-  if (params.status) records = records.filter(item => item.status === params.status)
+  if (hasStatus || hasStatuses) {
+    records = records.filter(item => statuses.has(normalizeStatus(item.status)))
+  }
   if (params.printerId !== undefined && params.printerId !== null && params.printerId !== '') {
     records = records.filter(item => String(item.printerId) === String(params.printerId))
   }
-  if (params.keyword) {
-    const keyword = String(params.keyword).trim().toLowerCase()
-    records = records.filter(item => (
-      String(item.id).toLowerCase().includes(keyword) ||
-      String(filesById.get(String(item.fileId))?.originalName || '').toLowerCase().includes(keyword)
-    ))
+  if (session.role === 'ADMIN' && params.userId !== undefined && params.userId !== null && params.userId !== '') {
+    records = records.filter(item => String(item.userId) === String(params.userId))
   }
-  if (params.startTime && params.endTime && new Date(params.startTime) > new Date(params.endTime)) {
-    fail(400, 400, '开始时间不能晚于结束时间')
+  if (fileName) {
+    const normalizedFileName = fileName.toLowerCase()
+    records = records.filter(item => String(filesById.get(String(item.fileId))?.originalName || '')
+      .toLowerCase().includes(normalizedFileName))
   }
-  if (params.startTime) records = records.filter(item => new Date(item.createdAt) >= new Date(params.startTime))
-  if (params.endTime) records = records.filter(item => new Date(item.createdAt) <= new Date(params.endTime))
+  const timeKey = timeField === 'COMPLETED_AT' ? 'completedAt' : 'createdAt'
+  if (params.startTime) records = records.filter(item => item[timeKey] && String(item[timeKey]) >= String(params.startTime))
+  if (params.endTime) records = records.filter(item => item[timeKey] && String(item[timeKey]) <= String(params.endTime))
+  records.sort((left, right) => {
+    if (timeField === 'COMPLETED_AT') {
+      const leftCompleted = left.completedAt == null
+      const rightCompleted = right.completedAt == null
+      if (leftCompleted !== rightCompleted) return leftCompleted ? 1 : -1
+    }
+    const timeDiff = String(right[timeKey] || '').localeCompare(String(left[timeKey] || ''))
+    return timeDiff || compareMockIds(right.id, left.id)
+  })
   return createMockPage(records.map(toPublicJob), params)
 }
 
@@ -1602,7 +1652,10 @@ const handleJobQueue = config => {
     records = records.filter(item => String(item.userId) === String(session.userId))
   }
   return records
-    .sort((a, b) => b.priority - a.priority || new Date(b.createdAt) - new Date(a.createdAt))
+    .slice()
+    .sort((a, b) => b.priority - a.priority
+      || String(a.createdAt).localeCompare(String(b.createdAt))
+      || compareMockIds(a.id, b.id))
     .map(toPublicJob)
 }
 

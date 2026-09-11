@@ -71,6 +71,7 @@ let originalAdapter
 let useGridStore
 let useDeviceStore
 let useRealtimeStore
+let useJobStore
 let useUserStore
 let request
 let router
@@ -91,6 +92,7 @@ test.before(async () => {
   ;({ useGridStore } = await viteServer.ssrLoadModule('/src/stores/printer/gridStore.js'))
   ;({ useDeviceStore } = await viteServer.ssrLoadModule('/src/stores/printer/deviceStore.js'))
   ;({ useRealtimeStore } = await viteServer.ssrLoadModule('/src/stores/printer/realtimeStore.js'))
+  ;({ useJobStore } = await viteServer.ssrLoadModule('/src/stores/jobStore.js'))
   originalAdapter = service.defaults.adapter
 })
 
@@ -198,6 +200,66 @@ test('真实 device Pinia Store 的旧设备请求被取消后不能覆盖最新
 
   assert.deepEqual(devices.rawDeviceList.map(device => device.id), ['9007199254740995'])
   assert.equal(devices.version, 1)
+})
+
+test('真实 job Pinia Store 活动页越界只补请求最后有效页，未知 WS 任务不插入当前页', async () => {
+  setActivePinia(createPinia())
+  const requests = []
+  service.defaults.adapter = config => {
+    const body = typeof config.data === 'string' ? JSON.parse(config.data) : config.data
+    requests.push(body)
+    const isOutOfRange = Number(body.pageNum) === 4
+    return Promise.resolve(axiosResponse(config, {
+      records: isOutOfRange ? [] : [{ id: 'page-job-1', status: 'PRINTING', updatedAt: '2026-09-11T10:00:00' }],
+      total: 25,
+      pageNum: isOutOfRange ? 4 : 3,
+      pageSize: 10,
+      pages: 3
+    }))
+  }
+
+  const jobs = useJobStore()
+  await jobs.fetchActive({ pageNum: 4, pageSize: 10 })
+  assert.equal(requests.length, 2)
+  assert.equal(requests[0].pageNum, 4)
+  assert.equal(requests[1].pageNum, 3)
+  assert.equal(jobs.activePage, 3)
+  assert.equal(jobs.activeTotal, 25)
+  assert.deepEqual(jobs.activeJobs.map(job => job.id), ['page-job-1'])
+
+  const unknown = jobs.applyRealtimeJobStatus({ data: { jobId: 'cross-page-job', status: 'PRINTING' } })
+  assert.equal(unknown, null)
+  assert.deepEqual(jobs.activeJobs.map(job => job.id), ['page-job-1'])
+  assert.equal(jobs.activeTotal, 25)
+})
+
+test('真实 job Pinia Store 只接受最新活动页响应', async () => {
+  setActivePinia(createPinia())
+  const requests = []
+  service.defaults.adapter = config => {
+    const operation = deferred()
+    const body = typeof config.data === 'string' ? JSON.parse(config.data) : config.data
+    requests.push({ ...operation, body, config })
+    return operation.promise
+  }
+
+  const jobs = useJobStore()
+  const first = jobs.fetchActive({ pageNum: 1, pageSize: 10 })
+  await waitFor(() => requests.length === 1)
+  const second = jobs.fetchActive({ pageNum: 2, pageSize: 10 })
+  await waitFor(() => requests.length === 2)
+
+  requests[1].resolve(axiosResponse(requests[1].config, {
+    records: [{ id: 'new-page', status: 'PRINTING' }], total: 20, pageNum: 2, pageSize: 10, pages: 2
+  }))
+  await second
+  requests[0].resolve(axiosResponse(requests[0].config, {
+    records: [{ id: 'old-page', status: 'PRINTING' }], total: 20, pageNum: 1, pageSize: 10, pages: 2
+  }))
+  await first
+
+  assert.equal(jobs.activePage, 2)
+  assert.deepEqual(jobs.activeJobs.map(job => job.id), ['new-page'])
 })
 
 test('真实 grid Pinia Store 保存未完成时路由守卫拒绝放弃，完成后恢复导航', async () => {

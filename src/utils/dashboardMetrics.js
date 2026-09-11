@@ -28,20 +28,115 @@ export function buildStatusSummary(statusCounts = {}) {
   }
 }
 
+export const FARM_TIME_ZONE = 'Asia/Shanghai'
+const LOCAL_DATE_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?$/
+const LOCAL_DATE_TIME_LIKE_PATTERN = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?$/
+
+function pad(value) {
+  return String(value).padStart(2, '0')
+}
+
+function formatDateKey(year, month, day) {
+  return `${String(year).padStart(4, '0')}-${pad(month)}-${pad(day)}`
+}
+
+function partsFromFormatter(date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: FARM_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).formatToParts(date)
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]))
+  return {
+    year: Number(values.year),
+    month: Number(values.month),
+    day: Number(values.day),
+    hour: Number(values.hour === '24' ? '00' : values.hour),
+    minute: Number(values.minute),
+    second: Number(values.second)
+  }
+}
+
+function farmCalendarParts(value) {
+  if (typeof value === 'string') {
+    const localMatch = value.match(LOCAL_DATE_TIME_PATTERN)
+    if (localMatch) {
+      return { year: Number(localMatch[1]), month: Number(localMatch[2]), day: Number(localMatch[3]) }
+    }
+    if (LOCAL_DATE_TIME_LIKE_PATTERN.test(value)) return null
+  }
+
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : partsFromFormatter(date)
+}
+
+function farmDateTimeParts(value) {
+  if (typeof value === 'string') {
+    const localMatch = value.match(LOCAL_DATE_TIME_PATTERN)
+    if (localMatch) {
+      return {
+        year: Number(localMatch[1]),
+        month: Number(localMatch[2]),
+        day: Number(localMatch[3]),
+        hour: Number(localMatch[4]),
+        minute: Number(localMatch[5]),
+        second: Number(localMatch[6])
+      }
+    }
+    if (LOCAL_DATE_TIME_LIKE_PATTERN.test(value)) return null
+  }
+
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : partsFromFormatter(date)
+}
+
+function formatDateTimeParts(parts) {
+  return `${formatDateKey(parts.year, parts.month, parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}:${pad(parts.second)}`
+}
+
+export function formatFarmLocalDateTime(value) {
+  const parts = farmDateTimeParts(value)
+  return parts ? formatDateTimeParts(parts) : ''
+}
+
+export function buildFarmDateRange(referenceTime = new Date(), dayCount = 7) {
+  const endParts = farmDateTimeParts(referenceTime)
+  if (!endParts || !Number.isInteger(dayCount) || dayCount < 1) return { startTime: '', endTime: '' }
+
+  const start = new Date(Date.UTC(endParts.year, endParts.month - 1, endParts.day))
+  start.setUTCDate(start.getUTCDate() - dayCount + 1)
+  const startParts = {
+    year: start.getUTCFullYear(),
+    month: start.getUTCMonth() + 1,
+    day: start.getUTCDate(),
+    hour: endParts.hour,
+    minute: endParts.minute,
+    second: endParts.second
+  }
+  return { startTime: formatDateTimeParts(startParts), endTime: formatDateTimeParts(endParts) }
+}
+
 function dateKey(value) {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10)
+  const parts = farmCalendarParts(value)
+  return parts ? formatDateKey(parts.year, parts.month, parts.day) : null
 }
 
 export function buildSevenDayJobTrend(jobs = [], referenceTime = new Date()) {
-  const end = new Date(referenceTime)
-  if (Number.isNaN(end.getTime())) return []
-  end.setUTCHours(0, 0, 0, 0)
+  const referenceParts = farmCalendarParts(referenceTime)
+  if (!referenceParts) return []
+  // Use UTC only as a timezone-free calendar arithmetic container. The values
+  // below are already Asia/Shanghai calendar parts, never browser-local time.
+  const end = new Date(Date.UTC(referenceParts.year, referenceParts.month - 1, referenceParts.day))
   const counts = new Map()
   const days = Array.from({ length: 7 }, (_, index) => {
     const day = new Date(end)
     day.setUTCDate(end.getUTCDate() - 6 + index)
-    const key = dateKey(day)
+    const key = formatDateKey(day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate())
     counts.set(key, 0)
     return { key, label: key.slice(5) }
   })

@@ -747,6 +747,7 @@ const fetchQueue = async () => {
 
 const handleActivePageChange = ({ current }) => {
   activePage.value = current
+  return jobStore.fetchActive({ pageNum: current })
 }
 
 const runJobAction = async (job, action, requestAction, successText) => {

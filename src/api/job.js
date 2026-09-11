@@ -6,6 +6,9 @@ import {
   normalizePrintJob
 } from '@/utils/dataAdapters'
 import { toBatchPreviewPayload } from '@/utils/batchDispatch'
+import { validateJobPageParams } from '@/utils/jobQuery'
+
+export { validateJobPageParams }
 
 /**
  * 打印任务 API 模块
@@ -169,15 +172,18 @@ export function retryPreviewBatchDispatch(data) {
  * @param {number} params.pageNum - 页码
  * @param {number} params.pageSize - 每页大小
  * @param {string} [params.status] - 任务状态
- * @param {string[]} [params.statuses] - 多状态筛选；与 status 互斥（TC-001 目标字段，当前后端尚未实现）
- * @param {number} [params.printerId] - 打印机ID
- * @param {string} [params.fileName] - 文件名筛选（TC-001 目标字段，当前后端尚未实现）
- * @param {'CREATED_AT'|'COMPLETED_AT'} [params.timeField] - 时间字段（TC-001 目标字段，当前后端尚未实现）
+ * @param {string[]} [params.statuses] - 多状态筛选；与 status 互斥
+ * @param {number|string} [params.printerId] - 打印机ID
+ * @param {number|string} [params.userId] - 用户ID；权限由服务端决定
+ * @param {string} [params.fileName] - 文件名字面包含筛选
+ * @param {'CREATED_AT'|'COMPLETED_AT'} [params.timeField] - 时间字段
  * @param {string} [params.startTime] - 开始时间，yyyy-MM-dd'T'HH:mm:ss local datetime
  * @param {string} [params.endTime] - 结束时间，yyyy-MM-dd'T'HH:mm:ss local datetime
- * @returns {Promise<{code: number, message: string, data: {records: Array<PrintJobSummary>, total: number}}>} 已返回 PageResult<PrintJobSummaryVO>；多状态/文件名/完成时间筛选仍由 TC-003 实施
+ * @returns {Promise<{code: number, message: string, data: {records: Array<PrintJobSummary>, total: number}}>} PageResult<PrintJobSummaryVO>
  */
 export function getJobPage(params = {}) {
+  validateJobPageParams(params)
+
   return request({
     url: '/api/v1/print-jobs/page',
     method: 'post',

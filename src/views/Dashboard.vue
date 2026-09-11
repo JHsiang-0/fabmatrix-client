@@ -138,7 +138,7 @@
                 <h2>活动任务进度</h2>
                 <p>来自任务 Store 的 REST/WS 合并状态</p>
               </div>
-              <t-tag theme="primary" variant="light">{{ activeJobs.length }} 项</t-tag>
+              <t-tag theme="primary" variant="light">{{ dashboardActiveTotal === null ? '—' : `${dashboardActiveTotal} 项` }}</t-tag>
             </div>
           </template>
           <div v-if="activeJobs.length" class="activity-list">
@@ -263,7 +263,9 @@ import { useJobStore } from '@/stores/jobStore'
 import { useRealtimeStore } from '@/stores/printer/realtimeStore'
 import { PRINTER_STATUS, PRINTER_STATUS_MAP } from '@/utils/constants'
 import { normalizePrinterStatus } from '@/utils/dataAdapters'
-import { buildSevenDayJobTrend } from '@/utils/dashboardMetrics'
+import { buildFarmDateRange, buildSevenDayJobTrend } from '@/utils/dashboardMetrics'
+import { ACTIVE_JOB_STATUSES } from '@/utils/jobSelectors'
+import { fetchAllPageRecords } from '@/utils/jobPagination'
 import { renderIcon } from '@/utils/tdesign'
 
 defineOptions({ name: 'DashboardView' })
@@ -280,6 +282,7 @@ const hasLoadedOnce = ref(false)
 const printers = ref([])
 const recentJobs = ref([])
 const failedJobTotal = ref(null)
+const dashboardActiveTotal = ref(null)
 const trendJobs = ref([])
 const overviewReferenceTime = ref(null)
 const lastUpdateAt = ref(null)
@@ -324,7 +327,7 @@ const statCards = computed(() => [
   { key: 'offline', title: '离线设备', value: offlinePrinters.value, description: 'REST/实时状态为 OFFLINE', icon: ErrorCircleIcon, to: { path: '/printers', query: { status: 'OFFLINE' } } },
   { key: 'unknown', title: '未知设备', value: unknownPrinters.value, description: '尚未取得可靠状态', icon: ErrorCircleIcon, to: { path: '/printers', query: { status: 'UNKNOWN' } } },
   { key: 'queued', title: '排队任务', value: queueJobs.value.length, description: '来自 QUEUED 队列接口', icon: TaskIcon, to: '/tasks/queue' },
-  { key: 'active', title: '活动任务', value: activeJobs.value.length, description: 'ASSIGNED 至 RECONCILING', icon: PrintIcon, to: '/tasks/queue' },
+  { key: 'active', title: '活动任务', value: dashboardActiveTotal.value === null ? '—' : dashboardActiveTotal.value, description: 'ASSIGNED 至 RECONCILING（独立统计）', icon: PrintIcon, to: '/tasks/queue' },
   { key: 'failed', title: '失败任务', value: failedJobTotal.value === null ? '—' : failedJobTotal.value, description: '来自 FAILED 分页接口', icon: ErrorCircleIcon, to: '/tasks/history' }
 ])
 
@@ -379,33 +382,35 @@ function markUpdated() {
 async function fetchOverview() {
   loading.value = true
   loadError.value = ''
-  const rangeEnd = new Date()
-  const rangeStart = new Date(rangeEnd)
-  rangeStart.setDate(rangeStart.getDate() - 6)
-  const range = { startTime: rangeStart.toISOString(), endTime: rangeEnd.toISOString() }
+  const range = buildFarmDateRange()
   const results = await Promise.allSettled([
     getPrinterList({ pageNum: 1, pageSize: 100 }),
     jobStore.refresh(),
+    getJobPage({ pageNum: 1, pageSize: 1, statuses: ACTIVE_JOB_STATUSES }),
     getJobPage({ pageNum: 1, pageSize: 100 }),
     getJobPage({ pageNum: 1, pageSize: 100, status: 'FAILED' }),
-    getJobPage({ pageNum: 1, pageSize: 100, status: 'COMPLETED', ...range }),
-    getJobPage({ pageNum: 1, pageSize: 100, status: 'FAILED', ...range }),
-    getJobPage({ pageNum: 1, pageSize: 100, status: 'CANCELLED', ...range })
+    fetchAllPageRecords(getJobPage, {
+      pageNum: 1,
+      pageSize: 100,
+      statuses: ['COMPLETED', 'FAILED', 'CANCELLED'],
+      timeField: 'COMPLETED_AT',
+      ...range
+    })
   ])
 
-  const [printerResult, , recentResult, failedResult, completedResult, failedTrendResult, cancelledResult] = results
+  const [printerResult, , activeTotalResult, recentResult, failedResult, trendResult] = results
   if (printerResult.status === 'fulfilled') printers.value = printerResult.value.data?.records || []
+  if (activeTotalResult.status === 'fulfilled') {
+    dashboardActiveTotal.value = Number(activeTotalResult.value.data?.total || 0)
+  }
   if (recentResult.status === 'fulfilled') recentJobs.value = recentResult.value.data?.records || []
   if (failedResult.status === 'fulfilled') {
     const data = failedResult.value.data || {}
     failedJobTotal.value = Number.isFinite(Number(data.total)) ? Number(data.total) : (data.records || []).length
   }
-  const trendResults = [completedResult, failedTrendResult, cancelledResult]
-    .filter(result => result.status === 'fulfilled')
-    .flatMap(result => result.value.data?.records || [])
-  if (completedResult.status === 'fulfilled' || failedTrendResult.status === 'fulfilled' || cancelledResult.status === 'fulfilled') {
-    trendJobs.value = trendResults
-    overviewReferenceTime.value = rangeEnd
+  if (trendResult.status === 'fulfilled') {
+    trendJobs.value = trendResult.value || []
+    overviewReferenceTime.value = range.endTime
   }
 
   const failedCount = results.filter(result => result.status === 'rejected').length

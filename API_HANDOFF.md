@@ -22,7 +22,7 @@ fileName, printerName, machineNumber, creatorUsername, operatorUsername, materia
 
 历史快照字段为 `fileNameSnapshot`、`printerNameSnapshot`、`machineNumberSnapshot`、`creatorUsernameSnapshot`、`operatorUsernameSnapshot`；重试字段为 `retryOfJobId`、`rootJobId`、`attemptNumber`。
 
-TC-002 已将 queue/page/detail 切换为独立的 `PrintJobSummaryVO`/`PrintJobDetailVO`，并通过一次 LEFT JOIN 查询提供当前文件、打印机和用户摘要；TC-003 的多状态/完成时间分页语义及 TC-007 的快照、重试关联字段填充仍未实施。桌面端和 Mock 仍保持旧任务响应契约，TC-002 不修改它们，分别由 TC-004/TC-008 同步。
+TC-002 已将 queue/page/detail 切换为独立的 `PrintJobSummaryVO`/`PrintJobDetailVO`，并通过一次 LEFT JOIN 查询提供当前文件、打印机和用户摘要；TC-003 已实施多状态/完成时间分页、文件名筛选、历史终态调用约定和旧状态迁移。TC-004–TC-008 仍未完成，桌面端和其他后续契约不在本任务范围。
 
 ### 2. 查询集合和排序
 
@@ -31,8 +31,8 @@ queue = QUEUED；active = ASSIGNED | UPLOADING | READY | PRINTING | PAUSED | REC
 遗留 `PENDING`、`MANUAL`、`CANCELED` 只允许由独立迁移规范化为 `QUEUED`、`CANCELLED`；GET 查询不得写库。
 
 - `GET /print-jobs/queue` 目标返回 `Result<PrintJobSummaryVO[]>`，权限条件必须在 SQL 查询阶段生效，排序为 `priority DESC, createdAt ASC, id ASC`。
-- `POST /print-jobs/page` 目标返回 `Result<PageResult<PrintJobSummaryVO>>`，兼容单值 `status`，增加 `statuses`、`fileName`、`timeField(CREATED_AT|COMPLETED_AT)`。传递 `status` 与 `statuses` 返回 400。
-- `startTime/endTime` 使用 `yyyy-MM-dd'T'HH:mm:ss` 的 ISO-8601 local datetime，按服务配置的农场时区解释，默认 `Asia/Shanghai`；`startTime>endTime` 返回 400。history 固定使用 `COMPLETED_AT`，按 `completedAt DESC,id DESC` 排序且 null last；其他集合按 `createdAt DESC,id DESC` 排序。
+- `POST /print-jobs/page` 返回 `Result<PageResult<PrintJobSummaryVO>>`，兼容单值 `status`，支持 1–10 项的 `statuses`、trim 后的 `fileName` 和 `timeField(CREATED_AT|COMPLETED_AT)`。显式传 `statuses: []`（包括与 `status` 同时传递）返回 400；非空 `status` 与非空 `statuses` 互斥并返回 400。文件名先 trim 再校验最多255字符。状态别名 `PENDING/MANUAL/CANCELED` 只读映射为 `QUEUED/QUEUED/CANCELLED`，未知状态返回 400。`COMPLETED_AT` 不自动限制终态，历史调用方必须显式传 `statuses=[COMPLETED,FAILED,CANCELLED]`。
+- `startTime/endTime` 使用 `yyyy-MM-dd'T'HH:mm:ss` 的 ISO-8601 local datetime，按服务配置的农场时区解释，默认 `Asia/Shanghai`；`startTime>endTime` 返回 400。任务 `created_at/completed_at` 是不带偏移的农场 wall-clock；真实服务的 JVM、MySQL JDBC/容器和 SQLite fresh schema 均固定 Asia/Shanghai，查询将 local datetime 原样传递，不对已存值做 UTC 转换。`fileName` 对文件原名执行不区分大小写的转义字面包含匹配。history 固定使用 `COMPLETED_AT`，按 `completedAt DESC,id DESC` 排序且 null last；其他集合按 `createdAt DESC,id DESC` 排序。
 - `GET /print-jobs/{id}` 目标返回 `Result<PrintJobDetailVO>`；不存在或不可访问统一返回 404，不泄露资源存在性。
 
 ### 3. 权限、操作和响应 data
@@ -61,7 +61,7 @@ retry 采用新建任务记录，不使用 attempt 表。新任务为 QUEUED，�
 
 ### 5. 当前实现与实施任务
 
-TC-001 只冻结契约；TC-002 已上线 queue/page/detail 的目标读模型和摘要 JOIN 查询，safe assign、safe start、safe confirm、reconcile 的成功 `data` 类型均为 null。TC-003 的多状态/文件名/完成时间分页和 TC-007 的快照、retry 新任务记录及旧 assign 的 410 仍未实施。
+TC-001 只冻结契约；TC-002 已上线 queue/page/detail 的目标读模型和摘要 JOIN 查询，safe assign、safe start、safe confirm、reconcile 的成功 `data` 类型均为 null。TC-003 已上线多状态/文件名/创建与完成时间分页及旧状态迁移；TC-007 的快照、retry 新任务记录及旧 assign 的 410 仍未实施。
 
 ## 1. 产品边界
 
@@ -326,7 +326,7 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 | 方法 | 地址 | 权限 | 参数 | 返回 |
 |---|---|---|---|---|
 | GET | `/print-jobs/queue` | ADMIN/OPERATOR | 无 | `PrintJobSummaryVO[]`；TC-002 已实施，精确 QUEUED、权限下推、priority/createdAt/id 稳定排序 |
-| POST | `/print-jobs/page` | ADMIN/OPERATOR | 当前为分页、单 status、打印机、用户、createdAt 时间范围 | `PageResult<PrintJobSummaryVO>`；TC-002 已实施；statuses、fileName、timeField 由 TC-003 实施 |
+| POST | `/print-jobs/page` | ADMIN/OPERATOR | 分页、status 或 statuses、printerId、userId、fileName、timeField、startTime/endTime；权限在 SQL 下推 | `PageResult<PrintJobSummaryVO>`；TC-003 已实施，固定 count+data 两条 SQL |
 | GET | `/print-jobs/{id}` | ADMIN/OPERATOR | Path ID | `PrintJobDetailVO`；TC-002 已实施，不存在或无权统一 404 |
 | POST | `/print-jobs` | ADMIN/OPERATOR | `fileId,priority,printerId?,idempotencyKey?` | 新任务 ID；同一用户同一幂等键重复请求返回原任务 |
 | POST | `/print-jobs/create` | ADMIN/OPERATOR | `fileId,priority,printerId?,idempotencyKey?` | 新任务 ID（兼容，deprecated） |
@@ -426,7 +426,7 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 | DTO/请求 | 字段 | 规则 |
 |---|---|---|
 | `PrintJobCreateDTO` | `fileId,priority?,printerId?,idempotencyKey?` | `fileId` 必填正数；优先级 0-100；幂等键最多 100 字符；不传打印机进入 `QUEUED` |
-| `PrintJobQueryDTO` | 当前 `pageNum?,pageSize?,status?,printerId?,userId?,startTime?,endTime?`；目标增加 `statuses?,fileName?,timeField?` | 默认 `1/10`；时间格式为 `yyyy-MM-dd'T'HH:mm:ss` local datetime；目标 history 使用 `COMPLETED_AT`；ADMIN 可按 `userId` 查询 |
+| `PrintJobQueryDTO` | `pageNum?,pageSize?,status?,statuses?,printerId?,userId?,fileName?,timeField?,startTime?,endTime?` | 默认 `1/10`、`timeField=CREATED_AT`；statuses 最多10项且与非空 status 互斥；fileName trim 后空值为 null、最多255；时间格式为 `yyyy-MM-dd'T'HH:mm:ss` local datetime；ADMIN 可按 `userId` 查询，OPERATOR 的 userId 静默忽略；history 显式使用终态 statuses 与 `COMPLETED_AT` |
 | `AssignJobRequest` | `jobId,printerId` | 两项均为正数；安全派发后等待现场确认 |
 | `ConfirmSafeRequest` | `printerId,operatorId?` | `printerId` 必填；`operatorId` 已废弃，后端使用 JWT 当前用户 |
 | `StartPrintJobRequest` | `jobId,operatorId?,action?` | `action` 为 `START_PRINT` 或 `UPLOAD_ONLY`；`operatorId` 已废弃 |
@@ -550,7 +550,7 @@ T6.6 取消规则已统一收敛到 `PrintJobService.cancelJob`：Controller 不
 
 文件夹创建和单文件删除以数据库实际写入结果为准；目录记录插入或文件记录删除影响 0 行时返回业务错误。对象存储删除发生在数据库删除之前，若数据库删除失败，服务端不会返回成功，残留对象需按运维清理流程处理。
 
-TC-002 已实施任务读模型：queue/page 使用 `PrintJobSummaryVO`，detail 使用 `PrintJobDetailVO`，列表和详情通过固定 LEFT JOIN 直接返回当前可读摘要；关联缺失保留任务并返回 null。快照和重试关联字段保留为可空目标 schema，实际填充仍由 TC-007 实施；多状态、文件名和完成时间分页仍由 TC-003 实施。
+TC-002 已实施任务读模型：queue/page 使用 `PrintJobSummaryVO`，detail 使用 `PrintJobDetailVO`，列表和详情通过固定 LEFT JOIN 直接返回当前可读摘要；关联缺失保留任务并返回 null。TC-003 已完成多状态、文件名、创建/完成时间范围、稳定排序、SQL 权限下推和旧状态独立迁移；快照和重试关联字段仍由 TC-007 实施。
 
 T6.8 当前已完成任务 Service 的状态/归属/设备调用测试、任务路由认证测试，以及持久化成功后绑定设备任务的 `JOB_STATUS` 事件测试。由于队列任务没有设备 ID，重试、重新排队和优先级修改不发送 `JOB_STATUS`；真实 MySQL/Redis/RustFS/打印机的端到端链路仍需在现场环境验收。
 
@@ -750,7 +750,8 @@ mysql -u root -p farm < src/main/resources/db/migration/09-v2-print-job-idempote
 ### 6.4 时间、数字和金额
 
 - REST 的 `LocalDateTime` 使用 ISO-8601 字符串：`yyyy-MM-dd'T'HH:mm:ss`。
-- 当前系统默认时区为服务端本地时区，现阶段按 Asia/Shanghai 使用。
+- 当前任务时间契约固定为 `Asia/Shanghai` 农场 wall-clock；前端日期范围仅将 TDesign 的 local datetime 规范为 `yyyy-MM-dd'T'HH:mm:ss`，不追加偏移或做 UTC 转换。后端服务与数据库约定见后端 API_HANDOFF。
+- 活动任务的 REST `/print-jobs/page` 在任务 Store 中只代表当前页；Dashboard 活动总数使用独立的 `total` 查询，不能用当前页长度代替。TC-003 阶段 WebSocket 仅更新当前页或已有详情缓存中的任务，未知跨页任务不插入当前页；完整事件收敛属于 TC-006。
 - WebSocket `timestamp` 使用 Unix epoch 毫秒。
 - 所有语义 Long ID 的 JSON 值（包括标量 `data`、对象 ID 和 ID 列表）统一为十进制字符串；`code`、`timestamp`、`sequence`、`version`、`size`、`count` 等非 ID 数值保持 JSON number。
 - REST `PrintJobVO.progress` 使用 BigDecimal，范围 0-100；WebSocket 消息中的 `progress` 保持 JSON 数值，前端按 0-100 的小数处理。

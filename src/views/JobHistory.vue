@@ -17,17 +17,33 @@
           <div class="flex items-center gap-2">
             <span class="text-sm text-gray-700 whitespace-nowrap">任务状态</span>
             <t-select v-model="queryForm.status" placeholder="请选择状态" clearable style="width: 160px">
-              <t-option label="排队中" value="QUEUED" />
-              <t-option label="上传中" value="UPLOADING" />
-              <t-option label="已分配待确认" value="ASSIGNED" />
-              <t-option label="已上传待机" value="READY" />
-              <t-option label="打印中" value="PRINTING" />
-              <t-option label="已暂停" value="PAUSED" />
               <t-option label="已完成" value="COMPLETED" />
               <t-option label="失败" value="FAILED" />
-              <t-option label="状态核对中" value="RECONCILING" />
               <t-option label="已取消" value="CANCELLED" />
             </t-select>
+          </div>
+
+          <div v-if="userStore.isAdmin" class="flex items-center gap-2">
+            <span class="text-sm text-gray-700 whitespace-nowrap">创建人</span>
+            <t-select
+              v-model="queryForm.userId"
+              placeholder="请选择创建人"
+              clearable
+              :loading="creatorLoading"
+              style="width: 180px"
+            >
+              <t-option
+                v-for="user in creatorOptions"
+                :key="String(user.id)"
+                :label="`${user.username}（${user.id}）`"
+                :value="user.id"
+              />
+            </t-select>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-gray-700 whitespace-nowrap">文件名</span>
+            <t-input v-model="queryForm.fileName" placeholder="请输入文件名" clearable style="width: 180px" />
           </div>
 
           <div class="flex items-center gap-2">
@@ -214,6 +230,7 @@ import {
   TaskTimeIcon as Timer,
   CloseCircleIcon as CircleClose
 } from 'tdesign-icons-vue-next'
+import { getAdminUsers } from '@/api/user'
 import { getJobPage, cancelJob, retryJob, requeueJob, updateJobPriority, reconcilePrintJob } from '@/api/job'
 import { message } from '@/utils/message'
 import { formatDateTime } from '@/utils/formatters'
@@ -227,11 +244,15 @@ import StatusTag from '@/components/StatusTag.vue'
 import TaskDetailDrawer from '@/components/TaskDetailDrawer.vue'
 import { useJobStore } from '@/stores/jobStore'
 import { useRealtimeStore } from '@/stores/printer/realtimeStore'
+import { useUserStore } from '@/stores/user'
 
 defineOptions({ name: 'JobHistory' })
 
 const loading = ref(false)
 const loadError = ref('')
+const creatorLoading = ref(false)
+const creatorOptions = ref([])
+const userStore = useUserStore()
 const jobStore = useJobStore()
 const realtimeStore = useRealtimeStore()
 const detailLoading = computed(() => jobStore.detailLoading)
@@ -301,9 +322,13 @@ const restoreTaskDetailContext = () => {
 // 查询表单
 const queryForm = reactive({
   status: '',
+  userId: '',
+  fileName: '',
   dateRange: [],
   printerId: '',
 })
+
+const HISTORY_STATUSES = Object.freeze(['COMPLETED', 'FAILED', 'CANCELLED'])
 
 // 分页信息
 const pagination = reactive({
@@ -380,23 +405,50 @@ const handlePriority = async (job, value) => {
 const buildParams = () => {
   const params = {
     pageNum: pagination.pageNum,
-    pageSize: pagination.pageSize
+    pageSize: pagination.pageSize,
+    timeField: 'COMPLETED_AT'
   }
 
   if (queryForm.status) {
     params.status = queryForm.status
+  } else {
+    params.statuses = [...HISTORY_STATUSES]
   }
 
   if (queryForm.dateRange && queryForm.dateRange.length === 2) {
-    params.startTime = queryForm.dateRange[0]
-    params.endTime = queryForm.dateRange[1]
+    params.startTime = toIsoLocalTime(queryForm.dateRange[0])
+    params.endTime = toIsoLocalTime(queryForm.dateRange[1])
   }
 
   if (queryForm.printerId) {
     params.printerId = queryForm.printerId
   }
 
+  if (queryForm.userId) {
+    params.userId = queryForm.userId
+  }
+
+  if (queryForm.fileName) {
+    params.fileName = queryForm.fileName
+  }
+
   return params
+}
+
+const toIsoLocalTime = value => String(value || '').replace(' ', 'T')
+
+const loadCreatorOptions = async () => {
+  if (!userStore.isAdmin) return
+  creatorLoading.value = true
+  try {
+    const response = await getAdminUsers({ pageNum: 1, pageSize: 100 })
+    creatorOptions.value = response.data?.records || []
+  } catch {
+    // 用户列表仅用于管理员辅助筛选；失败时历史页仍可正常查询。
+    creatorOptions.value = []
+  } finally {
+    creatorLoading.value = false
+  }
 }
 
 // 查询数据
@@ -408,6 +460,8 @@ const handleQuery = async () => {
 // 重置查询
 const handleReset = () => {
   queryForm.status = ''
+  queryForm.userId = ''
+  queryForm.fileName = ''
   queryForm.dateRange = []
   queryForm.printerId = ''
   pagination.pageNum = 1
@@ -448,6 +502,7 @@ const fetchData = async () => {
 
 // 初始化数据
 fetchData()
+loadCreatorOptions()
 </script>
 
 <style scoped>

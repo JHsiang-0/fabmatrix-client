@@ -1,7 +1,10 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getJobDetail, getJobPage, getJobQueue } from '@/api/job'
-import { ACTIVE_JOB_STATUSES, isActiveJob, selectActiveJobs } from '@/utils/jobSelectors'
+import { ACTIVE_JOB_STATUSES, selectActiveJobs } from '@/utils/jobSelectors'
+import { fetchPageWithLastValidFallback } from '@/utils/jobPagination'
+import { mergeRealtimeActivePage, normalizeRealtimeJobStatus as normalizeRealtimeJobStatusMessage } from '@/utils/jobRealtime'
+import { createLatestRequestGuard } from '@/utils/latestRequestGuard'
 
 const scheduleMicrotask = typeof queueMicrotask === 'function'
   ? queueMicrotask
@@ -25,6 +28,7 @@ export const useJobStore = defineStore('job', () => {
   const activePage = ref(1)
   const activePageSize = ref(10)
   const pendingRealtimeStatuses = new Map()
+  const activeRequestGuard = createLatestRequestGuard()
   let realtimeFlushScheduled = false
 
   function cacheJobDetail(id, detail) {
@@ -38,11 +42,8 @@ export const useJobStore = defineStore('job', () => {
     jobDetails.value = nextDetails
   }
 
-  const activeTotal = computed(() => activeJobs.value.length)
-  const activePageJobs = computed(() => {
-    const start = (activePage.value - 1) * activePageSize.value
-    return activeJobs.value.slice(start, start + activePageSize.value)
-  })
+  const activeTotal = ref(0)
+  const activePageJobs = computed(() => activeJobs.value)
 
   async function fetchQueue() {
     queueLoading.value = true
@@ -59,32 +60,32 @@ export const useJobStore = defineStore('job', () => {
     }
   }
 
-  async function fetchActive() {
+  async function fetchActive(options = {}) {
+    const requestId = activeRequestGuard.begin()
+    if (requestId === null) return activeJobs.value
     activeLoading.value = true
     activeError.value = null
     try {
-      const responses = await Promise.all(
-        ACTIVE_JOB_STATUSES.map(status => getJobPage({
-          pageNum: 1,
-          pageSize: 100,
-          status
-        }))
-      )
-      const jobsById = new Map()
-      responses.forEach(response => {
-        const records = response.data?.records || []
-        records.forEach(job => jobsById.set(String(job.id), job))
+      const pageNum = options.pageNum ?? activePage.value
+      const pageSize = options.pageSize ?? activePageSize.value
+      const response = await fetchPageWithLastValidFallback(getJobPage, {
+        pageNum,
+        pageSize,
+        statuses: ACTIVE_JOB_STATUSES
       })
-      activeJobs.value = selectActiveJobs([...jobsById.values()]).sort(sortByUpdatedAt)
-      if (activePage.value > Math.max(1, Math.ceil(activeJobs.value.length / activePageSize.value))) {
-        activePage.value = 1
-      }
+      if (!activeRequestGuard.isCurrent(requestId)) return activeJobs.value
+      const page = response.data || {}
+      activePage.value = page.pageNum ?? pageNum
+      activePageSize.value = page.pageSize ?? pageSize
+      activeTotal.value = page.total ?? 0
+      activeJobs.value = selectActiveJobs(page.records || [])
       return activeJobs.value
     } catch (error) {
+      if (!activeRequestGuard.isCurrent(requestId)) return activeJobs.value
       activeError.value = error
       throw error
     } finally {
-      activeLoading.value = false
+      if (activeRequestGuard.isCurrent(requestId)) activeLoading.value = false
     }
   }
 
@@ -105,42 +106,15 @@ export const useJobStore = defineStore('job', () => {
   }
 
   function normalizeRealtimeJobStatus(message = {}) {
-    const data = message.data || {}
-    const id = data.jobId ?? message.jobId
-    const status = String(data.status || data.currentJobStatus || '').toUpperCase()
-    if (id === undefined || id === null || !status) return null
-    return { data, id, status, key: String(id), message }
+    return normalizeRealtimeJobStatusMessage(message)
   }
 
   function applyRealtimeJobStatuses(messages = []) {
-    const jobsById = new Map(activeJobs.value.map(job => [String(job.id), job]))
-    const details = new Map(jobDetails.value)
-    const updatedJobs = []
-
-    messages.forEach(message => {
-      const normalized = normalizeRealtimeJobStatus(message)
-      if (!normalized) return
-
-      const { data, id, status, key } = normalized
-      const existing = jobsById.get(key) || details.get(key) || {}
-      const updated = { ...existing, id, status }
-      if (data.progress !== undefined) updated.progress = data.progress
-      if (data.printerId !== undefined) updated.printerId = data.printerId
-      if (data.errorReason !== undefined) updated.errorReason = data.errorReason
-      if (data.completedAt !== undefined) updated.completedAt = data.completedAt
-      if (data.updatedAt !== undefined) updated.updatedAt = data.updatedAt
-      if (message.timestamp !== undefined && updated.updatedAt === undefined) updated.updatedAt = message.timestamp
-
-      if (isActiveJob(updated)) jobsById.set(key, updated)
-      else jobsById.delete(key)
-      if (details.has(key)) details.set(key, updated)
-      updatedJobs.push(updated)
-    })
-
-    if (!updatedJobs.length) return []
-    activeJobs.value = selectActiveJobs([...jobsById.values()]).sort(sortByUpdatedAt)
-    if (updatedJobs.some(job => details.has(String(job.id)))) jobDetails.value = details
-    return updatedJobs
+    const result = mergeRealtimeActivePage(activeJobs.value, jobDetails.value, messages)
+    if (!result.updatedJobs.length) return []
+    activeJobs.value = result.activeJobs
+    jobDetails.value = result.jobDetails
+    return result.updatedJobs
   }
 
   function applyRealtimeJobStatus(message = {}) {
@@ -182,7 +156,10 @@ export const useJobStore = defineStore('job', () => {
     if (!jobs.length) return []
 
     const jobsById = new Map(activeJobs.value.map(job => [String(job.id), job]))
-    jobs.forEach(job => jobsById.set(String(job.id), job))
+    jobs.forEach(job => {
+      const key = String(job.id)
+      if (jobsById.has(key)) jobsById.set(key, job)
+    })
     activeJobs.value = selectActiveJobs([...jobsById.values()]).sort(sortByUpdatedAt)
     const details = new Map(jobDetails.value)
     jobs.forEach(job => details.set(String(job.id), job))
