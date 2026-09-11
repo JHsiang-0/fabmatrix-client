@@ -1,6 +1,6 @@
 # FabMatrix 任务中心可读性与可靠性改造设计
 
-版本：v1.0  
+版本：v1.0
 对应需求：`.kiro/specs/farm-task-center-readability/requirements.md`
 
 ## 1. 总体数据流
