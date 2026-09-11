@@ -453,6 +453,52 @@ test('UI-006 批量导入部分失败时保留 Drawer、失败选择和逐项原
   }
 })
 
+test('UI-007 扫描网段分段输入校验、请求范围和 800x560 布局', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 800, height: 560 } })
+  const page = await context.newPage()
+
+  try {
+    await page.goto('/login')
+    await page.getByLabel('用户名', { exact: true }).fill('admin')
+    await page.getByLabel('密码', { exact: true }).fill('Admin123')
+    await page.getByRole('button', { name: '登录', exact: true }).click()
+    await openSidebarItem(page, 800, '打印机管理')
+    await page.getByRole('button', { name: '扫描局域网设备', exact: true }).click()
+
+    const scanDrawer = page.locator('.t-drawer').filter({ hasText: '扫描局域网设备' })
+    const subnetInputs = scanDrawer.locator('.printer-scan-subnet-segment input')
+    await expect(subnetInputs).toHaveCount(3)
+    await expect(subnetInputs.nth(0)).toHaveValue('192')
+    await expect(subnetInputs.nth(1)).toHaveValue('168')
+    await expect(subnetInputs.nth(2)).toHaveValue('0')
+    await expect(scanDrawer).toContainText('扫描范围：192.168.0.1 – 192.168.0.254')
+    await expect(scanDrawer.locator('.printer-scan-subnet-button')).toHaveCount(1)
+    await expect(scanDrawer.locator('.printer-scan-subnet-segment .t-input__suffix')).toHaveCount(0)
+
+    await subnetInputs.nth(2).fill('7')
+    await expect(scanDrawer).toContainText('扫描范围：192.168.7.1 – 192.168.7.254')
+    await scanDrawer.getByRole('button', { name: '开始扫描', exact: true }).click()
+    await expect.poll(() => page.evaluate(() => window.__FARM_GET_LAST_SCAN_SUBNET__())).toBe('192.168.7')
+
+    for (const invalidValue of ['', '-1', '1.2', 'abc', '256']) {
+      await subnetInputs.nth(1).fill(invalidValue)
+      await expect(scanDrawer).toContainText('第2段请输入 0–255 的整数')
+      await scanDrawer.getByRole('button', { name: '开始扫描', exact: true }).click()
+      await expect.poll(() => page.evaluate(() => window.__FARM_GET_LAST_SCAN_SUBNET__())).toBe('192.168.7')
+    }
+
+    const drawerMetrics = await scanDrawer.locator('.t-drawer__content-wrapper').evaluate(element => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      viewportWidth: window.innerWidth
+    }))
+    expect(drawerMetrics.scrollWidth).toBeLessThanOrEqual(drawerMetrics.clientWidth + 1)
+    expect(drawerMetrics.clientWidth).toBeLessThanOrEqual(drawerMetrics.viewportWidth + 1)
+  } finally {
+    await context.close()
+  }
+})
+
 test('UI-006 打印机选择不跨筛选分页且两个抽屉在 800x560 可用', async ({ browser }) => {
   test.setTimeout(120000)
   const context = await browser.newContext({ viewport: { width: 800, height: 560 } })

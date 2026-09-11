@@ -818,6 +818,7 @@ const handleDeletePrinter = config => {
 const handleScanPrinters = config => {
   requireSession(config, ['ADMIN'])
   const subnet = getParams(config).subnet || '192.168.1'
+  mockState.lastScanSubnet = subnet
   return Array.from({ length: 12 }, (_, index) => {
     const host = 90 + index
     const discoveryStatus = index === 1 ? 'EXISTING' : index === 2 ? 'UNKNOWN_MAC' : 'NEW'
@@ -2194,6 +2195,7 @@ export const isMockEnabled = runtimeEnv.VITE_USE_MOCK === 'true' || [
 if ((runtimeEnv.DEV || runtimeEnv.MODE === 'mock' || String(runtimeEnv.MODE || '').startsWith('desktop')) && typeof window !== 'undefined') {
   window.__FARM_RESET_MOCK__ = resetMockState
   window.__FARM_GET_LAST_BATCH_ADD_PAYLOAD__ = () => cloneMockData(mockState.lastBatchAddPayload || [])
+  window.__FARM_GET_LAST_SCAN_SUBNET__ = () => mockState.lastScanSubnet || null
   window.__FARM_SET_DASHBOARD_LAYOUT_ERROR__ = failure => {
     mockState.dashboardLayoutError = cloneMockData(failure)
   }

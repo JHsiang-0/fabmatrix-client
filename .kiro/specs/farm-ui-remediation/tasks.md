@@ -1706,3 +1706,24 @@ Git 检查：提交前执行 `git status --short`、`git diff --check`，仅暂�
 审查补丁（2026-09-11）：已修复批量导入部分失败逐项反馈、看板布局编辑虚假成功、未分配设备请求竞态，以及扫描统计误把未知 MAC 计入已知的问题；保持既有布局草稿绑定与保存链路不变。
 
 审查补丁验证：`npm test`（270/270）、针对性 Node 测试（28/28）、UI-006 Browser E2E（3/3）、OPERATOR 看板 Browser E2E（1/1）、`npm run lint`、`npm run build` 和 `git diff --check` 均通过；Electron 验证命令在执行期间被用户中断，未计为通过。
+
+### [x] UI-007 扫描网段分段输入优化
+
+状态：DONE（2026-09-11）
+
+优先级：P1
+
+目标：将扫描 Drawer 顶部的单个网段前缀输入改为三个可访问的 TDesign 输入段，降低编辑具体网段时的输入和校验成本，同时保持 UI-006 的扫描结果、选择、批量导入和 Drawer 滚动/footer 行为不变。
+
+范围：`src/views/PrinterManage.vue`、`src/mock/index.js`（仅提供 E2E 的最后扫描 subnet 观测）、`tests/printerCenter.test.js`、`tests/e2e/browser.spec.js` 和本任务记录；不修改后端、依赖锁、环境文件或 `src/stores/printerStore.js.backup`。
+
+验收：
+
+- 默认显示 `192 · 168 · 0`，每段为带 `inputmode="numeric"`、最大 3 位和可访问标签的 TDesign 输入；非法空值、负数、小数、非数字和超出 255 的值不能发起扫描并有原位提示。
+- 扫描按钮独立位于输入段右侧，扫描和批量导入期间 loading/disabled；桌面横排，小屏可换行且 800×560 不溢出。
+- 辅助文案按实际网段实时显示 `.1–.254` 范围；通过校验后以三段值组合 subnet，API 路径、超时和批量导入 payload 保持不变。
+- 更新打印机专项静态契约和 Browser E2E，运行 `npm test`、`npm run lint`、`npm run build`、Browser/Electron E2E 与 `git diff --check`，仅提交当前任务文件。
+
+完成记录：扫描 Drawer 顶部改为三个 TDesign 文本输入段，限制最多 3 位并通过输入辅助文案校验整数 0–255；扫描按钮独立于输入 suffix，桌面横排、小屏换行；合法 subnet 组合后继续调用原有扫描 API，重试和批量导入状态保持不变。Mock 仅新增最后扫描 subnet 的浏览器测试观测，不改变接口行为。
+
+验证：`node --test tests/printerCenter.test.js`（15/15）、UI-007 Browser E2E（1/1）、`npm test`（271/271）、`npm run lint`、`npm run build`、完整 Browser E2E（15/15）、Electron E2E（3/3）和 `git diff --check` 均通过。构建保留既有 realtimeStore 动静态导入提示与大 chunk 警告，不影响退出码。

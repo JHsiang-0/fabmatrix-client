@@ -349,25 +349,44 @@
     >
       <div class="printer-scan-drawer__content">
         <t-form class="printer-scan-drawer__form" label-width="90px">
-          <t-form-item label="网段前缀">
-            <t-input
-              v-model="subnet"
-              placeholder="例：192.168.0"
-              size="medium"
-              :disabled="isScanning || isBatchAdding"
-            >
-              <template #suffix>
-                <t-button
-                  theme="primary"
-                  :loading="isScanning"
-                  :disabled="isScanning || isBatchAdding"
-                  @click="handleScan"
-                >
-                  <span><search /></span>
-                  {{ isScanning ? '扫描中...' : '开始扫描' }}
-                </t-button>
-              </template>
-            </t-input>
+          <t-form-item label="扫描网段">
+            <div class="printer-scan-subnet-control">
+              <div class="printer-scan-subnet-segments" role="group" aria-label="扫描网段前三段">
+                <template v-for="(segment, index) in subnetSegments" :key="`subnet-segment-${index}`">
+                  <t-input
+                    v-model="subnetSegments[index]"
+                    class="printer-scan-subnet-segment"
+                    size="medium"
+                    inputmode="numeric"
+                    maxlength="3"
+                    autocomplete="off"
+                    :aria-label="`网段第${index + 1}段`"
+                    :disabled="isScanning || isBatchAdding"
+                    @input="value => handleSubnetSegmentInput(index, value)"
+                    @enter="handleScan"
+                  />
+                  <span v-if="index < subnetSegments.length - 1" class="printer-scan-subnet-separator" aria-hidden="true">·</span>
+                </template>
+              </div>
+              <t-button
+                class="printer-scan-subnet-button"
+                theme="primary"
+                :loading="isScanning"
+                :disabled="isScanning || isBatchAdding"
+                @click="handleScan"
+              >
+                <span><search /></span>
+                {{ isScanning ? '扫描中...' : '开始扫描' }}
+              </t-button>
+              <p
+                class="printer-scan-subnet-hint"
+                :class="{ 'printer-scan-subnet-hint--error': !subnetIsValid }"
+                role="status"
+                aria-live="polite"
+              >
+                {{ scanSubnetHint }}
+              </p>
+            </div>
           </t-form-item>
         </t-form>
 
@@ -617,13 +636,27 @@ const rules = {
 
 // ===== 扫描状态 =====
 const scanDialogVisible = ref(false)
-const subnet = ref('192.168.0')
+const subnetSegments = ref(['192', '168', '0'])
 const isScanning = ref(false)
 const hasScanned = ref(false)
 const scanResults = ref([])
 const scanError = ref('')
 const isBatchAdding = ref(false)
 const selectedScanKeys = ref([])
+
+const isValidSubnetSegment = segment => {
+  const value = String(segment ?? '')
+  return /^\d{1,3}$/.test(value) && Number(value) >= 0 && Number(value) <= 255
+}
+
+const invalidSubnetSegmentIndex = computed(() => subnetSegments.value.findIndex(segment => !isValidSubnetSegment(segment)))
+const subnetIsValid = computed(() => invalidSubnetSegmentIndex.value === -1)
+const subnetValidationMessage = computed(() => invalidSubnetSegmentIndex.value === -1
+  ? ''
+  : `第${invalidSubnetSegmentIndex.value + 1}段请输入 0–255 的整数`)
+const scanSubnetHint = computed(() => subnetIsValid.value
+  ? `扫描范围：${subnetSegments.value.join('.')}.1 – ${subnetSegments.value.join('.')}.254`
+  : subnetValidationMessage.value)
 
 // ===== 现场操作状态 =====
 const confirmingSafeIds = ref([])
@@ -1185,17 +1218,24 @@ const handleScanSelectAll = checked => {
   selectedScanKeys.value = checked ? [...scanDeviceKeys.value] : []
 }
 
+const handleSubnetSegmentInput = (index, value) => {
+  const rawValue = typeof value === 'string' ? value : value?.target?.value ?? ''
+  subnetSegments.value[index] = String(rawValue).slice(0, 3)
+}
+
 const handleScan = async () => {
-  if (!subnet.value || isScanning.value || isBatchAdding.value) {
-    if (!subnet.value) message.warning('请输入网段前缀')
+  if (isScanning.value || isBatchAdding.value) return
+  if (!subnetIsValid.value) {
+    message.warning(subnetValidationMessage.value)
     return
   }
+  const subnet = `${subnetSegments.value.join('.')}`
   isScanning.value = true
   hasScanned.value = false
   scanError.value = ''
   selectedScanKeys.value = []
   try {
-    const res = await scanPrinters(subnet.value)
+    const res = await scanPrinters(subnet)
     const devices = res?.data ?? res
     scanResults.value = (Array.isArray(devices) ? devices : []).map((device, index) => ({
       ...device,
@@ -1579,6 +1619,51 @@ const handleBatchAdd = async () => {
   flex: 0 0 auto;
 }
 
+.printer-scan-subnet-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--app-spacing-2);
+  min-width: 0;
+  width: 100%;
+}
+
+.printer-scan-subnet-segments {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--app-spacing-1);
+  min-width: 0;
+}
+
+.printer-scan-subnet-segment {
+  flex: 0 0 64px;
+  width: 64px;
+}
+
+.printer-scan-subnet-separator {
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-title-medium);
+  line-height: 1;
+}
+
+.printer-scan-subnet-button {
+  flex: 0 0 auto;
+}
+
+.printer-scan-subnet-hint {
+  flex: 1 1 100%;
+  min-width: 0;
+  margin: 0;
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+  line-height: 1.5;
+}
+
+.printer-scan-subnet-hint--error {
+  color: var(--app-danger);
+}
+
 .printer-scan-drawer__state {
   display: flex;
   min-height: 220px;
@@ -1734,6 +1819,16 @@ const handleBatchAdd = async () => {
 @media (max-width: 768px) {
   .printer-scan-drawer :deep(.t-drawer__content-wrapper) {
     width: 100vw !important;
+  }
+
+  .printer-scan-subnet-segment {
+    flex-basis: 56px;
+    width: 56px;
+  }
+
+  .printer-scan-subnet-button {
+    flex: 1 1 100%;
+    width: 100%;
   }
 
   .printer-management-toolbar-card__top {
