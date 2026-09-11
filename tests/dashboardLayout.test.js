@@ -84,8 +84,9 @@ test('非法布局输入严格失败，不静默修正同名过道', () => {
   ]), /过道数量|48-240/)
 })
 
-test('归一化布局修复历史 UTF-8 过道名称乱码并保持正常中文不变', () => {
+test('归一化布局修复 Latin-1/Windows-1252 UTF-8 过道名称乱码并保持正常中文不变', () => {
   assert.equal(repairUtf8Mojibake('è¿é'), '过道')
+  assert.equal(repairUtf8Mojibake('è¿‡é“'), '过道')
   assert.equal(repairUtf8Mojibake('过道'), '过道')
   assert.equal(layout(4, 12, [
     { id: 'aisle', axis: 'COLUMN', afterIndex: 7, label: 'è¿é', size: 100 }

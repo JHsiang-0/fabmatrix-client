@@ -51,16 +51,34 @@ const assertText = (value, name, maxLength) => {
   return value.trim()
 }
 
-/** 修复服务端历史数据中 UTF-8 字节被误当作 Latin-1 解码的过道名称。 */
+const WINDOWS_1252_BYTES = Object.freeze({
+  '€': 0x80, '‚': 0x82, 'ƒ': 0x83, '„': 0x84, '…': 0x85, '†': 0x86, '‡': 0x87,
+  'ˆ': 0x88, '‰': 0x89, 'Š': 0x8a, '‹': 0x8b, 'Œ': 0x8c, 'Ž': 0x8e, '‘': 0x91,
+  '’': 0x92, '“': 0x93, '”': 0x94, '•': 0x95, '–': 0x96, '—': 0x97, '˜': 0x98,
+  '™': 0x99, 'š': 0x9a, '›': 0x9b, 'œ': 0x9c, 'ž': 0x9e, 'Ÿ': 0x9f
+})
+
+/** 修复服务端历史数据中 UTF-8 字节被错误按 Latin-1/Windows-1252 解码的过道名称。 */
 export function repairUtf8Mojibake(value) {
-  if (typeof value !== 'string' || !/[\u0080-\u00ff]/.test(value)) return value
-  try {
-    const bytes = Uint8Array.from([...value], character => character.charCodeAt(0))
-    const decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
-    return /[\u4e00-\u9fff]/.test(decoded) ? decoded : value
-  } catch {
-    return value
+  if (typeof value !== 'string') return value
+  let repaired = value
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const characters = [...repaired]
+    if (!characters.some(character => character.charCodeAt(0) >= 0x80)) return repaired
+    const byteValues = characters.map(character => {
+      const code = character.charCodeAt(0)
+      return code <= 0xff ? code : WINDOWS_1252_BYTES[character]
+    })
+    if (byteValues.some(valueItem => valueItem == null)) return repaired
+    try {
+      const decoded = new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(byteValues))
+      if (decoded === repaired || !/[\u4e00-\u9fff]/.test(decoded)) return repaired
+      repaired = decoded
+    } catch {
+      return repaired
+    }
   }
+  return repaired
 }
 
 const normalizeLimits = limits => {

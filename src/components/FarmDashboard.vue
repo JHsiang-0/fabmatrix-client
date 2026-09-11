@@ -7,8 +7,6 @@
       <template #actions>
         <div v-if="canManageLayout && isEditMode" class="dashboard-layout-actions">
           <t-button class="dashboard-action-button" theme="default" variant="outline" size="small"
-            @click="openLayoutSettings">布局设置</t-button>
-          <t-button class="dashboard-action-button" theme="default" variant="outline" size="small"
             @click="openAisleDialog">过道管理</t-button>
           <t-button class="dashboard-action-button" theme="default" variant="outline" size="small"
             @click="cancelLayoutEdit">取消</t-button>
@@ -80,37 +78,10 @@
         <grid-map :device-matrix="store.deviceMatrix" :devices="displayDevices" :real-time-status="store.realTimeStatus"
           :grid-config="store.GRID_CONFIG" :is-edit-mode="isEditMode" :dragged-device="draggedDevice"
           :drag-over-cell="dragOverCell" @dragstart="handleDragStart" @dragend="handleDragEnd"
-          @dragenter="handleDragEnter" @dragleave="handleDragLeave" @drop="handleDrop" @cell-click="handleCellClick" />
+          @dragenter="handleDragEnter" @dragleave="handleDragLeave" @drop="handleDrop" @cell-click="handleCellClick"
+          @dimension-change="handleDimensionChange" />
       </div>
     </div>
-
-    <t-dialog v-model:visible="layoutDialogVisible" header="布局设置" :confirm-btn="{ content: '应用' }"
-      @confirm="applyLayoutSettings">
-      <t-form :data="layoutForm" layout="vertical">
-        <t-form-item label="物理行数">
-          <div class="dashboard-dimension-control">
-            <t-button shape="square" variant="outline" size="small" aria-label="减少物理行数"
-              :disabled="layoutForm.rowCount <= layoutLimits.minRows"
-              @click="adjustLayoutDimension('rowCount', -1)">−</t-button>
-            <span class="dashboard-dimension-control__value" aria-live="polite">{{ layoutForm.rowCount }}</span>
-            <t-button shape="square" variant="outline" size="small" aria-label="增加物理行数"
-              :disabled="layoutForm.rowCount >= layoutLimits.maxRows"
-              @click="adjustLayoutDimension('rowCount', 1)">+</t-button>
-          </div>
-        </t-form-item>
-        <t-form-item label="物理列数">
-          <div class="dashboard-dimension-control">
-            <t-button shape="square" variant="outline" size="small" aria-label="减少物理列数"
-              :disabled="layoutForm.columnCount <= layoutLimits.minColumns"
-              @click="adjustLayoutDimension('columnCount', -1)">−</t-button>
-            <span class="dashboard-dimension-control__value" aria-live="polite">{{ layoutForm.columnCount }}</span>
-            <t-button shape="square" variant="outline" size="small" aria-label="增加物理列数"
-              :disabled="layoutForm.columnCount >= layoutLimits.maxColumns"
-              @click="adjustLayoutDimension('columnCount', 1)">+</t-button>
-          </div>
-        </t-form-item>
-      </t-form>
-    </t-dialog>
 
     <t-dialog v-model:visible="aisleDialogVisible" :header="editingAisleId ? '编辑过道' : '新增过道'"
       :confirm-btn="{ content: '应用' }" @confirm="applyAisleSettings">
@@ -258,7 +229,6 @@ const draggedDevice = ref(null)
 const draggedFrom = ref(null)
 const dragOverCell = ref(null)
 const positionChanges = ref([])
-const layoutDialogVisible = ref(false)
 const aisleListVisible = ref(false)
 const aisleDialogVisible = ref(false)
 const summaryDialogVisible = ref(false)
@@ -270,7 +240,6 @@ const outOfBoundsDevices = ref([])
 const shrinkDevices = ref([])
 const editingAisleId = ref('')
 const overflowPolicy = ref('REJECT')
-const layoutForm = ref({ rowCount: 4, columnCount: 12 })
 const aisleForm = ref({ axis: 'COLUMN', afterIndex: 0, label: '过道', size: 100 })
 const aisleAxisOptions = [
   { label: '纵向过道', value: 'COLUMN' },
@@ -327,8 +296,8 @@ const layoutLimits = computed(() => store.layoutLimits || {
 
 const draftAisles = computed(() => store.layoutDraft?.aisles || [])
 const aislePositionMax = computed(() => aisleForm.value.axis === 'ROW'
-  ? layoutForm.value.rowCount
-  : layoutForm.value.columnCount)
+  ? (store.layoutDraft?.rowCount || 1)
+  : (store.layoutDraft?.columnCount || 1))
 const displayDevices = computed(() => {
   const changes = new Map(positionChanges.value.map(change => [String(change.printerId), change]))
   return store.rawDeviceList.map(device => {
@@ -781,43 +750,20 @@ async function cancelLayoutEdit() {
   }
 }
 
-function openLayoutSettings() {
-  if (!store.layoutDraft) return
-  layoutForm.value = {
-    rowCount: store.layoutDraft.rowCount,
-    columnCount: store.layoutDraft.columnCount
-  }
-  layoutDialogVisible.value = true
-}
-
-function applyLayoutSettings() {
-  const rowCount = Number(layoutForm.value.rowCount)
-  const columnCount = Number(layoutForm.value.columnCount)
-  if (rowCount * columnCount > (layoutLimits.value.maxCells || 1800)) {
-    message.error('行列乘积不能超过布局槽位上限')
-    return
-  }
-  store.updateLayoutDraft({ rowCount, columnCount })
-  layoutDialogVisible.value = false
-}
-
-function adjustLayoutDimension(field, delta) {
-  const isRow = field === 'rowCount'
-  const current = Number(layoutForm.value[field])
+function handleDimensionChange({ axis, delta }) {
+  if (!isEditMode.value || !canManageLayout.value || !store.layoutDraft) return
+  const isRow = axis === 'row'
+  const current = isRow ? store.layoutDraft.rowCount : store.layoutDraft.columnCount
   const min = isRow ? layoutLimits.value.minRows : layoutLimits.value.minColumns
   const max = isRow ? layoutLimits.value.maxRows : layoutLimits.value.maxColumns
-  const next = Math.min(max, Math.max(min, current + delta))
-  const other = isRow ? Number(layoutForm.value.columnCount) : Number(layoutForm.value.rowCount)
-  const rowCount = isRow ? next : other
-  const columnCount = isRow ? other : next
-
+  const next = Math.min(max, Math.max(min, Number(current) + Number(delta)))
+  const rowCount = isRow ? next : store.layoutDraft.rowCount
+  const columnCount = isRow ? store.layoutDraft.columnCount : next
   if (next === current) return
   if (rowCount * columnCount > (layoutLimits.value.maxCells || 1800)) {
     message.error('行列乘积不能超过布局槽位上限')
     return
   }
-
-  layoutForm.value[field] = next
   store.updateLayoutDraft({ rowCount, columnCount })
 }
 
@@ -844,8 +790,8 @@ function applyAisleSettings() {
   const afterIndex = Number(aisleForm.value.afterIndex)
   const size = Number(aisleForm.value.size)
   const positionMax = aisleForm.value.axis === 'ROW'
-    ? layoutForm.value.rowCount
-    : layoutForm.value.columnCount
+    ? (store.layoutDraft?.rowCount || 1)
+    : (store.layoutDraft?.columnCount || 1)
   if (!label || label.length > 12 || !Number.isInteger(afterIndex) || afterIndex < 0 || afterIndex > positionMax
     || !Number.isInteger(size) || size < layoutLimits.value.minAisleSize || size > layoutLimits.value.maxAisleSize) {
     message.error('请填写合法的过道方向、位置、名称和尺寸')
@@ -1083,19 +1029,6 @@ async function initializeDashboard() {
   flex-wrap: wrap;
   gap: 0.5rem;
   justify-content: flex-end;
-}
-
-.dashboard-dimension-control {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.dashboard-dimension-control__value {
-  min-width: 3rem;
-  color: var(--app-text-primary);
-  font-variant-numeric: tabular-nums;
-  text-align: center;
 }
 
 .dashboard-aisle-list {

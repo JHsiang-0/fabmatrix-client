@@ -12,14 +12,12 @@ test('ADMIN 布局编辑使用草稿，保存才提交布局资源', () => {
   assert.doesNotMatch(source, /machineNumber: targetSlotLabel\.value/)
 })
 
-test('行列使用 30adedc 风格的点击增减，并即时写回布局草稿', () => {
-  assert.match(source, /adjustLayoutDimension\('rowCount', -1\)/)
-  assert.match(source, /adjustLayoutDimension\('rowCount', 1\)/)
-  assert.match(source, /adjustLayoutDimension\('columnCount', -1\)/)
-  assert.match(source, /adjustLayoutDimension\('columnCount', 1\)/)
+test('行列使用 30adedc 网格轨道按钮并即时写回布局草稿', () => {
+  assert.match(source, /@dimension-change="handleDimensionChange"/)
+  assert.match(source, /function handleDimensionChange\(\{ axis, delta \}\)/)
   assert.match(source, /store\.updateLayoutDraft\(\{ rowCount, columnCount \}\)/)
-  assert.doesNotMatch(source, /t-input-number v-model="layoutForm\.rowCount"/)
-  assert.doesNotMatch(source, /t-input-number v-model="layoutForm\.columnCount"/)
+  assert.doesNotMatch(source, /layoutDialogVisible/)
+  assert.doesNotMatch(source, /adjustLayoutDimension/)
 })
 
 test('编辑工作流覆盖取消确认、缩容下架确认、冲突提示和刷新保护', () => {

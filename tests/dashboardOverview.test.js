@@ -97,7 +97,7 @@ test('看板传递服务端布局和完整设备集合，并保留现有事件�
 test('全屏看板不引入动态布局、虚假车间或组件级 WebSocket 生命周期', () => {
   assert.doesNotMatch(farmDashboardSource, /workshopOptions|selectedWorkshop|二号车间|三号车间/)
   assert.doesNotMatch(dashboardHeaderSource, /workshopOptions|t-dropdown|workshop-change/)
-  assert.doesNotMatch(farmDashboardSource, /localStorage|dimension-change|aisle-context|GridAisleSettingsDialog/)
+  assert.doesNotMatch(farmDashboardSource, /localStorage|aisle-context|GridAisleSettingsDialog/)
   assert.doesNotMatch(farmDashboardSource, /<dashboard-details-panel/)
   assert.doesNotMatch(farmDashboardSource, /onUnmounted/)
   assert.doesNotMatch(farmDashboardSource, /store\.disconnectWs\(\)/)
