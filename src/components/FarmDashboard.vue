@@ -77,10 +77,26 @@
       @confirm="applyLayoutSettings">
       <t-form :data="layoutForm" layout="vertical">
         <t-form-item label="物理行数">
-          <t-input-number v-model="layoutForm.rowCount" :min="layoutLimits.minRows" :max="layoutLimits.maxRows" />
+          <div class="dashboard-dimension-control">
+            <t-button shape="square" variant="outline" size="small" aria-label="减少物理行数"
+              :disabled="layoutForm.rowCount <= layoutLimits.minRows"
+              @click="adjustLayoutDimension('rowCount', -1)">−</t-button>
+            <span class="dashboard-dimension-control__value" aria-live="polite">{{ layoutForm.rowCount }}</span>
+            <t-button shape="square" variant="outline" size="small" aria-label="增加物理行数"
+              :disabled="layoutForm.rowCount >= layoutLimits.maxRows"
+              @click="adjustLayoutDimension('rowCount', 1)">+</t-button>
+          </div>
         </t-form-item>
         <t-form-item label="物理列数">
-          <t-input-number v-model="layoutForm.columnCount" :min="layoutLimits.minColumns" :max="layoutLimits.maxColumns" />
+          <div class="dashboard-dimension-control">
+            <t-button shape="square" variant="outline" size="small" aria-label="减少物理列数"
+              :disabled="layoutForm.columnCount <= layoutLimits.minColumns"
+              @click="adjustLayoutDimension('columnCount', -1)">−</t-button>
+            <span class="dashboard-dimension-control__value" aria-live="polite">{{ layoutForm.columnCount }}</span>
+            <t-button shape="square" variant="outline" size="small" aria-label="增加物理列数"
+              :disabled="layoutForm.columnCount >= layoutLimits.maxColumns"
+              @click="adjustLayoutDimension('columnCount', 1)">+</t-button>
+          </div>
         </t-form-item>
       </t-form>
     </t-dialog>
@@ -692,6 +708,26 @@ function applyLayoutSettings() {
   layoutDialogVisible.value = false
 }
 
+function adjustLayoutDimension(field, delta) {
+  const isRow = field === 'rowCount'
+  const current = Number(layoutForm.value[field])
+  const min = isRow ? layoutLimits.value.minRows : layoutLimits.value.minColumns
+  const max = isRow ? layoutLimits.value.maxRows : layoutLimits.value.maxColumns
+  const next = Math.min(max, Math.max(min, current + delta))
+  const other = isRow ? Number(layoutForm.value.columnCount) : Number(layoutForm.value.rowCount)
+  const rowCount = isRow ? next : other
+  const columnCount = isRow ? other : next
+
+  if (next === current) return
+  if (rowCount * columnCount > (layoutLimits.value.maxCells || 1800)) {
+    message.error('行列乘积不能超过布局槽位上限')
+    return
+  }
+
+  layoutForm.value[field] = next
+  store.updateLayoutDraft({ rowCount, columnCount })
+}
+
 function openAisleDialog(aisle = null) {
   if (!aisle) {
     aisleListVisible.value = true
@@ -929,6 +965,19 @@ async function initializeDashboard() {
   flex-wrap: wrap;
   gap: 0.5rem;
   justify-content: flex-end;
+}
+
+.dashboard-dimension-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dashboard-dimension-control__value {
+  min-width: 3rem;
+  color: var(--app-text-primary);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .dashboard-aisle-list {

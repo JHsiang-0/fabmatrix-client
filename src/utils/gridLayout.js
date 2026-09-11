@@ -51,6 +51,18 @@ const assertText = (value, name, maxLength) => {
   return value.trim()
 }
 
+/** 修复服务端历史数据中 UTF-8 字节被误当作 Latin-1 解码的过道名称。 */
+export function repairUtf8Mojibake(value) {
+  if (typeof value !== 'string' || !/[\u0080-\u00ff]/.test(value)) return value
+  try {
+    const bytes = Uint8Array.from([...value], character => character.charCodeAt(0))
+    const decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    return /[\u4e00-\u9fff]/.test(decoded) ? decoded : value
+  } catch {
+    return value
+  }
+}
+
 const normalizeLimits = limits => {
   const source = limits && typeof limits === 'object' ? limits : GRID_LAYOUT_LIMITS
   const normalized = {}
@@ -100,7 +112,7 @@ const normalizeAisles = (aisles, rowCount, columnCount, limits) => {
       id,
       axis,
       afterIndex,
-      label: assertText(aisle.label, `aisles[${index}].label`, 12),
+      label: assertText(repairUtf8Mojibake(aisle.label), `aisles[${index}].label`, 12),
       size
     }
   }).sort((left, right) => left.axis.localeCompare(right.axis) || left.afterIndex - right.afterIndex)

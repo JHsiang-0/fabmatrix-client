@@ -12,7 +12,8 @@ import {
   getVisualColumns,
   getVisualRows,
   GridLayoutValidationError,
-  normalizeLayout
+  normalizeLayout,
+  repairUtf8Mojibake
 } from '../src/utils/gridLayout.js'
 
 const limits = {
@@ -81,6 +82,14 @@ test('非法布局输入严格失败，不静默修正同名过道', () => {
   assert.throws(() => layout(4, 12, [
     { id: 'a', axis: 'COLUMN', afterIndex: 1, label: 'a', size: 47 }
   ]), /过道数量|48-240/)
+})
+
+test('归一化布局修复历史 UTF-8 过道名称乱码并保持正常中文不变', () => {
+  assert.equal(repairUtf8Mojibake('è¿é'), '过道')
+  assert.equal(repairUtf8Mojibake('过道'), '过道')
+  assert.equal(layout(4, 12, [
+    { id: 'aisle', axis: 'COLUMN', afterIndex: 7, label: 'è¿é', size: 100 }
+  ]).aisles[0].label, '过道')
 })
 
 test('异常坐标、半空坐标和重复槽位进入确定性清单，超过100台不丢失', () => {
