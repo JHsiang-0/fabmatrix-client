@@ -87,6 +87,30 @@ const findPrinter = id => mockState.printers.find(item => sameMockId(item.id, id
 const findFile = id => mockState.files.find(item => sameMockId(item.id, id))
 const findJob = id => mockState.jobs.find(item => sameMockId(item.id, id))
 
+/**
+ * 生成与 TC-002 PrintJobSummaryVO 对齐的 Mock 任务。
+ * 摘要只来自 Mock 中已有的文件、打印机和用户记录，关联缺失时返回 null，
+ * 不在前端或 Mock 中猜测耗材、喷嘴或名称。
+ */
+const toMockJobSummary = job => {
+  const file = findFile(job?.fileId)
+  const printer = findPrinter(job?.printerId)
+  const creator = mockState.users.find(user => sameMockId(user.id, job?.userId))
+  const operator = mockState.users.find(user => sameMockId(user.id, job?.operatorId))
+  const printableFile = file && file.folder !== true ? file : null
+
+  return toPublicJob({
+    ...job,
+    fileName: printableFile?.originalName ?? null,
+    printerName: printer?.name ?? null,
+    machineNumber: printer?.machineNumber ?? null,
+    creatorUsername: creator?.username ?? null,
+    operatorUsername: operator?.username ?? null,
+    materialType: printableFile?.materialType ?? null,
+    nozzleSize: printableFile?.nozzleSize ?? null
+  })
+}
+
 const setJobStatus = (job, nextStatus) => {
   job.status = transitionMockJob(job.status, nextStatus)
   job.updatedAt = now()
@@ -1411,7 +1435,7 @@ const handleFileJobs = config => {
     .filter(job => canReadResource(session, job.userId))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
-  return createMockPage(records.map(toPublicJob), getParams(config))
+  return createMockPage(records.map(toMockJobSummary), getParams(config))
 }
 
 const handleFileTree = config => {
@@ -1642,7 +1666,7 @@ const handleJobPage = config => {
     const timeDiff = String(right[timeKey] || '').localeCompare(String(left[timeKey] || ''))
     return timeDiff || compareMockIds(right.id, left.id)
   })
-  return createMockPage(records.map(toPublicJob), params)
+  return createMockPage(records.map(toMockJobSummary), params)
 }
 
 const handleJobQueue = config => {
@@ -1656,7 +1680,7 @@ const handleJobQueue = config => {
     .sort((a, b) => b.priority - a.priority
       || String(a.createdAt).localeCompare(String(b.createdAt))
       || compareMockIds(a.id, b.id))
-    .map(toPublicJob)
+    .map(toMockJobSummary)
 }
 
 const handleJobDetail = config => {
@@ -1664,7 +1688,7 @@ const handleJobDetail = config => {
   const id = getPath(config.url).split('/').pop()
   const job = findJob(id)
   if (!job || !canReadResource(session, job.userId)) fail(404, 404, '任务不存在')
-  return toPublicJob(job)
+  return toMockJobSummary(job)
 }
 
 const handleReconcileJob = config => {
@@ -1699,7 +1723,7 @@ const handleReconcileJob = config => {
     job.completedAt = now()
   }
   setJobStatus(job, result)
-  return toPublicJob(job)
+  return toMockJobSummary(job)
 }
 
 const handleCreateJob = config => {
@@ -1797,7 +1821,7 @@ const handleAssignJob = config => {
   printer.currentJobId = job.id
   printer.status = 'IDLE'
   printer.updatedAt = now()
-  return toPublicJob(job)
+  return toMockJobSummary(job)
 }
 
 const handleRetryJob = config => {
@@ -2072,7 +2096,7 @@ const handleBatchConfirm = config => {
       attemptCount: 1,
       retryable: false,
       success: true,
-      job: toPublicJob(result.job)
+      job: toMockJobSummary(result.job)
     })
     previewItem.status = result.job.status
     previewItem.jobId = result.job.id
@@ -2127,7 +2151,7 @@ const handleStartJob = config => {
   printer.status = job.status === 'PRINTING' ? 'PRINTING' : 'IDLE'
   printer.isSafeToPrint = false
   printer.updatedAt = now()
-  return toPublicJob(job)
+  return toMockJobSummary(job)
 }
 
 const handlePrinterControl = config => {

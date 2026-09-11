@@ -58,7 +58,7 @@ test('rejects folder preview and returns null for a missing thumbnail', async ()
   assert.equal(thumbnail.data, null)
 })
 
-test('returns real associated jobs with pagination and public fields only', async () => {
+test('returns real associated jobs with pagination and readable summary fields', async () => {
   setupSession()
   const response = await request(
     'GET',
@@ -71,8 +71,11 @@ test('returns real associated jobs with pagination and public fields only', asyn
   assert.equal(response.data.total, 2)
   assert.deepEqual(response.data.records.map(job => job.id), ['1001', '1005'])
   assert.equal(response.data.records.every(job => job.fileId === '20'), true)
-  assert.equal('fileName' in response.data.records[0], false)
-  assert.equal('printerName' in response.data.records[0], false)
+  assert.equal(response.data.records[0].fileName, 'gearbox.gcode')
+  assert.equal(response.data.records[0].printerName, 'Printer_C0DA')
+  assert.equal(response.data.records[0].machineNumber, 'A-01')
+  assert.equal(response.data.records[0].creatorUsername, 'admin')
+  assert.equal(response.data.records[0].operatorUsername, 'operator')
 })
 
 test('returns an access-filtered nested file tree without internal fields', async () => {

@@ -16,6 +16,7 @@ const normalizePublicLongIds = (value, fields) => {
 
 const SEMANTIC_ID_FIELDS = new Set([
   'id', 'printerId', 'currentJobId', 'jobId', 'fileId', 'userId', 'operatorId',
+  'retryOfJobId', 'rootJobId',
   'conflicts', 'outOfBoundsPrinters', 'changedPositions', 'unallocatedPrinters'
 ])
 
@@ -62,12 +63,9 @@ export const toPublicPrinter = printer => normalizePublicLongIds(removeFields(pr
 ]), ['id', 'currentJobId'])
 
 /**
- * 将内部任务对象转换为正式 PrintJobVO，不输出文件/打印机嵌套摘要或旧结束时间。
+ * 将内部任务对象转换为正式 PrintJobSummaryVO，不输出内部嵌套资源或旧结束时间。
+ * 可读摘要由任务路由在 Mock 边界按当前关联资源补齐。
  */
 export const toPublicJob = job => normalizePublicLongIds(removeFields(job, [
-  'fileName',
-  'printerName',
-  'materialType',
-  'nozzleSize',
   'endedAt'
-]), ['id', 'fileId', 'printerId', 'userId', 'operatorId'])
+]), ['id', 'fileId', 'printerId', 'userId', 'operatorId', 'retryOfJobId', 'rootJobId'])

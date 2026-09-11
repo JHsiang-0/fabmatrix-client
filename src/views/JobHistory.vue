@@ -97,26 +97,58 @@
             @row-click="openTaskDetail"
             :loading="loading"
             :height="historyTableHeight"
+            table-content-width="max-content"
             style="width: 100%"
             class="history-table history-management-table"
             hover
           >
-        <TdTableColumn prop="id" label="任务ID" width="100" align="center">
+        <TdTableColumn prop="id" label="任务 ID" width="130" align="center">
           <template #default="scope">
-            <span class="font-mono font-semibold text-gray-700">#{{ scope.row.id }}</span>
+            <t-tooltip :content="`#${getHistoryDisplay(scope.row).jobId}`" class="job-display-tooltip">
+              <span class="job-display__secondary job-display__ellipsis font-mono">#{{ getHistoryDisplay(scope.row).jobId }}</span>
+            </t-tooltip>
           </template>
         </TdTableColumn>
 
-        <TdTableColumn prop="fileId" label="关联文件ID" width="100" align="center">
+        <TdTableColumn label="文件" min-width="220">
           <template #default="scope">
-            <t-tag size="small" variant="light-outline">{{ scope.row.fileId }}</t-tag>
+            <div class="job-display-cell">
+              <t-tooltip :content="getHistoryDisplay(scope.row).fileName" class="job-display-tooltip">
+                <span class="job-display__primary job-display__ellipsis">{{ getHistoryDisplay(scope.row).fileName }}</span>
+              </t-tooltip>
+              <span v-if="getHistoryDisplay(scope.row).fileId" class="job-display__secondary job-display__ellipsis">
+                文件 ID {{ getHistoryDisplay(scope.row).fileId }}
+              </span>
+            </div>
           </template>
         </TdTableColumn>
 
-        <TdTableColumn prop="printerId" label="分配设备ID" width="100" align="center">
+        <TdTableColumn label="打印设备" min-width="210">
           <template #default="scope">
-            <t-tag size="small" variant="light-outline" v-if="scope.row.printerId">{{ scope.row.printerId }}</t-tag>
-            <span v-else>-</span>
+            <div class="job-display-cell">
+              <t-tooltip :content="getHistoryDisplay(scope.row).printerName" class="job-display-tooltip">
+                <span class="job-display__primary job-display__ellipsis">{{ getHistoryDisplay(scope.row).printerName }}</span>
+              </t-tooltip>
+              <t-tooltip :content="getHistoryDisplay(scope.row).machineNumber" class="job-display-tooltip">
+                <span class="job-display__secondary job-display__ellipsis">{{ getHistoryDisplay(scope.row).machineNumber }}</span>
+              </t-tooltip>
+              <span v-if="getHistoryDisplay(scope.row).printerId" class="job-display__secondary job-display__ellipsis">
+                打印机 ID {{ getHistoryDisplay(scope.row).printerId }}
+              </span>
+            </div>
+          </template>
+        </TdTableColumn>
+
+        <TdTableColumn label="人员" min-width="190">
+          <template #default="scope">
+            <div class="job-display-cell">
+              <t-tooltip :content="getHistoryDisplay(scope.row).creatorUsername" class="job-display-tooltip">
+                <span class="job-display__primary job-display__ellipsis">创建人：{{ getHistoryDisplay(scope.row).creatorUsername }}</span>
+              </t-tooltip>
+              <t-tooltip :content="getHistoryDisplay(scope.row).operatorUsername" class="job-display-tooltip">
+                <span class="job-display__secondary job-display__ellipsis">操作员：{{ getHistoryDisplay(scope.row).operatorUsername }}</span>
+              </t-tooltip>
+            </div>
           </template>
         </TdTableColumn>
 
@@ -159,39 +191,16 @@
 
         <TdTableColumn prop="errorReason" label="报错原因" min-width="180" show-overflow-tooltip>
           <template #default="scope">
-            <span v-if="scope.row.errorReason" class="text-red-600 text-sm">{{ scope.row.errorReason }}</span>
-            <span v-else>-</span>
+            <t-tooltip v-if="scope.row.errorReason" :content="String(scope.row.errorReason)" class="job-display-tooltip">
+              <span class="job-display__error job-display__ellipsis">{{ scope.row.errorReason }}</span>
+            </t-tooltip>
+            <span v-else class="job-display__secondary">-</span>
           </template>
         </TdTableColumn>
 
-        <TdTableColumn label="操作" width="300" align="center" fixed="right">
+        <TdTableColumn label="操作" width="100" align="center" fixed="right">
           <template #default="scope">
             <t-button size="small" variant="text" @click.stop="openTaskDetail(scope.row)">详情</t-button>
-            <t-button v-if="scope.row.status === 'FAILED'" size="small" theme="primary" variant="text"
-              @click="handleRetry(scope.row.id)">重试</t-button>
-            <t-button v-if="['ASSIGNED', 'READY'].includes(scope.row.status)" size="small" theme="warning" variant="text"
-              @click="handleRequeue(scope.row.id)">重新排队</t-button>
-            <t-select v-if="scope.row.status === 'QUEUED'" :value="scope.row.priority" size="small"
-              @change="value => handlePriority(scope.row, value)" style="width: 88px">
-              <t-option label="普通" :value="0" />
-              <t-option label="优先" :value="50" />
-              <t-option label="加急" :value="100" />
-            </t-select>
-            <t-popconfirm content="确定要取消这个任务吗？"
-              theme="danger"
-              @confirm="handleCancel(scope.row.id)"
-              :disabled="!canCancel(scope.row.status)"
-            >
-              <template>
-                <t-button
-                  size="small" theme="danger" variant="outline"
-                  :disabled="!canCancel(scope.row.status)"
-                >
-                  <span><circle-close /></span>
-                  取消
-                </t-button>
-              </template>
-            </t-popconfirm>
           </template>
         </TdTableColumn>
           </TdTable>
@@ -226,15 +235,14 @@ import { ref, reactive, computed } from 'vue'
 import {
   RefreshIcon as Refresh,
   SearchIcon as Search,
-  TimeIcon as Clock,
-  TaskTimeIcon as Timer,
-  CloseCircleIcon as CircleClose
+  TimeIcon as Clock
 } from 'tdesign-icons-vue-next'
 import { getAdminUsers } from '@/api/user'
-import { getJobPage, cancelJob, retryJob, requeueJob, updateJobPriority, reconcilePrintJob } from '@/api/job'
+import { getJobPage, reconcilePrintJob } from '@/api/job'
 import { message } from '@/utils/message'
 import { formatDateTime } from '@/utils/formatters'
 import { renderIcon } from '@/utils/tdesign'
+import { getHistoryJobDisplay } from '@/utils/jobDisplay'
 import TdTable from '@/components/TdTable.vue'
 import TdTableColumn from '@/components/TdTableColumn.vue'
 import AsyncState from '@/components/AsyncState.vue'
@@ -265,6 +273,7 @@ const detailDrawerVisible = ref(false)
 const selectedJob = ref(null)
 const reconcileSubmitting = ref(false)
 const JOB_HISTORY_DETAIL_CONTEXT_KEY = 'farm-ui:job-history-detail'
+const getHistoryDisplay = getHistoryJobDisplay
 
 const openTaskDetail = job => {
   selectedJob.value = job
@@ -337,12 +346,6 @@ const pagination = reactive({
   total: 0
 })
 
-// 判断任务是否可以取消
-const canCancel = (status) => {
-  const cancelableStatuses = ['QUEUED', 'ASSIGNED', 'UPLOADING', 'READY', 'PRINTING', 'PAUSED', 'RECONCILING']
-  return cancelableStatuses.includes(status)
-}
-
 const hasValue = value => value !== undefined && value !== null && value !== ''
 
 // 获取进度条状态
@@ -352,53 +355,6 @@ const getProgressStatus = (status, progress) => {
   if (status === 'PAUSED' || status === 'CANCELLED') return 'warning'
   if (progress === 100) return 'success'
   return ''
-}
-
-// 取消任务
-const handleCancel = async (id) => {
-  try {
-    await cancelJob(id)
-    message.success('任务已取消')
-    fetchData()
-  } catch (error) {
-    console.error('取消任务失败:', error)
-    message.error('取消任务失败')
-    await fetchData()
-  }
-}
-
-const handleRetry = async id => {
-  try {
-    await retryJob(id)
-    message.success('任务已重新加入队列')
-    fetchData()
-  } catch (error) {
-    console.error('重试任务失败:', error)
-    await fetchData()
-  }
-}
-
-const handleRequeue = async id => {
-  try {
-    await requeueJob(id)
-    message.success('任务已重新排队')
-    fetchData()
-  } catch (error) {
-    console.error('重新排队失败:', error)
-    await fetchData()
-  }
-}
-
-const handlePriority = async (job, value) => {
-  const priority = Number(value)
-  try {
-    await updateJobPriority(job.id, priority)
-    job.priority = priority
-    message.success('优先级已更新')
-  } catch (error) {
-    console.error('更新优先级失败:', error)
-    fetchData()
-  }
 }
 
 // 构建请求参数
@@ -558,7 +514,7 @@ loadCreatorOptions()
 }
 
 .history-management-table :deep(.t-table) {
-  min-width: 1260px;
+  min-width: 1460px;
 }
 
 .history-management-table :deep(.t-table__content) {
@@ -592,6 +548,42 @@ loadCreatorOptions()
 
 .history-management-table :deep(.t-table__body tr:hover > td:first-child) {
   box-shadow: inset 3px 0 0 var(--td-brand-color);
+}
+
+.job-display-cell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.job-display-tooltip {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.job-display__ellipsis {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-display__primary {
+  color: var(--app-text-primary);
+  font-weight: 600;
+}
+
+.job-display__secondary {
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+}
+
+.job-display__error {
+  color: var(--td-error-color-7);
+  font-size: var(--td-font-size-body-small);
 }
 
 .history-pagination-footer {

@@ -277,7 +277,9 @@ export function normalizePrintJob(record) {
     'fileId',
     'printerId',
     'userId',
-    'operatorId'
+    'operatorId',
+    'retryOfJobId',
+    'rootJobId'
   ])
 
   if (normalized && Object.prototype.hasOwnProperty.call(normalized, 'progress')) {

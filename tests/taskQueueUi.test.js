@@ -32,12 +32,11 @@ test('任务刷新失败保留已有服务端数据并提供页面内重试', ()
   assert.match(historySource, /loadError && tableData\.length/)
 })
 
-test('任务操作失败后重新读取服务端状态，避免 409 或 422 留下过期列表', () => {
+test('任务操作失败后重新读取服务端状态，历史页不暴露活动控制', () => {
   assert.match(queueSource, /message\.error\(error\?\.message \|\| `\$\{successText\}失败`\)[\s\S]*?await fetchQueue\(\)/)
   assert.match(queueSource, /重新读取服务端状态/)
-  assert.match(historySource, /取消任务失败[\s\S]*?await fetchData\(\)/)
-  assert.match(historySource, /重试任务失败[\s\S]*?await fetchData\(\)/)
-  assert.match(historySource, /重新排队失败[\s\S]*?await fetchData\(\)/)
+  assert.match(historySource, /@click\.stop="openTaskDetail\(scope\.row\)"/)
+  assert.doesNotMatch(historySource, /handleRetry|handleRequeue|handleCancel|handlePriority/)
 })
 
 test('TC-003 活动任务一次发送多状态服务端分页并保留服务端页元数据', async () => {

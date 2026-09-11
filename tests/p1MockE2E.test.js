@@ -37,12 +37,20 @@ const assertPublicFile = file => {
 }
 
 const assertPublicJob = job => {
-  assert.equal('fileName' in job, false)
-  assert.equal('printerName' in job, false)
-  assert.equal('materialType' in job, false)
-  assert.equal('nozzleSize' in job, false)
+  assert.equal('fileName' in job, true)
+  assert.equal('printerName' in job, true)
+  assert.equal('machineNumber' in job, true)
+  assert.equal('creatorUsername' in job, true)
+  assert.equal('operatorUsername' in job, true)
+  assert.equal('materialType' in job, true)
+  assert.equal('nozzleSize' in job, true)
+  assert.equal(job.fileName === null || typeof job.fileName === 'string', true)
+  assert.equal(job.printerName === null || typeof job.printerName === 'string', true)
+  assert.equal(job.machineNumber === null || typeof job.machineNumber === 'string', true)
+  assert.equal(job.creatorUsername === null || typeof job.creatorUsername === 'string', true)
+  assert.equal(job.operatorUsername === null || typeof job.operatorUsername === 'string', true)
   assert.equal('endedAt' in job, false)
-  assert.equal(typeof job.id === 'number' || typeof job.id === 'string', true)
+  assert.equal(typeof job.id, 'string')
   assert.equal(typeof job.status, 'string')
 }
 

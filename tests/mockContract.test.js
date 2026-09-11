@@ -36,7 +36,7 @@ test('keeps HTTP and business codes in mock error envelopes', () => {
   assert.deepEqual(resolveMockErrorScenario({ headers: { 'X-Mock-Error': '400' } }), MOCK_ERROR_SCENARIOS['400'])
 })
 
-test('sanitizes public mock DTOs to the backend contracts', () => {
+test('sanitizes public mock DTOs while preserving the readable job summary contract', () => {
   const file = toPublicFile({
     id: 1,
     folder: false,
@@ -73,6 +73,9 @@ test('sanitizes public mock DTOs to the backend contracts', () => {
     status: 'COMPLETED',
     fileName: 'private.gcode',
     printerName: 'Printer-1',
+    machineNumber: 'A-01',
+    creatorUsername: 'admin',
+    operatorUsername: 'operator',
     materialType: 'PLA',
     nozzleSize: 0.4,
     endedAt: '2026-09-04T10:00:00',
@@ -81,6 +84,13 @@ test('sanitizes public mock DTOs to the backend contracts', () => {
     id: '1',
     fileId: '2',
     status: 'COMPLETED',
+    fileName: 'private.gcode',
+    printerName: 'Printer-1',
+    machineNumber: 'A-01',
+    creatorUsername: 'admin',
+    operatorUsername: 'operator',
+    materialType: 'PLA',
+    nozzleSize: 0.4,
     completedAt: '2026-09-04T10:00:00'
   })
 })
