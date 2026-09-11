@@ -1,48 +1,58 @@
 <template>
   <div v-cloak class="farm-dashboard h-full bg-gray-100 flex flex-col overflow-hidden">
-    <!-- 顶部标题和统计 -->
-    <div class="farm-dashboard__header p-4 pb-0">
-      <dashboard-header :status-counts="store.statusCounts" :workshop-name="workshopName"
-        :last-update-time="lastUpdateTime" @refresh="handleRefresh">
+    <!-- 顶部品牌和操作 -->
+    <div class="dashboard-top-shell">
+      <dashboard-header :workshop-name="workshopName" :last-update-time="lastUpdateTime" @refresh="handleRefresh">
       <!-- 布局锁定/编辑模式切换按钮 -->
       <template #actions>
-        <t-button v-if="canManageLayout && !isEditMode" theme="default" :icon="renderIcon(Lock)" @click="toggleEditMode">
-          解锁布局
+        <t-button v-if="canManageLayout && !isEditMode" class="dashboard-action-button" theme="default" variant="outline"
+          size="small" :icon="renderIcon(Lock)" @click="toggleEditMode">
+          布局设置
         </t-button>
-        <t-button v-else-if="canManageLayout" theme="primary" :icon="renderIcon(Unlock)" @click="saveLayout">
-          保存布局
+        <t-button v-else-if="canManageLayout" class="dashboard-action-button" theme="primary" variant="base"
+          size="small" :icon="renderIcon(Unlock)" @click="saveLayout">
+          完成布局
         </t-button>
       </template>
+      <template #fullscreen-action>
+        <slot name="fullscreen-action"></slot>
+      </template>
       </dashboard-header>
-      <t-alert
-        v-if="store.wsConnectionState !== 'OPEN' || store.isRealtimeStale || store.isRecovering"
-        class="farm-dashboard__realtime-alert mt-2"
-        theme="warning"
-        :title="store.isRecovering ? '正在恢复实时状态' : (store.isRealtimeStale ? '实时状态可能已陈旧' : '实时连接未建立，当前看板数据可能不是最新')"
-        :close-btn="false"
-      />
-      <div v-if="store.alerts.length" class="farm-dashboard__alerts mt-2 space-y-2" aria-live="polite">
-        <t-alert
-          v-for="alert in store.alerts"
-          :key="alert.id"
-          :theme="alert.theme"
-          :title="alert.title"
-          :message="alert.message"
-          :close-btn="true"
-          @close="store.dismissAlert(alert.id)"
-        />
+      <div v-if="realtimeNotice || store.alerts.length" class="dashboard-alert-stack" aria-live="polite">
+        <t-alert v-if="realtimeNotice" theme="warning" class="dashboard-realtime-alert" :close-btn="false">
+          <template #default>
+            <span class="dashboard-alert__message">{{ realtimeNotice }}</span>
+          </template>
+          <template #operation>
+            <t-button size="small" variant="outline" :loading="reconnecting" @click="reconnectRealtime">
+              重新连接
+            </t-button>
+          </template>
+        </t-alert>
+        <t-alert v-for="alert in store.alerts" :key="alert.id" :theme="alert.theme" :title="alert.title"
+          :message="alert.message" :close-btn="true" @close="store.dismissAlert(alert.id)" />
       </div>
     </div>
 
-    <dashboard-details-panel
-      class="farm-dashboard__details"
-      :status-counts="store.statusCounts"
-      :active-jobs="activeJobs"
-      :history-jobs="historyJobs"
-      :history-loading="historyLoading"
-      :history-error="historyError"
-      @retry-history="fetchHistory"
-    />
+    <section class="stat-grid" aria-label="设备统计">
+      <div v-for="stat in statCards" :key="stat.key" class="stat-card"
+        :class="[`stat-card--${stat.tone}`, { 'stat-card--interactive': stat.to }]"
+        :role="stat.to ? 'button' : undefined" :tabindex="stat.to ? 0 : undefined"
+        :aria-label="stat.to ? `查看${stat.label}` : undefined" @click="stat.to && goTo(stat.to)"
+        @keydown.enter.prevent="stat.to && goTo(stat.to)" @keydown.space.prevent="stat.to && goTo(stat.to)">
+        <div class="stat-card__body">
+          <div class="stat-card__topline">
+            <span class="stat-card__label">{{ stat.label }}</span>
+            <span class="stat-card__icon"><component :is="stat.icon" :size="22" /></span>
+          </div>
+          <div class="stat-card__value">{{ stat.value }}</div>
+          <div class="stat-card__footer">
+            <span>{{ stat.description }}</span>
+            <ChevronRightIcon :size="16" />
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- 独立车间看板容器 - 响应式布局，与状态栏对齐 -->
     <div class="farm-dashboard__workshop dashboard-workshop-scroll app-scroll-region relative w-full flex-1 px-4 pb-4 bg-gray-100">
@@ -71,21 +81,37 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import {
+  CheckCircleIcon,
+  ChevronRightIcon,
+  DashboardIcon,
+  ErrorCircleIcon,
+  LockOnIcon as Lock,
+  LockOffIcon as Unlock,
+  PrintIcon
+} from 'tdesign-icons-vue-next'
 import { message, confirmMessage } from '@/utils/message'
 import { renderIcon } from '@/utils/tdesign'
 import { useUserStore } from '@/stores/user'
-import { LockOnIcon as Lock, LockOffIcon as Unlock } from 'tdesign-icons-vue-next'
 import { usePrinterStore } from '@/stores/printer'
-import { useJobStore } from '@/stores/jobStore'
 import { emergencyStopPrinter, pausePrinter, resumePrinter, cancelPrinter } from '@/api/printer'
 import { getJobPage } from '@/api/job'
+import { PRINTER_STATUS } from '@/utils/constants'
+import { normalizePrinterStatus } from '@/utils/dataAdapters'
 import DashboardHeader from './DashboardHeader.vue'
-import DashboardDetailsPanel from './DashboardDetailsPanel.vue'
 import GridMap from './grid/GridMap.vue'
 import BindDeviceDialog from './BindDeviceDialog.vue'
 import DeviceDetailDrawer from './device/DeviceDetailDrawer.vue'
 
 defineOptions({ name: 'FarmDashboard' })
+
+const props = defineProps({
+  realtimeNoticeOverride: {
+    type: String,
+    default: ''
+  }
+})
 
 // ============================================
 // Store
@@ -93,12 +119,12 @@ defineOptions({ name: 'FarmDashboard' })
 
 const store = usePrinterStore()
 const userStore = useUserStore()
-const jobStore = useJobStore()
+const router = useRouter()
 const controlLoading = ref(false)
-const activeJobs = computed(() => jobStore.activeJobs)
 const historyJobs = ref([])
 const historyLoading = ref(false)
 const historyError = ref('')
+const reconnecting = ref(false)
 
 // ============================================
 // Reactive State
@@ -163,6 +189,83 @@ const activeRealTimeData = computed(() => {
   if (!activeDevice.value) return null
   return store.realTimeStatus[String(activeDevice.value.id)]
 })
+
+const realtimeNotice = computed(() => props.realtimeNoticeOverride || (
+  store.isRecovering
+    ? '正在恢复实时状态，当前显示最近一次可用快照'
+    : store.isRealtimeStale
+      ? '实时状态可能已陈旧，当前看板正在重新收敛'
+      : store.wsConnectionState !== 'OPEN'
+        ? '实时连接未建立，当前看板展示 REST 快照数据'
+        : ''
+))
+
+function getEffectiveStatus(device) {
+  const realtime = store.realTimeStatus[String(device.id)]
+  if (realtime?.connectionStatus === 'OFFLINE') return PRINTER_STATUS.OFFLINE
+  return normalizePrinterStatus(
+    realtime?.businessStatus || realtime?.unifiedState || realtime?.state || device.status
+  )
+}
+
+const dashboardStatusCounts = computed(() => store.rawDeviceList.reduce((counts, device) => {
+  const status = getEffectiveStatus(device)
+  counts[status] = (counts[status] || 0) + 1
+  return counts
+}, {}))
+
+const statCards = computed(() => {
+  const counts = dashboardStatusCounts.value
+  const total = Number(store.totalDevices) || 0
+  const printing = counts[PRINTER_STATUS.PRINTING] || 0
+  const idle = counts[PRINTER_STATUS.IDLE] || 0
+  const abnormal = [PRINTER_STATUS.ERROR, PRINTER_STATUS.OFFLINE, PRINTER_STATUS.UNKNOWN]
+    .reduce((sum, status) => sum + (counts[status] || 0), 0)
+  const online = total - (counts[PRINTER_STATUS.OFFLINE] || 0) - (counts[PRINTER_STATUS.UNKNOWN] || 0)
+
+  return [
+    {
+      key: 'printers',
+      label: '打印机总数',
+      value: total,
+      description: `${Math.max(0, online)} 台设备在线`,
+      icon: DashboardIcon,
+      tone: 'primary',
+      to: '/printers'
+    },
+    {
+      key: 'printing',
+      label: '正在打印',
+      value: printing,
+      description: '实时打印中的设备',
+      icon: PrintIcon,
+      tone: 'blue',
+      to: { path: '/printers', query: { status: PRINTER_STATUS.PRINTING } }
+    },
+    {
+      key: 'idle',
+      label: '空闲打印机',
+      value: idle,
+      description: '当前可分配任务的设备',
+      icon: CheckCircleIcon,
+      tone: 'orange',
+      to: { path: '/printers', query: { status: PRINTER_STATUS.IDLE } }
+    },
+    {
+      key: 'errors',
+      label: '异常设备',
+      value: abnormal,
+      description: abnormal ? '请及时处理异常' : '当前运行正常',
+      icon: ErrorCircleIcon,
+      tone: abnormal ? 'red' : 'green',
+      to: '/printers'
+    }
+  ]
+})
+
+function goTo(path) {
+  router.push(path)
+}
 
 async function fetchHistory() {
   historyLoading.value = true
@@ -539,25 +642,31 @@ async function saveLayout() {
 // ============================================
 
 /**
- * 处理刷新按钮点击 - 刷新打印机 WebSocket 状态
- * 1. 断开现有 WebSocket 连接
- * 2. 重新获取设备数据
- * 3. 重新建立 WebSocket 连接
+ * 处理刷新按钮点击 - 刷新 REST 设备和任务快照。
+ * WebSocket 生命周期由 App.vue 管理；此处只请求最新基线。
  */
 async function handleRefresh() {
   try {
-  message.info('正在重新连接打印机...')
+    message.info('正在刷新打印机数据...')
 
-    // 重新获取设备数据并建立 WebSocket 连接
+    // 重新获取设备和任务数据，实时连接继续由应用根部维护。
     await Promise.all([store.fetchDeviceData(), fetchHistory()])
-    store.connectWs()
 
     updateLastUpdateTime()
-  message.success('打印机状态已刷新')
+    message.success('打印机状态已刷新')
   } catch (error) {
     console.error('刷新打印机状态失败:', error)
-  message.error('刷新打印机状态失败，请重试')
+    message.error('刷新打印机状态失败，请重试')
   }
+}
+
+function reconnectRealtime() {
+  if (reconnecting.value || store.wsConnectionState === 'OPEN') return
+  reconnecting.value = true
+  store.connectWs()
+  window.setTimeout(() => {
+    reconnecting.value = false
+  }, 800)
 }
 
 // ============================================
@@ -630,22 +739,6 @@ onMounted(() => {
   color: var(--app-text-primary);
 }
 
-.farm-dashboard__header,
-.farm-dashboard__details,
-.farm-dashboard__workshop {
-  min-width: 0;
-}
-
-.farm-dashboard__header,
-.farm-dashboard__details {
-  flex: 0 0 auto;
-}
-
-.farm-dashboard__realtime-alert :deep(.t-alert),
-.farm-dashboard__alerts :deep(.t-alert) {
-  border-radius: var(--app-radius);
-}
-
 .farm-dashboard__workshop {
   box-sizing: border-box;
   background: var(--app-page-background);
@@ -658,8 +751,180 @@ onMounted(() => {
   border-color: var(--app-border);
 }
 
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--app-spacing-4);
+  padding: var(--app-spacing-3) var(--app-spacing-4) var(--app-spacing-4);
+  background: var(--app-page-background);
+}
+
+.stat-card {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 142px;
+  padding: var(--app-spacing-4);
+  overflow: hidden;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+}
+
+.stat-card--interactive {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card--interactive:hover {
+  box-shadow: var(--app-shadow);
+  transform: translateY(-2px);
+}
+
+.stat-card--interactive:focus-visible {
+  outline: 2px solid var(--app-primary);
+  outline-offset: 2px;
+}
+
+.stat-card__body {
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.stat-card__topline,
+.stat-card__footer {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-spacing-2);
+}
+
+.stat-card__label,
+.stat-card__footer > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stat-card__label {
+  color: var(--app-text-secondary);
+  font-size: var(--app-font-size-body-small);
+}
+
+.stat-card__icon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--app-primary);
+  background: var(--app-primary-light);
+  border-radius: var(--app-radius-round);
+}
+
+.stat-card__value {
+  margin: var(--app-spacing-3) 0 var(--app-spacing-2);
+  color: var(--app-text-primary);
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.stat-card__footer {
+  margin-top: auto;
+  color: var(--app-text-secondary);
+  font-size: var(--app-font-size-caption);
+}
+
+.stat-card--primary {
+  color: var(--app-text-on-brand);
+  background: var(--app-primary);
+  border-color: var(--app-primary);
+}
+
+.stat-card--primary .stat-card__label,
+.stat-card--primary .stat-card__value,
+.stat-card--primary .stat-card__footer {
+  color: var(--app-text-on-brand);
+}
+
+.stat-card--primary .stat-card__icon {
+  color: var(--app-text-on-brand);
+  background: rgb(255 255 255 / 18%);
+}
+
+.stat-card--orange .stat-card__icon {
+  color: var(--app-warning);
+  background: var(--app-warning-light);
+}
+
+.stat-card--green .stat-card__icon {
+  color: var(--app-success);
+  background: var(--app-success-light);
+}
+
+.stat-card--red .stat-card__icon {
+  color: var(--app-danger);
+  background: var(--app-danger-light);
+}
+
+.dashboard-top-shell {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.dashboard-alert-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 var(--app-spacing-4);
+  background: var(--app-page-background);
+}
+
+.dashboard-alert-stack :deep(.t-alert) {
+  min-height: 32px;
+  padding: 4px 8px;
+  border-radius: 0;
+}
+
+.dashboard-realtime-alert :deep(.t-alert__content),
+.dashboard-realtime-alert :deep(.t-alert__message) {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.dashboard-realtime-alert :deep(.t-alert__message) {
+  justify-content: space-between;
+  gap: var(--app-spacing-3);
+}
+
+.dashboard-realtime-alert :deep(.t-alert__description),
+.dashboard-alert__message {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-realtime-alert :deep(.t-alert__operation) {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0;
+}
+
+@media (max-width: 1100px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 767px) {
-  .farm-dashboard__header,
   .farm-dashboard__workshop {
     padding-left: var(--app-spacing-3);
     padding-right: var(--app-spacing-3);

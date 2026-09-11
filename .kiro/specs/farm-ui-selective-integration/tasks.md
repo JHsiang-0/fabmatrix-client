@@ -113,6 +113,16 @@
 
 完成记录：文件网格卡片使用 TDesign `small` 官方外壳和 `#cover` 插槽，移除文件卡片边框/hover、阴影/过渡及 body padding 覆盖；保留自适应行高、选择框、材质标签、文件信息和完整操作区。`node --test tests/fileLibrary.test.js`（30/30）、`npm test`（206/206）、`npm run lint`、`npm run build` 和 `git diff --check` 均通过；构建仅保留既有动态导入与大 chunk 提示，未产生失败。
 
+### [x] SYNC-001.12 全屏看板布局选择性移植
+
+- 范围：`src/views/FullscreenDashboard.vue`、`src/components/FarmDashboard.vue`、`src/components/DashboardHeader.vue`、`tests/dashboardOverview.test.js` 和本任务文档。
+- 按提交 `30adedc` 的样式布局恢复紧凑品牌/操作 Header、顶部实时/业务告警栈、四张统计卡和可滚动车间固定网格；退出全屏通过 `FarmDashboard` 的 `fullscreen-action` slot 放入 Header，使用 TDesign danger small 按钮。
+- 统计卡以当前 REST `rawDeviceList/totalDevices` 为初始化基线，由 `realTimeStatus` 对单设备状态做增量覆盖；不因尚未收到 WS 而显示全零。继续传递 `store.GRID_CONFIG`，保留 `deviceMatrix`、`updateDevicePositions`、绑定/交换/下架、详情 Drawer、暂停/恢复/取消/急停和历史任务 REST 获取。
+- 必须保持 ADMIN 才能编辑布局/绑定/移动/下架，ADMIN/OPERATOR 的既有控制动作不变；WS 生命周期仍由 `App.vue` 管理，FarmDashboard 不在挂载/卸载时连接或断开。全屏继续保留 Escape、fullscreenchange、Electron 监听、resize、卸载退出和返回 printers；断线/stale/recovering 告警保留“重新连接”。
+- 明确不引入动态 1–30×1–60 网格、GridAisleSettingsDialog、GridLayoutSettingsDialog、gridLayout 工具、localStorage 布局、dimension-change、aisle-context、store.gridConfig/updateGridConfig 或虚假多车间切换；不修改 DashboardDetailsPanel.vue、后端、API、Store 契约、真实设备或 `src/stores/printerStore.js.backup`。
+- 验收：`node --test tests/dashboardOverview.test.js`（10/10）、`npm test`（208/208）、`npm run lint`、`npm run build`、`npm run build:mock`、`npm run build:desktop:mock`、`npm run test:e2e`（9/9）和 `git diff --check` 均通过；构建仅保留既有动态导入与大 chunk 警告。
+- 完成记录：已完成（2026-09-11）。
+
 ## 依赖关系
 
 ```text

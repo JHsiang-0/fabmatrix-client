@@ -1,13 +1,19 @@
 <template>
   <div class="fullscreen-dashboard" :class="{ 'is-compact': viewportWidth < 768 }">
-    <FarmDashboard />
+    <FarmDashboard :realtime-notice-override="realtimeNotice">
+      <template #fullscreen-action>
+        <t-button class="dashboard-action-button" theme="danger" variant="base" size="small" @click.stop="leaveFullscreenDashboard">
+          退出全屏
+        </t-button>
+      </template>
+    </FarmDashboard>
 
     <div v-if="!fullscreenSupported" class="fullscreen-dashboard__support-notice">
       <t-alert theme="warning" title="当前浏览器不支持原生全屏，仍可使用监控看板" :close-btn="false" />
     </div>
 
     <div v-if="snapshotError" class="fullscreen-dashboard__state fullscreen-dashboard__state--error">
-      <t-card bordered class="fullscreen-dashboard__overlay-card">
+      <t-card bordered>
         <t-alert theme="error" title="实时看板快照加载失败" :close-btn="false">
           <template #default>{{ snapshotErrorMessage }}</template>
           <template #operation>
@@ -18,38 +24,19 @@
     </div>
 
     <div v-else-if="snapshotLoading" class="fullscreen-dashboard__state">
-      <t-card bordered class="fullscreen-dashboard__overlay-card">
+      <t-card bordered>
         <t-loading text="正在加载打印机快照..." />
       </t-card>
     </div>
 
     <div v-else-if="noDevices" class="fullscreen-dashboard__state">
-      <t-card bordered class="fullscreen-dashboard__overlay-card">
+      <t-card bordered>
         <t-empty type="empty" title="看板暂无设备" description="请先在打印机管理中分配设备位置">
           <template #action>
             <t-button theme="primary" @click="router.push('/printers')">前往设备管理</t-button>
           </template>
         </t-empty>
       </t-card>
-    </div>
-
-    <div v-if="realtimeNotice" class="fullscreen-dashboard__realtime-notice">
-      <t-alert theme="warning" :title="realtimeNotice" :close-btn="false">
-        <template #operation>
-          <t-button size="small" variant="outline" :loading="reconnecting" @click="reconnectRealtime">重新连接</t-button>
-        </template>
-      </t-alert>
-    </div>
-
-    <div class="fullscreen-dashboard__actions">
-      <t-button
-        type="button"
-        size="small"
-        variant="outline"
-        @click.stop="leaveFullscreenDashboard"
-      >
-        退出全屏
-      </t-button>
     </div>
   </div>
 </template>
@@ -161,7 +148,6 @@ onUnmounted(() => {
 <style scoped>
 .fullscreen-dashboard {
   position: relative;
-  box-sizing: border-box;
   width: 100vw;
   height: 100dvh;
   min-height: 100%;
@@ -169,16 +155,7 @@ onUnmounted(() => {
   background: var(--app-page-background);
 }
 
-.fullscreen-dashboard__actions {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 100;
-  pointer-events: auto;
-}
-
-.fullscreen-dashboard__support-notice,
-.fullscreen-dashboard__realtime-notice {
+.fullscreen-dashboard__support-notice {
   position: fixed;
   top: var(--app-spacing-4);
   left: 50%;
@@ -188,7 +165,6 @@ onUnmounted(() => {
 }
 
 .fullscreen-dashboard__support-notice { top: var(--app-spacing-4); }
-.fullscreen-dashboard__realtime-notice { top: 4.25rem; }
 
 .fullscreen-dashboard__state {
   position: fixed;
@@ -203,15 +179,8 @@ onUnmounted(() => {
 
 .fullscreen-dashboard__state .t-card { width: min(520px, 100%); }
 .fullscreen-dashboard__state--error .t-card { width: min(680px, 100%); }
-.fullscreen-dashboard__overlay-card {
-  border-color: var(--app-border);
-  background: var(--app-surface);
-  box-shadow: var(--app-shadow-raised);
-}
 
 @media (max-width: 767px) {
-  .fullscreen-dashboard__actions { top: var(--app-spacing-3); right: var(--app-spacing-3); }
   .fullscreen-dashboard__support-notice { top: 3.75rem; }
-  .fullscreen-dashboard__realtime-notice { top: 7.5rem; }
 }
 </style>
