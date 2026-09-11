@@ -1,7 +1,8 @@
 <template>
   <div class="grid-map-shell" :class="{ 'is-edit-mode': isEditMode }">
     <div class="grid-map-scroll" ref="scrollHost">
-      <div class="grid-map-content" :style="contentStyle">
+      <div class="grid-map-stage" :style="stageStyle">
+        <div class="grid-map-content" :style="contentStyle">
         <!-- 行标签与网格使用同一组视觉轨道，保证过道插入后仍然对齐。 -->
         <div class="grid-map-row-rail">
           <div class="grid-map-corner" aria-hidden="true"></div>
@@ -34,6 +35,7 @@
             </template>
           </div>
         </div>
+        </div>
       </div>
     </div>
   </div>
@@ -42,12 +44,19 @@
 <script setup>
 import { computed, ref, onBeforeUnmount, onMounted } from 'vue'
 import GridCell from './GridCell.vue'
-import { formatGridRowLabel as formatRowLabel, getPhysicalColumn, getPhysicalRow, getVisualColumns, getVisualRows } from '@/utils/gridLayout'
+import {
+  calculateGridFit,
+  formatGridRowLabel as formatRowLabel,
+  getPhysicalColumn,
+  getPhysicalRow,
+  getVisualColumns,
+  getVisualRows
+} from '@/utils/gridLayout'
 
 defineOptions({ name: 'GridMap' })
 
 const props = defineProps({
-  deviceMatrix: { type: Array, required: true },
+  deviceMatrix: { type: Array, default: () => [] },
   devices: { type: Array, default: () => [] },
   realTimeStatus: { type: Object, default: () => ({}) },
   gridConfig: { type: Object, required: true },
@@ -60,6 +69,9 @@ const props = defineProps({
 
 const emit = defineEmits(['dragstart', 'dragend', 'dragenter', 'dragleave', 'drop', 'cell-click'])
 const scrollHost = ref(null)
+const resizeObserver = ref(null)
+const gridFit = ref({ scale: 1, naturalWidth: 0, naturalHeight: 0 })
+const MIN_READABLE_SCALE = 0.72
 const visualColumns = computed(() => getVisualColumns(props.gridConfig))
 const visualRows = computed(() => getVisualRows(props.gridConfig))
 
@@ -72,6 +84,7 @@ const deviceByPosition = computed(() => {
     })
     return map
   }
+  if (!props.deviceMatrix.every(row => Array.isArray(row))) return map
   props.deviceMatrix.forEach((row, rowIndex) => row.forEach((cell, colIndex) => {
     const device = typeof cell === 'object' && cell !== null ? cell : null
     const rowNumber = getPhysicalRow(rowIndex + 1, props.gridConfig)
@@ -90,7 +103,18 @@ const rowTemplate = computed(() => visualRows.value.map(row => (
 const columnTemplateStyle = computed(() => ({ gridTemplateColumns: columnTemplate.value }))
 const rowTemplateStyle = computed(() => ({ gridTemplateRows: rowTemplate.value }))
 const gridStyle = computed(() => ({ gridTemplateColumns: columnTemplate.value, gridTemplateRows: rowTemplate.value }))
-const contentStyle = computed(() => ({ minWidth: 'max-content', minHeight: 'max-content' }))
+const displayScale = computed(() => gridFit.value.scale >= MIN_READABLE_SCALE
+  ? gridFit.value.scale
+  : 1)
+const contentStyle = computed(() => ({
+  width: gridFit.value.naturalWidth ? `${gridFit.value.naturalWidth}px` : 'max-content',
+  height: gridFit.value.naturalHeight ? `${gridFit.value.naturalHeight}px` : 'max-content',
+  transform: `scale(${displayScale.value})`
+}))
+const stageStyle = computed(() => ({
+  width: gridFit.value.naturalWidth ? `${gridFit.value.naturalWidth * displayScale.value}px` : '100%',
+  height: gridFit.value.naturalHeight ? `${gridFit.value.naturalHeight * displayScale.value}px` : '100%'
+}))
 
 function getCellType(row, column) {
   if (row.type === 'aisle' || column.type === 'aisle') return 'aisle'
@@ -138,31 +162,66 @@ function handleDrop(rowIndex, colIndex) { emit('drop', rowIndex, colIndex) }
 function handleCellClick(device, rowIndex, colIndex) { emit('cell-click', device, rowIndex, colIndex) }
 
 function handleScroll() {
-  // 保留可观测的内部滚动容器，避免大布局把页面宽度撑开。
+  // 滚动只发生在看板内部，避免大布局把页面宽度撑开。
 }
 
-onMounted(() => scrollHost.value?.addEventListener('scroll', handleScroll, { passive: true }))
-onBeforeUnmount(() => scrollHost.value?.removeEventListener('scroll', handleScroll))
+function updateGridFit() {
+  if (!scrollHost.value) return
+  gridFit.value = calculateGridFit(props.gridConfig, {
+    width: scrollHost.value.clientWidth,
+    height: scrollHost.value.clientHeight,
+    isEditMode: props.isEditMode
+  })
+}
+
+onMounted(() => {
+  scrollHost.value?.addEventListener('scroll', handleScroll, { passive: true })
+  if (typeof ResizeObserver !== 'undefined' && scrollHost.value) {
+    resizeObserver.value = new ResizeObserver(updateGridFit)
+    resizeObserver.value.observe(scrollHost.value)
+  }
+  updateGridFit()
+})
+onBeforeUnmount(() => {
+  scrollHost.value?.removeEventListener('scroll', handleScroll)
+  resizeObserver.value?.disconnect()
+  resizeObserver.value = null
+})
 </script>
 
 <style scoped>
 .grid-map-shell {
   width: 100%;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
 }
 
 .grid-map-scroll {
   width: 100%;
   max-width: 100%;
   max-height: 100%;
+  height: 100%;
   overflow: auto;
   overscroll-behavior: contain;
+}
+
+.grid-map-stage {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 100%;
+  min-height: 100%;
 }
 
 .grid-map-content {
   display: flex;
   gap: 0.75rem;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
   min-width: max-content;
+  min-height: max-content;
   padding-bottom: 0.25rem;
 }
 
@@ -187,7 +246,7 @@ onBeforeUnmount(() => scrollHost.value?.removeEventListener('scroll', handleScro
 .grid-map-body {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .grid-map-column-header {

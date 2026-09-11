@@ -50,7 +50,7 @@ test('sanitizes public mock DTOs to the backend contracts', () => {
     filamentLength: 1.2
   })
   assert.deepEqual(file, {
-    id: 1,
+    id: '1',
     folder: false,
     estTime: 60,
     filamentLength: 1.2
@@ -63,7 +63,7 @@ test('sanitizes public mock DTOs to the backend contracts', () => {
     currentJobStatus: 'PRINTING',
     currentJobFileName: 'private.gcode'
   }), {
-    id: 1,
+    id: '1',
     status: 'IDLE'
   })
 
@@ -78,8 +78,8 @@ test('sanitizes public mock DTOs to the backend contracts', () => {
     endedAt: '2026-09-04T10:00:00',
     completedAt: '2026-09-04T10:00:00'
   }), {
-    id: 1,
-    fileId: 2,
+    id: '1',
+    fileId: '2',
     status: 'COMPLETED',
     completedAt: '2026-09-04T10:00:00'
   })

@@ -32,7 +32,7 @@ test('returns safe preview metadata and keeps filament length in meters', async 
   setupSession()
   const response = await request('GET', '/api/v1/print-files/20/preview', undefined, adminHeaders)
 
-  assert.equal(response.data.id, 20)
+  assert.equal(response.data.id, '20')
   assert.equal(response.data.filamentLength, 3)
   assert.equal(response.data.estTime, 3600)
   assert.equal(response.data.previewSupported, true)
@@ -69,8 +69,8 @@ test('returns real associated jobs with pagination and public fields only', asyn
   )
 
   assert.equal(response.data.total, 2)
-  assert.deepEqual(response.data.records.map(job => job.id), [1001, 1005])
-  assert.equal(response.data.records.every(job => job.fileId === 20), true)
+  assert.deepEqual(response.data.records.map(job => job.id), ['1001', '1005'])
+  assert.equal(response.data.records.every(job => job.fileId === '20'), true)
   assert.equal('fileName' in response.data.records[0], false)
   assert.equal('printerName' in response.data.records[0], false)
 })
@@ -79,7 +79,7 @@ test('returns an access-filtered nested file tree without internal fields', asyn
   setupSession()
   const response = await request('GET', '/api/v1/print-files/tree', undefined, operatorHeaders)
   const rootNames = response.data.map(node => node.name)
-  const defaultFolder = response.data.find(node => node.id === 4)
+  const defaultFolder = response.data.find(node => node.id === '4')
 
   assert.deepEqual(rootNames, ['公共文件', '我的文件夹', '测试文件'])
   assert.equal(defaultFolder.isDefault, true)
@@ -90,10 +90,10 @@ test('returns an access-filtered nested file tree without internal fields', asyn
     parentId: 4,
     folder: false
   }, operatorHeaders)
-  assert.deepEqual(defaultFolderFiles.data.records.map(file => file.id), [23])
+  assert.deepEqual(defaultFolderFiles.data.records.map(file => file.id), ['23'])
   assert.equal(defaultFolderFiles.data.records[0].originalName, 'calibration.bgcode')
-  assert.equal(response.data.some(node => node.id === 1), false)
-  assert.equal(response.data.every(node => node.userId === 2), true)
+  assert.equal(response.data.some(node => node.id === '1'), false)
+  assert.equal(response.data.every(node => node.userId === '2'), true)
   assert.equal(response.data.find(node => node.visibility === 'PUBLIC').canUpload, true)
   assert.equal(response.data.find(node => node.visibility === 'PUBLIC').canManage, false)
   assert.equal('safeName' in defaultFolder, false)
@@ -210,14 +210,14 @@ test('allows admin to move public folders across creators and keeps operator man
     folderName: '公共目标目录',
     visibility: 'PUBLIC'
   }, adminHeaders)
-  mockState.files.find(file => file.id === source.data.id).userId = 2
-  mockState.files.find(file => file.id === target.data.id).userId = 3
+  mockState.files.find(file => String(file.id) === String(source.data.id)).userId = 2
+  mockState.files.find(file => String(file.id) === String(target.data.id)).userId = 3
 
   const moved = await request('PUT', `/api/v1/print-files/folder/${source.data.id}/move`, {
     parentId: target.data.id
   }, adminHeaders)
   assert.equal(moved.data.parentId, target.data.id)
-  assert.equal(mockState.files.find(file => file.id === source.data.id).parentId, target.data.id)
+  assert.equal(mockState.files.find(file => String(file.id) === String(source.data.id)).parentId, Number(target.data.id))
 })
 
 test('allows a third user to read public files but only the uploader can delete', async () => {
@@ -229,10 +229,10 @@ test('allows a third user to read public files but only the uploader can delete'
     parentId: 5,
     folder: false
   }, thirdUserHeaders)
-  assert.deepEqual(publicPage.data.records.map(file => file.id), [24])
+  assert.deepEqual(publicPage.data.records.map(file => file.id), ['24'])
   assert.equal(publicPage.data.records[0].canPrint, true)
   const preview = await request('GET', '/api/v1/print-files/24/preview', undefined, thirdUserHeaders)
-  assert.equal(preview.data.id, 24)
+  assert.equal(preview.data.id, '24')
   const thumbnail = await request('GET', '/api/v1/print-files/24/thumbnail', undefined, thirdUserHeaders)
   assert.equal(thumbnail.data, null)
 
@@ -253,7 +253,7 @@ test('allows the real default folder as a second-level parent but still caps dep
     parentId: 4,
     folderName: '校准归档'
   }, operatorHeaders)
-  assert.equal(created.data.parentId, 4)
+  assert.equal(created.data.parentId, '4')
   assert.equal(created.data.level, 2)
 
   await assert.rejects(
@@ -305,7 +305,7 @@ test('renames and moves folders through the real endpoints and records mock audi
     parentId: target.data.id
   }, operatorHeaders)
   assert.equal(moved.data.parentId, target.data.id)
-  assert.equal(mockState.files.find(file => file.id === source.data.id).parentId, target.data.id)
+  assert.equal(mockState.files.find(file => String(file.id) === String(source.data.id)).parentId, Number(target.data.id))
   assert.deepEqual(mockState.auditLogs.slice(0, 2).map(log => log.action), ['FOLDER_MOVE', 'FOLDER_RENAME'])
 })
 
@@ -324,8 +324,8 @@ test('批量移动文件返回逐项结果，不会移动文件夹或触碰对�
   assert.equal(response.data.movedCount, 1)
   assert.equal(response.data.failedCount, 1)
   assert.deepEqual(response.data.items.map(item => item.success), [true, false])
-  assert.equal(mockState.files.find(file => file.id === 23).parentId, target.data.id)
-  assert.equal(mockState.files.find(file => file.id === target.data.id).parentId, null)
+  assert.equal(mockState.files.find(file => file.id === 23).parentId, Number(target.data.id))
+  assert.equal(mockState.files.find(file => String(file.id) === String(target.data.id)).parentId, null)
 })
 
 test('protects default folders and rejects illegal names, duplicate names, cross-user and third-level moves', async () => {
@@ -386,13 +386,13 @@ test('resolves omitted upload parents to the real default folder and validates p
   const single = await request('POST', '/api/v1/print-files/upload', {
     file: { name: 'default-single.gcode', size: 12 }
   }, operatorHeaders)
-  assert.equal(single.data.parentId, 4)
+  assert.equal(single.data.parentId, '4')
 
   const batch = await request('POST', '/api/v1/print-files/batch-upload', {
     files: [{ name: 'default-batch.gcode', size: 12 }]
   }, operatorHeaders)
   assert.equal(batch.data.items[0].status, 'SUCCESS')
-  const batchFile = mockState.files.find(file => file.id === batch.data.items[0].fileId)
+  const batchFile = mockState.files.find(file => String(file.id) === String(batch.data.items[0].fileId))
   assert.equal(batchFile.parentId, 4)
 
   await assert.rejects(

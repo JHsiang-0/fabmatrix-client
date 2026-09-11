@@ -24,15 +24,14 @@ const buildPrinterData = printer => ({
 
 export function createMockWebSocketStream({ onOpen, onMessage, onClose } = {}) {
   let tick = 0
-  let sequence = 0
   const emit = message => onMessage?.({
     version: '1',
     eventId: `mock-event-${++mockEventSequence}`,
-    sequence: ++sequence,
+    sequence: mockEventSequence,
     timestamp: Date.now(),
     ...message
   })
-  mockSubscribers.add(emit)
+  mockSubscribers.add(onMessage)
 
   onOpen?.()
   emit({
@@ -71,7 +70,7 @@ export function createMockWebSocketStream({ onOpen, onMessage, onClose } = {}) {
   return {
     close() {
       window.clearInterval(timer)
-      mockSubscribers.delete(emit)
+      mockSubscribers.delete(onMessage)
       onClose?.()
     }
   }
@@ -79,5 +78,13 @@ export function createMockWebSocketStream({ onOpen, onMessage, onClose } = {}) {
 
 /** 向当前所有 Mock 客户端广播服务端事件。 */
 export function publishMockWebSocketEvent(message) {
-  mockSubscribers.forEach(emit => emit(message))
+  // 广播事件的 envelope 只构造一次，所有订阅者共享同一个 eventId/sequence。
+  const event = {
+    version: '1',
+    eventId: `mock-event-${++mockEventSequence}`,
+    sequence: mockEventSequence,
+    timestamp: Date.now(),
+    ...message
+  }
+  mockSubscribers.forEach(subscriber => subscriber?.(event))
 }

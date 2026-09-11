@@ -55,7 +55,7 @@ test('allows an operator to create and confirm its own plan containing another u
     confirmationToken: preview.data.confirmationToken
   }, publicConfirmerHeaders)
   assert.equal(confirmed.data.items[0].success, true)
-  assert.equal(confirmed.data.items[0].job.userId, 3)
+  assert.equal(confirmed.data.items[0].job.userId, '3')
 })
 
 test('rejects a different operator from confirming the public-file owners plan', async () => {

@@ -58,7 +58,7 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
   ))
   assert.equal(typeof login.token, 'string')
   assert.equal(login.expiresIn, 604800)
-  assert.equal(login.userId, 1)
+  assert.equal(login.userId, '1')
   assert.equal(login.role, 'ADMIN')
 
   const sessionHeaders = { Authorization: `Bearer ${login.token}` }
@@ -68,7 +68,7 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
     undefined,
     sessionHeaders
   ))
-  assert.equal(restoredUser.id, 1)
+  assert.equal(restoredUser.id, '1')
   assert.equal(restoredUser.username, 'admin')
   assert.equal(restoredUser.role, 'ADMIN')
   assert.equal('password' in restoredUser, false)
@@ -150,8 +150,8 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
     { jobId: String(createdJobId), printerId: '404' },
     sessionHeaders
   ))
-  assert.equal(assignedJob.id, createdJobId)
-  assert.equal(assignedJob.printerId, 404)
+  assert.equal(assignedJob.id, String(createdJobId))
+  assert.equal(assignedJob.printerId, '404')
   assert.equal(assignedJob.status, 'ASSIGNED')
 
   const safetyConfirmation = assertSuccessEnvelope(await request(
@@ -160,7 +160,7 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
     { printerId: '404' },
     sessionHeaders
   ))
-  assert.equal(safetyConfirmation.id, 404)
+  assert.equal(safetyConfirmation.id, '404')
   assert.equal(safetyConfirmation.isSafeToPrint, true)
 
   const startedJob = assertSuccessEnvelope(await request(
@@ -324,7 +324,7 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
     { pageNum: 1, pageSize: 10 }
   ))
   assertPage(history)
-  assert.equal(history.records[0].printerId, 403)
+  assert.equal(history.records[0].printerId, '403')
   assert.equal(history.records[0].recordedAt, '2026-09-02T17:10:30')
 
   const statistics = assertSuccessEnvelope(await request(
@@ -333,7 +333,7 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
     undefined,
     sessionHeaders
   ))
-  assert.equal(statistics.printerId, 403)
+  assert.equal(statistics.printerId, '403')
   assert.equal(statistics.totalJobs, 1)
   assert.equal(statistics.activeJobs, 1)
   assert.equal(statistics.totalPrintSeconds, 0)

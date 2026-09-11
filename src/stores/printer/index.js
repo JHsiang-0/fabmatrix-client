@@ -116,9 +116,10 @@ export function usePrinterStore() {
     invalidPositionDevices,
 
     // ============================================
-    // Constants (来自 gridStore) - 非响应式
+    // Constants (来自 gridStore) - 与当前布局保持响应式
     // ============================================
-    GRID_CONFIG: grid.GRID_CONFIG,
+    // 直接读取 grid.GRID_CONFIG 会拿到已解包的一次性值，无法响应布局草稿。
+    GRID_CONFIG: gridConfig,
 
     // ============================================
     // Actions (来自 deviceStore) - 非响应式函数

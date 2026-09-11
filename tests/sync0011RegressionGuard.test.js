@@ -64,8 +64,8 @@ test('文件树按归属暴露 capability，目录操作保持完整且不越权
   const treeResponse = await request('GET', '/api/v1/print-files/tree', undefined, operatorHeaders)
   assert.equal(treeResponse.code, 200)
   const nodes = flattenTree(treeResponse.data)
-  const publicRoot = nodes.find(node => node.id === 2)
-  const operatorDefaultRoot = nodes.find(node => node.id === 4)
+  const publicRoot = nodes.find(node => node.id === '2')
+  const operatorDefaultRoot = nodes.find(node => node.id === '4')
 
   assert.ok(publicRoot)
   assert.equal(publicRoot.visibility, 'PUBLIC')
@@ -74,7 +74,7 @@ test('文件树按归属暴露 capability，目录操作保持完整且不越权
   assert.ok(operatorDefaultRoot)
   assert.equal(operatorDefaultRoot.canCreate, true)
   assert.equal(operatorDefaultRoot.canManage, false)
-  assert.equal(nodes.some(node => node.id === 1), false)
+  assert.equal(nodes.some(node => node.id === '1'), false)
   nodes.forEach(node => {
     for (const capability of ['canManage', 'canCreate', 'canUpload']) {
       assert.equal(typeof node[capability], 'boolean')
@@ -145,7 +145,7 @@ test('单文件和批量上传遵守类型、1GB、100个上限并保留逐项�
   const single = await request('POST', '/api/v1/print-files/upload', {
     file: { name: 'sync-0011-single.G', size: 10 }
   }, operatorHeaders)
-  assert.equal(single.data.parentId, 4)
+  assert.equal(single.data.parentId, '4')
   await assert.rejects(
     request('POST', '/api/v1/print-files/upload', {
       file: { name: 'sync-0011-invalid.zip', size: 10 }
@@ -164,7 +164,7 @@ test('打印机业务状态、通信状态和监控权限保持分离', async ()
     pageNum: 1,
     pageSize: 10
   })
-  const row = page.data.records.find(item => item.id === 403)
+  const row = page.data.records.find(item => item.id === '403')
   assert.equal(row.status, 'PRINTING')
   assert.equal(row.connectionStatus, 'OFFLINE')
   assert.equal(row.lastKnownStatus, 'PRINTING')

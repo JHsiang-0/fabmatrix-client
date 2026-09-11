@@ -9,6 +9,7 @@ import { useUserStore } from '@/stores/user'
 import { useJobStore } from '@/stores/jobStore'
 import { createMockWebSocketStream } from '@/mock/websocket'
 import { getPrinterList } from '@/api/printer'
+import { collectAllPages } from '@/utils/pagination'
 import { acceptRealtimeSequence } from '@/utils/realtimeSequence'
 import {
   isSupportedRealtimeVersion,
@@ -343,7 +344,8 @@ export const useRealtimeStore = defineStore('realtime', () => {
     }
 
     if (type === 'LAYOUT_UPDATED') {
-      const nextVersion = Number(message.layoutVersion ?? data?.layoutVersion)
+      // 布局元数据严格位于 data，顶层同名字段不属于正式契约。
+      const nextVersion = data?.stateSource === 'LAYOUT' ? Number(data.layoutVersion) : NaN
       if (Number.isInteger(nextVersion) && nextVersion > Number(layoutVersion.value || 0)) {
         layoutVersion.value = nextVersion
       }
@@ -376,9 +378,17 @@ export const useRealtimeStore = defineStore('realtime', () => {
     if (recoveryPromise) return recoveryPromise
     isRecovering.value = true
     recoveryPromise = getPrinterList({ pageNum: 1, pageSize: 100 })
-      .then(response => {
-        const records = response?.data?.records || []
-        records.forEach(printer => {
+      .then(firstPage => collectAllPages(
+        (pageNum, pageSize) => getPrinterList({ pageNum, pageSize }),
+        firstPage
+      ))
+      .then(records => {
+        const uniquePrinters = Array.from(new Map(
+          records
+            .filter(printer => printer?.id !== undefined && printer?.id !== null)
+            .map(printer => [String(printer.id), printer])
+        ).values())
+        uniquePrinters.forEach(printer => {
           queueRealtimeUpdate(printer.id, {
             ...printer,
             unifiedState: printer.status,
@@ -386,7 +396,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
           }, printer.updatedAt || Date.now())
         })
         isRealtimeStale.value = false
-        refreshJobState()
+        return refreshJobState()
       })
       .catch(error => {
         console.error('[RealtimeStore] WebSocket 断档恢复失败:', error)
@@ -459,7 +469,12 @@ export const useRealtimeStore = defineStore('realtime', () => {
 
     wsClient.on('close', event => {
       connectionState.value = wsClient?.getState() || 'CLOSED'
-      if (event?.code !== 1000) isRealtimeStale.value = true
+      if (event?.code !== 1000) {
+        isRealtimeStale.value = true
+        // 保留当前 statusMap，以完整 REST 快照恢复；recoveryPromise
+        // 同时防止断档、断开和重连回调形成恢复风暴。
+        void recoverRealtimeSnapshot()
+      }
       console.log('[RealtimeStore] WebSocket 连接已关闭')
     })
 

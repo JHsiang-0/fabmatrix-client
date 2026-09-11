@@ -237,6 +237,16 @@ test('Electron App Shell 在三个桌面窗口尺寸下保持单一滚动模型'
   try {
     const page = await electronApp.firstWindow()
     await page.waitForLoadState('domcontentloaded')
+    await page.evaluate(() => window.__FARM_RESET_MOCK__({
+      dashboardLayout: {
+        rowCount: 30,
+        columnCount: 60,
+        aisles: [],
+        version: 1,
+        limits: { minRows: 1, maxRows: 30, minColumns: 1, maxColumns: 60, maxCells: 1800, maxAisles: 20, minAisleSize: 48, maxAisleSize: 240 },
+        updatedAt: '2026-09-11T00:00:00'
+      }
+    }))
     await page.getByLabel('用户名', { exact: true }).fill('admin')
     await page.getByLabel('密码', { exact: true }).fill('Admin123')
     await page.getByRole('button', { name: '登录', exact: true }).click()
@@ -279,6 +289,25 @@ test('Electron App Shell 在三个桌面窗口尺寸下保持单一滚动模型'
       expect(layoutMetrics.contentView.overflowY).toBe('auto')
       expect(layoutMetrics.contentView.clientHeight).toBeGreaterThan(0)
     }
+
+    await page.goto(`${E2E_DESKTOP_URL}/#/dashboard`)
+    await expect(page.getByRole('heading', { name: '概览仪表盘' })).toBeVisible()
+    await electronApp.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.setContentSize(800, 560)
+    })
+    await expect.poll(() => page.evaluate(() => [window.innerWidth, window.innerHeight])).toEqual([800, 560])
+    const gridMetrics = await page.locator('.grid-map-scroll').evaluate(element => ({
+      clientWidth: element.clientWidth,
+      clientHeight: element.clientHeight,
+      scrollWidth: element.scrollWidth,
+      scrollHeight: element.scrollHeight,
+      documentWidth: document.documentElement.scrollWidth,
+      documentHeight: document.documentElement.scrollHeight
+    }))
+    expect(gridMetrics.scrollWidth).toBeGreaterThan(gridMetrics.clientWidth)
+    expect(gridMetrics.scrollHeight).toBeGreaterThan(gridMetrics.clientHeight)
+    expect(gridMetrics.documentWidth).toBeLessThanOrEqual(801)
+    expect(gridMetrics.documentHeight).toBeLessThanOrEqual(561)
 
     await page.goto(`${E2E_DESKTOP_URL}/#/printers`)
     await expect(page.getByRole('heading', { name: '打印机管理' })).toBeVisible()

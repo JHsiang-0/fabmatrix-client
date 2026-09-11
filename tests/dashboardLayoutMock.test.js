@@ -82,9 +82,30 @@ test('Mock 布局保存向多个客户端广播 LAYOUT_UPDATED 且不伪造打�
   const streamA = createMockWebSocketStream({ onMessage: event => eventsA.push(event) })
   const streamB = createMockWebSocketStream({ onMessage: event => eventsB.push(event) })
   await request('PUT', saveBody({ rowCount: 5 }))
-  assert.equal(eventsA.some(event => event.type === 'LAYOUT_UPDATED' && event.layoutVersion === 2), true)
-  assert.equal(eventsB.some(event => event.type === 'LAYOUT_UPDATED' && event.data.stateSource === 'LAYOUT'), true)
+  const eventA = eventsA.find(event => event.type === 'LAYOUT_UPDATED')
+  const eventB = eventsB.find(event => event.type === 'LAYOUT_UPDATED')
+  assert.equal(eventA?.data?.layoutVersion, 2)
+  assert.equal(eventA?.stateSource, undefined)
+  assert.equal(eventA?.layoutVersion, undefined)
+  assert.equal(eventA?.eventId, eventB?.eventId)
+  assert.equal(eventA?.sequence, eventB?.sequence)
+  assert.equal(eventB?.data?.stateSource, 'LAYOUT')
   streamA.close()
   streamB.close()
   globalThis.window = previousWindow
+})
+
+test('Mock 请求内重复目标槽位返回 400/DUPLICATE_SLOT 且不改变状态', async () => {
+  const before = JSON.stringify({ layout: mockState.dashboardLayout, printers: mockState.printers })
+  await assert.rejects(() => request('PUT', saveBody({
+    positionChanges: [
+      { printerId: 403, gridRow: 1, gridCol: 3 },
+      { printerId: 404, gridRow: 1, gridCol: 3 }
+    ]
+  })), error => {
+    assert.equal(error.response.status, 400)
+    assert.equal(error.response.data.data.reason, 'DUPLICATE_SLOT')
+    return true
+  })
+  assert.equal(JSON.stringify({ layout: mockState.dashboardLayout, printers: mockState.printers }), before)
 })

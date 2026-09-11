@@ -236,6 +236,7 @@ const resolveUploadParent = (session, parentId) => {
 const publicUser = user => {
   const data = cloneMockData(user)
   delete data.password
+  if (data.id !== undefined && data.id !== null) data.id = String(data.id)
   return data
 }
 
@@ -268,7 +269,7 @@ const handleLogin = config => {
   return {
     token,
     expiresIn: 604800,
-    userId: user.id,
+    userId: String(user.id),
     username: user.username,
     role: user.role,
     email: user.email,
@@ -312,7 +313,7 @@ const handleFirstAdminSetup = config => {
   return {
     token,
     expiresIn: 604800,
-    userId: user.id,
+    userId: String(user.id),
     username: user.username,
     role: user.role,
     email: user.email,
@@ -628,7 +629,10 @@ const handlePrinterHistory = config => {
   const records = [currentRecord, ...jobs]
     .filter(record => isInTimeRange(record.recordedAt, range))
     .sort((left, right) => new Date(right.recordedAt) - new Date(left.recordedAt))
-  return createMockPage(records, getParams(config))
+  return createMockPage(records.map(record => ({
+    ...record,
+    printerId: String(record.printerId)
+  })), getParams(config))
 }
 
 const handlePrinterStatistics = config => {
@@ -648,7 +652,7 @@ const handlePrinterStatistics = config => {
   const denominator = completedJobs.length + failedJobs.length
 
   return {
-    printerId: printer.id,
+    printerId: String(printer.id),
     from: range.from,
     to: range.to,
     totalJobs: jobs.length,
@@ -924,7 +928,7 @@ const handleDashboardLayout = config => {
   if (session.role !== 'ADMIN') fail(403, 403, '没有权限执行此操作')
 
   const body = getBody(config)
-  if (body.expectedVersion !== mockState.dashboardLayout.version) {
+  if (Number(body.expectedVersion) !== Number(mockState.dashboardLayout.version)) {
     fail(409, 409, '布局版本已过期', {
       reason: 'VERSION_CONFLICT',
       serverVersion: mockState.dashboardLayout.version,
@@ -937,6 +941,7 @@ const handleDashboardLayout = config => {
   validateMockLayout(body)
 
   const changes = new Map()
+  const targetSlots = new Set()
   body.positionChanges.forEach(change => {
     const id = String(change?.printerId ?? '')
     if (!id || changes.has(id)) fail(400, 400, '设备变更列表存在重复 ID')
@@ -947,6 +952,18 @@ const handleDashboardLayout = config => {
     if (hasRow !== hasCol || (hasRow && (!Number.isInteger(change.gridRow) || !Number.isInteger(change.gridCol)
       || change.gridRow < 1 || change.gridRow > body.rowCount || change.gridCol < 1 || change.gridCol > body.columnCount))) {
       fail(400, 400, '设备坐标不合法')
+    }
+    if (hasRow) {
+      const targetSlot = layoutPosition(change.gridRow, change.gridCol)
+      if (targetSlots.has(targetSlot)) {
+        fail(400, 400, '请求中的目标槽位重复', {
+          reason: 'DUPLICATE_SLOT',
+          serverVersion: mockState.dashboardLayout.version,
+          conflicts: [],
+          outOfBoundsPrinters: []
+        })
+      }
+      targetSlots.add(targetSlot)
     }
     changes.set(id, { printer, gridRow: hasRow ? change.gridRow : null, gridCol: hasCol ? change.gridCol : null })
   })
@@ -1003,14 +1020,13 @@ const handleDashboardLayout = config => {
   const changedPositions = nextPrinters
     .filter(printer => changes.has(String(printer.id)) || outOfBoundsPrinters.some(item => String(item.printerId) === String(printer.id)))
     .map(printer => ({ printerId: printer.id, gridRow: printer.gridRow, gridCol: printer.gridCol }))
-  const unallocatedPrinters = outOfBoundsPrinters.map(item => ({ ...item, gridRow: null, gridCol: null }))
+  // 返回下架前的原坐标；changedPositions 才表示提交后的 null 坐标。
+  const unallocatedPrinters = outOfBoundsPrinters.map(item => ({ ...item }))
   mockState.printers = nextPrinters
   mockState.dashboardLayout = nextLayout
   publishMockWebSocketEvent({
     type: 'LAYOUT_UPDATED',
     printerId: null,
-    stateSource: 'LAYOUT',
-    layoutVersion: nextLayout.version,
     data: { stateSource: 'LAYOUT', layoutVersion: nextLayout.version }
   })
   return { layout: cloneMockData(nextLayout), changedPositions, unallocatedPrinters }
@@ -1333,12 +1349,12 @@ const handleFileTree = config => {
   const files = mockState.files
     .filter(file => file.folder && canReadFile(session, file))
     .map(file => ({
-      id: file.id,
-      parentId: file.parentId ?? null,
+      id: String(file.id),
+      parentId: file.parentId == null ? null : String(file.parentId),
       folder: true,
       level: file.level || getFolderLevel(file),
       isDefault: Boolean(file.isDefault),
-      userId: file.userId,
+      userId: file.userId == null ? null : String(file.userId),
       visibility: visibilityOf(file),
       ...fileCapabilities(session, file),
       name: file.originalName,
@@ -2102,7 +2118,7 @@ export const isMockEnabled = runtimeEnv.VITE_USE_MOCK === 'true' || [
   'desktop-mock'
 ].includes(runtimeEnv.MODE)
 
-if (runtimeEnv.DEV && typeof window !== 'undefined') {
+if ((runtimeEnv.DEV || runtimeEnv.MODE === 'mock' || runtimeEnv.MODE.startsWith('desktop')) && typeof window !== 'undefined') {
   window.__FARM_RESET_MOCK__ = resetMockState
 }
 

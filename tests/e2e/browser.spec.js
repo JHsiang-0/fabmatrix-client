@@ -41,6 +41,15 @@ const login = async page => {
   await expect(page.getByRole('heading', { name: '概览仪表盘' })).toBeVisible()
 }
 
+const loginAs = async (page, username, password) => {
+  await page.goto('/login')
+  await page.getByLabel('用户名', { exact: true }).fill(username)
+  await page.getByLabel('密码', { exact: true }).fill(password)
+  await page.getByRole('button', { name: '登录', exact: true }).click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.getByRole('heading', { name: '概览仪表盘' })).toBeVisible()
+}
+
 const openSidebarItem = async (page, width, label) => {
   const sidebar = page.locator('.app-sidebar')
   const targetPath = pages.find(item => item.label === label)?.path
@@ -295,6 +304,74 @@ test('移动端在表格页面通过真实点击打开侧栏并导航', async ({
     await openSidebarItem(page, 375, '打印机管理')
     await expect(page).toHaveURL(/\/printers$/)
     await expect(page.getByRole('heading', { name: '打印机管理' })).toBeVisible()
+  } finally {
+    await context.close()
+  }
+})
+
+test('800x560 下 30x60 布局在网格内部滚动并展示保存摘要', async ({ browser }) => {
+  test.setTimeout(120000)
+  const context = await browser.newContext({ viewport: { width: 800, height: 560 } })
+  const page = await context.newPage()
+
+  try {
+    await page.goto('/login')
+    await page.evaluate(() => window.__FARM_RESET_MOCK__({
+      dashboardLayout: {
+        rowCount: 30,
+        columnCount: 60,
+        aisles: [],
+        version: 1,
+        limits: { minRows: 1, maxRows: 30, minColumns: 1, maxColumns: 60, maxCells: 1800, maxAisles: 20, minAisleSize: 48, maxAisleSize: 240 },
+        updatedAt: '2026-09-11T00:00:00'
+      }
+    }))
+    await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible()
+    await page.getByLabel('用户名', { exact: true }).fill('admin')
+    await page.getByLabel('密码', { exact: true }).fill('Admin123')
+    await page.getByRole('button', { name: '登录', exact: true }).click()
+    await expect(page).toHaveURL(/\/dashboard$/)
+    await expect(page.getByRole('heading', { name: '概览仪表盘' })).toBeVisible()
+    await page.getByRole('button', { name: '设备看板', exact: true }).click()
+    await expect(page).toHaveURL(/\/dashboard\/fullscreen$/)
+    await expect(page.getByRole('heading', { name: '嘉东三维联动打印机实时控制系统' })).toBeVisible()
+    await page.getByRole('button', { name: '布局设置', exact: true }).click()
+    const gridMetrics = await page.locator('.grid-map-scroll').evaluate(element => ({
+      clientWidth: element.clientWidth,
+      clientHeight: element.clientHeight,
+      scrollWidth: element.scrollWidth,
+      scrollHeight: element.scrollHeight,
+      documentWidth: document.documentElement.scrollWidth,
+      documentHeight: document.documentElement.scrollHeight,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight
+    }))
+    expect(gridMetrics.scrollWidth).toBeGreaterThan(gridMetrics.clientWidth)
+    expect(gridMetrics.scrollHeight).toBeGreaterThan(gridMetrics.clientHeight)
+    expect(gridMetrics.documentWidth).toBeLessThanOrEqual(gridMetrics.viewportWidth + 1)
+    expect(gridMetrics.documentHeight).toBeLessThanOrEqual(gridMetrics.viewportHeight + 1)
+
+    await page.getByRole('button', { name: '布局设置', exact: true }).click()
+    await page.getByRole('button', { name: '减少物理列数', exact: true }).click()
+    await page.getByRole('button', { name: '应用', exact: true }).click()
+    await page.getByRole('button', { name: '保存布局', exact: true }).click()
+    await expect(page.getByText('确认保存布局', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '确认保存', exact: true }).click()
+    await expect(page.getByText('布局已保存', { exact: true })).toBeVisible()
+  } finally {
+    await context.close()
+  }
+})
+
+test('OPERATOR 看板不显示布局编辑入口', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 800, height: 560 } })
+  const page = await context.newPage()
+  try {
+    await loginAs(page, 'operator', 'Operator123')
+    await page.getByRole('button', { name: '设备看板', exact: true }).click()
+    await expect(page).toHaveURL(/\/dashboard\/fullscreen$/)
+    await expect(page.getByRole('button', { name: '布局设置', exact: true })).toHaveCount(0)
+    await expect(page.getByText('设备坐标异常', { exact: true })).toHaveCount(0)
   } finally {
     await context.close()
   }

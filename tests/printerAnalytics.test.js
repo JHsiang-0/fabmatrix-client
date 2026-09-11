@@ -23,7 +23,7 @@ test('returns paginated printer history in reverse recorded order', async () => 
 
   assert.equal(response.data.total, 2)
   assert.equal(response.data.records.length, 1)
-  assert.equal(response.data.records[0].printerId, 403)
+  assert.equal(response.data.records[0].printerId, '403')
   assert.equal(response.data.records[0].status, 'PRINTING')
   assert.equal(response.data.records[0].recordedAt, '2026-09-02T17:10:30')
   assert.equal(response.data.pageSize, 1)
@@ -34,7 +34,7 @@ test('calculates statistics from associated jobs and excludes incomplete duratio
   const response = await request('GET', '/api/v1/printers/403/statistics', undefined, headers)
 
   assert.deepEqual(response.data, {
-    printerId: 403,
+    printerId: '403',
     from: null,
     to: null,
     totalJobs: 1,

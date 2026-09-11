@@ -38,6 +38,17 @@
         <t-alert v-for="alert in store.alerts" :key="alert.id" :theme="alert.theme" :title="alert.title"
           :message="alert.message" :close-btn="true" @close="store.dismissAlert(alert.id)" />
       </div>
+      <t-alert v-if="invalidPositionEntries.length" theme="error" title="设备坐标异常" :close-btn="false"
+        class="dashboard-position-alert">
+        <template #default>
+          <p>以下设备未能安全放入当前布局，请修正服务端数据或在编辑模式中处理：</p>
+          <ul class="dashboard-position-issues">
+            <li v-for="item in invalidPositionEntries" :key="item.key">
+              {{ item.name || `设备 ${item.id || '未知'}` }}（{{ item.kind }}，原坐标 {{ item.position }}）
+            </li>
+          </ul>
+        </template>
+      </t-alert>
     </div>
 
     <section class="stat-grid" aria-label="设备统计">
@@ -133,6 +144,44 @@
       </div>
     </t-dialog>
 
+    <t-dialog v-model:visible="summaryDialogVisible" header="确认保存布局"
+      :confirm-btn="{ content: '确认保存', theme: 'primary', loading: store.layoutSaving }"
+      :cancel-btn="{ content: '返回调整' }" @confirm="confirmSaveLayout">
+      <t-alert theme="warning" title="保存将一次性提交布局和设备坐标" :close-btn="false" />
+      <ul class="dashboard-change-summary">
+        <li v-for="item in layoutChangeSummary" :key="item">{{ item }}</li>
+      </ul>
+    </t-dialog>
+
+    <t-dialog v-model:visible="shrinkDialogVisible" header="缩容将下架设备"
+      :confirm-btn="{ content: '下架并保存', theme: 'danger', loading: store.layoutSaving }"
+      :cancel-btn="{ content: '返回调整' }" @confirm="confirmShrinkAndSave">
+      <p>以下设备超出新的行列范围。确认后会在同一事务中保留原坐标清单并将其下架：</p>
+      <ul class="dashboard-position-issues">
+        <li v-for="item in shrinkDevices" :key="`shrink-${item.printerId}`">
+          {{ item.name || `设备 ${item.printerId}` }}（{{ formatPosition(item.gridRow, item.gridCol) }}）
+        </li>
+      </ul>
+    </t-dialog>
+
+    <t-dialog v-model:visible="conflictDialogVisible" header="布局已被更新"
+      :confirm-btn="{ content: '重新载入', theme: 'primary' }" :cancel-btn="{ content: '继续查看草稿' }"
+      @confirm="reloadLatestLayout">
+      <t-alert theme="error" title="其他管理员已经保存了更新" :close-btn="false" />
+      <p>当前服务端版本：{{ conflictDetails.serverVersion || '未知' }}。你的草稿仍保留，重新载入后才会丢弃草稿。</p>
+    </t-dialog>
+
+    <t-dialog v-model:visible="outOfBoundsDialogVisible" header="布局保存被拒绝"
+      :confirm-btn="{ content: '返回调整', theme: 'primary' }" :cancel-btn="false">
+      <t-alert theme="error" title="缩容后存在越界设备" :close-btn="false" />
+      <p>请调整布局；服务端原坐标如下：</p>
+      <ul class="dashboard-position-issues">
+        <li v-for="item in outOfBoundsDevices" :key="`out-of-bounds-${item.printerId}`">
+          {{ item.name || `设备 ${item.printerId}` }}（{{ formatPosition(item.gridRow, item.gridCol) }}）
+        </li>
+      </ul>
+    </t-dialog>
+
     <!-- 绑定设备弹窗 -->
     <bind-device-dialog v-model:visible="bindDialogVisible" :target-slot-label="targetSlotLabel"
       @confirm="performBind" />
@@ -212,6 +261,13 @@ const positionChanges = ref([])
 const layoutDialogVisible = ref(false)
 const aisleListVisible = ref(false)
 const aisleDialogVisible = ref(false)
+const summaryDialogVisible = ref(false)
+const shrinkDialogVisible = ref(false)
+const conflictDialogVisible = ref(false)
+const outOfBoundsDialogVisible = ref(false)
+const conflictDetails = ref({})
+const outOfBoundsDevices = ref([])
+const shrinkDevices = ref([])
 const editingAisleId = ref('')
 const overflowPolicy = ref('REJECT')
 const layoutForm = ref({ rowCount: 4, columnCount: 12 })
@@ -281,6 +337,43 @@ const displayDevices = computed(() => {
   })
 })
 const draftPositionIssues = computed(() => analyzeDevicePositions(displayDevices.value, store.GRID_CONFIG))
+const activePositionIssues = computed(() => isEditMode.value ? draftPositionIssues.value : store.invalidPositionDevices)
+const invalidPositionEntries = computed(() => {
+  const issues = activePositionIssues.value || {}
+  const entries = []
+  const add = (item, kind) => entries.push({
+    key: `${kind}-${item.id}-${item.gridRow ?? 'null'}-${item.gridCol ?? 'null'}`,
+    id: item.id,
+    name: item.name,
+    kind,
+    position: formatPosition(item.gridRow, item.gridCol)
+  })
+  ;(issues.invalid || []).forEach(item => add(item, '半空或格式异常'))
+  ;(issues.outOfBounds || []).forEach(item => add(item, '越界'))
+  ;(issues.duplicates || []).forEach(group => (group.devices || []).forEach(item => add(item, '重复槽位')))
+  return entries
+})
+const layoutChangeSummary = computed(() => {
+  const summary = []
+  const snapshot = store.layoutSnapshot
+  const draft = store.layoutDraft
+  if (snapshot && draft && (snapshot.rowCount !== draft.rowCount || snapshot.columnCount !== draft.columnCount)) {
+    summary.push(`物理布局：${snapshot.rowCount}×${snapshot.columnCount} → ${draft.rowCount}×${draft.columnCount}`)
+  }
+  if (snapshot && draft && JSON.stringify(snapshot.aisles || []) !== JSON.stringify(draft.aisles || [])) {
+    summary.push(`过道配置：${snapshot.aisles?.length || 0} 条 → ${draft.aisles?.length || 0} 条`)
+  }
+  positionChanges.value.forEach(change => {
+    const device = store.getDeviceById(change.printerId)
+    summary.push(`${device?.name || `设备 ${change.printerId}`}：${formatPosition(device?.gridRow, device?.gridCol)} → ${formatPosition(change.gridRow, change.gridCol)}`)
+  })
+  return summary.length ? summary : ['没有检测到布局或设备坐标变化']
+})
+
+function formatPosition(row, col) {
+  if (row == null && col == null) return '未分配'
+  return `${row ?? '空'}行 / ${col ?? '空'}列`
+}
 
 /** 当前设备的实时状态数据 */
 const activeRealTimeData = computed(() => {
@@ -797,24 +890,37 @@ async function removeAisle(aisle) {
   }
 }
 
-async function saveLayout() {
+function saveLayout() {
   if (!canManageLayout.value || store.layoutSaving) return
-
-  if (draftPositionIssues.value.outOfBounds.length && overflowPolicy.value === 'REJECT') {
-    const names = draftPositionIssues.value.outOfBounds.map(item => item.name || item.id).join('、')
-    try {
-      await confirmMessage(`缩容后以下设备越界：${names}。确认下架这些设备并保存吗？`, '确认缩容下架', {
-        confirmButtonText: '下架并保存',
-        cancelButtonText: '返回调整',
-        type: 'danger'
-      })
-      overflowPolicy.value = 'UNALLOCATE'
-    } catch (error) {
-      if (error !== 'cancel') console.error('缩容确认失败:', error)
-      return
-    }
+  if (!store.layoutDirty && !positionChanges.value.length) {
+    message.info('当前没有需要保存的布局变更')
+    return
   }
+  summaryDialogVisible.value = true
+}
 
+async function confirmSaveLayout() {
+  summaryDialogVisible.value = false
+  if (draftPositionIssues.value.outOfBounds.length && overflowPolicy.value === 'REJECT') {
+    shrinkDevices.value = draftPositionIssues.value.outOfBounds.map(item => ({
+      printerId: item.id,
+      name: item.name,
+      gridRow: item.gridRow,
+      gridCol: item.gridCol
+    }))
+    shrinkDialogVisible.value = true
+    return
+  }
+  await executeSaveLayout()
+}
+
+async function confirmShrinkAndSave() {
+  shrinkDialogVisible.value = false
+  overflowPolicy.value = 'UNALLOCATE'
+  await executeSaveLayout()
+}
+
+async function executeSaveLayout() {
   try {
     await store.saveLayoutDraft(positionChanges.value, overflowPolicy.value)
     await store.fetchDeviceData()
@@ -824,16 +930,28 @@ async function saveLayout() {
   } catch (error) {
     console.error('保存布局失败:', error)
     if (Number(error?.status || error?.code) === 409) {
-      message.error('布局已被其他管理员修改，请重新载入后再保存')
+      conflictDetails.value = error.data || {}
+      conflictDialogVisible.value = true
     } else if (Number(error?.status || error?.code) === 422) {
-      const outOfBounds = error.data?.outOfBoundsPrinters || []
-      const names = outOfBounds.map(item => item.name || item.printerId).join('、')
-      message.error(names
-        ? `布局存在越界设备：${names}，请调整布局或选择下架后重试`
-        : '布局存在越界设备，请调整布局或选择下架后重试')
+      outOfBoundsDevices.value = error.data?.outOfBoundsPrinters || []
+      outOfBoundsDialogVisible.value = true
     } else {
       message.error(error?.message || '保存布局失败，请重试')
     }
+  }
+}
+
+async function reloadLatestLayout() {
+  conflictDialogVisible.value = false
+  try {
+    await store.loadLayout()
+    await store.fetchDeviceData()
+    positionChanges.value = []
+    overflowPolicy.value = 'REJECT'
+    isEditMode.value = false
+    message.success('已重新载入服务端布局')
+  } catch (error) {
+    message.error(error?.message || '重新载入布局失败，请重试')
   }
 }
 
@@ -1007,14 +1125,40 @@ async function initializeDashboard() {
 
 .farm-dashboard__workshop {
   box-sizing: border-box;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
   background: var(--app-page-background);
 }
 
 .farm-dashboard__workshop-surface {
   box-sizing: border-box;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
   min-width: 0;
   background: var(--app-surface);
   border-color: var(--app-border);
+}
+
+.dashboard-position-alert {
+  flex: 0 0 auto;
+  margin: 0 var(--app-spacing-4);
+}
+
+.dashboard-position-issues,
+.dashboard-change-summary {
+  max-height: 180px;
+  margin: var(--app-spacing-2) 0 0;
+  padding-left: 1.25rem;
+  overflow: auto;
+}
+
+.dashboard-position-issues li,
+.dashboard-change-summary li {
+  margin-bottom: 0.25rem;
+  color: var(--app-text-primary);
 }
 
 .stat-grid {

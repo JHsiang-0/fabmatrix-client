@@ -125,13 +125,14 @@ export function normalizeLayout(input) {
   const rowCount = assertInteger(input.rowCount, 'rowCount', limits.minRows, limits.maxRows)
   const columnCount = assertInteger(input.columnCount, 'columnCount', limits.minColumns, limits.maxColumns)
   if (rowCount * columnCount > limits.maxCells) fail('物理槽位总数超过限制', 'INVALID_LAYOUT_FIELD')
-  if (!isInteger(input.version) || input.version <= 0) fail('version 必须为正整数', 'INVALID_LAYOUT_FIELD')
+  const version = Number(input.version)
+  if (!Number.isSafeInteger(version) || version <= 0) fail('version 必须为正整数', 'INVALID_LAYOUT_FIELD')
 
   return {
     rowCount,
     columnCount,
     aisles: normalizeAisles(input.aisles, rowCount, columnCount, limits),
-    version: input.version,
+    version,
     limits,
     updatedAt: input.updatedAt ?? null
   }

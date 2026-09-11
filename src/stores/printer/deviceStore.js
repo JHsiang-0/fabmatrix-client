@@ -1,7 +1,6 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { getPrinterDetail, getPrinterList, batchUpdatePositions, updatePrinter } from '@/api/printer'
-import { GRID_CONFIG } from '@/utils/constants'
 import { collectAllPages } from '@/utils/pagination'
 
 const MAX_DETAIL_CACHE_SIZE = 100
@@ -65,40 +64,11 @@ export const useDeviceStore = defineStore('device', () => {
   const totalDevices = computed(() => rawDeviceList.value.length)
 
   /**
-   * 将扁平设备数组转换为4行13列的二维矩阵（包含过道列）
-   * 直接依赖 rawDeviceList.value，确保数据更新后自动重新计算
+   * 兼容旧调用方的扁平设备集合。
+   * 网格矩阵必须由 gridStore 的服务端布局配置计算，不能在设备 Store
+   * 内按固定 4×13 轨道生成；保留该字段只为旧组件过渡。
    */
-  const deviceMatrix = computed(() => {
-    // 使用 Map 优化查找性能 O(n) -> O(1)
-    const deviceMap = new Map()
-    rawDeviceList.value.forEach(device => {
-      const key = `${device.gridRow},${device.gridCol}`
-      deviceMap.set(key, device)
-    })
-
-    const matrix = []
-    for (let row = 1; row <= GRID_CONFIG.ROWS; row++) {
-      const rowData = []
-      for (let col = 1; col <= GRID_CONFIG.TOTAL_COLS; col++) {
-        // 过道位置
-        if (col === GRID_CONFIG.AISLE_COL) {
-          rowData.push('aisle')
-          continue
-        }
-
-        // 计算物理列号（排除过道）
-        const physicalCol = col < GRID_CONFIG.AISLE_COL ? col : col - 1
-
-        // 使用 Map 查找设备 O(1)
-        const key = `${row},${physicalCol}`
-        const device = deviceMap.get(key)
-        rowData.push(device || null)
-      }
-      matrix.push(rowData)
-    }
-
-    return matrix
-  })
+  const deviceMatrix = computed(() => rawDeviceList.value)
 
   // ============================================
   // Actions

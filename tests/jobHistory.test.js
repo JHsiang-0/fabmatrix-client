@@ -23,8 +23,8 @@ test('filters job history by keyword, printer and time while returning completed
   }, headers)
 
   assert.equal(filtered.data.total, 1)
-  assert.equal(filtered.data.records[0].id, 1002)
-  assert.equal(filtered.data.records[0].printerId, 405)
+  assert.equal(filtered.data.records[0].id, '1002')
+  assert.equal(filtered.data.records[0].printerId, '405')
   assert.equal('endedAt' in filtered.data.records[0], false)
 
   const completed = await request('POST', '/api/v1/print-jobs/page', {

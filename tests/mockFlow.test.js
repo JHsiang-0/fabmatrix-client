@@ -12,7 +12,7 @@ test('runs the P0 Mock printer and job contract through a legal lifecycle', asyn
   const headers = { Authorization: `Bearer ${sessionKey}` }
 
   const detail = await request('GET', '/api/v1/printers/404', undefined, headers)
-  assert.equal(detail.data.id, 404)
+  assert.equal(detail.data.id, '404')
 
   const filePage = await request('POST', '/api/v1/print-files/page', {
     pageNum: 1,
