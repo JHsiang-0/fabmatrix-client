@@ -217,7 +217,7 @@ test('allows admin to move public folders across creators and keeps operator man
     parentId: target.data.id
   }, adminHeaders)
   assert.equal(moved.data.parentId, target.data.id)
-  assert.equal(mockState.files.find(file => String(file.id) === String(source.data.id)).parentId, Number(target.data.id))
+  assert.equal(mockState.files.find(file => String(file.id) === String(source.data.id)).parentId, target.data.id)
 })
 
 test('allows a third user to read public files but only the uploader can delete', async () => {
@@ -305,7 +305,7 @@ test('renames and moves folders through the real endpoints and records mock audi
     parentId: target.data.id
   }, operatorHeaders)
   assert.equal(moved.data.parentId, target.data.id)
-  assert.equal(mockState.files.find(file => String(file.id) === String(source.data.id)).parentId, Number(target.data.id))
+  assert.equal(mockState.files.find(file => String(file.id) === String(source.data.id)).parentId, target.data.id)
   assert.deepEqual(mockState.auditLogs.slice(0, 2).map(log => log.action), ['FOLDER_MOVE', 'FOLDER_RENAME'])
 })
 
@@ -324,7 +324,7 @@ test('批量移动文件返回逐项结果，不会移动文件夹或触碰对�
   assert.equal(response.data.movedCount, 1)
   assert.equal(response.data.failedCount, 1)
   assert.deepEqual(response.data.items.map(item => item.success), [true, false])
-  assert.equal(mockState.files.find(file => file.id === 23).parentId, Number(target.data.id))
+  assert.equal(mockState.files.find(file => file.id === 23).parentId, target.data.id)
   assert.equal(mockState.files.find(file => String(file.id) === String(target.data.id)).parentId, null)
 })
 
@@ -393,7 +393,7 @@ test('resolves omitted upload parents to the real default folder and validates p
   }, operatorHeaders)
   assert.equal(batch.data.items[0].status, 'SUCCESS')
   const batchFile = mockState.files.find(file => String(file.id) === String(batch.data.items[0].fileId))
-  assert.equal(batchFile.parentId, 4)
+  assert.equal(batchFile.parentId, '4')
 
   await assert.rejects(
     request('POST', '/api/v1/print-files/page', { pageNum: 1, pageSize: 10, parentId: 20 }, operatorHeaders),

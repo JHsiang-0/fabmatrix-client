@@ -52,6 +52,8 @@ SYNC-002.9 迁移交付与文档收口
 
 完成记录：已新增 MySQL 8.4/SQLite 独立只读坐标预检、MySQL 编号 16 幂等迁移、SQLite 新库约束和已有库启动迁移；追加修复后，MySQL 新库/增量脚本均由 `farm_printer` 表定义成对与正数 CHECK 及联合唯一索引，布局表和默认行仅由编号 16 在预检通过后创建。编号 16 会核对已有布局表的真实列、启用 CHECK、主键和时间列语义，并在失败/成功路径清理辅助例程；SQLite 严格核对 partial unique index，预检后安全重建项目自有坐标触发器并阻断同名伪对象。默认布局为 4×12、物理第 7 列后 100px 过道、版本 1。已补齐两份 Compose 的 MySQL 14、15、16 只读挂载，并新增备份、执行、验证、回滚及失败新卷处理说明。未进行真实 MySQL 数据卷验收，因当前没有安全隔离的 MySQL 容器环境。
 
+编号 17 迁移与 SQLite 同等受控纠错已补齐：仅修复 `id=1,row_count=4,column_count=12,version=1,updated_by IS NULL` 且唯一默认 COLUMN 过道 `afterIndex=6,label=过道,size=100` 的记录；正确默认、用户定制和高版本均不覆盖。当前代码、SQLite、自动化和文档已完成，真实 MySQL 8.4 最终 HEAD 现场复核是唯一剩余项。
+
 ### [x] SYNC-002.2 实现后端布局读取资源
 
 - 新增 Layout Entity/Mapper/DTO/VO/Service/Controller。
@@ -129,7 +131,9 @@ SecurityConfig 显式限制 GET 为 ADMIN/OPERATOR、PUT 为 ADMIN（PUT 保存�
 刷新布局和完整设备快照，编辑状态保留草稿并标记过期；断线重连后按同样规则收敛。新增 Mock 双客户端、权限、冲突、
 原子性和状态分层测试；前端全量测试 224/224、lint、build 均通过。
 
-### [x] SYNC-002.8 建立回归护栏并完成联调验收
+### [~] SYNC-002.8 建立回归护栏并完成联调验收
+
+收口状态：代码、SQLite 和自动化验证已完成；当前最终 HEAD 未重新验证真实 MySQL 8.4。唯一剩余现场项是隔离 MySQL 8.4 的编号 16/17 预检、迁移与受控纠错复核，不能声称本任务整体完成。
 
 - 替换 `dashboardOverview.test.js` 中固定 4×12 和禁止动态布局的旧门禁。
 - 恢复/重写 `gridLayout.test.js`、`gridAisleUi.test.js`，补充权限、事务、冲突、缩容、超过 100 台和 WebSocket 测试。
@@ -145,7 +149,9 @@ Electron-dist E2E 1/1 通过；后端 `mvn test` 通过。2026-09-11 在 WSL Ubu
 迁移后布局定义、CHECK、主键、时间列、联合唯一索引和辅助过程清理正确；两端重复槽位、半空/非正数坐标拒绝，
 事务回滚后均无临时数据残留。本任务验收完成。
 
-### [x] SYNC-002.9 完成迁移交付与文档收口
+### [~] SYNC-002.9 完成迁移交付与文档收口
+
+收口状态：文档、代码、SQLite 和自动化已完成；当前最终 HEAD 未重新验证真实 MySQL 8.4，唯一剩余现场项同上。
 
 - 更新部署、升级、回滚、数据库预检、API handoff 和管理员操作说明。
 - 明确部署顺序为“数据库迁移 → 后端 → 前端”，并记录旧 positions API 的弃用窗口。
@@ -156,7 +162,7 @@ Electron-dist E2E 1/1 通过；后端 `mvn test` 通过。2026-09-11 在 WSL Ubu
 完成记录：后端已更新 `OPERATIONS.md`、`API_HANDOFF.md`、`docs/DASHBOARD_LAYOUT_MIGRATION.md` 和
 `docs/DASHBOARD_LAYOUT_CONTRACT.md`，明确“预检 → 数据库迁移 → 后端 → 前端”顺序、MySQL 16 号迁移入口、
 SQLite `LocalSchemaMigration`/partial index/触发器职责、备份回滚、管理员缩容操作及旧 positions 弃用窗口；
-后端文档提交为 `6af0a6c`，前端任务记录随本提交更新。真实数据库验收仍按 002.8 的安全限制单独保留未完成。
+后端文档提交为 `6af0a6c`，前端任务记录随本提交更新。代码、SQLite 和自动化已完成；当前最终 HEAD 未重新验证真实 MySQL 8.4，唯一剩余现场项为隔离 MySQL 8.4 的编号 16/17 预检、迁移与受控纠错复核。
 
 ## 实施纪律
 

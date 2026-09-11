@@ -63,6 +63,7 @@ export function usePrinterStore() {
     layoutConflict,
     layoutDirty,
     positionDraft,
+    draftBaseVersion,
     gridConfig,
     invalidPositionDevices
   } = storeToRefs(grid)
@@ -112,6 +113,7 @@ export function usePrinterStore() {
     layoutConflict,
     layoutDirty,
     positionDraft,
+    draftBaseVersion,
     gridConfig,
     invalidPositionDevices,
 
@@ -151,6 +153,7 @@ export function usePrinterStore() {
     loadLayout: grid.loadLayout,
     refreshLayout: grid.refreshLayout,
     beginLayoutEdit: grid.beginLayoutEdit,
+    startLayoutEdit: grid.startLayoutEdit,
     updateLayoutDraft: grid.updateLayoutDraft,
     setPositionDraft: grid.setPositionDraft,
     cancelLayoutEdit: grid.cancelLayoutEdit,

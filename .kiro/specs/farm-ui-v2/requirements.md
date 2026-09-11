@@ -260,7 +260,7 @@
 
 - 前置条件：收到业务消息。
 - 操作：校验 `version/type/eventId/sequence/printerId/timestamp/data`。
-- 预期结果：只处理 version=1 和四种冻结类型；未知版本标记数据陈旧并回退 REST；重复 eventId 或乱序事件不重复应用。
+- 预期结果：只处理 version=1 和五种冻结类型（含 LAYOUT_UPDATED）；未知版本标记数据陈旧并回退 REST；重复 eventId 或乱序事件不重复应用。
 
 ### R-WS-03 快照和增量
 

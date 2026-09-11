@@ -31,6 +31,8 @@ export const useDeviceStore = defineStore('device', () => {
 
   /** 详情请求状态 */
   const detailLoading = ref(false)
+  let fetchGeneration = 0
+  let activeFetchController = null
 
   function cacheDeviceDetail(detail) {
     const key = String(detail.id)
@@ -78,25 +80,38 @@ export const useDeviceStore = defineStore('device', () => {
    * 获取全部设备数据。
    * @description 看板必须保留未分配、半空、重复和越界坐标，交由布局层生成异常清单。
    */
-  async function fetchDeviceData() {
+  async function fetchDeviceData(options = {}) {
+    const generation = ++fetchGeneration
+    activeFetchController?.abort()
+    const abortController = new AbortController()
+    activeFetchController = abortController
+    const signal = options.signal || abortController.signal
+    const isCurrent = () => generation === fetchGeneration && !signal.aborted
     loading.value = true
     error.value = null
     try {
-      const firstPage = await getPrinterList({ pageNum: 1, pageSize: 100 })
+      const firstPage = await getPrinterList({ pageNum: 1, pageSize: 100 }, { signal })
       const records = await collectAllPages(
-        (pageNum, pageSize) => getPrinterList({ pageNum, pageSize }),
+        (pageNum, pageSize) => getPrinterList({ pageNum, pageSize }, { signal }),
         firstPage
       )
 
+      if (!isCurrent()) return rawDeviceList.value
       // 直接赋值，触发 rawDeviceList 的响应式更新；异常位置不能在这里静默丢弃。
       rawDeviceList.value = records
       version.value++
+      return rawDeviceList.value
     } catch (requestError) {
+      if (requestError?.code === 'ERR_CANCELED' || requestError?.name === 'CanceledError'
+        || generation !== fetchGeneration) return rawDeviceList.value
       console.error('[DeviceStore] 获取设备数据失败:', requestError)
       error.value = requestError
       throw requestError
     } finally {
-      loading.value = false
+      if (generation === fetchGeneration) {
+        loading.value = false
+        if (activeFetchController === abortController) activeFetchController = null
+      }
     }
   }
 

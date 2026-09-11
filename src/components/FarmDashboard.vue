@@ -280,7 +280,7 @@ const shrinkDevices = ref([])
 const editingAisleId = ref('')
 const overflowPolicy = ref('REJECT')
 const layoutForm = ref({ rowCount: 4, columnCount: 12 })
-const aisleForm = ref({ axis: 'COLUMN', afterIndex: 0, label: '过道', size: 100 })
+const aisleForm = ref({ axis: 'COLUMN', afterIndex: 7, label: '过道', size: 100 })
 const aisleAxisOptions = [
   { label: '纵向过道', value: 'COLUMN' },
   { label: '横向过道', value: 'ROW' }
@@ -335,9 +335,10 @@ const layoutLimits = computed(() => store.layoutLimits || {
 })
 
 const draftAisles = computed(() => store.layoutDraft?.aisles || [])
-const aislePositionMax = computed(() => aisleForm.value.axis === 'ROW'
-  ? layoutForm.value.rowCount
-  : layoutForm.value.columnCount)
+const aislePositionMax = computed(() => {
+  const layout = store.layoutDraft || store.layoutSnapshot || layoutForm.value
+  return aisleForm.value.axis === 'ROW' ? layout.rowCount : layout.columnCount
+})
 const displayDevices = computed(() => {
   const changes = new Map(positionChanges.value.map(change => [String(change.printerId), change]))
   return store.rawDeviceList.map(device => {
@@ -763,6 +764,10 @@ function toggleEditMode() {
     message.error('布局快照尚未加载完成，请稍后重试')
     return
   }
+  layoutForm.value = {
+    rowCount: store.layoutDraft.rowCount,
+    columnCount: store.layoutDraft.columnCount
+  }
   positionChanges.value = []
   store.setPositionDraft([])
   overflowPolicy.value = 'REJECT'
@@ -802,8 +807,20 @@ function openLayoutSettings() {
 function applyLayoutSettings() {
   const rowCount = Number(layoutForm.value.rowCount)
   const columnCount = Number(layoutForm.value.columnCount)
-  if (rowCount * columnCount > (layoutLimits.value.maxCells || 1800)) {
+  const limits = layoutLimits.value
+  const invalidAisles = (store.layoutDraft?.aisles || []).filter(aisle => (
+    aisle.afterIndex < 0
+      || aisle.afterIndex > (aisle.axis === 'ROW' ? rowCount : columnCount)
+  ))
+  if (!Number.isInteger(rowCount) || !Number.isInteger(columnCount)
+    || rowCount < limits.minRows || rowCount > limits.maxRows
+    || columnCount < limits.minColumns || columnCount > limits.maxColumns
+    || rowCount * columnCount > (limits.maxCells || 1800)) {
     message.error('行列乘积不能超过布局槽位上限')
+    return
+  }
+  if (invalidAisles.length) {
+    message.error('当前行列会使已有过道位置越界，请先移动或删除对应过道')
     return
   }
   store.updateLayoutDraft({ rowCount, columnCount })
@@ -816,23 +833,8 @@ function adjustLayoutDimension(field, delta) {
   const min = isRow ? layoutLimits.value.minRows : layoutLimits.value.minColumns
   const max = isRow ? layoutLimits.value.maxRows : layoutLimits.value.maxColumns
   const next = Math.min(max, Math.max(min, current + delta))
-  const other = isRow ? Number(layoutForm.value.columnCount) : Number(layoutForm.value.rowCount)
-  const rowCount = isRow ? next : other
-  const columnCount = isRow ? other : next
   if (next === current) return
-  if (rowCount * columnCount > (layoutLimits.value.maxCells || 1800)) {
-    message.error('行列乘积不能超过布局槽位上限')
-    return
-  }
-  const invalidAisles = (store.layoutDraft.aisles || []).filter(aisle => (
-    aisle.axis === (isRow ? 'ROW' : 'COLUMN') && aisle.afterIndex > next
-  ))
-  if (invalidAisles.length) {
-    message.warning(`缩容后${isRow ? '横向' : '纵向'}过道位置越界，请先移动或删除对应过道`)
-    return
-  }
   layoutForm.value[field] = next
-  store.updateLayoutDraft({ rowCount, columnCount })
 }
 
 function openAisleDialog(aisle = null) {
@@ -848,7 +850,7 @@ function openAisleDialog(aisle = null) {
 
 function openNewAisleDialog() {
   editingAisleId.value = ''
-  aisleForm.value = { axis: 'COLUMN', afterIndex: 0, label: '过道', size: 100 }
+  aisleForm.value = { axis: 'COLUMN', afterIndex: 7, label: '过道', size: 100 }
   aisleDialogVisible.value = true
   aisleListVisible.value = false
 }
@@ -857,9 +859,7 @@ function applyAisleSettings() {
   const label = String(aisleForm.value.label || '').trim()
   const afterIndex = Number(aisleForm.value.afterIndex)
   const size = Number(aisleForm.value.size)
-  const positionMax = aisleForm.value.axis === 'ROW'
-    ? layoutForm.value.rowCount
-    : layoutForm.value.columnCount
+  const positionMax = aislePositionMax.value
   if (!label || label.length > 12 || !Number.isInteger(afterIndex) || afterIndex < 0 || afterIndex > positionMax
     || !Number.isInteger(size) || size < layoutLimits.value.minAisleSize || size > layoutLimits.value.maxAisleSize) {
     message.error('请填写合法的过道方向、位置、名称和尺寸')

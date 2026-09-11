@@ -196,13 +196,13 @@
 - 优先级：P0
 - 前置依赖：T011、T014
 - 修改文件：`src/stores/printer/realtimeStore.js`、任务 Store、看板/状态组件、Mock WebSocket 和测试
-- 实现内容：SNAPSHOT 从 `PrinterVO.status` 解析；处理四类消息；JOB_STATUS 同步任务 Store；暴露连接、恢复中和 stale 状态；Mock 发送正式协议。
+- 实现内容：SNAPSHOT 从 `PrinterVO.status` 解析；处理五类消息（含 LAYOUT_UPDATED）；JOB_STATUS 同步任务 Store；暴露连接、恢复中和 stale 状态；Mock 发送正式协议。
 - 验收标准：初始快照不再全为 UNKNOWN；断线时显示陈旧态；重连快照收敛 REST 与任务列表。
 - 测试方式：快照/增量/乱序/重连 Store 测试和看板组件测试。
 - 需要后端配合：否。
 - 需要真实打印机：否。
 - 风险：REST 和 WS 更新顺序可能导致旧值覆盖。
-- 完成状态：已完成（2026-09-04）。SNAPSHOT 统一从正式 `PrinterVO.status` 读取，四类实时消息均按协议分流；`JOB_STATUS` 同步任务 Store，断线和 sequence 断档/未知版本时暴露 stale 与恢复中状态并以 REST 快照及任务列表收敛；Mock WebSocket 补齐 `version/eventId/sequence` 和真实任务状态。`npm.cmd test`（42/42）、`npm.cmd run lint`、`npm.cmd run build`、`npm.cmd run build:mock` 均通过。
+- 完成状态：已完成（2026-09-04，SYNC-002 收口补充）。SNAPSHOT 统一从正式 `PrinterVO.status` 读取，五类实时消息均按协议分流；`LAYOUT_UPDATED` 只读取 `data` 中的布局版本，不清空设备状态；`JOB_STATUS` 同步任务 Store，断线和 sequence 断档/未知版本时暴露 stale 与恢复中状态并以 REST 快照及任务列表收敛；Mock WebSocket 补齐 `version/eventId/sequence` 和真实任务状态。专项与全量验证结果以本次 SYNC-002 收口记录为准。
 
 ## 3. P1：批量业务与管理能力
 

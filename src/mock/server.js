@@ -26,17 +26,18 @@ export const toPublicSemanticIds = value => {
   const result = {}
   Object.entries(value).forEach(([key, item]) => {
     if (SEMANTIC_ID_FIELDS.has(key)) {
-      if (key === 'conflicts') {
-        result[key] = Array.isArray(item) ? item.map(id => id == null ? id : String(id)) : item
-      } else if (Array.isArray(item)) {
-        result[key] = item.map(toPublicSemanticIds)
-      }
-      else result[key] = item == null ? item : String(item)
+      result[key] = normalizeSemanticIdValue(item)
     } else {
       result[key] = toPublicSemanticIds(item)
     }
   })
   return result
+}
+
+const normalizeSemanticIdValue = value => {
+  if (Array.isArray(value)) return value.map(normalizeSemanticIdValue)
+  if (value && typeof value === 'object') return toPublicSemanticIds(value)
+  return value == null ? value : String(value)
 }
 
 /**

@@ -142,7 +142,7 @@ const createSeedData = ({ initialized = true, dashboardLayout: layoutOverride = 
     rowCount: 4,
     columnCount: 12,
     aisles: [
-      { id: 'default-column-aisle', axis: 'COLUMN', afterIndex: 6, label: '过道', size: 100 }
+      { id: 'default-column-aisle', axis: 'COLUMN', afterIndex: 7, label: '过道', size: 100 }
     ],
     version: 1,
     limits: {
@@ -556,13 +556,13 @@ const createSeedData = ({ initialized = true, dashboardLayout: layoutOverride = 
   ] : [],
   batchPlans: [],
   nextIds: {
-    users: 3,
-    file: 25,
-    folder: 6,
-    job: 1007,
-    printer: 409,
-    batchPlan: 1,
-    auditLog: 4
+    users: '3',
+    file: '25',
+    folder: '6',
+    job: '1007',
+    printer: '409',
+    batchPlan: '1',
+    auditLog: '4'
   },
   sessions: {}
 })
@@ -576,9 +576,34 @@ export function resetMockState(options = {}) {
   })
 }
 
+export const normalizeMockId = value => value == null ? null : String(value).trim()
+
+export const sameMockId = (left, right) => {
+  const normalizedLeft = normalizeMockId(left)
+  const normalizedRight = normalizeMockId(right)
+  return normalizedLeft !== null && normalizedLeft === normalizedRight
+}
+
+export const sameOptionalMockId = (left, right) => (
+  (left == null && right == null) || sameMockId(left, right)
+)
+
+export const compareMockIds = (left, right) => {
+  const leftId = normalizeMockId(left)
+  const rightId = normalizeMockId(right)
+  if (leftId === null || rightId === null) return 0
+  return BigInt(leftId) < BigInt(rightId) ? -1 : BigInt(leftId) > BigInt(rightId) ? 1 : 0
+}
+
+export const isValidMockId = value => {
+  const normalized = normalizeMockId(value)
+  return Boolean(normalized && /^\d+$/.test(normalized) && BigInt(normalized) > 0n)
+}
+
 export function nextMockId(type) {
-  const id = mockState.nextIds[type]
-  mockState.nextIds[type] += 1
+  const id = normalizeMockId(mockState.nextIds[type])
+  if (!isValidMockId(id)) throw new Error(`Mock ID 序列无效: ${type}`)
+  mockState.nextIds[type] = (BigInt(id) + 1n).toString()
   return id
 }
 

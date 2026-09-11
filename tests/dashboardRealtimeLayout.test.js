@@ -17,14 +17,36 @@ test('布局事件只更新布局版本，不能因 printerId=null 进入设备�
 
 test('非编辑客户端刷新布局和设备快照，编辑客户端只标记过期草稿', () => {
   assert.match(gridSource, /if \(layoutDraft\.value\) \{[\s\S]*reason: 'STALE_DRAFT'/)
-  assert.match(gridSource, /await loadLayout\(\)[\s\S]*await deviceStore\.fetchDeviceData\(\)/)
+  assert.match(gridSource, /const latest = await loadLayout\(\)[\s\S]*await deviceStore\.fetchDeviceData\(\)/)
   assert.match(gridSource, /watch\(\(\) => realtimeStore\.layoutVersion/)
   assert.match(gridSource, /watch\(\(\) => realtimeStore\.wsConnectionState/)
   assert.match(gridSource, /recoverAfterRealtimeReconnect/)
   assert.match(gridSource, /let layoutLoadGeneration = 0/)
   assert.match(gridSource, /const generation = \+\+layoutLoadGeneration/)
   assert.match(gridSource, /if \(generation !== layoutLoadGeneration\) return layoutSnapshot\.value/)
-  assert.match(gridSource, /const hasDraft = Boolean\(layoutDraft\.value\)/)
+  assert.match(gridSource, /const hasDraft = draftBaseVersion\.value !== null/)
+  assert.match(gridSource, /let reconcileGeneration = 0/)
+  assert.match(gridSource, /if \(generation !== reconcileGeneration/)
+  assert.match(gridSource, /layoutLoadController\?\.abort\(\)/)
+})
+
+test('连续布局事件使用 deferred 结果只提交最新协调代次', async () => {
+  let resolveFirst
+  let resolveLatest
+  const first = new Promise(resolve => { resolveFirst = resolve })
+  const latest = new Promise(resolve => { resolveLatest = resolve })
+  let committed = null
+  const commitLatest = async (generation, response) => {
+    const result = await response
+    if (generation === 2) committed = result
+  }
+  void commitLatest(1, first)
+  void commitLatest(2, latest)
+  resolveFirst({ version: 2 })
+  resolveLatest({ version: 3 })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(committed, { version: 3 })
+  assert.match(gridSource, /const generation = \+\+reconcileGeneration/)
 })
 
 test('实时恢复使用生命周期代次和 AbortController 隔离断开后的旧分页响应', () => {

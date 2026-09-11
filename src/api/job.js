@@ -191,10 +191,10 @@ export function getJobPage(params = {}) {
 
 /**
  * @typedef {Object} PrintJob
- * @property {number} id - 任务ID
- * @property {number} fileId - 关联文件ID
+ * @property {string} id - 任务ID（JSON 十进制字符串）
+ * @property {string} fileId - 关联文件ID（JSON 十进制字符串）
  * @property {string} fileName - 文件名称
- * @property {number} [printerId] - 分配的打印机ID
+ * @property {string} [printerId] - 分配的打印机ID（JSON 十进制字符串）
  * @property {string} [printerName] - 打印机名称
  * @property {string} status - 任务状态（UPLOADING/QUEUED/ASSIGNED/READY/PRINTING/PAUSED/COMPLETED/RECONCILING/FAILED/CANCELLED）
  * @property {number} priority - 优先级（0-100）

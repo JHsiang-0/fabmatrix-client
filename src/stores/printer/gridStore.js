@@ -28,7 +28,11 @@ export const useGridStore = defineStore('grid', () => {
   const layoutError = ref(null)
   const layoutConflict = ref(null)
   const positionDraft = ref([])
+  const draftBaseVersion = ref(null)
   let layoutLoadGeneration = 0
+  let layoutLoadController = null
+  let editGeneration = 0
+  let reconcileGeneration = 0
 
   const activeLayout = computed(() => layoutDraft.value || layoutSnapshot.value)
   const layoutVersion = computed(() => layoutSnapshot.value?.version ?? null)
@@ -81,38 +85,55 @@ export const useGridStore = defineStore('grid', () => {
     return counts
   })
 
+  const isCancelled = error => error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError'
+
   async function loadLayout() {
     const generation = ++layoutLoadGeneration
+    const editGenerationAtRequest = editGeneration
+    layoutLoadController?.abort()
+    const abortController = new AbortController()
+    layoutLoadController = abortController
     layoutLoading.value = true
     layoutError.value = null
     try {
-      const response = await getDashboardLayout()
+      const response = await getDashboardLayout({ signal: abortController.signal })
       if (generation !== layoutLoadGeneration) return layoutSnapshot.value
-      const hasDraft = Boolean(layoutDraft.value)
-      layoutSnapshot.value = response.data
-      if (hasDraft) {
-        layoutConflict.value = {
-          reason: 'STALE_DRAFT',
-          serverVersion: response.data?.version ?? null,
-          conflicts: [],
-          outOfBoundsPrinters: []
+      const hasDraft = draftBaseVersion.value !== null
+      // A response that started before editing must not replace the frozen
+      // baseline or clear the user's draft after editing has begun.
+      if (hasDraft || editGeneration !== editGenerationAtRequest) {
+        const serverVersion = response.data?.version ?? null
+        if (Number(serverVersion) > Number(draftBaseVersion.value || 0)) {
+          layoutConflict.value = {
+            reason: 'STALE_DRAFT',
+            serverVersion,
+            conflicts: [],
+            outOfBoundsPrinters: []
+          }
         }
-      } else {
-        layoutDraft.value = null
-        positionDraft.value = []
-        layoutConflict.value = null
+        return response.data
       }
+      layoutSnapshot.value = response.data
+      layoutDraft.value = null
+      positionDraft.value = []
+      draftBaseVersion.value = null
+      layoutConflict.value = null
       return layoutSnapshot.value
     } catch (error) {
-      if (generation === layoutLoadGeneration) layoutError.value = error
+      if (generation === layoutLoadGeneration && !isCancelled(error)) layoutError.value = error
+      if (isCancelled(error)) return layoutSnapshot.value
       throw error
     } finally {
-      if (generation === layoutLoadGeneration) layoutLoading.value = false
+      if (generation === layoutLoadGeneration) {
+        layoutLoading.value = false
+        if (layoutLoadController === abortController) layoutLoadController = null
+      }
     }
   }
 
   async function reconcileLayoutEvent(nextVersion) {
     if (!layoutSnapshot.value || nextVersion <= Number(layoutSnapshot.value.version || 0)) return
+    const generation = ++reconcileGeneration
     if (layoutDraft.value) {
       layoutConflict.value = {
         reason: 'STALE_DRAFT',
@@ -123,33 +144,26 @@ export const useGridStore = defineStore('grid', () => {
       return
     }
     try {
-      await loadLayout()
+      const latest = await loadLayout()
+      if (generation !== reconcileGeneration || !latest
+        || Number(latest.version) < Number(realtimeStore.layoutVersion || nextVersion)) return
+      if (layoutDraft.value) return
       await deviceStore.fetchDeviceData()
+      if (generation !== reconcileGeneration) return
     } catch (error) {
-      layoutError.value = error
+      if (!isCancelled(error)) layoutError.value = error
     }
   }
 
   async function recoverAfterRealtimeReconnect() {
     if (!layoutSnapshot.value) return
+    const generation = ++reconcileGeneration
     try {
-      const response = await getDashboardLayout()
-      const latest = response.data
-      if (latest.version > Number(layoutSnapshot.value.version || 0)) {
-        if (layoutDraft.value) {
-          layoutConflict.value = {
-            reason: 'STALE_DRAFT',
-            serverVersion: latest.version,
-            conflicts: [],
-            outOfBoundsPrinters: []
-          }
-        } else {
-          layoutSnapshot.value = latest
-        }
-      }
+      const latest = await loadLayout()
+      if (generation !== reconcileGeneration || !latest) return
       if (!layoutDraft.value) await deviceStore.fetchDeviceData()
     } catch (error) {
-      layoutError.value = error
+      if (!isCancelled(error)) layoutError.value = error
     }
   }
 
@@ -164,16 +178,20 @@ export const useGridStore = defineStore('grid', () => {
     }
   })
 
-  function beginLayoutEdit() {
+  function startLayoutEdit() {
     if (!layoutSnapshot.value) return null
+    editGeneration++
     layoutDraft.value = clone(layoutSnapshot.value)
+    draftBaseVersion.value = layoutSnapshot.value.version
     layoutConflict.value = null
     layoutError.value = null
     return layoutDraft.value
   }
 
+  const beginLayoutEdit = startLayoutEdit
+
   function updateLayoutDraft(patch) {
-    if (!layoutDraft.value) beginLayoutEdit()
+    if (!layoutDraft.value) startLayoutEdit()
     if (!layoutDraft.value || !patch || typeof patch !== 'object') return layoutDraft.value
     layoutDraft.value = { ...layoutDraft.value, ...clone(patch) }
     return layoutDraft.value
@@ -185,20 +203,29 @@ export const useGridStore = defineStore('grid', () => {
   }
 
   function cancelLayoutEdit() {
+    editGeneration++
     layoutDraft.value = null
     positionDraft.value = []
+    draftBaseVersion.value = null
     layoutConflict.value = null
     layoutError.value = null
   }
 
   async function saveLayoutDraft(changes = positionDraft.value, overflowPolicy = 'REJECT') {
-    if (!layoutSnapshot.value || !activeLayout.value) return null
+    if (!layoutSnapshot.value || !layoutDraft.value || draftBaseVersion.value === null) return null
+    if (layoutConflict.value?.reason === 'STALE_DRAFT') {
+      const staleError = new Error('布局草稿已过期，请重新载入后再保存')
+      staleError.code = 409
+      staleError.status = 409
+      staleError.data = layoutConflict.value
+      throw staleError
+    }
     layoutSaving.value = true
     layoutError.value = null
     try {
       const draft = normalizeDraftForRequest(activeLayout.value)
       const response = await saveDashboardLayout({
-        expectedVersion: layoutSnapshot.value.version,
+        expectedVersion: draftBaseVersion.value,
         ...draft,
         overflowPolicy,
         positionChanges: (Array.isArray(changes) ? changes : []).map(change => ({
@@ -210,6 +237,7 @@ export const useGridStore = defineStore('grid', () => {
       layoutSnapshot.value = response.data.layout
       layoutDraft.value = null
       positionDraft.value = []
+      draftBaseVersion.value = null
       layoutConflict.value = null
       return response.data
     } catch (error) {
@@ -240,6 +268,7 @@ export const useGridStore = defineStore('grid', () => {
   return {
     layoutSnapshot,
     layoutDraft,
+    draftBaseVersion,
     layoutVersion,
     layoutLimits,
     layoutLoading,
@@ -255,6 +284,7 @@ export const useGridStore = defineStore('grid', () => {
     loadLayout,
     refreshLayout: loadLayout,
     beginLayoutEdit,
+    startLayoutEdit,
     updateLayoutDraft,
     setPositionDraft,
     cancelLayoutEdit,

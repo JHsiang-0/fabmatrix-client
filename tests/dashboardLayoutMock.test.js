@@ -110,3 +110,22 @@ test('Mock 请求内重复目标槽位返回 400/DUPLICATE_SLOT 且不改变状�
   })
   assert.equal(JSON.stringify({ layout: mockState.dashboardLayout, printers: mockState.printers }), before)
 })
+
+test('Mock HTTP/WS 路由保留大 ID 字符串并保持布局事件仅使用 data', async () => {
+  const largeId = '9007199254740993'
+  const printer = mockState.printers.find(item => String(item.id) === '403')
+  printer.id = largeId
+  const previousWindow = globalThis.window
+  globalThis.window = { setInterval, clearInterval }
+  const events = []
+  const stream = createMockWebSocketStream({ onMessage: event => events.push(event) })
+  const saved = await request('PUT', saveBody({
+    positionChanges: [{ printerId: largeId, gridRow: 4, gridCol: 12 }]
+  }))
+  assert.equal(saved.data.changedPositions[0].printerId, largeId)
+  const event = events.find(item => item.type === 'LAYOUT_UPDATED')
+  assert.equal(event?.data?.layoutVersion, 2)
+  assert.equal(event?.layoutVersion, undefined)
+  stream.close()
+  globalThis.window = previousWindow
+})

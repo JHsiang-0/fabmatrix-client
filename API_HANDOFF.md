@@ -1,10 +1,10 @@
 # FabMatrix 前后端接口交接与契约文档
 
 版本：v2.1
-更新时间：2026-09-05
+更新时间：2026-09-11
 适用范围：FabMatrix 本地 3D 打印生产管理服务端与浏览器/客户端
 
-> 本文以当前 Java 源码、`SecurityConfig` 和当前 OpenAPI 注解为准。第 4 节列出的正式 Farm API 均已有对应 Controller；开发环境兼容用路由单独列在第 4.6 节。v2 不提供后台自动派单接口，相关能力延期到 v3。
+> 本文以当前 Java 源码、`SecurityConfig` 和当前 OpenAPI 注解为准。第 4 节列出的正式 Farm API 均已有对应 Controller；开发环境兼容用路由单独列在第 4.6 节。v2 不提供后台自动派单接口，相关能力延期到 v3。SYNC-002 收口：默认 4×12、COLUMN 过道位于物理第 7 列后；Long 语义 ID 的 JSON 值为十进制字符串，非 ID 数值保持 number。
 
 项目执行入口：[PROJECT.md](./.kiro/specs/farm-ui-v2/PROJECT.md)；Kiro 需求、设计和任务清单位于 `.kiro/specs/farm-ui-v2/`。
 
@@ -180,8 +180,8 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 
 | 方法 | 地址 | 权限 | 请求 | 返回 |
 |---|---|---|---|---|
-| POST | `/auth/register` | ADMIN | 用户注册 DTO | `Result<Long>` |
-| POST | `/auth/admin/users` | ADMIN | 用户注册 DTO | `Result<Long>` |
+| POST | `/auth/register` | ADMIN | 用户注册 DTO | `Result<String>`（Long ID 十进制字符串） |
+| POST | `/auth/admin/users` | ADMIN | 用户注册 DTO | `Result<String>`（Long ID 十进制字符串） |
 | GET | `/auth/admin/users` | ADMIN | `pageNum,pageSize,username,role,email,enabled` | `PageResult<UserVO>`，不包含密码 |
 | PUT | `/auth/admin/users/{userId}` | ADMIN | 用户更新 DTO | `Result<null>` |
 | POST | `/auth/admin/users/{userId}/disable` | ADMIN | Path ID | `Result<null>` |
@@ -226,7 +226,7 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 | POST | `/printers/batch-add` | ADMIN | 扫描结果数组 | 批量新增/更新统计及逐项结果 |
 | GET | `/printers/by-mac/{macAddress}` | ADMIN/OPERATOR | Path MAC | `PrinterVO` 或 null |
 | GET | `/printers/by-ip/{ipAddress}` | ADMIN/OPERATOR | Path IP | `PrinterVO` 或 null |
-| PUT | `/printers/positions` | ADMIN | 位置更新数组 | `Result<null>` |
+| PUT | `/printers/positions` | ADMIN | 位置更新数组 | 已弃用；ADMIN 兼容调用并委托动态布局原子事务 |
 | GET | `/printers/unallocated` | ADMIN/OPERATOR | Query：`keyword` | `PrinterVO[]` |
 
 ### 4.1.1 动态看板布局（SYNC-002 目标契约，尚未实现）
@@ -236,9 +236,9 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 | GET | `/dashboard-layout` | ADMIN/OPERATOR | 无 | `DashboardLayoutVO`：行列、横纵过道、版本、服务端限制和更新时间 |
 | PUT | `/dashboard-layout` | ADMIN | `DashboardLayoutSaveRequest`：`expectedVersion,rowCount,columnCount,aisles,overflowPolicy,positionChanges` | `DashboardLayoutSaveResultVO`：最新布局、变更坐标和下架设备 |
 
-完整目标契约见 `.kiro/specs/farm-dashboard-dynamic-layout/design.md`。该接口在 SYNC-002.2/002.3 完成前不可调用，前端不得以 localStorage 或旧 `/printers/positions` 假装完成布局持久化。范围固定为单农场共享布局；行 `1–30`、列 `1–60`、物理槽位不超过 `1800`，支持最多 20 条横向/纵向过道。布局保存使用 `expectedVersion` 乐观锁并与位置变化原子提交；默认缩容策略为 `REJECT`，显式 `UNALLOCATE` 需要二次确认。
+完整契约见 `.kiro/specs/farm-dashboard-dynamic-layout/design.md`。GET/PUT 已实现，前端使用布局资源持久化，不使用 localStorage；旧 `/printers/positions` 仅作为 ADMIN 兼容入口并委托同一原子事务。范围固定为单农场共享布局；行 `1–30`、列 `1–60`、物理槽位不超过 `1800`，默认 4×12 且纵向过道位于物理第 7 列之后，支持最多 20 条横向/纵向过道。布局保存使用 `expectedVersion` 乐观锁并与位置变化原子提交；默认缩容策略为 `REJECT`，显式 `UNALLOCATE` 需要二次确认。
 
-计划在现有 WebSocket `version=1` 中兼容新增 `LAYOUT_UPDATED`。该消息 `printerId=null`，`data` 固定包含 `stateSource="LAYOUT"` 和正数 `layoutVersion`；旧四类消息及设备业务/通信状态语义不变。当前运行中的后端仍只支持 `SNAPSHOT/PRINTER_STATUS/PRINTER_OFFLINE/JOB_STATUS`。
+现有 WebSocket `version=1` 已实现五类消息：`SNAPSHOT/PRINTER_STATUS/PRINTER_OFFLINE/JOB_STATUS/LAYOUT_UPDATED`。布局消息 `printerId=null`，布局字段仅位于 `data`（`stateSource="LAYOUT"`、正数 `layoutVersion`），不覆盖设备业务/通信状态。
 
 新增、重新录入或批量扫描入库的打印机，在下一次协议状态探测完成前返回 `status=UNKNOWN`；`ONLINE` 不属于打印机状态枚举，也不会作为业务状态写入。普通配置编辑不重置设备当前状态。
 
@@ -695,7 +695,7 @@ mysql -u root -p farm < src/main/resources/db/migration/09-v2-print-job-idempote
 - REST 的 `LocalDateTime` 使用 ISO-8601 字符串：`yyyy-MM-dd'T'HH:mm:ss`。
 - 当前系统默认时区为服务端本地时区，现阶段按 Asia/Shanghai 使用。
 - WebSocket `timestamp` 使用 Unix epoch 毫秒。
-- ID 使用 Long，前端 JavaScript 建议按字符串安全处理超大 ID。
+- 所有语义 Long ID 的 JSON 值（包括标量 `data`、对象 ID 和 ID 列表）统一为十进制字符串；`code`、`timestamp`、`sequence`、`version`、`size`、`count` 等非 ID 数值保持 JSON number。
 - REST `PrintJobVO.progress` 使用 BigDecimal，范围 0-100；WebSocket 消息中的 `progress` 保持 JSON 数值，前端按 0-100 的小数处理。
 - 金额字段当前不存在；如果以后增加，使用整数分或 Decimal 字符串，禁止使用 Double 表示金额。
 
@@ -754,9 +754,10 @@ SNAPSHOT          连接后的全量快照
 PRINTER_STATUS    单台打印机状态变化
 PRINTER_OFFLINE   打印机离线
 JOB_STATUS        任务状态变化
+LAYOUT_UPDATED    共享布局版本变化（布局字段仅位于 data）
 ```
 
-四类消息的 `data` 结构固定如下。所有消息都保留相同的顶层字段；`SNAPSHOT` 不携带 `printerId`，其余三类必须携带正数 `printerId`。
+五类消息的 `data` 结构固定如下。所有消息都保留相同的顶层字段；`SNAPSHOT` 和 `LAYOUT_UPDATED` 不携带 `printerId`，其余三类必须携带正数 `printerId`。布局字段仅位于 `LAYOUT_UPDATED.data`。
 
 `SNAPSHOT`：
 
@@ -807,7 +808,7 @@ JOB_STATUS        任务状态变化
 }
 ```
 
-`JOB_STATUS` 只在任务有绑定打印机时发送；没有打印机的 `QUEUED` 任务以 REST 队列/分页结果为准。客户端必须丢弃重复或旧 `sequence` 事件，发现断档或未知 `version` 时重新请求打印机 REST 快照。服务端不会发送包含 API Key、Token、密码、session key 或 RustFS key 的消息。
+`JOB_STATUS` 只在任务有绑定打印机时发送；没有打印机的 `QUEUED` 任务以 REST 队列/分页结果为准。客户端必须丢弃重复或旧 `sequence` 事件，发现断档或未知 `version` 时重新请求打印机 REST 快照。服务端不会发送包含 API Key、Token、密码、session key 或 RustFS key 的消息。当前五类消息均已实现；`LAYOUT_UPDATED` 的 `printerId` 为 null，布局字段仅位于 `data`，不覆盖设备状态。
 
 当前已实现消息类型和 `FarmStatusMessage` 顶层结构，并由服务端校验类型、时间戳、关联 ID 和敏感字段。鉴权成功后服务端发送一次 `SNAPSHOT`，其 `data.printers` 使用安全 `PrinterVO`，没有打印机时返回空数组。监控任务通过 `WebSocketEventPublisher` 发布 `PRINTER_STATUS` 和 `PRINTER_OFFLINE`：状态/进度数据变化时推送，连续离线只推送一次，设备恢复后重新推送状态。任务服务和监控任务在任务状态 `updateById` 成功后发布 `JOB_STATUS`；有数据库事务时，四类业务事件统一在事务提交后广播，事务回滚不广播；无事务的监控场景直接发布。没有绑定打印机的排队任务不发送任务事件。服务端按 `farm.websocket.heartbeat-interval`（Spring Duration，默认 `30s`）发送协议级 Ping，连接上限按 `farm.websocket.max-connections` 配置（默认 100），失败连接会清理。2026-09-03 的历史容器冒烟曾收到 46 台打印机的快照，后续当前实例验证为 49 台；两者均为当时数据库设备数量，不属于固定契约。前端已完成自动重连、告警展示、重复/乱序事件丢弃、sequence 断档后的 REST 快照恢复和客户端测试，浏览器端完整端到端与真实设备事件仍待后续联调。本阶段已完成握手鉴权，生产环境不再允许匿名广播。
 
@@ -961,7 +962,7 @@ farm.scheduler.enabled=false
 8. 返回 VO，禁止直接暴露 `apiKey` 和 `rustfsKey`。
 9. 文件分页已支持名称、材质筛选。
 10. 新建文件夹已正确设置用户归属并校验父目录。
-11. WebSocket 已完成握手鉴权、四类 `type` 消息、初始快照、离线/恢复事件、任务失败原因、协议级 Ping 保活和异常连接清理；2026-09-03 已在真实启动的本地后端完成 JWT 握手和 `SNAPSHOT` 请求级验证，前端已完成告警展示、序号断档恢复和客户端测试，浏览器端完整端到端仍待联调。
+11. WebSocket 已完成握手鉴权、五类 `type` 消息（含 `LAYOUT_UPDATED`）、初始快照、离线/恢复事件、任务失败原因、协议级 Ping 保活和异常连接清理；`LAYOUT_UPDATED` 仅在 `data` 提供布局版本，前端已完成告警展示、序号断档恢复和客户端测试，浏览器端完整端到端仍待联调。
 12. 为 ADMIN/OPERATOR 增加 401/403 集成测试。
 13. Klipper 和 RRF 都通过协议适配器接入；RRF 已有可复现 HTTP 协议测试，并已在真实目标 `192.168.0.77` 完成控制、上传、Farm 安全任务和启动请求的响应级验证；完整生产任务物理链路仍待现场验收。
 

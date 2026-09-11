@@ -114,3 +114,13 @@ test('Mock semantic ID boundary keeps values above 2^53 as strings without chang
   assert.equal(response.layoutVersion, 7)
   assert.equal(response.timestamp, 1700000000000)
 })
+
+test('Mock recursively preserves object conflicts and generated IDs as decimal strings', () => {
+  const largeId = '9007199254740993'
+  const response = toPublicSemanticIds({
+    conflicts: [{ printerId: largeId, gridRow: 4, nested: { jobId: largeId } }]
+  })
+  assert.equal(response.conflicts[0].printerId, largeId)
+  assert.equal(response.conflicts[0].nested.jobId, largeId)
+  assert.equal(response.conflicts[0].gridRow, 4)
+})

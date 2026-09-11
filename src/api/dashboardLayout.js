@@ -28,10 +28,11 @@ export const normalizeDashboardSaveResult = data => {
   }
 }
 
-export function getDashboardLayout() {
+export function getDashboardLayout(options = {}) {
   return request({
     url: '/api/v1/dashboard-layout',
-    method: 'get'
+    method: 'get',
+    ...options
   }).then(response => mapResponseData(response, normalizeDashboardLayout))
 }
 

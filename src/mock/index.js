@@ -1,4 +1,14 @@
-import { cloneMockData, mockState, nextMockId, resetMockState } from './data.js'
+import {
+  cloneMockData,
+  compareMockIds,
+  isValidMockId,
+  mockState,
+  nextMockId,
+  normalizeMockId,
+  resetMockState,
+  sameMockId,
+  sameOptionalMockId
+} from './data.js'
 import { createMockPage, createMockSuccess, MockRequestError } from './factory.js'
 import { resolveMockErrorScenario } from './scenarios.js'
 import { toPublicFile, toPublicJob, toPublicPrinter, toPublicSemanticIds } from './server.js'
@@ -73,9 +83,9 @@ const getPath = url => {
 
 const getParams = config => config.params || {}
 
-const findPrinter = id => mockState.printers.find(item => String(item.id) === String(id))
-const findFile = id => mockState.files.find(item => String(item.id) === String(id))
-const findJob = id => mockState.jobs.find(item => String(item.id) === String(id))
+const findPrinter = id => mockState.printers.find(item => sameMockId(item.id, id))
+const findFile = id => mockState.files.find(item => sameMockId(item.id, id))
+const findJob = id => mockState.jobs.find(item => sameMockId(item.id, id))
 
 const setJobStatus = (job, nextStatus) => {
   job.status = transitionMockJob(job.status, nextStatus)
@@ -180,7 +190,7 @@ const isFolderSameOrDescendant = (candidate, ancestor, foldersById) => {
 
 const requireFolderParent = (session, parentId, options = {}) => {
   if (parentId === null || parentId === undefined || parentId === '') return null
-  const normalizedId = Number(parentId)
+  const normalizedId = normalizeMockId(parentId)
   const parent = findFile(normalizedId)
   if (!parent) fail(404, 404, '父文件夹不存在')
   if (!parent.folder) fail(422, 422, '父级资源不是文件夹')
@@ -198,7 +208,7 @@ const requireFolderParent = (session, parentId, options = {}) => {
 }
 
 const requireUploadParent = (session, parentId) => {
-  const parent = findFile(Number(parentId))
+  const parent = findFile(normalizeMockId(parentId))
   if (!parent) fail(404, 404, '父文件夹不存在')
   if (!parent.folder) fail(422, 422, '父级资源不是文件夹')
   if (!canReadFile(session, parent)) fail(403, 403, '无权访问该文件夹')
@@ -335,7 +345,7 @@ const handleRegister = config => {
   }
 
   const user = {
-    id: mockState.users.length + 1,
+    id: nextMockId('users'),
     username: body.username,
     password: body.password,
     role: 'OPERATOR',
@@ -396,7 +406,7 @@ const handleAuditLogPage = config => {
   if (params.to) records = records.filter(item => item.occurredAt <= String(params.to))
   records.sort((left, right) => {
     const timeDiff = String(right.occurredAt).localeCompare(String(left.occurredAt))
-    return timeDiff || Number(right.id) - Number(left.id)
+    return timeDiff || compareMockIds(right.id, left.id)
   })
   return createMockPage(records, params)
 }
@@ -446,7 +456,7 @@ const handleProfile = config => {
   const session = requireSession(config, ['ADMIN', 'OPERATOR'])
   const id = getPath(config.url).split('/').at(-2)
   if (String(session.userId) !== String(id)) fail(403, 403, '鍙兘鏌ョ湅鑷繁鐨勮祫鏂?')
-  const user = mockState.users.find(item => item.id === session.userId)
+  const user = mockState.users.find(item => sameMockId(item.id, session.userId))
   if (!user) fail(404, 404, '鐢ㄦ埛涓嶅瓨鍦?')
   if (config.method?.toLowerCase() === 'put') {
     const body = getBody(config)
@@ -462,7 +472,7 @@ const handleChangePassword = config => {
   const id = getPath(config.url).split('/').at(-2)
   if (String(session.userId) !== String(id)) fail(403, 403, '鍙兘淇敼鑷繁鐨勫瘑鐮?')
   const body = getBody(config)
-  const user = mockState.users.find(item => item.id === session.userId)
+  const user = mockState.users.find(item => sameMockId(item.id, session.userId))
   if (!user || user.password !== body.oldPassword) fail(422, 422, '鏃у瘑鐮侀敊璇?')
   if (!body.newPassword || body.newPassword !== body.confirmPassword || !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,20}$/.test(body.newPassword)) {
     fail(422, 422, '鏂板瘑鐮佹牸寮忔垨纭涓嶆纭?')
@@ -561,7 +571,7 @@ const handleBatchUpdatePrinterMonitor = config => {
 const getPrinterForAnalytics = config => {
   requireSession(config, ['ADMIN', 'OPERATOR'])
   const id = getPath(config.url).split('/').at(-2)
-  if (!/^\d+$/.test(String(id)) || Number(id) <= 0) fail(400, 400, '打印机 ID 不合法')
+  if (!isValidMockId(id)) fail(400, 400, '打印机 ID 不合法')
   const printer = findPrinter(id)
   if (!printer) fail(404, 404, '打印机不存在')
   return printer
@@ -678,7 +688,7 @@ const handleBatchRetryPreview = config => {
     fail(400, 400, '来源计划、失败项和恢复幂等键不能为空')
   }
   const existing = mockState.batchPlans.find(item => (
-    item.userId === session.userId && item.retryKey === String(body.retryKey)
+    sameMockId(item.userId, session.userId) && item.retryKey === String(body.retryKey)
   ))
   if (existing) return batchPreviewResponse(existing)
 
@@ -1036,9 +1046,11 @@ const handleDashboardLayout = config => {
 const handleFilePage = config => {
   const session = requireSession(config, ['ADMIN', 'OPERATOR'])
   const params = getBody(config)
-  const parentId = params.parentId == null || params.parentId === '' ? null : Number(params.parentId)
+  const parentId = params.parentId == null || params.parentId === '' ? null : normalizeMockId(params.parentId)
   if (parentId !== null) requirePageFolderParent(session, parentId)
-  let records = mockState.files.filter(item => item.parentId === parentId)
+  let records = mockState.files.filter(item => parentId === null
+    ? item.parentId === null || item.parentId === undefined
+    : sameMockId(item.parentId, parentId))
   if (params.fileName) {
     const fileName = String(params.fileName).trim().toLowerCase()
     records = records.filter(item => item.originalName.toLowerCase().includes(fileName))
@@ -1057,7 +1069,7 @@ const createUploadedFile = (session, file, parentId) => {
   const createdAt = now()
   const printFile = {
     id: nextMockId('file'),
-    parentId: parentId == null || parentId === '' ? null : Number(parentId),
+    parentId: parentId == null || parentId === '' ? null : normalizeMockId(parentId),
     folder: false,
     isFolder: 0,
     isDefault: false,
@@ -1133,7 +1145,9 @@ const handleBatchUpload = config => {
 }
 
 const isSameFolderNameNamespace = (file, parentId, visibility, ownerUserId) => {
-  if ((file.parentId ?? null) !== parentId) return false
+  if (parentId === null
+    ? file.parentId !== null && file.parentId !== undefined
+    : !sameMockId(file.parentId, parentId)) return false
   if (parentId !== null) return true
   if (visibilityOf(file) !== visibility) return false
   return visibility === 'PUBLIC' || String(file.userId) === String(ownerUserId)
@@ -1148,7 +1162,7 @@ const handleCreateFolder = config => {
   if (folderName.length > 100 || hasControlCharacter || /[\\/:*?"<>|]/.test(folderName)) {
     fail(400, 400, '文件夹名称不合法')
   }
-  const parentId = body.parentId == null || body.parentId === '' ? null : Number(body.parentId)
+  const parentId = body.parentId == null || body.parentId === '' ? null : normalizeMockId(body.parentId)
   const parent = requireFolderParent(session, parentId)
   const visibility = parent ? visibilityOf(parent) : body.visibility === 'PUBLIC' ? 'PUBLIC' : 'PRIVATE'
   if (visibility === 'PUBLIC' && session.role !== 'ADMIN') fail(403, 403, '无权创建公共目录')
@@ -1245,8 +1259,8 @@ const handleMoveFolder = config => {
   if (fileCapabilities(session, folder).canManage !== true) fail(403, 403, '无权管理该文件夹')
 
   const rawParentId = getBody(config).parentId
-  const parentId = rawParentId == null || rawParentId === '' ? null : Number(rawParentId)
-  if (parentId !== null && (!Number.isInteger(parentId) || parentId <= 0)) {
+  const parentId = rawParentId == null || rawParentId === '' ? null : normalizeMockId(rawParentId)
+  if (parentId !== null && !isValidMockId(parentId)) {
     fail(400, 400, '目标目录 ID 必须为正数')
   }
 
@@ -1453,10 +1467,10 @@ const handleBatchMoveFiles = config => {
   if (!Array.isArray(rawIds) || rawIds.length === 0 || rawIds.length > 100) {
     fail(400, 400, '批量移动文件数量必须为 1-100 个')
   }
-  const ids = [...new Set(rawIds)]
+  const ids = [...new Set(rawIds.map(normalizeMockId))]
   const rawParentId = body.parentId
-  const parentId = rawParentId == null || rawParentId === '' ? null : Number(rawParentId)
-  if (parentId !== null && (!Number.isInteger(parentId) || parentId <= 0)) {
+  const parentId = rawParentId == null || rawParentId === '' ? null : normalizeMockId(rawParentId)
+  if (parentId !== null && !isValidMockId(parentId)) {
     fail(400, 400, '目标目录 ID 必须为正数')
   }
   const target = parentId === null ? null : findFile(parentId)
@@ -1480,7 +1494,9 @@ const handleBatchMoveFiles = config => {
       && String(target.userId) !== String(file.userId)) {
       return { id, success: false, reason: '目标文件夹必须属于文件所属用户' }
     }
-    if ((file.parentId ?? null) === parentId) {
+    if (parentId === null
+      ? file.parentId === null || file.parentId === undefined
+      : sameMockId(file.parentId, parentId)) {
       return { id, success: false, reason: '文件已经位于目标目录' }
     }
     file.parentId = parentId
@@ -1560,7 +1576,7 @@ const handleReconcileJob = config => {
 
   if (job.printerId) {
     const printer = findPrinter(job.printerId)
-    if (printer?.currentJobId === job.id) {
+    if (sameMockId(printer?.currentJobId, job.id)) {
       printer.currentJobId = null
       printer.isSafeToPrint = false
       printer.status = 'IDLE'
@@ -1581,20 +1597,22 @@ const handleReconcileJob = config => {
 const handleCreateJob = config => {
   const session = requireSession(config, ['ADMIN', 'OPERATOR'])
   const body = getBody(config)
-  const fileId = Number(body.fileId)
+  const fileId = normalizeMockId(body.fileId)
   const priority = Number(body.priority)
   const printerId = body.printerId === undefined || body.printerId === null || body.printerId === ''
     ? null
-    : Number(body.printerId)
-  if (!Number.isInteger(fileId) || fileId <= 0 || !Number.isInteger(priority) || priority < 0 || priority > 100) {
+    : normalizeMockId(body.printerId)
+  if (!isValidMockId(fileId) || (printerId !== null && !isValidMockId(printerId))
+    || !Number.isInteger(priority) || priority < 0 || priority > 100) {
     fail(400, 400, '任务参数不合法')
   }
   if (body.idempotencyKey) {
     const previous = mockState.jobs.find(job => (
-      job.userId === session.userId && job.idempotencyKey === body.idempotencyKey
+      sameMockId(job.userId, session.userId) && job.idempotencyKey === body.idempotencyKey
     ))
     if (previous) {
-      if (previous.fileId !== fileId || previous.printerId !== printerId || previous.priority !== priority) {
+      if (!sameMockId(previous.fileId, fileId) || !sameOptionalMockId(previous.printerId, printerId)
+        || previous.priority !== priority) {
         fail(409, 409, '幂等键对应的任务参数不一致')
       }
       return previous.id
@@ -1647,7 +1665,7 @@ const handleCancelJob = config => {
   setJobStatus(job, 'CANCELLED')
   if (job.printerId) {
     const printer = findPrinter(job.printerId)
-    if (printer?.currentJobId === job.id) {
+    if (sameMockId(printer?.currentJobId, job.id)) {
       printer.currentJobId = null
       printer.status = 'IDLE'
       printer.updatedAt = now()
@@ -1701,7 +1719,7 @@ const handleRequeueJob = config => {
   if (!['ASSIGNED', 'READY'].includes(job.status)) fail(422, 422, '当前任务状态不允许重新排队')
   if (job.printerId) {
     const printer = findPrinter(job.printerId)
-    if (printer?.currentJobId === job.id) {
+    if (sameMockId(printer?.currentJobId, job.id)) {
       printer.currentJobId = null
       printer.isSafeToPrint = false
       printer.status = 'IDLE'

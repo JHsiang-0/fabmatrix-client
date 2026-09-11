@@ -132,7 +132,8 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
     { fileId: uploadedFileId, priority: 70 },
     sessionHeaders
   ))
-  assert.equal(Number.isInteger(createdJobId), true)
+  assert.equal(typeof createdJobId, 'string')
+  assert.match(createdJobId, /^\d+$/)
 
   const queuedJob = assertSuccessEnvelope(await request(
     'GET',
