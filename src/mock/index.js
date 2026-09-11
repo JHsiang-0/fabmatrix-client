@@ -3,6 +3,7 @@ import { createMockPage, createMockSuccess, MockRequestError } from './factory.j
 import { resolveMockErrorScenario } from './scenarios.js'
 import { toPublicFile, toPublicJob, toPublicPrinter } from './server.js'
 import { transitionMockJob } from './stateMachine.js'
+import { publishMockWebSocketEvent } from './websocket.js'
 
 const runtimeEnv = import.meta.env || {}
 const MOCK_DELAY = 120
@@ -878,6 +879,141 @@ const handlePositions = config => {
     }
   })
   return null
+}
+
+const layoutLimits = {
+  minRows: 1,
+  maxRows: 30,
+  minColumns: 1,
+  maxColumns: 60,
+  maxCells: 1800,
+  maxAisles: 20,
+  minAisleSize: 48,
+  maxAisleSize: 240
+}
+
+const layoutPosition = (row, col) => `${row},${col}`
+
+const validateMockLayout = body => {
+  if (!Number.isInteger(body.rowCount) || body.rowCount < 1 || body.rowCount > layoutLimits.maxRows
+    || !Number.isInteger(body.columnCount) || body.columnCount < 1 || body.columnCount > layoutLimits.maxColumns
+    || body.rowCount * body.columnCount > layoutLimits.maxCells) {
+    fail(400, 400, '布局行列不合法')
+  }
+  if (!Array.isArray(body.aisles) || body.aisles.length > layoutLimits.maxAisles) fail(400, 400, '过道配置不合法')
+  const aisleIds = new Set()
+  const aislePositions = new Set()
+  body.aisles.forEach(aisle => {
+    if (!aisle || typeof aisle.id !== 'string' || !aisle.id.trim() || aisle.id.length > 64
+      || !['ROW', 'COLUMN'].includes(aisle.axis) || !Number.isInteger(aisle.afterIndex)
+      || aisle.afterIndex < 0 || aisle.afterIndex > (aisle.axis === 'ROW' ? body.rowCount : body.columnCount)
+      || typeof aisle.label !== 'string' || !aisle.label.trim() || aisle.label.length > 12
+      || !Number.isInteger(aisle.size) || aisle.size < layoutLimits.minAisleSize || aisle.size > layoutLimits.maxAisleSize) {
+      fail(400, 400, '过道配置不合法')
+    }
+    const position = `${aisle.axis}:${aisle.afterIndex}`
+    if (aisleIds.has(aisle.id) || aislePositions.has(position)) fail(400, 400, '过道 ID 或位置重复')
+    aisleIds.add(aisle.id)
+    aislePositions.add(position)
+  })
+}
+
+const handleDashboardLayout = config => {
+  const session = requireSession(config, ['ADMIN', 'OPERATOR'])
+  if (config.method?.toLowerCase() === 'get') return cloneMockData(mockState.dashboardLayout)
+  if (session.role !== 'ADMIN') fail(403, 403, '没有权限执行此操作')
+
+  const body = getBody(config)
+  if (body.expectedVersion !== mockState.dashboardLayout.version) {
+    fail(409, 409, '布局版本已过期', {
+      reason: 'VERSION_CONFLICT',
+      serverVersion: mockState.dashboardLayout.version,
+      conflicts: [],
+      outOfBoundsPrinters: []
+    })
+  }
+  if (!['REJECT', 'UNALLOCATE'].includes(body.overflowPolicy) || !Array.isArray(body.positionChanges)
+    || body.positionChanges.length > 100) fail(400, 400, '布局保存请求不合法')
+  validateMockLayout(body)
+
+  const changes = new Map()
+  body.positionChanges.forEach(change => {
+    const id = String(change?.printerId ?? '')
+    if (!id || changes.has(id)) fail(400, 400, '设备变更列表存在重复 ID')
+    const printer = findPrinter(id)
+    if (!printer) fail(404, 404, '打印机不存在')
+    const hasRow = change.gridRow !== null && change.gridRow !== undefined
+    const hasCol = change.gridCol !== null && change.gridCol !== undefined
+    if (hasRow !== hasCol || (hasRow && (!Number.isInteger(change.gridRow) || !Number.isInteger(change.gridCol)
+      || change.gridRow < 1 || change.gridRow > body.rowCount || change.gridCol < 1 || change.gridCol > body.columnCount))) {
+      fail(400, 400, '设备坐标不合法')
+    }
+    changes.set(id, { printer, gridRow: hasRow ? change.gridRow : null, gridCol: hasCol ? change.gridCol : null })
+  })
+
+  const nextPrinters = mockState.printers.map(printer => {
+    const change = changes.get(String(printer.id))
+    return change ? { ...printer, gridRow: change.gridRow, gridCol: change.gridCol } : { ...printer }
+  })
+  const outOfBoundsPrinters = nextPrinters.filter(printer => (
+    Number.isInteger(printer.gridRow) && Number.isInteger(printer.gridCol)
+      && (printer.gridRow > body.rowCount || printer.gridCol > body.columnCount)
+  )).map(printer => ({
+    printerId: printer.id,
+    name: printer.name,
+    gridRow: printer.gridRow,
+    gridCol: printer.gridCol
+  }))
+  if (outOfBoundsPrinters.length && body.overflowPolicy === 'REJECT') {
+    fail(422, 422, '缩容后存在越界设备', {
+      reason: 'OUT_OF_BOUNDS',
+      serverVersion: mockState.dashboardLayout.version,
+      conflicts: [],
+      outOfBoundsPrinters
+    })
+  }
+  if (body.overflowPolicy === 'UNALLOCATE') {
+    outOfBoundsPrinters.forEach(item => {
+      const printer = nextPrinters.find(candidate => String(candidate.id) === String(item.printerId))
+      printer.gridRow = null
+      printer.gridCol = null
+    })
+  }
+  const occupied = new Map()
+  nextPrinters.forEach(printer => {
+    if (printer.gridRow == null && printer.gridCol == null) return
+    const position = layoutPosition(printer.gridRow, printer.gridCol)
+    if (occupied.has(position)) fail(409, 409, '目标槽位已被占用', {
+      reason: 'SLOT_CONFLICT',
+      serverVersion: mockState.dashboardLayout.version,
+      conflicts: [occupied.get(position), printer.id],
+      outOfBoundsPrinters: []
+    })
+    occupied.set(position, printer.id)
+  })
+
+  const nextLayout = {
+    rowCount: body.rowCount,
+    columnCount: body.columnCount,
+    aisles: cloneMockData(body.aisles),
+    version: mockState.dashboardLayout.version + 1,
+    limits: cloneMockData(layoutLimits),
+    updatedAt: now()
+  }
+  const changedPositions = nextPrinters
+    .filter(printer => changes.has(String(printer.id)) || outOfBoundsPrinters.some(item => String(item.printerId) === String(printer.id)))
+    .map(printer => ({ printerId: printer.id, gridRow: printer.gridRow, gridCol: printer.gridCol }))
+  const unallocatedPrinters = outOfBoundsPrinters.map(item => ({ ...item, gridRow: null, gridCol: null }))
+  mockState.printers = nextPrinters
+  mockState.dashboardLayout = nextLayout
+  publishMockWebSocketEvent({
+    type: 'LAYOUT_UPDATED',
+    printerId: null,
+    stateSource: 'LAYOUT',
+    layoutVersion: nextLayout.version,
+    data: { stateSource: 'LAYOUT', layoutVersion: nextLayout.version }
+  })
+  return { layout: cloneMockData(nextLayout), changedPositions, unallocatedPrinters }
 }
 
 const handleFilePage = config => {
@@ -1911,6 +2047,7 @@ const route = async config => {
   if (/^POST \/api\/v1\/auth\/admin\/users\/[^/]+\/(enable|disable)$/.test(key)) return handleAdminUserToggle(config)
   if (/^(GET|PUT) \/api\/v1\/auth\/[^/]+\/profile$/.test(key)) return handleProfile(config)
   if (/^POST \/api\/v1\/auth\/[^/]+\/change-password$/.test(key)) return handleChangePassword(config)
+  if (key === 'GET /api/v1/dashboard-layout' || key === 'PUT /api/v1/dashboard-layout') return handleDashboardLayout(config)
   if (key === 'GET /api/v1/printers/page') return handlePrinterPage(config)
   if (key === 'PUT /api/v1/printers/monitor/batch') return handleBatchUpdatePrinterMonitor(config)
   if (/^GET \/api\/v1\/printers\/[^/]+\/monitor$/.test(key)) return handleGetPrinterMonitor(config)

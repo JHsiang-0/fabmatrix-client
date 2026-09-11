@@ -2,6 +2,7 @@ import { mockState } from './data.js'
 import { toPublicPrinter } from './server.js'
 
 let mockEventSequence = 0
+const mockSubscribers = new Set()
 
 const toState = status => ({
   status,
@@ -31,6 +32,7 @@ export function createMockWebSocketStream({ onOpen, onMessage, onClose } = {}) {
     timestamp: Date.now(),
     ...message
   })
+  mockSubscribers.add(emit)
 
   onOpen?.()
   emit({
@@ -69,7 +71,13 @@ export function createMockWebSocketStream({ onOpen, onMessage, onClose } = {}) {
   return {
     close() {
       window.clearInterval(timer)
+      mockSubscribers.delete(emit)
       onClose?.()
     }
   }
+}
+
+/** 向当前所有 Mock 客户端广播服务端事件。 */
+export function publishMockWebSocketEvent(message) {
+  mockSubscribers.forEach(emit => emit(message))
 }

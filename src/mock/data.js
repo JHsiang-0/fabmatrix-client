@@ -138,6 +138,25 @@ const createSeedData = ({ initialized = true } = {}) => ({
       updatedAt: '2026-09-02T16:40:00'
     }
   ],
+  dashboardLayout: {
+    rowCount: 4,
+    columnCount: 12,
+    aisles: [
+      { id: 'default-column-aisle', axis: 'COLUMN', afterIndex: 7, label: '过道', size: 100 }
+    ],
+    version: 1,
+    limits: {
+      minRows: 1,
+      maxRows: 30,
+      minColumns: 1,
+      maxColumns: 60,
+      maxCells: 1800,
+      maxAisles: 20,
+      minAisleSize: 48,
+      maxAisleSize: 240
+    },
+    updatedAt: '2026-09-02T16:40:00'
+  },
   files: [
     {
       id: 1,

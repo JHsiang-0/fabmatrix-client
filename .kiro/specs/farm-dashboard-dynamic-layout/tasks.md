@@ -116,13 +116,18 @@ SecurityConfig 显式限制 GET 为 ADMIN/OPERATOR、PUT 为 ADMIN（PUT 保存�
 
 完成记录：ADMIN 布局编辑已改为快照加草稿工作流，行列/过道设置、拖拽移动与交换、绑定、下架均只修改草稿；保存时携带 `expectedVersion` 一次提交，成功后刷新设备快照，失败保留草稿。已加入 TDesign 布局/过道 Dialog、保存 loading、防重复提交、取消确认、缩容越界下架二次确认、409/422 提示、OPERATOR 写入保护和 beforeunload 未保存保护；绑定不再改写 `machineNumber`。前端全量测试 219/219、lint 和 build 均通过。
 
-### [ ] SYNC-002.7 实现多客户端同步与 Mock 契约
+### [x] SYNC-002.7 实现多客户端同步与 Mock 契约
 
 - 后端提交后发送 `LAYOUT_UPDATED`，包含 `layoutVersion/eventId/sequence`。
 - 前端非编辑状态收到新版本后刷新布局和设备快照；编辑状态只标记草稿过期，不覆盖草稿。
 - 断线、事件缺口和重连后通过 REST 快照收敛，布局消息不得清空设备实时字段。
 - Mock 实现布局 GET/PUT、版本冲突、权限、越界、原子坐标和布局事件。
 - 验收：两个客户端同步；两个管理员并发只允许一个保存；OPERATOR 客户端自动看到已提交布局。
+
+完成记录：Mock 已实现布局 GET/PUT、ADMIN/OPERATOR 权限、版本冲突、REJECT/UNALLOCATE 缩容、槽位冲突和原子更新，
+并通过共享订阅广播 `LAYOUT_UPDATED`。realtimeStore 仅记录递增布局版本，不覆盖设备实时状态；非编辑看板通过 REST
+刷新布局和完整设备快照，编辑状态保留草稿并标记过期；断线重连后按同样规则收敛。新增 Mock 双客户端、权限、冲突、
+原子性和状态分层测试；前端全量测试 224/224、lint、build 均通过。
 
 ### [ ] SYNC-002.8 建立回归护栏并完成联调验收
 

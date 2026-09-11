@@ -48,6 +48,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
   const connectionState = ref('CLOSED')
   const lastSequence = ref(null)
   const lastEventId = ref(null)
+  const layoutVersion = ref(null)
   const seenEventIds = new Set()
   const isRealtimeStale = ref(false)
   const isRecovering = ref(false)
@@ -341,6 +342,14 @@ export const useRealtimeStore = defineStore('realtime', () => {
       return
     }
 
+    if (type === 'LAYOUT_UPDATED') {
+      const nextVersion = Number(message.layoutVersion ?? data?.layoutVersion)
+      if (Number.isInteger(nextVersion) && nextVersion > Number(layoutVersion.value || 0)) {
+        layoutVersion.value = nextVersion
+      }
+      return
+    }
+
     if (printerId === undefined || printerId === null || !data) {
       console.warn('[RealtimeStore] 收到无效的 WebSocket 消息:', message)
       return
@@ -499,6 +508,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
     alerts.value = []
     lastSequence.value = null
     lastEventId.value = null
+    layoutVersion.value = null
     seenEventIds.clear()
     isRealtimeStale.value = false
     isRecovering.value = false
@@ -549,6 +559,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
     dismissAlert,
     lastSequence,
     lastEventId,
+    layoutVersion,
     isRealtimeStale,
     isRecovering,
     refreshPrinterSnapshot

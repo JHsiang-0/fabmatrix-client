@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { useDeviceStore } from './deviceStore'
 import { useRealtimeStore } from './realtimeStore'
@@ -97,6 +97,59 @@ export const useGridStore = defineStore('grid', () => {
       layoutLoading.value = false
     }
   }
+
+  async function reconcileLayoutEvent(nextVersion) {
+    if (!layoutSnapshot.value || nextVersion <= Number(layoutSnapshot.value.version || 0)) return
+    if (layoutDraft.value) {
+      layoutConflict.value = {
+        reason: 'STALE_DRAFT',
+        serverVersion: nextVersion,
+        conflicts: [],
+        outOfBoundsPrinters: []
+      }
+      return
+    }
+    try {
+      await loadLayout()
+      await deviceStore.fetchDeviceData()
+    } catch (error) {
+      layoutError.value = error
+    }
+  }
+
+  async function recoverAfterRealtimeReconnect() {
+    if (!layoutSnapshot.value) return
+    try {
+      const response = await getDashboardLayout()
+      const latest = response.data
+      if (latest.version > Number(layoutSnapshot.value.version || 0)) {
+        if (layoutDraft.value) {
+          layoutConflict.value = {
+            reason: 'STALE_DRAFT',
+            serverVersion: latest.version,
+            conflicts: [],
+            outOfBoundsPrinters: []
+          }
+        } else {
+          layoutSnapshot.value = latest
+        }
+      }
+      if (!layoutDraft.value) await deviceStore.fetchDeviceData()
+    } catch (error) {
+      layoutError.value = error
+    }
+  }
+
+  watch(() => realtimeStore.layoutVersion, nextVersion => {
+    const version = Number(nextVersion)
+    if (Number.isInteger(version) && version > 0) void reconcileLayoutEvent(version)
+  })
+
+  watch(() => realtimeStore.wsConnectionState, (state, previousState) => {
+    if (state === 'OPEN' && previousState && previousState !== 'OPEN') {
+      void recoverAfterRealtimeReconnect()
+    }
+  })
 
   function beginLayoutEdit() {
     if (!layoutSnapshot.value) return null
