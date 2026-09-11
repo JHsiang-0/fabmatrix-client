@@ -104,6 +104,15 @@
 
 完成记录：网格改用 `grid-auto-rows: max-content` 与顶部对齐，卡片和上下文容器按内容自适应高度，移除卡片裁切和自定义阴影过渡，并允许操作区换行；补充文件库视觉回归断言。`node --test tests/fileLibrary.test.js` 29/29、`npm test` 205/205、`npm run lint`、`npm run build` 均通过；构建仅保留既有动态导入和大 chunk 提示，未产生失败。
 
+### [x] SYNC-001.11 文件网格卡片恢复 TDesign 官方外壳
+
+- 范围：`src/views/FileLibrary.vue`、`tests/fileLibrary.test.js` 和本任务文档。
+- 恢复文件卡片的 TDesign `small` 卡片尺寸、官方 `bordered` 边框、`hover-shadow` 阴影和 `#cover` 媒体插槽。
+- 删除文件卡片自定义边框/hover、阴影/过渡和 body padding 覆盖；保留自适应网格行高、选择框、材质标签、文件信息和完整操作区。
+- 不修改文件库接口、Store、权限、上传、目录、列表视图或外层 results card。
+
+完成记录：文件网格卡片使用 TDesign `small` 官方外壳和 `#cover` 插槽，移除文件卡片边框/hover、阴影/过渡及 body padding 覆盖；保留自适应行高、选择框、材质标签、文件信息和完整操作区。`node --test tests/fileLibrary.test.js`（30/30）、`npm test`（206/206）、`npm run lint`、`npm run build` 和 `git diff --check` 均通过；构建仅保留既有动态导入与大 chunk 提示，未产生失败。
+
 ## 依赖关系
 
 ```text

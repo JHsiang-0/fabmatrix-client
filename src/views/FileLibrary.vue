@@ -93,7 +93,7 @@
         >
           <t-dropdown :options="getContextMenuOptions(file)" trigger="context-menu" :popup-props="contextMenuPopupProps"
             @click="handleContextMenuClick($event, file)">
-            <t-card bordered hover-shadow class="file-card"
+            <t-card bordered hover-shadow size="small" class="file-card"
               :class="{ 'file-card--selected': selectedIds.includes(file.id) }"
               @click="handleFileClick(file)">
               <!-- 文件选择框始终可见，避免浏览/选择模式切换造成布局跳动。 -->
@@ -103,7 +103,8 @@
               </div>
 
               <!-- 缩略图区域 -->
-              <div class="file-card__media">
+              <template #cover>
+                <div class="file-card__media">
                 <t-image v-if="file.thumbnailUrl" :src="file.thumbnailUrl" :alt="file.originalName" fit="cover"
                   class="file-card__thumbnail">
                   <template #error>
@@ -126,7 +127,8 @@
                     {{ file.materialType || '未指定' }}
                   </t-tag>
                 </t-tooltip>
-              </div>
+                </div>
+              </template>
 
               <!-- 卡片内容 -->
               <div class="file-card__body">
@@ -2737,18 +2739,6 @@ onBeforeUnmount(() => {
   position: relative;
   min-width: 0;
   height: auto;
-  border-color: var(--app-border);
-}
-
-.file-card:hover {
-  border-color: var(--td-brand-color-3);
-}
-
-.file-card :deep(.t-card__body) {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding: 0;
 }
 
 .file-card__selection {
@@ -2766,6 +2756,7 @@ onBeforeUnmount(() => {
   height: 88px;
   flex-shrink: 0;
   background: var(--td-bg-color-container-hover);
+  border-radius: calc(var(--td-radius-medium) - 1px) calc(var(--td-radius-medium) - 1px) 0 0;
   overflow: hidden;
 }
 
@@ -2812,7 +2803,6 @@ onBeforeUnmount(() => {
   min-height: 124px;
   flex-direction: column;
   gap: 6px;
-  padding: 10px;
 }
 
 .file-card__name {

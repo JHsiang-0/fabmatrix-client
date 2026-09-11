@@ -296,7 +296,7 @@ test('文件库使用 TDesign 视图分段并永久显示选择列', () => {
   assert.match(source, /@row-click="handleTableRowClick"/)
   assert.match(source, /@click="handleFileClick\(file\)"/)
   assert.match(source, /<t-card[\s\S]*class="file-card"/)
-  assert.match(source, /<t-card bordered hover-shadow class="file-card"/)
+  assert.match(source, /<t-card bordered hover-shadow size="small" class="file-card"/)
   assert.doesNotMatch(source, /<t-button[^>]*>\s*详情\s*<\/t-button>/)
   assert.doesNotMatch(source, /<t-form layout="inline" class="file-library-filter-form"/)
   assert.doesNotMatch(source, /description="管理可见的切片文件与目录/)
@@ -360,18 +360,38 @@ test('文件库视觉容器保留 TDesign 层级、独立滚动和响应式细�
   assert.match(fileCardContextSource, /min-height: max-content/)
   assert.doesNotMatch(fileCardContextSource, /height: 100%/)
   assert.match(fileCardSource, /height: auto/)
-  assert.match(fileCardSource, /border-color: var\(--app-border\)/)
+  assert.doesNotMatch(fileCardSource, /border-color/)
   assert.doesNotMatch(fileCardSource, /box-shadow|transition/)
   assert.match(fileCardActionsSource, /display: flex/)
   assert.match(fileCardActionsSource, /flex-wrap: wrap/)
   assert.match(fileCardActionSource, /min-width: 0/)
-  assert.match(source, /\.file-card:hover \{[\s\S]*border-color: var\(--td-brand-color-3\)/)
+  assert.doesNotMatch(source, /\.file-card:hover\s*\{[\s\S]*?\}/)
   assert.match(source, /\.file-library-pagination \{[\s\S]*padding-top: var\(--app-spacing-3\)[\s\S]*border-top: 1px solid var\(--app-border\)/)
   assert.match(folderTreeSource, /\.file-folder-tree__search :deep\(\.t-input__inner\)[\s\S]*color: var\(--app-text-primary\)/)
   assert.match(folderTreeSource, /\.file-folder-tree :deep\(\.t-tree__item:hover\)[\s\S]*background-color: var\(--td-bg-color-container-hover\)/)
   assert.match(detailSource, /class="file-detail-drawer__error-alert"/)
   assert.match(detailSource, /\.file-detail-drawer :deep\(\.t-drawer__body\)[\s\S]*overflow-y: auto/)
   assert.match(detailSource, /@media \(max-width: 460px\)/)
+})
+
+test('SYNC-001.11 文件网格卡片恢复 TDesign small 外壳与 cover 布局', () => {
+  const fileCardSource = source.match(/<t-card bordered hover-shadow size="small" class="file-card"[\s\S]*?<\/t-card>/)?.[0] || ''
+  const fileCardStyle = source.match(/\.file-card \{[\s\S]*?\n\}/)?.[0] || ''
+  const fileCardMediaStyle = source.match(/\.file-card__media \{[\s\S]*?\n\}/)?.[0] || ''
+  const fileCardBodyStyle = source.match(/\.file-card__body \{[\s\S]*?\n\}/)?.[0] || ''
+
+  assert.ok(fileCardSource)
+  assert.match(fileCardSource, /<template #cover>[\s\S]*class="file-card__media"[\s\S]*NO IMAGE[\s\S]*file-card__material-tag[\s\S]*<\/template>/)
+  assert.match(fileCardSource, /file-card__selection[\s\S]*file-card__body[\s\S]*file-card__metrics[\s\S]*file-card__stats[\s\S]*file-card__actions/)
+  assert.doesNotMatch(fileCardStyle, /border-color|box-shadow|transition/)
+  assert.doesNotMatch(source, /\.file-card:hover\s*\{/)
+  assert.doesNotMatch(source, /\.file-card\s+:deep\(\.t-card__body\)/)
+  assert.doesNotMatch(fileCardBodyStyle, /padding\s*:/)
+  assert.match(fileCardMediaStyle, /border-radius: calc\(var\(--td-radius-medium\) - 1px\)/)
+  assert.match(fileCardStyle, /height: auto/)
+  assert.match(fileCardBodyStyle, /display: flex[\s\S]*min-height: 124px[\s\S]*flex-direction: column[\s\S]*gap: 6px/)
+  assert.match(source, /\.file-card__actions \{[\s\S]*display: flex[\s\S]*flex-wrap: wrap/)
+  assert.match(source, /\.file-card__action \{[\s\S]*min-width: 0/)
 })
 
 test('文件库提供批量移动 API、目标校验、操作锁定和部分失败保留', () => {
