@@ -153,10 +153,17 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
   assert.equal(queuedJob.printerId, null)
   assertPublicJob(queuedJob)
 
-  const assignedJob = assertSuccessEnvelope(await request(
+  const assignedResponse = await request(
     'POST',
     '/api/v1/print-jobs/safe/assign',
     { jobId: String(createdJobId), printerId: '404' },
+    sessionHeaders
+  )
+  assert.equal(assertSuccessEnvelope(assignedResponse), null)
+  const assignedJob = assertSuccessEnvelope(await request(
+    'GET',
+    `/api/v1/print-jobs/${createdJobId}`,
+    undefined,
     sessionHeaders
   ))
   assert.equal(assignedJob.id, String(createdJobId))
@@ -172,10 +179,17 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
   assert.equal(safetyConfirmation.id, '404')
   assert.equal(safetyConfirmation.isSafeToPrint, true)
 
-  const startedJob = assertSuccessEnvelope(await request(
+  const startedResponse = await request(
     'POST',
     '/api/v1/print-jobs/safe/start',
     { jobId: String(createdJobId), action: 'START_PRINT' },
+    sessionHeaders
+  )
+  assert.equal(assertSuccessEnvelope(startedResponse), null)
+  const startedJob = assertSuccessEnvelope(await request(
+    'GET',
+    `/api/v1/print-jobs/${createdJobId}`,
+    undefined,
     sessionHeaders
   ))
   assert.equal(startedJob.status, 'PRINTING')

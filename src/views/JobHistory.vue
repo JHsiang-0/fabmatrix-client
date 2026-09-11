@@ -235,7 +235,8 @@ import { ref, reactive, computed } from 'vue'
 import {
   RefreshIcon as Refresh,
   SearchIcon as Search,
-  TimeIcon as Clock
+  TimeIcon as Clock,
+  TaskTimeIcon as Timer
 } from 'tdesign-icons-vue-next'
 import { getAdminUsers } from '@/api/user'
 import { getJobPage, reconcilePrintJob } from '@/api/job'
@@ -514,11 +515,16 @@ loadCreatorOptions()
 }
 
 .history-management-table :deep(.t-table) {
-  min-width: 1460px;
+  width: 100%;
+  min-width: 0;
 }
 
 .history-management-table :deep(.t-table__content) {
-  overflow: auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
   scrollbar-color: var(--app-border-strong) transparent;
   scrollbar-width: thin;
 }

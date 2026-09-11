@@ -93,6 +93,8 @@
         <TdTableColumn prop="priority" label="优先级" width="100" align="center">
           <template #default="scope">
             <t-select v-if="scope.row.status === 'QUEUED'" :value="scope.row.priority" size="small"
+              @mousedown.stop
+              @click.stop
               @change="value => handlePriority(scope.row, value)" style="width: 88px">
               <t-option label="普通" :value="0" />
               <t-option label="优先" :value="50" />
@@ -126,13 +128,13 @@
 
         <TdTableColumn label="调度操作" width="300" align="center" fixed="right">
           <template #default="scope">
-            <t-space size="small" class="task-action-group">
+            <t-space size="small" class="task-action-group" @mousedown.stop @click.stop>
               <t-button size="small" variant="text" @click.stop="openTaskDetail(scope.row)">详情</t-button>
               <t-button
                 size="small"
                 theme="primary"
                 :disabled="scope.row.status !== 'QUEUED'"
-                @click="openAssignDialog(scope.row)"
+                @click.stop="openAssignDialog(scope.row)"
               >
                 <span><promotion /></span>
                 分配机器
@@ -140,9 +142,10 @@
               <t-dropdown
                 trigger="click"
                 :options="getQueueActionOptions(scope.row)"
+                @mousedown.stop
                 @click="item => handleQueueAction(scope.row, item)"
               >
-                <t-button size="small" variant="text">更多</t-button>
+                <t-button size="small" variant="text" @mousedown.stop @click.stop>更多</t-button>
               </t-dropdown>
             </t-space>
           </template>
@@ -240,14 +243,15 @@
         </TdTableColumn>
         <TdTableColumn label="操作" width="300" align="center" fixed="right">
           <template #default="scope">
-            <t-space size="small" class="task-action-group">
+            <t-space size="small" class="task-action-group" @mousedown.stop @click.stop>
               <t-button size="small" variant="text" @click.stop="openTaskDetail(scope.row)">详情</t-button>
               <t-dropdown
                 trigger="click"
                 :options="getActiveActionOptions(scope.row)"
+                @mousedown.stop
                 @click="item => handleActiveAction(scope.row, item)"
               >
-                <t-button size="small" variant="text">更多</t-button>
+                <t-button size="small" variant="text" @mousedown.stop @click.stop>更多</t-button>
               </t-dropdown>
             </t-space>
           </template>
@@ -1000,11 +1004,16 @@ onMounted(() => {
 }
 
 .job-queue-table :deep(.t-table) {
-  min-width: 1180px;
+  width: 100%;
+  min-width: 0;
 }
 
 .job-queue-table :deep(.t-table__content) {
-  overflow: auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
   scrollbar-color: var(--app-border-strong) transparent;
   scrollbar-width: thin;
 }

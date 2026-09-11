@@ -80,13 +80,15 @@ test('RECONCILING 任务支持人工核对并在重新排队时解除打印机�
   printer.currentJobId = job.id
   printer.status = 'PRINTING'
 
-  const result = unwrap(await request(
+  const resultResponse = await request(
     'POST',
     `/api/v1/print-jobs/${job.id}/reconcile`,
     { result: 'QUEUED', reason: '现场确认模型未完整打印，重新排队' },
     adminHeaders
-  ))
+  )
 
+  assert.equal(unwrap(resultResponse), null)
+  const result = unwrap(await request('GET', `/api/v1/print-jobs/${job.id}`, undefined, adminHeaders))
   assert.equal(result.status, 'QUEUED')
   assert.equal(result.printerId, null)
   assert.equal(printer.currentJobId, null)

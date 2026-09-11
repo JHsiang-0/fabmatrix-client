@@ -1723,7 +1723,7 @@ const handleReconcileJob = config => {
     job.completedAt = now()
   }
   setJobStatus(job, result)
-  return toMockJobSummary(job)
+  return null
 }
 
 const handleCreateJob = config => {
@@ -1821,7 +1821,7 @@ const handleAssignJob = config => {
   printer.currentJobId = job.id
   printer.status = 'IDLE'
   printer.updatedAt = now()
-  return toMockJobSummary(job)
+  return null
 }
 
 const handleRetryJob = config => {
@@ -2151,7 +2151,7 @@ const handleStartJob = config => {
   printer.status = job.status === 'PRINTING' ? 'PRINTING' : 'IDLE'
   printer.isSafeToPrint = false
   printer.updatedAt = now()
-  return toMockJobSummary(job)
+  return null
 }
 
 const handlePrinterControl = config => {

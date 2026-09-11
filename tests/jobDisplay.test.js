@@ -77,21 +77,35 @@ test('显示适配器按集合选择当前值或历史快照，并统一处理�
   assert.equal(getJobDisplay({}).fileName, '未知文件')
 })
 
-test('任务列表使用 TDesign Tooltip 单行省略，且窄窗口保留横向滚动和固定操作列', () => {
+test('800×560 窄视口保留组件视口、内部横向滚动和固定操作列（静态 DOM/CSS 护栏）', () => {
   for (const source of [queueSource, historySource]) {
     assert.match(source, /<t-tooltip/)
     assert.match(source, /job-display__ellipsis/)
     assert.match(source, /table-content-width="max-content"/)
+    assert.match(source, /style="width: 100%"/)
     assert.match(source, /fixed="right"/)
-    assert.match(source, /overflow: auto/)
+    assert.match(source, /\.t-table__content[\s\S]*overflow-x: auto/)
+    assert.match(source, /\.t-table__content[\s\S]*width: 100%[\s\S]*min-width: 0[\s\S]*max-width: 100%/)
   }
-  assert.match(queueSource, /min-width: 1180px/)
-  assert.match(historySource, /min-width: 1460px/)
+  assert.match(queueSource, /\.job-queue-table :deep\(\.t-table\)\s*\{[\s\S]*width: 100%[\s\S]*min-width: 0/)
+  assert.match(historySource, /\.history-management-table :deep\(\.t-table\)\s*\{[\s\S]*width: 100%[\s\S]*min-width: 0/)
+  assert.doesNotMatch(queueSource, /\.job-queue-table :deep\(\.t-table\)\s*\{[^}]*min-width:\s*\d+px/)
+  assert.doesNotMatch(historySource, /\.history-management-table :deep\(\.t-table\)\s*\{[^}]*min-width:\s*\d+px/)
   assert.match(historySource, /报错原因[\s\S]*<t-tooltip[\s\S]*String\(scope\.row\.errorReason\)/)
+})
+
+test('JobQueue 行内控件阻止冒泡，静态护栏覆盖选择、分配和更多菜单', () => {
+  assert.match(queueSource, /<t-select v-if="scope\.row\.status === 'QUEUED'"[\s\S]*?@mousedown\.stop[\s\S]*?@click\.stop[\s\S]*?@change=/)
+  assert.match(queueSource, /@click\.stop="openAssignDialog\(scope\.row\)"/)
+  assert.match(queueSource, /class="task-action-group" @mousedown\.stop @click\.stop/)
+  assert.match(queueSource, /<t-dropdown[\s\S]*?@mousedown\.stop[\s\S]*?<t-button[^>]*@mousedown\.stop @click\.stop>更多<\/t-button>/)
+  assert.match(queueSource, /@click\.stop="openTaskDetail\(scope\.row\)"/)
 })
 
 test('历史列表只保留详情入口，不渲染活动控制操作', () => {
   assert.match(historySource, /<t-button size="small" variant="text" @click\.stop="openTaskDetail\(scope\.row\)">详情<\/t-button>/)
+  assert.match(historySource, /TaskTimeIcon as Timer/)
+  assert.match(historySource, /<timer \/>/)
   for (const pattern of [
     />\s*重新排队\s*</,
     />\s*暂停打印\s*</,

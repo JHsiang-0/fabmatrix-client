@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createMockPage, createMockSuccess, MockRequestError } from '../src/mock/factory.js'
 import { MOCK_ERROR_SCENARIOS, resolveMockErrorScenario } from '../src/mock/scenarios.js'
+import { mockRequest } from '../src/mock/index.js'
 import { toPublicFile, toPublicJob, toPublicPrinter, toPublicSemanticIds } from '../src/mock/server.js'
 import { mockState, resetMockState } from '../src/mock/data.js'
 
@@ -133,4 +134,37 @@ test('Mock recursively preserves object conflicts and generated IDs as decimal s
   assert.equal(response.conflicts[0].printerId, largeId)
   assert.equal(response.conflicts[0].nested.jobId, largeId)
   assert.equal(response.conflicts[0].gridRow, 4)
+})
+
+test('Mock reconcile、safe assign 和 safe start 成功响应的 data 均为 null', async () => {
+  resetMockState()
+  const sessionKey = 'mock-write-contract-session'
+  mockState.sessions[sessionKey] = { userId: 1, username: 'admin', role: 'ADMIN' }
+  const headers = { Authorization: `Bearer ${sessionKey}` }
+  const request = (method, url, data) => mockRequest({ method, url, data, headers })
+
+  try {
+    const reconcilingJob = mockState.jobs.find(job => String(job.id) === '1001')
+    reconcilingJob.status = 'RECONCILING'
+    const reconcile = await request('POST', '/api/v1/print-jobs/1001/reconcile', {
+      result: 'FAILED',
+      reason: 'Mock contract test'
+    })
+    assert.equal(reconcile.data, null)
+
+    const assign = await request('POST', '/api/v1/print-jobs/safe/assign', {
+      jobId: '1003',
+      printerId: '404'
+    })
+    assert.equal(assign.data, null)
+
+    await request('POST', '/api/v1/print-jobs/safe/confirm', { printerId: '404' })
+    const start = await request('POST', '/api/v1/print-jobs/safe/start', {
+      jobId: '1003',
+      action: 'START_PRINT'
+    })
+    assert.equal(start.data, null)
+  } finally {
+    resetMockState()
+  }
 })

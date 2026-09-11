@@ -224,8 +224,10 @@ test('急停进入 RECONCILING，人工核对重新排队时释放打印机绑�
     result: 'QUEUED',
     reason: 'SYNC-001.1 回归护栏核对'
   }, adminHeaders)
-  assert.equal(reconciled.data.status, 'QUEUED')
-  assert.equal(reconciled.data.printerId, null)
+  assert.equal(reconciled.data, null)
+  const reconciledJob = await request('GET', '/api/v1/print-jobs/1001', undefined, adminHeaders)
+  assert.equal(reconciledJob.data.status, 'QUEUED')
+  assert.equal(reconciledJob.data.printerId, null)
   assert.equal(mockState.printers.find(item => item.id === 403).status, 'IDLE')
   assert.equal(mockState.printers.find(item => item.id === 403).currentJobId, null)
 })
