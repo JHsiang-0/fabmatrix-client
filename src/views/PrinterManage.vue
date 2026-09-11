@@ -49,9 +49,6 @@
         <t-button size="medium" theme="default" variant="base" :icon="renderIcon(Refresh)" :loading="loading" @click="fetchData">
           刷新
         </t-button>
-        <t-button size="medium" theme="warning" variant="base" :icon="renderIcon(FolderAdd)" @click="openUnallocatedDialog">
-          未分配设备
-        </t-button>
         <t-button v-if="isAdmin" size="medium" theme="success" variant="base" :icon="renderIcon(Aim)" @click="openScanDialog">
           扫描局域网设备
         </t-button>
@@ -85,6 +82,7 @@
           <t-input
             v-model="keyword"
             class="printer-management-filter__search"
+            borderless
             clearable
             placeholder="搜索机器名称"
             size="medium"
@@ -340,55 +338,30 @@
       </template>
     </t-dialog>
 
-    <!-- 未分配设备抽屉 -->
-    <t-drawer v-model:visible="unallocatedDialogVisible" header="未分配设备" size="720px" :close-btn="true" destroy-on-close @close="unallocatedDialogVisible = false">
-      <AsyncState
-        v-if="unallocatedLoading || unallocatedError || unallocatedPrinters.length === 0"
-        :loading="unallocatedLoading"
-        :error="unallocatedError"
-        :empty="unallocatedPrinters.length === 0"
-        empty-description="暂无未分配设备"
-        @retry="loadUnallocatedPrinters"
-      />
-      <t-table
-        v-else
-        :data="unallocatedPrinters"
-        :columns="unallocatedColumns"
-        row-key="id"
-        bordered
-        hover
-      >
-        <template #status="slotProps">
-          <StatusTag domain="printer" :status="slotProps.row.status" />
-        </template>
-        <template #position>
-          <t-button size="small" variant="text" @click="goToDashboard">前往看板管理位置</t-button>
-        </template>
-      </t-table>
-      <template #footer>
-        <t-button @click="unallocatedDialogVisible = false">关闭</t-button>
-      </template>
-    </t-drawer>
-
-    <!-- 扫描局域网设备弹窗 -->
-    <t-dialog v-model:visible="scanDialogVisible" header="扫描局域网设备" class="printer-scan-dialog"
-      width="800px"
+    <!-- 局域网设备扫描抽屉 -->
+    <t-drawer
+      v-model:visible="scanDialogVisible"
+      class="printer-scan-drawer"
+      header="扫描局域网设备"
+      size="660px"
+      :close-btn="!isScanning && !isBatchAdding"
       destroy-on-close
     >
-      <!-- 扫描输入区 -->
-      <div class="mb-4">
-        <t-form label-width="90px">
+      <div class="printer-scan-drawer__content">
+        <t-form class="printer-scan-drawer__form" label-width="90px">
           <t-form-item label="网段前缀">
             <t-input
               v-model="subnet"
               placeholder="例：192.168.0"
               size="medium"
-              :disabled="isScanning"
+              :disabled="isScanning || isBatchAdding"
             >
               <template #suffix>
-                <t-button theme="primary"
-                  @click="handleScan"
+                <t-button
+                  theme="primary"
                   :loading="isScanning"
+                  :disabled="isScanning || isBatchAdding"
+                  @click="handleScan"
                 >
                   <span><search /></span>
                   {{ isScanning ? '扫描中...' : '开始扫描' }}
@@ -397,107 +370,90 @@
             </t-input>
           </t-form-item>
         </t-form>
-      </div>
 
-      <!-- 加载状态 -->
-      <div v-if="isScanning" class="text-center py-8">
-        <t-skeleton :rows="5" animated />
-        <p class="mt-4 text-sm text-gray-600">正在扫描局域网设备，请稍候...</p>
-      </div>
-
-      <!-- 扫描结果表格 -->
-      <div v-else-if="scanResults.length > 0" class="printer-scan-results bg-white rounded-lg">
-        <!-- 统计文案 -->
-        <div class="mb-4">
-          <t-alert
-            :title="scanStatsText" theme="info"
-            :close-btn="false"
-
-          />
+        <div v-if="isScanning" class="printer-scan-drawer__state" role="status" aria-live="polite">
+          <t-loading text="正在扫描局域网设备，请稍候..." />
         </div>
-
-        <!-- 结果表格 -->
-        <div class="printer-scan-results__table">
-        <t-table
-          :data="scanResults"
-          :columns="scanColumns"
-          row-key="ipAddress"
-          height="100%"
-          style="width: 100%"
-          class="rounded-lg overflow-hidden"
-          @select-change="handleScanSelectionChange"
-        >
-          <template #deviceType="scope">
-              <t-tag
-                :theme="scope.row.isNewDevice ? 'success' : 'primary'"
-                variant="light"
-                size="small"
-              >
-                {{ scope.row.isNewDevice ? '全新设备' : '已知设备' }}
-              </t-tag>
+        <t-alert v-else-if="scanError" theme="error" :close-btn="false">
+          <template #default>{{ scanError }}</template>
+          <template #operation>
+            <t-button size="small" variant="outline" @click="handleScan">重试</t-button>
           </template>
-
-          <template #status="scope">
-            <StatusTag domain="printer" :status="scope.row.status" />
+        </t-alert>
+        <t-empty v-else-if="hasScanned && !scanResults.length" description="该网段未发现设备">
+          <template #description>
+            <p>该网段未发现设备</p>
+            <p class="mt-2 text-sm text-gray-400">请检查网段是否正确或设备是否在线</p>
           </template>
-
-          <template #firmwareType="scope">{{ getFirmwareLabel(scope.row.firmwareType) }}</template>
-
-          <template #macAddress="scope">
-            <span class="font-mono text-sm font-medium text-gray-700">{{ scope.row.macAddress }}</span>
-          </template>
-
-          <template #ipAddress="scope">
-            <t-tag size="small" variant="light-outline" theme="default">
-              {{ scope.row.ipAddress }}
-            </t-tag>
-          </template>
-
-          <template #name="scope">
-            <t-input
-              v-model="scope.row.name"
-              size="small"
-              placeholder="请输入机器名称"
+        </t-empty>
+        <div v-else-if="scanResults.length" class="printer-scan-drawer__results">
+          <t-alert :title="scanStatsText" theme="info" :close-btn="false" />
+          <div class="printer-scan-drawer__selection-bar">
+            <t-checkbox
+              :checked="allScanSelected"
+              :indeterminate="scanSelectionIndeterminate"
+              :disabled="isBatchAdding"
+              @change="handleScanSelectAll"
             >
-              <template #prefixIcon>
-                <span><printer /></span>
-              </template>
-            </t-input>
-          </template>
-
-          <template #suggestedName="scope">
-            <span class="text-sm text-gray-600">{{ scope.row.suggestedName }}</span>
-          </template>
-        </t-table>
+              全选
+            </t-checkbox>
+            <span aria-live="polite">已选择 {{ selectedDevices.length }} 台</span>
+          </div>
+          <div class="printer-scan-drawer__list" aria-label="扫描结果">
+            <article v-for="device in scanResults" :key="device.scanKey" class="printer-scan-card">
+              <div class="printer-scan-card__primary">
+                <t-checkbox
+                  :checked="isScanDeviceSelected(device)"
+                  :disabled="isBatchAdding"
+                  :aria-label="`选择 ${device.suggestedName || device.ipAddress || '设备'}`"
+                  @click.stop
+                  @change="checked => toggleScanDevice(device, checked)"
+                />
+                <t-tooltip :content="device.suggestedName || '未命名设备'">
+                  <t-input
+                    v-model="device.suggestedName"
+                    class="printer-scan-card__name"
+                    size="small"
+                    borderless
+                    :disabled="isBatchAdding"
+                    placeholder="请输入设备名称"
+                    @click.stop
+                  />
+                </t-tooltip>
+                <t-tag :theme="getDiscoveryStatus(device).theme" variant="light" size="small">
+                  {{ getDiscoveryStatus(device).label }}
+                </t-tag>
+              </div>
+              <div class="printer-scan-card__meta">
+                <t-tooltip :content="device.ipAddress || '-'">
+                  <span>IP {{ device.ipAddress || '-' }}</span>
+                </t-tooltip>
+                <span>协议 {{ getFirmwareLabel(device.firmwareType) }}</span>
+                <t-tooltip :content="device.macAddress || '-'">
+                  <span>MAC {{ device.macAddress || '-' }}</span>
+                </t-tooltip>
+              </div>
+            </article>
+          </div>
         </div>
+        <t-empty v-else description="输入网段后开始扫描" />
       </div>
-
-      <!-- 空状态 -->
-      <t-empty
-        v-else-if="hasScanned && !isScanning"
-        description="该网段未发现设备"
-
-      >
-        <template #description>
-          <p>该网段未发现设备</p>
-          <p class="mt-2 text-sm text-gray-400">请检查网段是否正确或设备是否在线</p>
-        </template>
-      </t-empty>
 
       <template #footer>
-        <div class="flex justify-end gap-3">
-          <t-button @click="scanDialogVisible = false">关闭</t-button>
-          <t-button theme="success"
-            :disabled="selectedDevices.length === 0"
-            @click="handleBatchAdd"
+        <div class="printer-scan-drawer__footer">
+          <t-button :disabled="isScanning || isBatchAdding" @click="scanDialogVisible = false">关闭</t-button>
+          <t-button
+            theme="success"
+            :disabled="selectedDevices.length === 0 || isScanning || isBatchAdding"
             :loading="isBatchAdding"
+            @click="handleBatchAdd"
           >
             <span><folder-add /></span>
             批量导入/同步 ({{ selectedDevices.length }})
           </t-button>
         </div>
       </template>
-    </t-dialog>
+    </t-drawer>
   </div>
 </template>
 
@@ -523,7 +479,6 @@ import {
   deletePrinter,
   scanPrinters,
   batchAddPrinters,
-  getUnallocatedPrinters,
   confirmSafe,
   getPrinterStatusHistory,
   getPrinterStatistics,
@@ -641,28 +596,9 @@ const subnet = ref('192.168.0')
 const isScanning = ref(false)
 const hasScanned = ref(false)
 const scanResults = ref([])
+const scanError = ref('')
 const isBatchAdding = ref(false)
-const selectedDevices = ref([])
-const unallocatedDialogVisible = ref(false)
-const unallocatedPrinters = ref([])
-const unallocatedLoading = ref(false)
-const unallocatedError = ref('')
-const unallocatedColumns = [
-  { colKey: 'name', title: '机器名称', ellipsis: true },
-  { colKey: 'ipAddress', title: 'IP 地址', width: 150 },
-  { colKey: 'status', title: '状态', width: 100, cell: 'status' },
-  { colKey: 'position', title: '位置', width: 140, cell: 'position' }
-]
-const scanColumns = [
-  { colKey: 'row-select', type: 'multiple', width: 50, fixed: 'left' },
-  { colKey: 'deviceType', title: '设备类型', width: 120, align: 'center', cell: 'deviceType' },
-  { colKey: 'status', title: '设备状态', width: 120, align: 'center', cell: 'status' },
-  { colKey: 'firmwareType', title: '协议', width: 100, align: 'center', cell: 'firmwareType' },
-  { colKey: 'macAddress', title: 'MAC 地址', width: 140, align: 'center', cell: 'macAddress' },
-  { colKey: 'ipAddress', title: 'IP 地址', width: 130, align: 'center', cell: 'ipAddress' },
-  { colKey: 'name', title: '机器名称', minWidth: 150, cell: 'name' },
-  { colKey: 'suggestedName', title: '建议名称', width: 120, align: 'center', cell: 'suggestedName' }
-]
+const selectedScanKeys = ref([])
 
 // ===== 现场操作状态 =====
 const confirmingSafeIds = ref([])
@@ -704,6 +640,19 @@ const selectedPrinterRows = computed(() => {
 
 const selectedVisiblePrinterIds = computed(() => selectedPrinterRows.value.map(printer => printer.id))
 
+const selectedDevices = computed(() => {
+  const selectedKeys = new Set(selectedScanKeys.value)
+  return scanResults.value.filter(device => selectedKeys.has(device.scanKey))
+})
+
+const scanDeviceKeys = computed(() => scanResults.value.map(device => device.scanKey))
+const allScanSelected = computed(() => (
+  scanDeviceKeys.value.length > 0 && selectedDevices.value.length === scanDeviceKeys.value.length
+))
+const scanSelectionIndeterminate = computed(() => (
+  selectedDevices.value.length > 0 && !allScanSelected.value
+))
+
 // 混合选择时统一执行启用，全部已启用时执行停用。
 const batchMonitorTarget = computed(() => (
   selectedPrinterRows.value.length > 0
@@ -734,10 +683,22 @@ const getFirmwareLabel = firmwareType => String(firmwareType || '').toUpperCase(
 // 扫描统计文案
 const scanStatsText = computed(() => {
   const total = scanResults.value.length
-  const newCount = scanResults.value.filter(d => d.isNewDevice).length
+  const newCount = scanResults.value.filter(d => getDiscoveryStatus(d).label === '新').length
   const existingCount = total - newCount
   return `共扫描到 ${total} 台设备，其中 ${newCount} 台新设备，${existingCount} 台已知设备`
 })
+
+const getDiscoveryStatus = device => {
+  const rawStatus = String(device?.discoveryStatus || device?.discoveryState || device?.status || '')
+    .toUpperCase()
+    .replace(/-/g, '_')
+  if (rawStatus === 'UNKNOWN_MAC') return { label: '未知 MAC', theme: 'warning' }
+  if (rawStatus === 'NEW' || device?.isNewDevice === true) return { label: '新', theme: 'success' }
+  if (rawStatus === 'EXISTING' || rawStatus === 'KNOWN' || device?.isNewDevice === false) {
+    return { label: '已知', theme: 'primary' }
+  }
+  return { label: '未知 MAC', theme: 'warning' }
+}
 
 // 获取状态标签类型
 const getStatusLabel = (status) => {
@@ -1191,79 +1152,70 @@ const getDeleteMessage = printer => {
     : `确定删除设备“${printer.name || printer.ipAddress}”吗？`
 }
 
-const openUnallocatedDialog = () => {
-  unallocatedDialogVisible.value = true
-  loadUnallocatedPrinters()
-}
-
-const loadUnallocatedPrinters = async () => {
-  unallocatedLoading.value = true
-  unallocatedError.value = ''
-  try {
-    const response = await getUnallocatedPrinters()
-    const data = response?.data ?? response
-    unallocatedPrinters.value = Array.isArray(data) ? data : []
-  } catch (error) {
-    unallocatedError.value = error?.message || '未分配设备加载失败，请重试'
-  } finally {
-    unallocatedLoading.value = false
-  }
-}
-
-const goToDashboard = () => {
-  unallocatedDialogVisible.value = false
-  router.push({ name: 'fullscreen-dashboard' })
-}
-
 // ===== 局域网扫描逻辑 =====
 const openScanDialog = () => {
   scanResults.value = []
-  selectedDevices.value = []
+  selectedScanKeys.value = []
+  scanError.value = ''
   hasScanned.value = false
   scanDialogVisible.value = true
 }
 
-// 表格多选变化
-const handleScanSelectionChange = (_keys, context) => {
-  selectedDevices.value = context?.selectedRowData || []
+const isScanDeviceSelected = device => selectedScanKeys.value.includes(device.scanKey)
+
+const toggleScanDevice = (device, checked) => {
+  const next = new Set(selectedScanKeys.value)
+  if (checked) next.add(device.scanKey)
+  else next.delete(device.scanKey)
+  selectedScanKeys.value = [...next]
+}
+
+const handleScanSelectAll = checked => {
+  selectedScanKeys.value = checked ? [...scanDeviceKeys.value] : []
 }
 
 const handleScan = async () => {
-  if (!subnet.value) {
-    message.warning('请输入网段前缀')
+  if (!subnet.value || isScanning.value || isBatchAdding.value) {
+    if (!subnet.value) message.warning('请输入网段前缀')
     return
   }
   isScanning.value = true
   hasScanned.value = false
-  selectedDevices.value = []
+  scanError.value = ''
+  selectedScanKeys.value = []
   try {
     const res = await scanPrinters(subnet.value)
     const devices = res?.data ?? res
-    // 为每个设备添加 name 字段（默认使用 suggestedName）
-    scanResults.value = (Array.isArray(devices) ? devices : []).map(device => ({
+    scanResults.value = (Array.isArray(devices) ? devices : []).map((device, index) => ({
       ...device,
-      name: device.suggestedName || ''
+      suggestedName: device.suggestedName || '',
+      scanKey: `${device.ipAddress || 'device'}-${device.macAddress || 'unknown'}-${index}`
     }))
     hasScanned.value = true
-  } catch {
-    // 拦截器处理错误
+  } catch (error) {
+    scanError.value = error?.message || '扫描设备失败，请重试'
+    hasScanned.value = true
+    scanResults.value = []
   } finally {
     isScanning.value = false
   }
 }
 
 const handleBatchAdd = async () => {
-  if (selectedDevices.value.length === 0) return
+  if (selectedDevices.value.length === 0 || isBatchAdding.value || isScanning.value) return
 
-  // 构造符合新 API 契约的请求体
   const devicesToSubmit = selectedDevices.value.map(device => {
     const payload = {
       ipAddress: device.ipAddress,
-      macAddress: device.macAddress,
-      name: device.name || device.suggestedName
+      firmwareType: device.firmwareType,
+      isNewDevice: device.isNewDevice === true,
+      suggestedName: device.suggestedName || ''
     }
-    for (const field of ['suggestedName', 'isNewDevice', 'firmwareType', 'apiKey']) {
-      if (device[field] !== undefined && device[field] !== null) payload[field] = device[field]
+    if (device.macAddress !== undefined && device.macAddress !== null && device.macAddress !== '') {
+      payload.macAddress = device.macAddress
+    }
+    if (device.apiKey !== undefined && device.apiKey !== null && device.apiKey !== '') {
+      payload.apiKey = device.apiKey
     }
     return payload
   })
@@ -1271,7 +1223,6 @@ const handleBatchAdd = async () => {
   isBatchAdding.value = true
   try {
     const res = await batchAddPrinters(devicesToSubmit)
-    // 解析后端返回的 message
     const result = res.data || {}
     const resultMessage = res.message || result.message || '批量处理完成'
     if (result.failedCount > 0) {
@@ -1280,10 +1231,9 @@ const handleBatchAdd = async () => {
       message.success(`${resultMessage}：新增 ${result.insertedCount || 0} 台，更新 ${result.updatedCount || 0} 台`)
     }
     scanDialogVisible.value = false
-    fetchData() // 刷新设备列表
+    fetchData()
   } catch (error) {
-    // 拦截器会处理错误，但如果有特定错误信息可以在这里显示
-    const errorMsg = error.response?.data?.message || '批量处理失败'
+    const errorMsg = error.response?.data?.message || error?.message || '批量处理失败'
     message.error(errorMsg)
   } finally {
     isBatchAdding.value = false
@@ -1371,6 +1321,19 @@ const handleBatchAdd = async () => {
   flex: 0 1 280px;
   width: 280px;
   min-width: 0;
+}
+
+.printer-management-filter__search :deep(.t-input) {
+  background: var(--app-surface-muted);
+  border-radius: var(--app-radius);
+}
+
+.printer-management-filter__search :deep(.t-input:hover) {
+  background: var(--app-surface-hover);
+}
+
+.printer-management-filter__search :deep(.t-input.t-input--focused) {
+  box-shadow: 0 0 0 2px var(--app-primary-light);
 }
 
 .printer-firmware-options {
@@ -1572,30 +1535,111 @@ const handleBatchAdd = async () => {
   display: none;
 }
 
-.printer-scan-results {
+.printer-scan-drawer :deep(.t-drawer__body) {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
   overflow: hidden;
 }
 
-.printer-scan-dialog :deep(.t-dialog__body) {
-  max-height: min(360px, calc(100vh - 180px));
+.printer-scan-drawer__content,
+.printer-scan-drawer__results {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--app-spacing-3);
+}
+
+.printer-scan-drawer__content {
+  height: 100%;
+  flex: 1 1 auto;
   overflow: hidden;
 }
 
-.printer-scan-dialog :deep(.t-dialog__footer) {
+.printer-scan-drawer__form {
   flex: 0 0 auto;
 }
 
-.printer-scan-results__table {
-  height: clamp(140px, calc(100vh - 370px), 240px);
-  max-height: 240px;
-  overflow: hidden;
+.printer-scan-drawer__state {
+  display: flex;
+  min-height: 220px;
+  align-items: center;
+  justify-content: center;
 }
 
-.printer-scan-results__table :deep(.td-table-adapter),
-.printer-scan-results__table :deep(.t-table),
-.printer-scan-results__table :deep(.t-table__content) {
-  height: 100%;
-  max-height: 240px;
+.printer-scan-drawer__results {
+  overflow: hidden;
+  flex: 1 1 auto;
+}
+
+.printer-scan-drawer__selection-bar,
+.printer-scan-drawer__footer,
+.printer-scan-card__primary,
+.printer-scan-card__meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--app-spacing-2);
+}
+
+.printer-scan-drawer__selection-bar {
+  justify-content: space-between;
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+}
+
+.printer-scan-drawer__list {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--app-spacing-2);
+  overflow-y: auto;
+}
+
+.printer-scan-card {
+  min-width: 0;
+  padding: var(--app-spacing-2) var(--app-spacing-3);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: var(--app-surface);
+}
+
+.printer-scan-card__primary {
+  min-width: 0;
+}
+
+.printer-scan-card__name {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.printer-scan-card__name :deep(.t-input) {
+  min-width: 0;
+}
+
+.printer-scan-card__meta {
+  padding-left: 28px;
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-caption);
+}
+
+.printer-scan-card__meta > span,
+.printer-scan-card__meta :deep(.t-tooltip) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.printer-scan-drawer__footer {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.printer-scan-drawer :deep(.t-drawer__content-wrapper) {
+  max-width: 100vw;
 }
 
 @media (max-width: 1100px) {
@@ -1641,9 +1685,19 @@ const handleBatchAdd = async () => {
     flex: 1 1 auto;
     width: auto;
   }
+
+  .printer-scan-card__meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
 }
 
 @media (max-width: 768px) {
+  .printer-scan-drawer :deep(.t-drawer__content-wrapper) {
+    width: 100vw !important;
+  }
+
   .printer-management-toolbar-card__top {
     align-items: stretch;
     flex-direction: column;

@@ -7,6 +7,7 @@ const dashboardSource = read('../src/views/Dashboard.vue')
 const fullscreenSource = read('../src/views/FullscreenDashboard.vue')
 const farmDashboardSource = read('../src/components/FarmDashboard.vue')
 const dashboardHeaderSource = read('../src/components/DashboardHeader.vue')
+const unallocatedDrawerSource = read('../src/components/UnallocatedPrinterDrawer.vue')
 const dashboardDetailsSource = read('../src/components/DashboardDetailsPanel.vue')
 const deviceStoreSource = read('../src/stores/printer/deviceStore.js')
 const appSource = read('../src/App.vue')
@@ -127,6 +128,16 @@ test('实时连接状态使用响应式字段同步原生 WebSocket 生命周期
   assert.match(realtimeStoreSource, /connectionState\.value = 'OPEN'/)
   assert.match(realtimeStoreSource, /connectionState\.value = wsClient\?\.getState\(\) \|\| 'CLOSED'/)
   assert.match(realtimeStoreSource, /connectionState\.value = 'CLOSED'/)
+})
+
+test('UI-006 看板允许双方查看未分配设备且仅 ADMIN 可以进入布局编辑', () => {
+  assert.match(farmDashboardSource, /<t-button class="dashboard-action-button" theme="warning" variant="outline" size="small"[\s\S]*未分配设备/)
+  assert.match(farmDashboardSource, /@click="openUnallocatedDrawer"/)
+  assert.match(farmDashboardSource, /:is-admin="canManageLayout"/)
+  assert.match(farmDashboardSource, /@enter-layout-edit="enterLayoutEditFromUnallocated"/)
+  assert.match(unallocatedDrawerSource, /v-if="isAdmin"[\s\S]*进入布局编辑/)
+  assert.match(unallocatedDrawerSource, /v-else theme="info" title="只读查看"/)
+  assert.match(farmDashboardSource, /if \(!canManageLayout\.value\) return/)
 })
 
 test('实时连接不使用业务消息不活跃超时，避免误判协议级 Ping 保活连接', () => {

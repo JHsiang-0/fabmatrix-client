@@ -207,7 +207,10 @@ export function scanPrinters(subnet, options = {}) {
  * @param {Array<Object>} devices - 设备数组
  * @param {string} devices[].ipAddress - IP地址
  * @param {string} devices[].macAddress - MAC地址
- * @param {string} devices[].name - 设备名称
+ * @param {string} devices[].suggestedName - 设备名称（可由用户编辑）
+ * @param {string} devices[].firmwareType - 设备协议（RRF/KLIPPER）
+ * @param {boolean} devices[].isNewDevice - 是否为新设备
+ * @param {string} [devices[].apiKey] - 设备 API Key（后端返回时才发送）
  * @returns {Promise<{code: number, message: string, data: Array<Printer>}>} 批量添加结果
  */
 export function batchAddPrinters(devices) {
@@ -337,4 +340,6 @@ export function confirmSafe(printerId) {
  * @property {boolean} isNewDevice - 是否为新设备
  * @property {string} status - 设备状态
  * @property {string} suggestedName - 建议的设备名称
+ * @property {string} [discoveryStatus] - 发现状态（NEW/EXISTING/UNKNOWN_MAC）
+ * @property {string} [apiKey] - 设备 API Key（后端返回时才发送）
  */

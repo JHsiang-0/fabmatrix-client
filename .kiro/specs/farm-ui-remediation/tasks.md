@@ -1666,3 +1666,39 @@ Git 检查：提交前执行 `git status --short`、`git diff --check`，仅暂�
 独立审查补丁：主表选择改为 TDesign 受控 `selected-row-keys`，批量按钮只统计当前页有效选择，并在筛选、实时搜索、分页、刷新和批量成功后清空；列表请求使用递增序号守卫，旧响应和卸载后的异步结果不再写回数据、错误或 loading。扫描结果恢复 RRF/Klipper 协议列并使用独立内部滚动，打印机详情缺失机器编号统一显示 `-`；主表通过正式 `table-content-width="1180px"` 生效横向滚动并保留固定首尾列。同步修正 Mock 静态扫描/未分配路由优先级，并提供 25 台分页种子及 12 台扫描结果的浏览器交互验证。
 
 审查补丁验证：`npm test`（264/264）、`npm run lint`、`npm run build`、`npm run test:e2e -- --reporter=line`（12/12）、`npm run test:electron -- --reporter=line`（3/3）和 `git diff --check` 均通过；构建仅保留既有 realtimeStore 动静态导入提示与大 chunk 警告。
+
+### [x] UI-006 打印机发现与未分配入口重构
+
+优先级：P1
+
+状态：完成（2026-09-11）
+
+目标：将未分配设备查看入口收敛到全屏设备看板，重构局域网扫描交互和批量导入字段，同时保持动态布局草稿与保存链路不变。
+
+范围：`src/views/PrinterManage.vue`、`src/components/FarmDashboard.vue`、新增未分配设备 Drawer 组件、必要的 Mock、API 文档和相关测试；不修改后端、依赖锁、环境文件或 `src/stores/printerStore.js.backup`。
+
+工作内容：
+
+- 从打印机管理页移除重复的未分配设备入口及其私有 Drawer；看板 ADMIN/OPERATOR 均可打开只读未分配列表，只有 ADMIN 可关闭 Drawer 并进入布局编辑，继续通过空槽位绑定和 `positionDraft` 保存。
+- 新增小型 TDesign 未分配设备 Drawer，覆盖正式 envelope 解包、loading/empty/error/retry、明确关闭、名称/机器编号/IP/状态展示和小屏省略；OPERATOR 不显示写入口。
+- 将扫描弹窗改为右侧 TDesign Drawer，结果使用两层纵向紧凑卡片，独立展示新/已知/未知 MAC 发现状态与 RRF/Klipper 协议；保留 `192.168.0` 默认网段和独立 30 秒超时，结果区纵向滚动且 footer 固定可达。
+- 批量请求只白名单发送 `ipAddress`、可选 `macAddress`、`firmwareType`、`isNewDevice`、编辑后的 `suggestedName` 和可选 `apiKey`，不发送额外 `name`；扫描、导入按钮执行期间防重复。
+- 名称搜索保留实时防抖，不增加查询按钮；页面局部使用 TDesign `t-input` borderless 和较深填充样式。
+
+验收：
+
+- 旧打印机管理未分配入口/Drawer 断言为不存在；看板 ADMIN/OPERATOR 可查看，ADMIN 可进入布局编辑，OPERATOR 无写入口；加载失败提供错误和重试。
+- 扫描在 800×560 及窄屏以 Drawer 打开，12 台以上结果无横向溢出、内部纵向滚动、footer 可达；全选/半选/单选、协议、发现状态、编辑名称和正式 payload 均可验证。
+- 保持动态布局草稿、空槽位绑定、保存和既有搜索实时请求行为。
+
+验证结果：`npm test`（266/266）、`npm run lint`、`npm run build`、`npm run test:e2e -- --reporter=line`（12/12）、`npm run test:electron -- --reporter=line`（3/3）、针对性 Node 测试（24/24）、ESLint 和 `git diff --check` 均通过；lint 自动修复未产生范围外改动。构建仅保留既有 realtimeStore 动静态导入提示与大 chunk 警告。
+
+测试要求：
+
+- 使用现有 Node 静态契约测试和 Mock Playwright Browser/Electron 回归，不引入测试框架；至少运行 `npm test`、`npm run lint`、`npm run build`、`npm run test:e2e`、`npm run test:electron` 和 `git diff --check`。
+
+需要后端配合：否；不修改接口、字段、权限、状态或扫描枚举，仅在前端兼容未知发现值。
+
+需要真实打印机：否。
+
+风险：真实扫描服务可能返回未登记的发现状态枚举；前端安全回退为“未知 MAC”，后端仍是权限和写操作最终边界。

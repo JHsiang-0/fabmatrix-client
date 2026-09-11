@@ -834,6 +834,7 @@ const handleScanPrinters = config => {
 const handleBatchAddPrinters = config => {
   requireSession(config, ['ADMIN'])
   const devices = Array.isArray(config.data) ? config.data : []
+  mockState.lastBatchAddPayload = cloneMockData(devices)
   let insertedCount = 0
   let updatedCount = 0
   const items = devices.map(device => {
@@ -846,7 +847,7 @@ const handleBatchAddPrinters = config => {
 
     const printer = {
       id: nextMockId('printer'),
-      name: device.name || `Mock_Printer_${Date.now()}`,
+      name: device.suggestedName || `Mock_Printer_${Date.now()}`,
       ipAddress: device.ipAddress,
       macAddress: device.macAddress,
       firmwareType: device.firmwareType || 'KLIPPER',
@@ -2151,6 +2152,7 @@ export const isMockEnabled = runtimeEnv.VITE_USE_MOCK === 'true' || [
 
 if ((runtimeEnv.DEV || runtimeEnv.MODE === 'mock' || String(runtimeEnv.MODE || '').startsWith('desktop')) && typeof window !== 'undefined') {
   window.__FARM_RESET_MOCK__ = resetMockState
+  window.__FARM_GET_LAST_BATCH_ADD_PAYLOAD__ = () => cloneMockData(mockState.lastBatchAddPayload || [])
 }
 
 export async function mockRequest(config) {

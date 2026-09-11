@@ -372,12 +372,19 @@ test('OPERATOR 看板不显示布局编辑入口', async ({ browser }) => {
     await expect(page).toHaveURL(/\/dashboard\/fullscreen$/)
     await expect(page.getByRole('button', { name: '布局设置', exact: true })).toHaveCount(0)
     await expect(page.getByText('设备坐标异常', { exact: true })).toHaveCount(0)
+    await page.getByRole('button', { name: '未分配设备', exact: true }).click()
+    const unallocatedDrawer = page.locator('.t-drawer').filter({ hasText: '未分配设备' }).last()
+    await expect(unallocatedDrawer).toBeVisible()
+    await expect(unallocatedDrawer).toContainText('只读查看')
+    await expect(unallocatedDrawer.getByRole('button', { name: '进入布局编辑', exact: true })).toHaveCount(0)
+    await unallocatedDrawer.getByRole('button', { name: '关闭', exact: true }).click()
+    await expect(unallocatedDrawer).toBeHidden()
   } finally {
     await context.close()
   }
 })
 
-test('UI-005 打印机选择不跨筛选分页且抽屉与扫描弹窗在 800x560 可用', async ({ browser }) => {
+test('UI-006 打印机选择不跨筛选分页且两个抽屉在 800x560 可用', async ({ browser }) => {
   test.setTimeout(120000)
   const context = await browser.newContext({ viewport: { width: 800, height: 560 } })
   const page = await context.newPage()
@@ -444,37 +451,61 @@ test('UI-005 打印机选择不跨筛选分页且抽屉与扫描弹窗在 800x56
     expect(mainTableMetrics.scrollWidth).toBeGreaterThan(mainTableMetrics.clientWidth)
     expect(['auto', 'scroll']).toContain(mainTableMetrics.overflowX)
 
+    await page.getByRole('button', { name: '设备看板', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '嘉东三维联动打印机实时控制系统' })).toBeVisible()
     await page.getByRole('button', { name: '未分配设备', exact: true }).click()
-    const unallocatedDrawer = page.locator('.t-drawer').filter({ hasText: '未分配设备' })
+    const unallocatedDrawer = page.locator('.t-drawer').filter({ hasText: '未分配设备' }).last()
     await expect(unallocatedDrawer).toBeVisible()
-    await unallocatedDrawer.locator('.t-drawer__footer').getByRole('button', { name: '关闭', exact: true }).click()
+    await expect(unallocatedDrawer).toContainText('IP 地址')
+    await unallocatedDrawer.getByRole('button', { name: '进入布局编辑', exact: true }).click()
+    await expect(page.getByText('点击空槽位选择并绑定设备', { exact: true })).toBeVisible()
     await expect(unallocatedDrawer).toBeHidden()
 
+    await page.goBack()
+    await expect(page.getByRole('heading', { name: '打印机管理' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '未分配设备', exact: true })).toHaveCount(0)
     await page.getByRole('button', { name: '扫描局域网设备', exact: true }).click()
-    const scanDialog = page.locator('.t-dialog').filter({ hasText: '扫描局域网设备' })
-    await expect(scanDialog).toBeVisible()
-    await scanDialog.getByRole('button', { name: '开始扫描', exact: true }).click()
-    await expect(scanDialog.getByText('共扫描到 12 台设备', { exact: false })).toBeVisible()
-    await expect(scanDialog.getByRole('columnheader', { name: '协议', exact: true })).toBeVisible()
-    await expect(scanDialog.getByText('Klipper', { exact: true }).first()).toBeVisible()
-    await expect(scanDialog.getByText('RRF', { exact: true }).first()).toBeVisible()
+    const scanDrawer = page.locator('.t-drawer').filter({ hasText: '扫描局域网设备' })
+    await expect(scanDrawer).toBeVisible()
+    await scanDrawer.getByRole('button', { name: '开始扫描', exact: true }).click()
+    await expect(scanDrawer.getByText('共扫描到 12 台设备', { exact: false })).toBeVisible()
+    await expect(scanDrawer.getByText('协议 Klipper', { exact: true }).first()).toBeVisible()
+    await expect(scanDrawer.getByText('协议 RRF', { exact: true }).first()).toBeVisible()
+    await expect(scanDrawer.getByText('新', { exact: true }).first()).toBeVisible()
+    await expect(scanDrawer.getByText('已知', { exact: true }).first()).toBeVisible()
 
-    const scanScrollMetrics = await scanDialog.locator('.printer-scan-results__table .t-table__content').evaluate(element => ({
+    const scanScrollMetrics = await scanDrawer.locator('.printer-scan-drawer__list').evaluate(element => ({
       clientHeight: element.clientHeight,
       scrollHeight: element.scrollHeight,
-      overflowY: getComputedStyle(element).overflowY
+      overflowY: getComputedStyle(element).overflowY,
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth
     }))
     expect(scanScrollMetrics.scrollHeight).toBeGreaterThan(scanScrollMetrics.clientHeight)
     expect(['auto', 'scroll']).toContain(scanScrollMetrics.overflowY)
+    expect(scanScrollMetrics.scrollWidth).toBeLessThanOrEqual(scanScrollMetrics.clientWidth + 1)
 
-    const footerMetrics = await scanDialog.locator('.t-dialog__footer').evaluate(element => {
+    const footerMetrics = await scanDrawer.locator('.t-drawer__footer').evaluate(element => {
       const box = element.getBoundingClientRect()
       return { top: box.top, bottom: box.bottom, viewportHeight: window.innerHeight }
     })
     expect(footerMetrics.top).toBeGreaterThanOrEqual(0)
     expect(footerMetrics.bottom).toBeLessThanOrEqual(footerMetrics.viewportHeight)
-    await expect(scanDialog.locator('.t-dialog__footer').getByRole('button', { name: '关闭', exact: true })).toBeVisible()
-    await expect(scanDialog.getByRole('button', { name: /批量导入\/同步/ })).toBeVisible()
+    await expect(scanDrawer.locator('.t-drawer__footer').getByRole('button', { name: '关闭', exact: true })).toBeVisible()
+    await expect(scanDrawer.getByRole('button', { name: /批量导入\/同步/ })).toBeVisible()
+    const firstScanCard = scanDrawer.locator('.printer-scan-card').first()
+    await firstScanCard.getByRole('checkbox').locator('..').click({ force: true })
+    await expect(scanDrawer).toContainText('已选择 1 台')
+    await scanDrawer.getByRole('checkbox').first().locator('..').click({ force: true })
+    await expect(scanDrawer).toContainText('已选择 12 台')
+
+    await firstScanCard.locator('input').last().fill('编辑后的设备名称')
+    await scanDrawer.getByRole('button', { name: /批量导入\/同步/ }).click()
+    await expect.poll(() => page.evaluate(() => window.__FARM_GET_LAST_BATCH_ADD_PAYLOAD__())).not.toEqual([])
+    const batchPayload = await page.evaluate(() => window.__FARM_GET_LAST_BATCH_ADD_PAYLOAD__())
+    expect(batchPayload[0]).toMatchObject({ suggestedName: '编辑后的设备名称' })
+    expect(batchPayload[0]).not.toHaveProperty('name')
+    expect(Object.keys(batchPayload[0]).sort()).toEqual(['firmwareType', 'ipAddress', 'isNewDevice', 'macAddress', 'suggestedName'].sort())
   } finally {
     await context.close()
   }

@@ -5,6 +5,10 @@
       <dashboard-header :last-update-time="lastUpdateTime" @refresh="handleRefresh">
       <!-- 布局锁定/编辑模式切换按钮 -->
       <template #actions>
+        <t-button class="dashboard-action-button" theme="warning" variant="outline" size="small"
+          @click="openUnallocatedDrawer">
+          未分配设备
+        </t-button>
         <div v-if="canManageLayout && isEditMode" class="dashboard-layout-actions">
           <t-button class="dashboard-action-button" theme="default" variant="outline" size="small"
             @click="openLayoutSettings">布局设置</t-button>
@@ -196,6 +200,12 @@
     <bind-device-dialog v-model:visible="bindDialogVisible" :target-slot-label="targetSlotLabel"
       @confirm="performBind" />
 
+    <unallocated-printer-drawer
+      v-model:visible="unallocatedDrawerVisible"
+      :is-admin="canManageLayout"
+      @enter-layout-edit="enterLayoutEditFromUnallocated"
+    />
+
     <!-- 设备详情抽屉 - 使用 DeviceDetailDrawer 组件 -->
     <device-detail-drawer v-model="drawerVisible" :device="activeDevice" :real-time-data="activeRealTimeData"
       :can-manage-device="userStore.isAdmin" :action-loading="controlLoading"
@@ -229,6 +239,7 @@ import DashboardHeader from './DashboardHeader.vue'
 import GridMap from './grid/GridMap.vue'
 import BindDeviceDialog from './BindDeviceDialog.vue'
 import DeviceDetailDrawer from './device/DeviceDetailDrawer.vue'
+import UnallocatedPrinterDrawer from './UnallocatedPrinterDrawer.vue'
 
 defineOptions({ name: 'FarmDashboard' })
 
@@ -320,6 +331,7 @@ watch(canManageLayout, canManage => {
 /** 绑定设备弹窗相关状态 */
 const bindDialogVisible = ref(false)
 const targetSlot = ref({ row: null, col: null }) // 目标槽位坐标（物理坐标）
+const unallocatedDrawerVisible = ref(false)
 
 /** 设备详情抽屉相关状态 */
 const drawerVisible = ref(false)
@@ -497,6 +509,16 @@ const statCards = computed(() => {
 
 function goTo(path) {
   router.push(path)
+}
+
+function openUnallocatedDrawer() {
+  unallocatedDrawerVisible.value = true
+}
+
+function enterLayoutEditFromUnallocated() {
+  if (!canManageLayout.value) return
+  if (!isEditMode.value) toggleEditMode()
+  message.info('点击空槽位选择并绑定设备')
 }
 
 async function fetchHistory() {

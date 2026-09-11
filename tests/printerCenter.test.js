@@ -5,6 +5,8 @@ import { createLatestRequestGuard } from '../src/utils/latestRequestGuard.js'
 
 const source = fs.readFileSync(new URL('../src/views/PrinterManage.vue', import.meta.url), 'utf8')
 const printerApiSource = fs.readFileSync(new URL('../src/api/printer.js', import.meta.url), 'utf8')
+const dashboardSource = fs.readFileSync(new URL('../src/components/FarmDashboard.vue', import.meta.url), 'utf8')
+const unallocatedSource = fs.readFileSync(new URL('../src/components/UnallocatedPrinterDrawer.vue', import.meta.url), 'utf8')
 const detailSource = fs.readFileSync(new URL('../src/components/device/DeviceDetailDrawer.vue', import.meta.url), 'utf8')
 const tableAdapterSource = fs.readFileSync(new URL('../src/components/TdTable.vue', import.meta.url), 'utf8')
 
@@ -21,9 +23,14 @@ test('打印机中心使用正式名称和状态筛选契约', () => {
   assert.match(source, /status: activeStatusFilterKey\.value/)
 })
 
-test('打印机中心覆盖未分配设备、详情分析和正式控制入口', () => {
-  assert.match(source, /getUnallocatedPrinters/)
-  assert.match(source, /未分配设备抽屉/)
+test('UI-006 打印机中心移除重复未分配入口，未分配设备迁移到看板', () => {
+  assert.doesNotMatch(source, /getUnallocatedPrinters/)
+  assert.doesNotMatch(source, /unallocatedDialogVisible|unallocatedPrinters|openUnallocatedDialog/)
+  assert.doesNotMatch(source, /未分配设备/)
+  assert.match(dashboardSource, /@click="openUnallocatedDrawer"/)
+  assert.match(dashboardSource, /<unallocated-printer-drawer/)
+  assert.match(unallocatedSource, /getUnallocatedPrinters/)
+  assert.match(unallocatedSource, /unwrapPrinters/)
   assert.match(source, /getPrinterStatusHistory/)
   assert.match(source, /getPrinterStatistics/)
   assert.match(source, /<DeviceDetailDrawer/)
@@ -81,28 +88,40 @@ test('UI-005 打印机管理压缩字段、固定首尾列并按条件显示批�
   assert.match(tableAdapterSource, /\{ tableContentWidth: props\.tableContentWidth \}/)
 })
 
-test('UI-005 协议选择、扫描默认网段和扫描结果限高使用 TDesign 语义', () => {
+test('UI-006 扫描使用右侧 Drawer、纵向列表和独立发现状态', () => {
   assert.match(source, /<t-radio-group v-model="form\.firmwareType" variant="default-filled" size="medium"/)
   assert.match(source, /<t-radio-button value="RRF">RRF<\/t-radio-button>/)
   assert.match(source, /<t-radio-button value="KLIPPER">Klipper<\/t-radio-button>/)
   assert.match(source, /const subnet = ref\('192\.168\.0'\)/)
   assert.match(source, /placeholder="例：192\.168\.0"/)
-  assert.match(source, /<div class="printer-scan-results__table">/)
-  assert.match(source, /class="printer-scan-dialog"/)
-  assert.match(source, /const scanColumns = \[/)
-  assert.match(source, /colKey: 'firmwareType', title: '协议'/)
-  assert.match(source, /max-height: min\(360px, calc\(100vh - 180px\)\)/)
-  assert.match(source, /height: clamp\(140px, calc\(100vh - 370px\), 240px\)/)
-  assert.match(source, /max-height: 240px/)
+  assert.match(source, /<t-drawer[\s\S]*class="printer-scan-drawer"[\s\S]*header="扫描局域网设备"/)
+  assert.doesNotMatch(source, /class="printer-scan-dialog"|const scanColumns = \[/)
+  assert.match(source, /printer-scan-drawer__list/)
+  assert.match(source, /printer-scan-card__primary/)
+  assert.match(source, /printer-scan-card__meta/)
+  assert.match(source, /getDiscoveryStatus/)
+  assert.match(source, /UNKNOWN_MAC/)
+  assert.match(source, /scanSelectionIndeterminate/)
+  assert.match(source, /已选择 \{\{ selectedDevices\.length \}\} 台/)
+  assert.match(source, /getFirmwareLabel\(device\.firmwareType\)/)
 })
 
-test('UI-005 未分配设备按 envelope data 数组稳健解包并保留关闭入口', () => {
-  assert.match(source, /const data = response\?\.data \?\? response/)
-  assert.match(source, /unallocatedPrinters\.value = Array\.isArray\(data\) \? data : \[\]/)
-  assert.match(source, /<t-drawer v-model:visible="unallocatedDialogVisible"[\s\S]*:close-btn="true"/)
-  assert.match(source, /@close="unallocatedDialogVisible = false"/)
-  const unallocatedColumnsSource = source.split('const unallocatedColumns = [')[1].split(']')[0]
-  assert.doesNotMatch(unallocatedColumnsSource, /firmwareType|协议/)
+test('UI-006 看板未分配 Drawer 覆盖角色、错误重试、关闭和设备字段', () => {
+  assert.match(unallocatedSource, /header="未分配设备"/)
+  assert.match(unallocatedSource, /:close-btn="true"/)
+  assert.match(unallocatedSource, /正在加载未分配设备/)
+  assert.match(unallocatedSource, /暂无未分配设备/)
+  assert.match(unallocatedSource, /未分配设备加载失败，请重试/)
+  assert.match(unallocatedSource, /@click="loadPrinters"/)
+  assert.match(unallocatedSource, /机器编号/)
+  assert.match(unallocatedSource, /IP 地址/)
+  assert.match(unallocatedSource, /状态/)
+  assert.match(unallocatedSource, /进入布局编辑/)
+  assert.match(unallocatedSource, /当前账号可以查看未分配设备，但没有布局编辑或绑定设备权限/)
+  assert.match(unallocatedSource, /emit\('enter-layout-edit'\)/)
+  assert.match(dashboardSource, /canManageLayout = computed\(\(\) => userStore\.isAdmin\)/)
+  assert.match(dashboardSource, /function enterLayoutEditFromUnallocated\(\)/)
+  assert.match(dashboardSource, /点击空槽位选择并绑定设备/)
 })
 
 test('UI-005 扫描 API 使用独立超时且不改变全局请求配置', () => {
@@ -111,8 +130,19 @@ test('UI-005 扫描 API 使用独立超时且不改变全局请求配置', () =>
   assert.match(printerApiSource, /data => Array\.isArray\(data\) \? data : \[\]/)
   assert.match(printerApiSource, /export function getUnallocatedPrinters\(\)/)
   assert.match(printerApiSource, /const records = Array\.isArray\(data\) \? data : data\?\.records/)
-  assert.match(source, /\['suggestedName', 'isNewDevice', 'firmwareType', 'apiKey'\]/)
-  assert.match(source, /if \(device\[field\] !== undefined && device\[field\] !== null\) payload\[field\] = device\[field\]/)
+  assert.match(source, /suggestedName: device\.suggestedName \|\| ''/)
+  assert.match(source, /payload\.macAddress = device\.macAddress/)
+  assert.match(source, /payload\.apiKey = device\.apiKey/)
+  assert.doesNotMatch(source, /payload\.name|name: device\.name|device\.name \|\| device\.suggestedName/)
+  assert.match(printerApiSource, /devices\[\]\.suggestedName/)
+})
+
+test('UI-006 打印机搜索使用局部 TDesign borderless 填充输入框并保持实时防抖', () => {
+  assert.match(source, /class="printer-management-filter__search"[\s\S]*borderless/)
+  assert.match(source, /\.printer-management-filter__search :deep\(\.t-input\)/)
+  assert.match(source, /background: var\(--app-surface-muted\)/)
+  assert.match(source, /@input="scheduleKeywordSearch"/)
+  assert.doesNotMatch(source, /查询按钮|搜索按钮/)
 })
 
 test('打印机详情抽屉标题有稳定回退且详情内容由 Drawer Body 滚动', () => {

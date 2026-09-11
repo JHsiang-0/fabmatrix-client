@@ -555,6 +555,7 @@ const createSeedData = ({ initialized = true, dashboardLayout: layoutOverride = 
     }
   ] : [],
   batchPlans: [],
+  lastBatchAddPayload: null,
   nextIds: {
     users: '3',
     file: '25',
