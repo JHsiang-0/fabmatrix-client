@@ -471,18 +471,19 @@ test('UI-007 扫描网段分段输入校验、请求范围和 800x560 布局', a
     await expect(subnetInputs.nth(0)).toHaveValue('192')
     await expect(subnetInputs.nth(1)).toHaveValue('168')
     await expect(subnetInputs.nth(2)).toHaveValue('0')
-    await expect(scanDrawer).toContainText('扫描范围：192.168.0.1 – 192.168.0.254')
+    await expect(scanDrawer.locator('.printer-scan-subnet-range')).toHaveText('范围 192.168.0.1 – 192.168.0.254')
     await expect(scanDrawer.locator('.printer-scan-subnet-button')).toHaveCount(1)
     await expect(scanDrawer.locator('.printer-scan-subnet-segment .t-input__suffix')).toHaveCount(0)
 
     await subnetInputs.nth(2).fill('7')
-    await expect(scanDrawer).toContainText('扫描范围：192.168.7.1 – 192.168.7.254')
+    await expect(scanDrawer.locator('.printer-scan-subnet-range')).toHaveText('范围 192.168.7.1 – 192.168.7.254')
     await scanDrawer.getByRole('button', { name: '开始扫描', exact: true }).click()
     await expect.poll(() => page.evaluate(() => window.__FARM_GET_LAST_SCAN_SUBNET__())).toBe('192.168.7')
 
     for (const invalidValue of ['', '-1', '1.2', 'abc', '256']) {
       await subnetInputs.nth(1).fill(invalidValue)
-      await expect(scanDrawer).toContainText('第2段请输入 0–255 的整数')
+      await expect(scanDrawer.locator('.printer-scan-subnet-range')).toHaveText('范围待校验')
+      await expect(scanDrawer.locator('.printer-scan-subnet-hint--error')).toHaveText('第2段请输入 0–255 的整数')
       await scanDrawer.getByRole('button', { name: '开始扫描', exact: true }).click()
       await expect.poll(() => page.evaluate(() => window.__FARM_GET_LAST_SCAN_SUBNET__())).toBe('192.168.7')
     }
@@ -499,7 +500,7 @@ test('UI-007 扫描网段分段输入校验、请求范围和 800x560 布局', a
   }
 })
 
-test('UI-008 扫描网段控件组在桌面与窄屏保持对齐且无横向溢出', async ({ browser }) => {
+test('UI-009 扫描网段标题与操作分层在桌面和窄屏保持可用', async ({ browser }) => {
   const viewports = [
     { width: 1440, height: 900 },
     { width: 375, height: 812 }
@@ -523,28 +524,23 @@ test('UI-008 扫描网段控件组在桌面与窄屏保持对齐且无横向溢�
           const rect = element.getBoundingClientRect()
           return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
         }
+        const heading = box(drawer.querySelector('.printer-scan-subnet-heading'))
+        const title = box(drawer.querySelector('.printer-scan-subnet-title'))
+        const range = box(drawer.querySelector('.printer-scan-subnet-range'))
+        const control = box(drawer.querySelector('.printer-scan-subnet-control'))
         const segments = [...drawer.querySelectorAll('.printer-scan-subnet-segment')].map(box)
         const button = box(drawer.querySelector('.printer-scan-subnet-button'))
-        const label = box(drawer.querySelector('.t-form__label'))
-        const hint = box(drawer.querySelector('.printer-scan-subnet-hint'))
         const body = box(drawer.querySelector('.t-drawer__body'))
-        const group = [...segments, button]
-        const groupLeft = Math.min(...group.map(item => item.x))
-        const groupRight = Math.max(...group.map(item => item.x + item.width))
-        const groupBottom = Math.max(...group.map(item => item.y + item.height))
         return {
+          heading,
+          title,
+          range,
+          control,
           segmentWidths: segments.map(item => item.width),
           segmentCenterY: segments[0]?.y + segments[0]?.height / 2,
           segmentHeight: segments[0]?.height,
           button,
-          label,
-          hint,
           body,
-          group: {
-            centerX: (groupLeft + groupRight) / 2,
-            bottom: groupBottom,
-            width: groupRight - groupLeft
-          },
           documentWidth: document.documentElement.scrollWidth,
           viewportWidth: window.innerWidth
         }
@@ -554,17 +550,16 @@ test('UI-008 扫描网段控件组在桌面与窄屏保持对齐且无横向溢�
       expect(Math.max(...metrics.segmentWidths) - Math.min(...metrics.segmentWidths)).toBeLessThanOrEqual(1)
       expect(metrics.segmentWidths[0]).toBeGreaterThanOrEqual(56)
       expect(metrics.segmentWidths[0]).toBeLessThanOrEqual(64)
+      expect(Math.abs(metrics.heading.x - metrics.control.x)).toBeLessThanOrEqual(1)
+      expect(metrics.heading.x).toBeGreaterThanOrEqual(metrics.body.x - 1)
+      expect(metrics.heading.x).toBeLessThan(metrics.body.x + metrics.body.width / 2)
+      expect(metrics.heading.y).toBeLessThan(metrics.control.y)
+      expect(Math.abs(metrics.title.y + metrics.title.height / 2 - (metrics.range.y + metrics.range.height / 2))).toBeLessThanOrEqual(2)
       expect(Math.abs(metrics.button.height - metrics.segmentHeight)).toBeLessThanOrEqual(2)
-      expect(Math.abs(metrics.label.y + metrics.label.height / 2 - metrics.segmentCenterY)).toBeLessThanOrEqual(2)
-      expect(Math.abs(metrics.group.centerX - (metrics.body.x + metrics.body.width / 2))).toBeLessThanOrEqual(64)
-      expect(metrics.hint.y).toBeGreaterThanOrEqual(metrics.group.bottom)
+      expect(Math.abs(metrics.button.y + metrics.button.height / 2 - metrics.segmentCenterY)).toBeLessThanOrEqual(2)
+      expect(Math.abs(metrics.button.x + metrics.button.width - (metrics.control.x + metrics.control.width))).toBeLessThanOrEqual(1)
       expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1)
-
-      if (viewport.width > 768) {
-        expect(Math.abs(metrics.button.y + metrics.button.height / 2 - metrics.segmentCenterY)).toBeLessThanOrEqual(2)
-      } else {
-        expect(metrics.button.width).toBeLessThan(metrics.body.width)
-      }
+      expect(metrics.button.width).toBeLessThan(metrics.body.width)
     } finally {
       await context.close()
     }

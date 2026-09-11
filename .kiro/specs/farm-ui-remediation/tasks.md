@@ -1764,3 +1764,21 @@ build：`npm run build`。
 git status --short、`git diff --check`：提交前执行并仅暂存本任务实际修改。
 
 提交：完成最终验证后创建独立本地提交，不执行 push。
+
+### [x] UI-009 扫描网段标题与操作分层
+
+状态：DONE（2026-09-11）
+
+优先级：P1
+
+目标：在不改变 UI-007 扫描输入、校验、Enter 扫描、loading/disabled、扫描 API、结果列表、选择和批量导入行为的前提下，调整扫描 Drawer 顶部信息层级和桌面操作布局。
+
+范围：`src/views/PrinterManage.vue`、`tests/printerCenter.test.js`、`tests/e2e/browser.spec.js` 和本任务记录；不修改后端、依赖锁、环境文件或 `src/stores/printerStore.js.backup`。
+
+完成记录：第一行左对齐展示“扫描网段”标题和 TDesign 小尺寸低强调范围 Tag；第二行保留左侧三段输入并将“开始扫描”按钮推至内容区域右侧；非法输入提示独立位于第三行并使用 aria-live。范围 Tag 在合法输入时实时显示 `.1 – .254`，非法时显示“范围待校验”，不与错误提示重复；桌面不再整体居中，窄屏保留自然换行、无横向溢出且按钮不撑满。
+
+修改文件：`src/views/PrinterManage.vue`、`tests/printerCenter.test.js`、`tests/e2e/browser.spec.js`、本任务记录。
+
+验证：专项测试、`npm test`、`npm run lint`、`npm run build`、Browser E2E、Electron E2E 和 `git diff --check`。
+
+提交：完成最终验证后创建独立本地 Conventional Commit，不执行 push。
