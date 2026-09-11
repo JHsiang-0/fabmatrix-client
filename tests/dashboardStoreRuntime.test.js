@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import axios from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 import { createServer } from 'vite'
@@ -73,6 +74,7 @@ let useRealtimeStore
 let useUserStore
 let request
 let router
+let getRequestLockKey
 
 test.before(async () => {
   viteServer = await createServer({
@@ -83,7 +85,7 @@ test.before(async () => {
     resolve: { alias: { '@': path.resolve(root, 'src') } },
     server: { middlewareMode: true, hmr: false }
   })
-  ;({ default: request, service } = await viteServer.ssrLoadModule('/src/utils/request.js'))
+  ;({ default: request, getRequestLockKey, service } = await viteServer.ssrLoadModule('/src/utils/request.js'))
   ;({ default: router } = await viteServer.ssrLoadModule('/src/router/index.js'))
   ;({ useUserStore } = await viteServer.ssrLoadModule('/src/stores/user.js'))
   ;({ useGridStore } = await viteServer.ssrLoadModule('/src/stores/printer/gridStore.js'))
@@ -332,7 +334,9 @@ test('旧会话 deferred 保存失败与 finally 不能污染新草稿错误状�
   const canceled = new Error('旧会话请求已取消')
   canceled.code = 'ERR_CANCELED'
   pendingSave.reject(canceled)
-  assert.equal(await oldSave, canceled)
+  const canceledResult = await oldSave
+  assert.equal(canceledResult.code, 'ERR_CANCELED')
+  assert.equal(canceledResult.name, 'CanceledError')
   assert.equal(grid.layoutDraft.rowCount, 8)
   assert.equal(grid.draftOwner, newOwner)
   assert.equal(grid.layoutError, null)
@@ -419,4 +423,85 @@ test('当前会话请求的 401 正常清除认证并导航登录页', async () 
     console.error = originalConsoleError
     router.push = originalRouterPush
   }
+})
+
+test('真实 Axios 取消错误保留判定语义但移除请求凭据和底层对象', async () => {
+  setActivePinia(createPinia())
+  const userStore = useUserStore()
+  authenticate(userStore, 'cancel-session-secret')
+  service.defaults.adapter = config => {
+    const canceled = new axios.CanceledError('调用方主动取消', config, { transport: 'secret-request' })
+    canceled.response = {
+      status: 499,
+      statusText: 'Canceled',
+      data: null,
+      config
+    }
+    return Promise.reject(canceled)
+  }
+
+  const error = await request({
+    url: '/api/v1/session-race/cancel',
+    method: 'get',
+    dedupe: false
+  }).catch(reason => reason)
+
+  assert.equal(axios.isAxiosError(error), true)
+  assert.equal(axios.isCancel(error), true)
+  assert.equal(error.name, 'CanceledError')
+  assert.equal(error.code, 'ERR_CANCELED')
+  assert.equal(error.message, '调用方主动取消')
+  assert.equal(Object.prototype.hasOwnProperty.call(error, 'request'), false)
+  assert.equal(Object.prototype.hasOwnProperty.call(error, 'originalError'), false)
+  assert.equal(Object.prototype.hasOwnProperty.call(error.config || {}, 'headers'), false)
+  assert.equal(Object.prototype.hasOwnProperty.call(error.response?.config || {}, 'headers'), false)
+  assert.equal(JSON.stringify(error).includes('cancel-session-secret'), false)
+  assert.equal(JSON.stringify(error).includes('secret-request'), false)
+})
+
+test('mutation 去重仅复用同一认证 generation，重登后相同请求独立发送', async () => {
+  setActivePinia(createPinia())
+  const userStore = useUserStore()
+  authenticate(userStore, 'dedupe-old-secret')
+  const pending = []
+  service.defaults.adapter = config => {
+    const operation = deferred()
+    pending.push({ ...operation, config })
+    return operation.promise
+  }
+  const requestConfig = {
+    url: '/api/v1/session-race/dedupe',
+    method: 'post',
+    data: { action: 'save' }
+  }
+
+  const oldRequest = request(requestConfig)
+  const oldDuplicate = request(requestConfig)
+  assert.equal(oldDuplicate, oldRequest)
+  await waitFor(() => pending.length === 1)
+  assert.equal(pending[0].config.headers.Authorization, 'Bearer dedupe-old-secret')
+
+  authenticate(userStore, 'dedupe-new-secret')
+  const newRequest = request(requestConfig)
+  const newDuplicate = request(requestConfig)
+  assert.equal(newDuplicate, newRequest)
+  assert.notEqual(newRequest, oldRequest)
+  await waitFor(() => pending.length === 2)
+  assert.equal(pending[1].config.headers.Authorization, 'Bearer dedupe-new-secret')
+
+  pending[0].resolve(axiosResponse(pending[0].config, { session: 'old' }))
+  assert.deepEqual((await oldRequest).data, { session: 'old' })
+  const duplicateWhileNewPending = request(requestConfig)
+  assert.equal(duplicateWhileNewPending, newRequest)
+  assert.equal(pending.length, 2)
+
+  pending[1].resolve(axiosResponse(pending[1].config, { session: 'new' }))
+  assert.deepEqual((await newRequest).data, { session: 'new' })
+  assert.deepEqual((await duplicateWhileNewPending).data, { session: 'new' })
+  const lockKey = getRequestLockKey({
+    ...requestConfig,
+    headers: { Authorization: 'Bearer key-must-not-contain-this-secret' }
+  }, 42)
+  assert.match(lockKey, /^42:/)
+  assert.equal(lockKey.includes('key-must-not-contain-this-secret'), false)
 })

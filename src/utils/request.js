@@ -38,13 +38,24 @@ const pendingRequests = new Map()
 // Session credentials stay private to this module and are never attached to
 // Axios config/error objects that may be logged or returned to callers.
 const requestAuthSessions = new WeakMap()
+let observedAuthToken
+let authSessionGeneration = 0
 
 const isCanceledError = error => (
   error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError'
 )
 
-const rememberRequestSession = (config, token) => {
-  if (config && typeof config === 'object') requestAuthSessions.set(config, token || '')
+const getCurrentAuthSession = () => {
+  const token = useUserStore().token || ''
+  if (observedAuthToken !== token) {
+    observedAuthToken = token
+    authSessionGeneration += 1
+  }
+  return { token, generation: authSessionGeneration }
+}
+
+const rememberRequestSession = (config, generation) => {
+  if (config && typeof config === 'object') requestAuthSessions.set(config, generation)
   return config
 }
 
@@ -83,27 +94,69 @@ const serializeRequestPart = value => {
  * Generate a lock key for non-idempotent requests. Callers may opt out for
  * operations where submitting the same body twice is intentional.
  */
-export const getRequestLockKey = config => {
+export const getRequestLockKey = (config, sessionGeneration = 0) => {
   if (config.dedupe === false) return null
 
   const method = String(config.method || 'get').toLowerCase()
   if (!MUTATING_METHODS.has(method)) return null
-  if (config.dedupeKey) return String(config.dedupeKey)
+  if (config.dedupeKey) return `${sessionGeneration}:${String(config.dedupeKey)}`
 
   const params = serializeRequestPart(config.params)
   const data = serializeRequestPart(config.data)
   if (params === null || data === null) return null
 
-  return `${method}:${config.url || ''}:${params}:${data}`
+  return `${sessionGeneration}:${method}:${config.url || ''}:${params}:${data}`
 }
 
-const withAuthHeader = config => {
-  const userStore = useUserStore()
+const withAuthSession = (config, session) => {
   const headers = { ...config.headers }
-  const requestToken = userStore.token || ''
 
-  if (requestToken) headers.Authorization = `Bearer ${requestToken}`
-  return rememberRequestSession({ ...config, headers }, requestToken)
+  if (session.token) headers.Authorization = `Bearer ${session.token}`
+  return { ...config, headers, authSessionGeneration: session.generation }
+}
+
+const bindRequestSession = config => {
+  let generation = config.authSessionGeneration
+  if (!Number.isSafeInteger(generation)) {
+    const session = getCurrentAuthSession()
+    config.headers = { ...config.headers }
+    if (session.token) config.headers.Authorization = `Bearer ${session.token}`
+    generation = session.generation
+  }
+  delete config.authSessionGeneration
+  return rememberRequestSession(config, generation)
+}
+
+const createCanceledError = (error, config) => {
+  const requestConfig = config || error?.config || error?.response?.config
+  const safeConfig = sanitizeRequestConfig(requestConfig)
+  const response = error?.response
+    ? {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        config: safeConfig
+      }
+    : undefined
+  const canceledError = new RequestError({
+    message: error?.message || '请求已取消',
+    code: 'ERR_CANCELED',
+    businessCode: 'ERR_CANCELED',
+    status: response?.status ?? null,
+    context: 'canceled',
+    method: requestConfig?.method,
+    url: requestConfig?.url,
+    axiosCode: 'ERR_CANCELED',
+    response,
+    config: safeConfig
+  })
+
+  canceledError.name = 'CanceledError'
+  canceledError.isAxiosError = error?.isAxiosError === true
+  canceledError.__CANCEL__ = true
+  delete canceledError.request
+  delete canceledError.originalError
+  return canceledError
 }
 
 const createErrorFromFailure = (error, config) => {
@@ -168,9 +221,9 @@ const handleUnauthorized = (error, requestConfig) => {
   if (error.context !== 'unauthorized') return false
 
   const userStore = useUserStore()
-  const requestToken = requestAuthSessions.get(requestConfig)
-  const currentToken = userStore.token || ''
-  if (requestToken === undefined || requestToken !== currentToken) return true
+  const requestGeneration = requestAuthSessions.get(requestConfig)
+  const currentSession = getCurrentAuthSession()
+  if (requestGeneration === undefined || requestGeneration !== currentSession.generation) return true
 
   userStore.logout()
 
@@ -182,9 +235,9 @@ const handleUnauthorized = (error, requestConfig) => {
 }
 
 export const handleRequestError = (error, config) => {
-  if (isCanceledError(error)) return Promise.reject(error)
-
   const requestConfig = config || error?.config || error?.response?.config
+  if (isCanceledError(error)) return Promise.reject(createCanceledError(error, requestConfig))
+
   const requestError = createErrorFromFailure(error, requestConfig)
   const staleUnauthorized = handleUnauthorized(requestError, requestConfig)
 
@@ -236,40 +289,38 @@ const validateAxiosResponse = response => {
 
 service.interceptors.request.use(
   config => {
-    const userStore = useUserStore()
-    const requestToken = userStore.token || ''
     config.baseURL = getApiBaseUrl()
-    config.headers = { ...config.headers }
-    if (requestToken) config.headers.Authorization = `Bearer ${requestToken}`
-    return rememberRequestSession(config, requestToken)
+    return bindRequestSession(config)
   },
   error => Promise.reject(error)
 )
 
 service.interceptors.response.use(validateAxiosResponse, handleRequestError)
 
-const executeRequest = config => {
-  if (!isMockEnabled) return service(config)
+const executeRequest = (config, session) => {
+  const requestConfig = withAuthSession(config, session)
+  if (!isMockEnabled) return service(requestConfig)
 
-  const requestConfig = withAuthHeader(config)
-  return mockRequest(requestConfig)
-    .then(response => normalizeSuccess(response, requestConfig, 200))
-    .catch(error => handleRequestError(error, requestConfig))
+  const boundRequestConfig = bindRequestSession(requestConfig)
+  return mockRequest(boundRequestConfig)
+    .then(response => normalizeSuccess(response, boundRequestConfig, 200))
+    .catch(error => handleRequestError(error, boundRequestConfig))
 }
 
 const request = config => {
+  const session = getCurrentAuthSession()
   const requestConfig = { ...config }
-  const lockKey = getRequestLockKey(requestConfig)
+  const lockKey = getRequestLockKey(requestConfig, session.generation)
   delete requestConfig.dedupe
   delete requestConfig.dedupeKey
 
-  if (!lockKey) return executeRequest(requestConfig)
+  if (!lockKey) return executeRequest(requestConfig, session)
 
   const pendingRequest = pendingRequests.get(lockKey)
   if (pendingRequest) return pendingRequest
 
   const promise = Promise.resolve()
-    .then(() => executeRequest(requestConfig))
+    .then(() => executeRequest(requestConfig, session))
     .finally(() => {
       if (pendingRequests.get(lockKey) === promise) pendingRequests.delete(lockKey)
     })
