@@ -96,7 +96,7 @@
             :data="tableData"
             @row-click="openTaskDetail"
             :loading="loading"
-            :height="historyTableHeight"
+            height="100%"
             table-content-width="max-content"
             style="width: 100%"
             class="history-table history-management-table"
@@ -267,9 +267,6 @@ const realtimeStore = useRealtimeStore()
 const detailLoading = computed(() => jobStore.detailLoading)
 const detailErrorText = computed(() => jobStore.detailError?.message || '')
 const tableData = ref([])
-const historyTableHeight = computed(() => tableData.value.length > 8
-  ? '100%'
-  : undefined)
 const detailDrawerVisible = ref(false)
 const selectedJob = ref(null)
 const reconcileSubmitting = ref(false)

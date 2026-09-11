@@ -91,6 +91,7 @@ test('800×560 窄视口保留组件视口、内部横向滚动和固定操作�
   assert.match(historySource, /\.history-management-table :deep\(\.t-table\)\s*\{[\s\S]*width: 100%[\s\S]*min-width: 0/)
   assert.doesNotMatch(queueSource, /\.job-queue-table :deep\(\.t-table\)\s*\{[^}]*min-width:\s*\d+px/)
   assert.doesNotMatch(historySource, /\.history-management-table :deep\(\.t-table\)\s*\{[^}]*min-width:\s*\d+px/)
+  assert.match(historySource, /class="history-table-wrapper"[\s\S]*height="100%"/)
   assert.match(historySource, /报错原因[\s\S]*<t-tooltip[\s\S]*String\(scope\.row\.errorReason\)/)
 })
 

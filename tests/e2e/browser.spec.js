@@ -309,6 +309,77 @@ test('移动端在表格页面通过真实点击打开侧栏并导航', async ({
   }
 })
 
+test('800x560 历史表在 3、8 和更多记录下保持内部双向滚动与详情可达', async ({ browser }) => {
+  test.setTimeout(120000)
+  const context = await browser.newContext({ viewport: { width: 800, height: 560 } })
+  const page = await context.newPage()
+
+  const createHistoryJobs = count => Array.from({ length: count }, (_, index) => ({
+    id: 2000 + index,
+    fileId: index % 2 ? 21 : 20,
+    printerId: null,
+    userId: index % 2 ? 2 : 1,
+    operatorId: null,
+    priority: 0,
+    status: 'COMPLETED',
+    progress: 100,
+    startedAt: `2026-09-02T${String(10 + index).padStart(2, '0')}:00:00`,
+    completedAt: `2026-09-02T${String(10 + index).padStart(2, '0')}:30:00`,
+    errorReason: null,
+    createdAt: `2026-09-02T${String(9 + index).padStart(2, '0')}:30:00`,
+    updatedAt: `2026-09-02T${String(10 + index).padStart(2, '0')}:30:00`
+  }))
+
+  try {
+    for (const count of [3, 8, 12]) {
+      await page.goto('/login')
+      await page.evaluate(jobs => window.__FARM_RESET_MOCK__({ jobs }), createHistoryJobs(count))
+      await page.getByLabel('用户名', { exact: true }).fill('admin')
+      await page.getByLabel('密码', { exact: true }).fill('Admin123')
+      await page.getByRole('button', { name: '登录', exact: true }).click()
+      await expect(page).toHaveURL(/\/dashboard$/)
+      await openSidebarItem(page, 800, '打印历史')
+      await expect(page.getByRole('heading', { name: '打印历史记录' })).toBeVisible()
+
+      const table = page.locator('.history-management-table')
+      const content = table.locator('.t-table__content').first()
+      await expect(content).toBeVisible()
+      await expect(table.locator('.t-table__body tr').first()).toBeVisible()
+
+      const metrics = await content.evaluate(element => ({
+        clientWidth: element.clientWidth,
+        clientHeight: element.clientHeight,
+        scrollWidth: element.scrollWidth,
+        scrollHeight: element.scrollHeight,
+        overflowX: getComputedStyle(element).overflowX,
+        overflowY: getComputedStyle(element).overflowY
+      }))
+      expect(metrics.clientWidth).toBeGreaterThan(0)
+      expect(metrics.clientHeight).toBeGreaterThan(0)
+      expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth)
+      expect(['auto', 'scroll']).toContain(metrics.overflowX)
+      expect(['auto', 'scroll']).toContain(metrics.overflowY)
+
+      await content.evaluate(element => {
+        element.scrollLeft = element.scrollWidth
+        element.scrollTop = element.scrollHeight
+      })
+      const endMetrics = await content.evaluate(element => ({
+        scrollLeft: element.scrollLeft,
+        maxScrollLeft: element.scrollWidth - element.clientWidth,
+        scrollTop: element.scrollTop,
+        maxScrollTop: element.scrollHeight - element.clientHeight
+      }))
+      expect(endMetrics.scrollLeft).toBeGreaterThanOrEqual(Math.max(0, endMetrics.maxScrollLeft - 1))
+      expect(endMetrics.scrollTop).toBeGreaterThanOrEqual(Math.max(0, endMetrics.maxScrollTop - 1))
+      await expect(table.locator('.t-table__body tr').last()).toBeVisible()
+      await expect(table.getByRole('button', { name: '详情', exact: true }).last()).toBeVisible()
+    }
+  } finally {
+    await context.close()
+  }
+})
+
 test('800x560 下 30x60 布局在网格内部滚动并展示保存摘要', async ({ browser }) => {
   test.setTimeout(120000)
   const context = await browser.newContext({ viewport: { width: 800, height: 560 } })

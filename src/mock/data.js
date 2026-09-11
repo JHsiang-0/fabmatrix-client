@@ -10,7 +10,8 @@ const createSeedData = ({
   dashboardLayout: layoutOverride = null,
   dashboardLayoutError = null,
   printers: printersOverride = null,
-  batchAddFailures = []
+  batchAddFailures = [],
+  jobs: jobsOverride = null
 } = {}) => ({
   users: initialized ? [
     {
@@ -424,7 +425,7 @@ const createSeedData = ({
       successRate: 0
     }
   ],
-  jobs: [
+  jobs: jobsOverride || [
     {
       id: 1001,
       fileId: 20,

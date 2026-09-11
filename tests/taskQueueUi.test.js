@@ -16,12 +16,13 @@ const jobQuerySource = fs.readFileSync(new URL('../src/utils/jobQuery.js', impor
 const request = (method, url, data, headers) => mockRequest({ method, url, data, headers })
 const activeSessionHeaders = { Authorization: 'Bearer tc003-active-session' }
 
-test('任务列表只有数据量足够时才启用局部滚动，少量数据保持自然高度', () => {
+test('队列按数据量控制高度，历史始终填充可用表格视口', () => {
   assert.match(queueSource, /:height="queueTableHeight"/)
   assert.match(queueSource, /queueData\.value\.length > 8/)
   assert.match(queueSource, /activePageData\.value\.length > 8/)
-  assert.match(historySource, /:height="historyTableHeight"/)
-  assert.match(historySource, /tableData\.value\.length > 8/)
+  assert.match(historySource, /height="100%"/)
+  assert.doesNotMatch(historySource, /historyTableHeight/)
+  assert.doesNotMatch(historySource, /tableData\.value\.length > 8/)
 })
 
 test('任务刷新失败保留已有服务端数据并提供页面内重试', () => {
