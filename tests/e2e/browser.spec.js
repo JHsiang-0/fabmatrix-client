@@ -499,6 +499,78 @@ test('UI-007 扫描网段分段输入校验、请求范围和 800x560 布局', a
   }
 })
 
+test('UI-008 扫描网段控件组在桌面与窄屏保持对齐且无横向溢出', async ({ browser }) => {
+  const viewports = [
+    { width: 1440, height: 900 },
+    { width: 375, height: 812 }
+  ]
+
+  for (const viewport of viewports) {
+    const context = await browser.newContext({ viewport })
+    const page = await context.newPage()
+
+    try {
+      await page.goto('/login')
+      await page.getByLabel('用户名', { exact: true }).fill('admin')
+      await page.getByLabel('密码', { exact: true }).fill('Admin123')
+      await page.getByRole('button', { name: '登录', exact: true }).click()
+      await openSidebarItem(page, viewport.width, '打印机管理')
+      await page.getByRole('button', { name: '扫描局域网设备', exact: true }).click()
+
+      const scanDrawer = page.locator('.t-drawer').filter({ hasText: '扫描局域网设备' })
+      const metrics = await scanDrawer.evaluate(drawer => {
+        const box = element => {
+          const rect = element.getBoundingClientRect()
+          return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+        }
+        const segments = [...drawer.querySelectorAll('.printer-scan-subnet-segment')].map(box)
+        const button = box(drawer.querySelector('.printer-scan-subnet-button'))
+        const label = box(drawer.querySelector('.t-form__label'))
+        const hint = box(drawer.querySelector('.printer-scan-subnet-hint'))
+        const body = box(drawer.querySelector('.t-drawer__body'))
+        const group = [...segments, button]
+        const groupLeft = Math.min(...group.map(item => item.x))
+        const groupRight = Math.max(...group.map(item => item.x + item.width))
+        const groupBottom = Math.max(...group.map(item => item.y + item.height))
+        return {
+          segmentWidths: segments.map(item => item.width),
+          segmentCenterY: segments[0]?.y + segments[0]?.height / 2,
+          segmentHeight: segments[0]?.height,
+          button,
+          label,
+          hint,
+          body,
+          group: {
+            centerX: (groupLeft + groupRight) / 2,
+            bottom: groupBottom,
+            width: groupRight - groupLeft
+          },
+          documentWidth: document.documentElement.scrollWidth,
+          viewportWidth: window.innerWidth
+        }
+      })
+
+      expect(metrics.segmentWidths.length).toBe(3)
+      expect(Math.max(...metrics.segmentWidths) - Math.min(...metrics.segmentWidths)).toBeLessThanOrEqual(1)
+      expect(metrics.segmentWidths[0]).toBeGreaterThanOrEqual(56)
+      expect(metrics.segmentWidths[0]).toBeLessThanOrEqual(64)
+      expect(Math.abs(metrics.button.height - metrics.segmentHeight)).toBeLessThanOrEqual(2)
+      expect(Math.abs(metrics.label.y + metrics.label.height / 2 - metrics.segmentCenterY)).toBeLessThanOrEqual(2)
+      expect(Math.abs(metrics.group.centerX - (metrics.body.x + metrics.body.width / 2))).toBeLessThanOrEqual(64)
+      expect(metrics.hint.y).toBeGreaterThanOrEqual(metrics.group.bottom)
+      expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1)
+
+      if (viewport.width > 768) {
+        expect(Math.abs(metrics.button.y + metrics.button.height / 2 - metrics.segmentCenterY)).toBeLessThanOrEqual(2)
+      } else {
+        expect(metrics.button.width).toBeLessThan(metrics.body.width)
+      }
+    } finally {
+      await context.close()
+    }
+  }
+})
+
 test('UI-006 打印机选择不跨筛选分页且两个抽屉在 800x560 可用', async ({ browser }) => {
   test.setTimeout(120000)
   const context = await browser.newContext({ viewport: { width: 800, height: 560 } })

@@ -1727,3 +1727,40 @@ Git 检查：提交前执行 `git status --short`、`git diff --check`，仅暂�
 完成记录：扫描 Drawer 顶部改为三个 TDesign 文本输入段，限制最多 3 位并通过输入辅助文案校验整数 0–255；扫描按钮独立于输入 suffix，桌面横排、小屏换行；合法 subnet 组合后继续调用原有扫描 API，重试和批量导入状态保持不变。Mock 仅新增最后扫描 subnet 的浏览器测试观测，不改变接口行为。
 
 验证：`node --test tests/printerCenter.test.js`（15/15）、UI-007 Browser E2E（1/1）、`npm test`（271/271）、`npm run lint`、`npm run build`、完整 Browser E2E（15/15）、Electron E2E（3/3）和 `git diff --check` 均通过。构建保留既有 realtimeStore 动静态导入提示与大 chunk 警告，不影响退出码。
+
+### [x] UI-008 扫描网段控件组视觉对齐
+
+状态：DONE（2026-09-11）
+
+优先级：P1
+
+目标：在不改变 UI-007 扫描参数、校验、接口、异步状态、结果列表和批量导入行为的前提下，收敛扫描 Drawer 顶部网段输入、分隔点、扫描按钮和范围提示的对齐与响应式布局。
+
+范围：`src/views/PrinterManage.vue`、`tests/printerCenter.test.js`、`tests/e2e/browser.spec.js` 和本任务记录；不修改后端、依赖锁、环境文件或 `src/stores/printerStore.js.backup`。
+
+验收：
+
+- 桌面 660px Drawer 中，标签与控件行垂直居中，三段输入等宽，分隔点固定窄宽并垂直居中，按钮与 medium 输入同高，控件组紧凑且居中。
+- 扫描范围提示独立位于控件下一行，居中显示并保留非法网段错误态。
+- 800×560 及 768px 以下视口自然换行，输入段保持等宽居中，按钮不无必要撑满整行，Drawer 无横向溢出。
+- 更新 Node 静态契约和 Browser E2E 几何断言，避免绑定单一像素值。
+
+完成记录：扫描表单项控件行统一使用 TDesign medium 尺寸和居中对齐，分隔点固定为窄宽并采用组件尺寸 token；范围提示移至表单项下一行独立居中；窄屏保留自然换行并让按钮维持内容宽度。扫描逻辑、校验、请求、loading/disabled、错误态、结果列表和批量导入均未改变。
+
+修改文件：`src/views/PrinterManage.vue`、`tests/printerCenter.test.js`、`tests/e2e/browser.spec.js`、本任务记录。
+
+API/OpenAPI 核对：未新增或修改接口、字段、权限或业务状态；继续使用 UI-007 已核对的扫描和批量导入契约。
+
+Loading/Empty/Error：仅调整扫描控件布局；扫描 Loading、原位错误 Alert、空结果、结果列表和 Drawer Footer 沿用现有实现，范围校验错误提示保持可见。
+
+响应式视口：Browser E2E 覆盖桌面 1440px 和窄屏 375px，并保留既有 800×560 扫描回归；验证等宽、按钮/输入高度和垂直中心接近、Drawer 内居中及页面无横向溢出。
+
+测试：`node --test tests/printerCenter.test.js`、`npm test`、Browser E2E、Electron E2E。
+
+lint：`npm run lint`。
+
+build：`npm run build`。
+
+git status --short、`git diff --check`：提交前执行并仅暂存本任务实际修改。
+
+提交：完成最终验证后创建独立本地提交，不执行 push。

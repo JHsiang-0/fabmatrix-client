@@ -349,7 +349,7 @@
     >
       <div class="printer-scan-drawer__content">
         <t-form class="printer-scan-drawer__form" label-width="90px">
-          <t-form-item label="扫描网段">
+          <t-form-item class="printer-scan-subnet-form-item" label="扫描网段">
             <div class="printer-scan-subnet-control">
               <div class="printer-scan-subnet-segments" role="group" aria-label="扫描网段前三段">
                 <template v-for="(segment, index) in subnetSegments" :key="`subnet-segment-${index}`">
@@ -370,6 +370,7 @@
               </div>
               <t-button
                 class="printer-scan-subnet-button"
+                size="medium"
                 theme="primary"
                 :loading="isScanning"
                 :disabled="isScanning || isBatchAdding"
@@ -378,17 +379,17 @@
                 <span><search /></span>
                 {{ isScanning ? '扫描中...' : '开始扫描' }}
               </t-button>
-              <p
-                class="printer-scan-subnet-hint"
-                :class="{ 'printer-scan-subnet-hint--error': !subnetIsValid }"
-                role="status"
-                aria-live="polite"
-              >
-                {{ scanSubnetHint }}
-              </p>
             </div>
           </t-form-item>
         </t-form>
+        <p
+          class="printer-scan-subnet-hint"
+          :class="{ 'printer-scan-subnet-hint--error': !subnetIsValid }"
+          role="status"
+          aria-live="polite"
+        >
+          {{ scanSubnetHint }}
+        </p>
 
         <div v-if="isScanning" class="printer-scan-drawer__state" role="status" aria-live="polite">
           <t-loading text="正在扫描局域网设备，请稍候..." />
@@ -1619,10 +1620,15 @@ const handleBatchAdd = async () => {
   flex: 0 0 auto;
 }
 
+.printer-scan-subnet-form-item :deep(.t-form__controls-content) {
+  align-items: center;
+}
+
 .printer-scan-subnet-control {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
   gap: var(--app-spacing-2);
   min-width: 0;
   width: 100%;
@@ -1642,6 +1648,12 @@ const handleBatchAdd = async () => {
 }
 
 .printer-scan-subnet-separator {
+  display: inline-flex;
+  flex: 0 0 12px;
+  width: 12px;
+  height: var(--td-comp-size-m);
+  align-items: center;
+  justify-content: center;
   color: var(--app-text-secondary);
   font-size: var(--td-font-size-title-medium);
   line-height: 1;
@@ -1652,12 +1664,12 @@ const handleBatchAdd = async () => {
 }
 
 .printer-scan-subnet-hint {
-  flex: 1 1 100%;
   min-width: 0;
   margin: 0;
   color: var(--app-text-secondary);
   font-size: var(--td-font-size-body-small);
   line-height: 1.5;
+  text-align: center;
 }
 
 .printer-scan-subnet-hint--error {
@@ -1827,8 +1839,9 @@ const handleBatchAdd = async () => {
   }
 
   .printer-scan-subnet-button {
-    flex: 1 1 100%;
-    width: 100%;
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 100%;
   }
 
   .printer-management-toolbar-card__top {

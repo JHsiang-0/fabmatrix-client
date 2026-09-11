@@ -123,6 +123,16 @@ test('UI-007 扫描网段使用可访问的三段输入并把扫描按钮移出 
   assert.match(source, /isScanning\.value \|\| isBatchAdding\.value/)
 })
 
+test('UI-008 扫描网段控件组使用紧凑居中布局并保持窄屏按钮自然宽度', () => {
+  assert.match(source, /class="printer-scan-subnet-form-item"/)
+  assert.match(source, /\.printer-scan-subnet-form-item :deep\(\.t-form__controls-content\)[\s\S]*align-items: center/)
+  assert.match(source, /\.printer-scan-subnet-control[\s\S]*align-items: center[\s\S]*justify-content: center/)
+  assert.match(source, /\.printer-scan-subnet-separator[\s\S]*flex: 0 0 12px[\s\S]*width: 12px[\s\S]*height: var\(--td-comp-size-m\)/)
+  assert.match(source, /class="printer-scan-subnet-button"[\s\S]*size="medium"/)
+  assert.match(source, /\.printer-scan-subnet-hint[\s\S]*text-align: center/)
+  assert.match(source, /@media \(max-width: 768px\)[\s\S]*\.printer-scan-subnet-button \{[\s\S]*flex: 0 0 auto;[\s\S]*width: auto;/)
+})
+
 test('UI-006 看板未分配 Drawer 覆盖角色、错误重试、关闭和设备字段', () => {
   assert.match(unallocatedSource, /header="未分配设备"/)
   assert.match(unallocatedSource, /:close-btn="true"/)
