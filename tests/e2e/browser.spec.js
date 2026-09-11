@@ -115,7 +115,7 @@ for (const viewport of viewports) {
       if (viewport.width > 768) {
         await page.getByRole('button', { name: '设备看板', exact: true }).click()
         await expect(page).toHaveURL(/\/dashboard\/fullscreen$/)
-        await expect(page.getByRole('heading', { name: 'FabMatrix 3D 打印控制系统' })).toBeVisible()
+        await expect(page.getByRole('heading', { name: '嘉东三维联动打印机实时控制系统' })).toBeVisible()
         await expect(page.getByRole('button', { name: '退出全屏', exact: true })).toBeVisible()
         await assertNoViewportOverflow(page)
         await page.screenshot({ path: testInfo.outputPath(`dashboard-fullscreen-${viewport.width}.png`) })

@@ -96,7 +96,7 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     await page.getByRole('button', { name: '设备看板', exact: true }).click()
     await expect(page).toHaveURL(/127\.0\.0\.1:5177\/#\/dashboard\/fullscreen/)
     await expect(page.getByRole('banner', { name: '应用标题栏' })).toHaveCount(0)
-    await expect(page.getByRole('heading', { name: 'FabMatrix 3D 打印控制系统' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '嘉东三维联动打印机实时控制系统' })).toBeVisible()
     await page.getByRole('button', { name: '退出全屏', exact: true }).click()
     await expect(page).toHaveURL(/127\.0\.0\.1:5177\/#\/printers/)
     await expect(page.getByRole('banner', { name: '应用标题栏' })).toBeVisible()
@@ -316,7 +316,7 @@ test('Electron UI-002 主业务页面在三种窗口尺寸下可达并生成稳�
     { key: 'history', path: '/tasks/history', heading: '打印历史记录' },
     { key: 'batch', path: '/batch-dispatch', heading: '批量手动派发' },
     { key: 'profile', path: '/profile', heading: '个人中心' },
-    { key: 'fullscreen', path: '/dashboard/fullscreen', heading: 'FabMatrix 3D 打印控制系统' }
+    { key: 'fullscreen', path: '/dashboard/fullscreen', heading: '嘉东三维联动打印机实时控制系统' }
   ]
 
   try {

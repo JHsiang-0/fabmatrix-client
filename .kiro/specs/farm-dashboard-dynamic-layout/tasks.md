@@ -137,6 +137,12 @@ SecurityConfig 显式限制 GET 为 ADMIN/OPERATOR、PUT 为 ADMIN（PUT 保存�
 - 执行后端 `mvn test`，前端 `npm test`、`npm run lint`、`npm run build`、浏览器 E2E、Electron E2E 和 desktop dist 验证。
 - 验收：全部命令通过；MySQL 与 SQLite 至少各完成一次真实约束/事务验收。
 
+自动化完成记录：已将浏览器与 Electron 全屏看板断言更新为现行 Header 文案，新增 `gridAisleUi.test.js`，
+覆盖动态横/纵过道、交叉标签、内部滚动和共享模板，并保留已有布局、权限、事务、冲突、缩容、超过 100 台和
+WebSocket 回归护栏。前端全量测试 227/227、lint、生产/desktop/desktop-mock 构建、浏览器 E2E 9/9、
+Electron E2E 3/3、Electron-dist E2E 1/1 通过；后端 `mvn test` 通过。真实 MySQL/SQLite 数据卷验收未执行，
+因当前任务明确禁止连接真实数据库或数据卷，待具备隔离环境后补做，故本任务暂不标记 DONE。
+
 ### [ ] SYNC-002.9 完成迁移交付与文档收口
 
 - 更新部署、升级、回滚、数据库预检、API handoff 和管理员操作说明。
