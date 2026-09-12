@@ -1,4 +1,5 @@
 import { createMemoryHistory, createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
+import { isFeatureEnabled } from '@/config/features'
 import { useUserStore } from '@/stores/user'
 import { message } from '@/utils/message'
 import { resolveRouteAccess, ROUTE_ACCESS } from '@/utils/permissions'
@@ -116,7 +117,7 @@ const router = createRouter({
           path: 'batch-dispatch',
           name: 'batch-dispatch',
           component: () => import('../views/BatchDispatch.vue'),
-          meta: { title: '批量手动派发', hideBreadcrumb: true, pageScroll: true }
+          meta: { title: '批量手动派发', hideBreadcrumb: true, pageScroll: true, feature: 'batchDispatch' }
         }
       ]
     },
@@ -130,6 +131,11 @@ const router = createRouter({
 
 // 全局路由守卫（门禁系统）
 router.beforeEach(async (to) => {
+  const disabledFeatureRoute = to.matched.find(record => (
+    record.meta.feature && !isFeatureEnabled(record.meta.feature)
+  ))
+  if (disabledFeatureRoute) return { name: 'not-found' }
+
   const userStore = useUserStore()
 
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)

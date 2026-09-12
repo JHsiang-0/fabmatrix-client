@@ -496,7 +496,6 @@ test('Electron UI-002 主业务页面在三种窗口尺寸下可达并生成稳�
     { key: 'files', path: '/files', heading: '文件库' },
     { key: 'queue', path: '/tasks/queue', heading: '生产调度队列' },
     { key: 'history', path: '/tasks/history', heading: '打印历史记录' },
-    { key: 'batch', path: '/batch-dispatch', heading: '批量手动派发' },
     { key: 'profile', path: '/profile', heading: '个人中心' },
     { key: 'fullscreen', path: '/dashboard/fullscreen', heading: '嘉东三维联动打印机实时控制系统' }
   ]
@@ -509,6 +508,10 @@ test('Electron UI-002 主业务页面在三种窗口尺寸下可达并生成稳�
     await page.getByLabel('密码', { exact: true }).fill('Admin123')
     await page.getByRole('button', { name: '登录', exact: true }).click()
     await expect(page).toHaveURL(/127\.0\.0\.1:5177\/#\/dashboard/)
+    await expect(page.locator('.app-sidebar').getByText('批量派发', { exact: true })).toHaveCount(0)
+    await page.goto(`${E2E_DESKTOP_URL}/#/batch-dispatch`)
+    await expect(page).toHaveURL(/127\.0\.0\.1:5177\/#\/404/)
+    await expect(page.getByText('页面不存在', { exact: true })).toBeVisible()
 
     for (const size of [[800, 560], [1024, 640], [1200, 760]]) {
       await electronApp.evaluate(({ BrowserWindow }, nextSize) => {
@@ -529,10 +532,6 @@ test('Electron UI-002 主业务页面在三种窗口尺寸下可达并生成稳�
         if (route.key === 'history') await expect(page.locator('.history-workspace')).toBeVisible()
         if (route.key === 'history') {
           await expect(page.getByRole('button', { name: '刷新', exact: true })).toBeEnabled({ timeout: 10000 })
-        }
-        if (route.key === 'batch') {
-          await expect(page.locator('.batch-dispatch-page')).toBeVisible()
-          await expect(page.getByRole('button', { name: '刷新资源', exact: true })).toBeEnabled({ timeout: 10000 })
         }
         if (route.key === 'profile') await expect(page.locator('.profile-loading')).toHaveCount(0, { timeout: 10000 })
         await expect(page.locator('.t-message')).toHaveCount(0, { timeout: 10000 })

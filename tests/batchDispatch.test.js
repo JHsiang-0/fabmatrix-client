@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
+import { isFeatureEnabled } from '../src/config/features.js'
 import { getNavigationItem } from '../src/config/navigation.js'
 import {
   acquireBatchConfirmLock,
@@ -11,8 +12,14 @@ import {
   toBatchPreviewPayload
 } from '../src/utils/batchDispatch.js'
 
-test('exposes the batch dispatch page through the application navigation', () => {
-  assert.deepEqual(getNavigationItem('/batch-dispatch')?.key, 'tasks-batch')
+const routerSource = await readFile(new URL('../src/router/index.js', import.meta.url), 'utf8')
+
+test('当前版本隐藏批量派发入口并拒绝直接路由访问', () => {
+  assert.equal(isFeatureEnabled('batchDispatch'), false)
+  assert.equal(getNavigationItem('/batch-dispatch'), null)
+  assert.match(routerSource, /feature: 'batchDispatch'/)
+  assert.match(routerSource, /isFeatureEnabled\(record\.meta\.feature\)/)
+  assert.match(routerSource, /if \(disabledFeatureRoute\) return \{ name: 'not-found' \}/)
 })
 
 test('v2 批量派发只展示 v3 预留标识，不包含自动派单动作', async () => {

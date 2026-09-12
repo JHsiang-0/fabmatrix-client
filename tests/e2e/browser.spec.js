@@ -13,7 +13,6 @@ const pages = [
   { label: '文件库', path: '/files', text: '文件库' },
   { label: '任务队列', path: '/tasks/queue', text: '生产调度队列' },
   { label: '打印历史', path: '/tasks/history', text: '打印历史记录' },
-  { label: '批量派发', path: '/batch-dispatch', text: '批量手动派发' },
   { label: '用户管理', path: '/users', text: '用户管理' },
   { label: '操作日志', path: '/audit-logs', text: '操作日志' },
   { label: '个人中心', path: '/profile', text: '个人资料' }
@@ -25,7 +24,6 @@ const parentLabels = {
   文件库: '文件',
   任务队列: '任务',
   打印历史: '任务',
-  批量派发: '批量派发',
   用户管理: '管理中心',
   操作日志: '管理中心',
   个人中心: '个人中心'
@@ -164,148 +162,25 @@ for (const viewport of viewports) {
   })
 }
 
-const batchConfirmRequest = request => request.method() === 'POST'
-  && new URL(request.url()).pathname === '/api/v1/print-jobs/batch/confirm'
-
-const batchConfirmDialog = page => page.locator('.t-dialog:visible').filter({ hasText: '确认批量派发' })
-
-const isMockBrowser = page => page.evaluate(() => typeof window.__FARM_RESET_MOCK__ === 'function')
-
-const mockRequestCount = (page, requestKey) => page.evaluate(key => {
-  const debug = window.__FARM_GET_MOCK_DEBUG__?.()
-  return debug?.requestCounts?.[key] || 0
-}, requestKey)
-
-const mockBatchConfirmRequestCount = page => mockRequestCount(page, 'POST /api/v1/print-jobs/batch/confirm')
-
-const expectMockBatchConfirmRequestCount = async (page, expected) => {
-  expect(await isMockBrowser(page)).toBe(true)
-  await expect.poll(() => mockBatchConfirmRequestCount(page)).toBe(expected)
-}
-
-const confirmBatchFromDialog = async (page, dialog) => {
-  const resultPromise = page.getByText(/执行完成：计划状态 COMPLETED/).waitFor({ state: 'visible' })
-  const confirmClickPromise = dialog.getByRole('button', { name: '确认执行', exact: true }).click()
-  if (await isMockBrowser(page)) {
-    await Promise.all([resultPromise, confirmClickPromise])
-    return
-  }
-  const responsePromise = page.waitForResponse(response => batchConfirmRequest(response.request()), { timeout: 5000 })
-  await Promise.all([responsePromise, resultPromise, confirmClickPromise])
-}
-
-test('批量派发页面完成真实预览确认流程', async ({ browser }) => {
-  test.setTimeout(120000)
+test('当前版本隐藏批量派发入口且直接访问返回404', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   const page = await context.newPage()
 
   try {
     await login(page)
-    await openSidebarItem(page, 1440, '批量派发')
-    await page.getByRole('checkbox', { name: /gearbox\.gcode/ }).check({ force: true })
-    await page.getByRole('checkbox', { name: /^bracket\.gcode个人/ }).check({ force: true })
-    await page.getByRole('checkbox', { name: /Printer_A12F/ }).check({ force: true })
-    await page.getByRole('button', { name: '下一步：配置策略', exact: true }).click()
-    await page.getByRole('button', { name: '生成派发预览', exact: true }).click()
-    await expect(page.getByText('无副作用预览', { exact: true })).toBeVisible()
-    await page.getByRole('button', { name: /确认执行（\d+项）/ }).click()
-    await expectMockBatchConfirmRequestCount(page, 0)
-    const dialog = batchConfirmDialog(page)
-    await expect(dialog).toHaveCount(1)
-    await confirmBatchFromDialog(page, dialog)
-    await expect(dialog).toHaveCount(0)
-    await expect(page.getByText(/执行完成：计划状态 COMPLETED/)).toBeVisible()
-    await expect(page.getByText(/成功 1 项，失败 0 项/)).toBeVisible()
-    await expect(page.getByRole('columnheader', { name: '原因码' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '再次获取执行结果', exact: true })).toBeVisible()
-    await expectMockBatchConfirmRequestCount(page, 1)
+    await expect(page.locator('.app-sidebar').getByText('批量派发', { exact: true })).toHaveCount(0)
+    await page.goto('/batch-dispatch')
+    await expect(page).toHaveURL(/\/404$/)
+    await expect(page.getByText('页面不存在', { exact: true })).toBeVisible()
   } finally {
     await context.close()
   }
 })
 
-const prepareBatchPreview = async page => {
-  await page.goto('/login')
-  await page.evaluate(() => window.__FARM_RESET_MOCK__())
-  await page.getByLabel('用户名', { exact: true }).fill('admin')
-  await page.getByLabel('密码', { exact: true }).fill('Admin123')
-  await page.getByRole('button', { name: '登录', exact: true }).click()
-  await expect(page).toHaveURL(/\/dashboard$/)
-  await openSidebarItem(page, 1440, '批量派发')
-  await expect(page.locator('.batch-dispatch-page')).toBeVisible()
-  await page.getByRole('checkbox', { name: /gearbox\.gcode/ }).check({ force: true })
-  await page.getByRole('checkbox', { name: /Printer_A12F/ }).check({ force: true })
-  await page.getByRole('button', { name: '下一步：配置策略', exact: true }).click({ force: true })
-  await page.getByRole('button', { name: '生成派发预览', exact: true }).click()
-  await expect(page.getByText('无副作用预览', { exact: true })).toBeVisible()
-}
-
-test('批量派发组件真实点击先显示一个确认框并只确认一次', async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
-  const page = await context.newPage()
-
-  try {
-    await prepareBatchPreview(page)
-    const confirmButton = page.getByRole('button', { name: /确认执行（\d+项）/ })
-    await confirmButton.click()
-    const dialog = batchConfirmDialog(page)
-    await expect(dialog).toHaveCount(1)
-    await expectMockBatchConfirmRequestCount(page, 0)
-
-    await confirmBatchFromDialog(page, dialog)
-    await expect(page.getByText(/执行完成：计划状态 COMPLETED/)).toBeVisible()
-    await expectMockBatchConfirmRequestCount(page, 1)
-  } finally {
-    await context.close()
-  }
-})
-
-test('批量派发组件真实点击取消后释放锁并允许再次点击', async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
-  const page = await context.newPage()
-
-  try {
-    await prepareBatchPreview(page)
-    const confirmButton = page.getByRole('button', { name: /确认执行（\d+项）/ })
-    await confirmButton.click()
-    let dialog = batchConfirmDialog(page)
-    await expect(dialog).toHaveCount(1)
-    await dialog.getByRole('button', { name: '返回检查', exact: true }).click()
-    await expect(dialog).toHaveCount(0)
-    await expectMockBatchConfirmRequestCount(page, 0)
-    await expect(confirmButton).toBeEnabled()
-
-    await confirmButton.click()
-    dialog = batchConfirmDialog(page)
-    await expect(dialog).toHaveCount(1)
-    await dialog.getByRole('button', { name: '返回检查', exact: true }).click()
-    await expect(dialog).toHaveCount(0)
-    await expectMockBatchConfirmRequestCount(page, 0)
-  } finally {
-    await context.close()
-  }
-})
-
-test('批量派发组件真实快速双击只显示一个确认框并只确认一次', async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
-  const page = await context.newPage()
-
-  try {
-    await prepareBatchPreview(page)
-    const confirmButton = page.getByRole('button', { name: /确认执行（\d+项）/ })
-    await confirmButton.dblclick()
-    const dialog = batchConfirmDialog(page)
-    await expect(dialog).toHaveCount(1)
-    await expectMockBatchConfirmRequestCount(page, 0)
-
-    await confirmBatchFromDialog(page, dialog)
-    await expect(dialog).toHaveCount(0)
-    await expect(page.getByText(/执行完成：计划状态 COMPLETED/)).toBeVisible()
-    await expectMockBatchConfirmRequestCount(page, 1)
-  } finally {
-    await context.close()
-  }
-})
+const mockRequestCount = (page, requestKey) => page.evaluate(key => {
+  const debug = window.__FARM_GET_MOCK_DEBUG__?.()
+  return debug?.requestCounts?.[key] || 0
+}, requestKey)
 
 test('JobQueue 暂停确认只发送一次可观测 Mock 请求', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })

@@ -56,7 +56,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import packageJson from '../../../package.json'
 import { useUserStore } from '@/stores/user'
-import { navigationGroups } from '@/config/navigation'
+import { getEnabledNavigationGroups } from '@/config/navigation'
 
 defineOptions({ name: 'AppSidebar' })
 
@@ -81,7 +81,7 @@ const userStore = useUserStore()
 const appVersion = packageJson.version
 
 const activePath = computed(() => route.path)
-const visibleGroups = computed(() => navigationGroups.map(group => ({
+const visibleGroups = computed(() => getEnabledNavigationGroups().map(group => ({
   ...group,
   items: group.items.filter(item => !item.roles || userStore.hasRole(item.roles))
 })).filter(group => group.items.length > 0))

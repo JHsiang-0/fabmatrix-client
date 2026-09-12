@@ -7,6 +7,7 @@ import {
   SettingIcon,
   UserCircleIcon
 } from 'tdesign-icons-vue-next'
+import { isFeatureEnabled } from './features.js'
 
 export const navigationGroups = [
   {
@@ -40,7 +41,7 @@ export const navigationGroups = [
     key: 'batch-dispatch',
     label: '批量派发',
     icon: SendIcon,
-    items: [{ key: 'tasks-batch', title: '批量派发', to: '/batch-dispatch' }]
+    items: [{ key: 'tasks-batch', title: '批量派发', to: '/batch-dispatch', feature: 'batchDispatch' }]
   },
   {
     key: 'management',
@@ -59,7 +60,16 @@ export const navigationGroups = [
   }
 ]
 
-export const navigationItems = navigationGroups.flatMap(group => group.items)
+export function getEnabledNavigationGroups() {
+  return navigationGroups
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item => !item.feature || isFeatureEnabled(item.feature))
+    }))
+    .filter(group => group.items.length > 0)
+}
+
+export const navigationItems = getEnabledNavigationGroups().flatMap(group => group.items)
 
 export function getNavigationItem(path) {
   return navigationItems.find(item => item.to === path) || null
