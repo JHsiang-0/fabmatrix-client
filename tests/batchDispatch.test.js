@@ -13,6 +13,8 @@ import {
 } from '../src/utils/batchDispatch.js'
 
 const routerSource = await readFile(new URL('../src/router/index.js', import.meta.url), 'utf8')
+const browserE2ESource = await readFile(new URL('./e2e/browser.spec.js', import.meta.url), 'utf8')
+const electronE2ESource = await readFile(new URL('./e2e/electron.spec.js', import.meta.url), 'utf8')
 
 test('当前版本隐藏批量派发入口并拒绝直接路由访问', () => {
   assert.equal(isFeatureEnabled('batchDispatch'), false)
@@ -20,6 +22,16 @@ test('当前版本隐藏批量派发入口并拒绝直接路由访问', () => {
   assert.match(routerSource, /feature: 'batchDispatch'/)
   assert.match(routerSource, /isFeatureEnabled\(record\.meta\.feature\)/)
   assert.match(routerSource, /if \(disabledFeatureRoute\) return \{ name: 'not-found' \}/)
+  assert.match(routerSource, /skipSessionRestore: true/)
+})
+
+test('批量派发导航、路由和业务 E2E 共享同一个功能开关', () => {
+  for (const source of [browserE2ESource, electronE2ESource]) {
+    assert.match(source, /isFeatureEnabled\('batchDispatch'\)/)
+    assert.match(source, /feature: 'batchDispatch'/)
+  }
+  assert.match(browserE2ESource, /test\.skip\(batchDispatchEnabled/)
+  assert.match(browserE2ESource, /test\.skip\(!batchDispatchEnabled/)
 })
 
 test('v2 批量派发只展示 v3 预留标识，不包含自动派单动作', async () => {

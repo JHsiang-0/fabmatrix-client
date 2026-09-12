@@ -38,7 +38,7 @@ const router = createRouter({
       path: '/404',
       name: 'not-found',
       component: () => import('../views/RouteResult.vue'),
-      meta: { title: '页面不存在', requiresAuth: false }
+      meta: { title: '页面不存在', requiresAuth: false, skipSessionRestore: true }
     },
     {
       path: '/dashboard/fullscreen',
@@ -135,6 +135,7 @@ router.beforeEach(async (to) => {
     record.meta.feature && !isFeatureEnabled(record.meta.feature)
   ))
   if (disabledFeatureRoute) return { name: 'not-found' }
+  if (to.matched.some(record => record.meta.skipSessionRestore)) return
 
   const userStore = useUserStore()
 
