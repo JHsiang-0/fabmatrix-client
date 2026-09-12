@@ -32,7 +32,7 @@ PREVIEWED -> EXECUTING -> COMPLETED | PARTIAL_FAILED | RECOVERY_REQUIRED
 | 恢复/重试计划 | 允许 | 允许 | 403 | 401 |
 | 终态结果回放 | 允许 | 允许 | 403 | 401 |
 
-预览和确认服务端都按会话重新计算可见资源。私有资源对无权用户和不存在资源使用相同的 404 响应；不会通过资源名称、版本、原因详情或计划明细泄露私有数据。`ADMIN` 具有跨用户计划管理权，但仍须遵守资源可见性、版本和设备状态校验。
+预览和确认服务端都按会话重新计算可见资源。创建预览时，单个不存在、已删除或不可见的私有文件以 HTTP 200 中的脱敏 `FILE_NOT_FOUND` 明细表达，不回显其资源元数据；确认、恢复和结果回放中的计划不存在或不可见时返回 404，其他 `OPERATOR` 对可见计划越权时返回 403。`ADMIN` 具有跨用户计划管理权，但仍须遵守资源可见性、版本和设备状态校验。
 
 ## 计划执行与租约
 
@@ -51,7 +51,7 @@ create preview
 
 计划认领、明细写入和设备副作用分层；设备调用不持有整批数据库事务。恢复扫描只处理过期 `EXECUTING` 租约，先通过设备查询或任务状态核对副作用，再决定重试、补写成功态或进入 `RECOVERY_REQUIRED`。后者必须经恢复检查/人工核对退出，且在不确定时禁止再次发送相同设备副作用。
 
-动作映射必须在 API、Mock 和前端适配器中一致：`UPLOAD_ONLY` 成功为 `READY`；`QUEUE` 成功为 `QUEUED` 或已绑定时的 `ASSIGNED`；`START_AFTER_CONFIRM` 只产生 `ASSIGNED`/`QUEUED` 的待确认任务，不得将确认动作等同于设备已开始打印。失败必须区分 `RETRYABLE`、`FAILED` 和 `RECOVERY_REQUIRED`，计划状态按明细汇总为 `COMPLETED`、`PARTIAL_FAILED` 或 `RECOVERY_REQUIRED`。
+动作映射必须在 API、Mock 和前端适配器中一致：`UPLOAD_ONLY` 成功为 `READY`；`QUEUE` 成功为 `QUEUED` 或已绑定时的 `ASSIGNED`；`START_AFTER_CONFIRM` 只产生 `ASSIGNED`/`QUEUED` 的待确认任务，不得将确认动作等同于设备已开始打印。失败必须区分 `RETRYABLE`、`FAILED` 和 `RECOVERY_REQUIRED`。计划汇总时先判断是否存在副作用未知项并进入 `RECOVERY_REQUIRED`，再判断是否全部成功并进入 `COMPLETED`，其余确定性结果（包括全部失败）统一进入 `PARTIAL_FAILED`。
 
 ## 幂等与并发
 
