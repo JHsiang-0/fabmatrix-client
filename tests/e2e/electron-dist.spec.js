@@ -39,8 +39,8 @@ test('Electron desktop 构建产物加载 dist-file 并保留运行诊断', asyn
       mode: 'desktop',
       baseUrl: './',
       useMock: false,
-      apiBaseUrl: 'http://localhost:8080',
-      wsUrl: 'ws://localhost:8080/ws/farm-status'
+      apiBaseUrl: 'http://localhost:28081',
+      wsUrl: 'ws://localhost:28081/ws/farm-status'
     })
 
     await expect(page.getByRole('banner', { name: '应用标题栏' })).toBeVisible()

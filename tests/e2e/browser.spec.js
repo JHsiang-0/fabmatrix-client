@@ -497,7 +497,7 @@ test('服务器连接页在桌面和移动视口保持可用且拆分地址操�
       await page.goto('/server-connection')
       await expect(page.getByRole('heading', { name: '连接生产服务器' })).toBeVisible()
       const hostInput = page.locator('.connection-endpoint-grid__host input')
-      const portInput = page.locator('.connection-endpoint-grid input[placeholder="8080"]')
+      const portInput = page.locator('.connection-endpoint-grid input[placeholder="28081"]')
       const wsToggle = page.locator('.connection-ws-label .t-switch')
       const wsProtocol = page.getByLabel('WebSocket 协议').getByRole('textbox', { name: '请选择' })
       const wsInput = page.locator('.connection-ws-address input')

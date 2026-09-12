@@ -84,7 +84,7 @@ npm run format      # 格式化 src/
 - API 模块位于 `src/api`，当前接口主要使用 `/api/v1/auth`、`/api/v1/printers`、`/api/v1/print-files`、`/api/v1/print-jobs`。
 - 请求拦截器从持久化的 Pinia 用户 Store 读取 token，并发送 `Authorization: Bearer <token>`；响应按业务 `code` 处理，未授权会登出并跳转登录页。
 - WebSocket 地址优先读取 `VITE_WS_URL`，否则根据当前页面地址推导；开发代理目标由 `VITE_WS_TARGET` 控制。
-- Vite API 代理目标由 `VITE_API_TARGET` 控制，默认 `http://localhost:8080`；WebSocket 代理默认 `ws://localhost:8080`。
+- Vite API 代理目标由 `VITE_API_TARGET` 控制，默认 `http://localhost:28081`；WebSocket 代理默认 `ws://localhost:28081`。
 - Vite 只会将 `VITE_` 前缀变量暴露给前端。环境文件未随项目提供；新增环境变量时应更新文档，并避免写入真实凭据。
 
 ## 修改代码前的检查要求

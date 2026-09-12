@@ -21,6 +21,7 @@ const {
   isValidServerHost,
   normalizeServerUrl,
   parseServerEndpoint,
+  resolveEnvironmentServerConfig,
   saveServerConfig
 } = await import('../src/utils/serverConfig.js')
 
@@ -74,4 +75,25 @@ test('prefers an explicitly saved WebSocket endpoint and clears only connection 
 test('启动配置读取不受已保存地址影响', () => {
   saveServerConfig({ apiBaseUrl: 'http://saved.example:8080' })
   assert.deepEqual(getEnvironmentServerConfig(), { apiBaseUrl: '', wsUrl: '' })
+})
+
+test('桌面模式在无显式环境变量时使用 tracked 28081 默认值', () => {
+  const expected = {
+    apiBaseUrl: 'http://localhost:28081',
+    wsUrl: 'ws://localhost:28081/ws/farm-status'
+  }
+  assert.deepEqual(resolveEnvironmentServerConfig({ mode: 'desktop' }), expected)
+  assert.deepEqual(resolveEnvironmentServerConfig({ mode: 'desktop-mock' }), expected)
+  assert.deepEqual(resolveEnvironmentServerConfig({ mode: 'production' }), { apiBaseUrl: '', wsUrl: '' })
+})
+
+test('桌面模式显式环境变量优先于 tracked 默认值', () => {
+  assert.deepEqual(resolveEnvironmentServerConfig({
+    mode: 'desktop-release',
+    apiBaseUrl: 'http://farm.example:8080',
+    wsUrl: 'ws://farm.example:8080/ws/farm-status'
+  }), {
+    apiBaseUrl: 'http://farm.example:8080',
+    wsUrl: 'ws://farm.example:8080/ws/farm-status'
+  })
 })

@@ -1,7 +1,10 @@
 const STORAGE_KEY = 'fabmatrix.server.connection'
+const DESKTOP_API_BASE_URL = 'http://localhost:28081'
+const DESKTOP_WS_URL = 'ws://localhost:28081/ws/farm-status'
 
 const envApiBaseUrl = import.meta.env?.VITE_API_BASE_URL || ''
 const envWsUrl = import.meta.env?.VITE_WS_URL || ''
+const envMode = import.meta.env?.MODE || ''
 
 const trimTrailingSlash = value => String(value || '').trim().replace(/\/+$/, '')
 
@@ -18,6 +21,22 @@ export const normalizeServerUrl = value => {
     return ''
   }
 }
+
+export const resolveEnvironmentServerConfig = ({ mode = '', apiBaseUrl = '', wsUrl = '' } = {}) => {
+  const desktopMode = mode === 'desktop' || mode.startsWith('desktop-')
+  const explicitApiBaseUrl = String(apiBaseUrl || '').trim()
+  const explicitWsUrl = String(wsUrl || '').trim()
+  return {
+    apiBaseUrl: normalizeServerUrl(explicitApiBaseUrl || (desktopMode ? DESKTOP_API_BASE_URL : '')),
+    wsUrl: explicitWsUrl || (desktopMode ? DESKTOP_WS_URL : '')
+  }
+}
+
+const readEnvironmentServerConfig = () => resolveEnvironmentServerConfig({
+  mode: envMode,
+  apiBaseUrl: envApiBaseUrl,
+  wsUrl: envWsUrl
+})
 
 const readStoredConfig = () => {
   if (typeof window === 'undefined') return null
@@ -37,16 +56,14 @@ const readStoredConfig = () => {
 export const getServerConfig = () => {
   const stored = readStoredConfig()
   const hasStoredConfig = Boolean(stored)
+  const environment = readEnvironmentServerConfig()
   return {
-    apiBaseUrl: hasStoredConfig ? stored.apiBaseUrl : normalizeServerUrl(envApiBaseUrl),
-    wsUrl: hasStoredConfig ? stored.wsUrl : envWsUrl
+    apiBaseUrl: hasStoredConfig ? stored.apiBaseUrl : environment.apiBaseUrl,
+    wsUrl: hasStoredConfig ? stored.wsUrl : environment.wsUrl
   }
 }
 
-export const getEnvironmentServerConfig = () => ({
-  apiBaseUrl: normalizeServerUrl(envApiBaseUrl),
-  wsUrl: envWsUrl
-})
+export const getEnvironmentServerConfig = () => readEnvironmentServerConfig()
 
 export const parseServerEndpoint = value => {
   const normalized = normalizeServerUrl(value)

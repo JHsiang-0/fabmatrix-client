@@ -24,16 +24,16 @@ export default defineConfig(({ mode }) => {
       host: env.VITE_HOST === 'true' ? '0.0.0.0' : '127.0.0.1',
       proxy: {
         '/api': {
-          target: env.VITE_API_TARGET || 'http://localhost:8080',
+          target: env.VITE_API_TARGET || 'http://localhost:28081',
           changeOrigin: true,
         },
         '/ws': {
-          target: env.VITE_WS_TARGET || 'ws://localhost:8080',
+          target: env.VITE_WS_TARGET || 'ws://localhost:28081',
           ws: true,
           changeOrigin: true,
         },
         '/actuator': {
-          target: env.VITE_API_TARGET || 'http://localhost:8080',
+          target: env.VITE_API_TARGET || 'http://localhost:28081',
           changeOrigin: true,
         }
       }

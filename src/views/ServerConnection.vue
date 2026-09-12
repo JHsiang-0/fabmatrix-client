@@ -35,7 +35,7 @@
             <t-input v-model="form.host" placeholder="例如：192.168.0.10" clearable />
           </t-form-item>
           <t-form-item label="端口" name="port">
-            <t-input v-model="form.port" inputmode="numeric" placeholder="8080" clearable />
+            <t-input v-model="form.port" inputmode="numeric" placeholder="28081" clearable />
           </t-form-item>
         </div>
         <div class="connection-current-config">
@@ -69,7 +69,7 @@
                 v-model="form.wsAddress"
                 class="connection-ws-address"
                 :disabled="!form.customWsUrlEnabled"
-                placeholder="localhost:8080/ws/farm-status"
+                placeholder="localhost:28081/ws/farm-status"
                 clearable
                 aria-label="WebSocket 主机、端口和路径"
               />

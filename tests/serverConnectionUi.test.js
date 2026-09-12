@@ -8,6 +8,8 @@ const loginSource = await readFile(new URL('../src/views/Login.vue', import.meta
 test('服务器连接页保持单屏布局、可选 WebSocket 地址和四按钮操作区', () => {
   assert.match(connectionSource, /label="服务器 IP \/ 主机"/)
   assert.match(connectionSource, /label="端口"/)
+  assert.match(connectionSource, /placeholder="28081"/)
+  assert.match(connectionSource, /localhost:28081\/ws\/farm-status/)
   assert.match(connectionSource, />WebSocket 地址<\/span>/)
   assert.match(connectionSource, /initialWsEndpoint = parseWebSocketEndpoint\(initialConfig\.wsUrl\)/)
   assert.match(connectionSource, /wsProtocol: initialWsEndpoint\.protocol/)

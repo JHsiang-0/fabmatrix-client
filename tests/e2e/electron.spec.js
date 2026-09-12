@@ -69,8 +69,8 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
       mode: 'desktop-mock',
       baseUrl: '/',
       useMock: true,
-      apiBaseUrl: 'http://localhost:8080',
-      wsUrl: 'ws://localhost:8080/ws/farm-status'
+      apiBaseUrl: 'http://localhost:28081',
+      wsUrl: 'ws://localhost:28081/ws/farm-status'
     })
 
     await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible()

@@ -21,7 +21,7 @@
 - [x] 已移除产品设计中的 `CUSTOMER` 角色方向
 - [x] 已确定打印机协议类型：`KLIPPER`、`RRF`
 - [x] 已确认当前设备实现仍是 Klipper/Moonraker
-- [x] 已确认开发环境默认端口为 `8080`
+- [x] 已确认开发环境默认端口为 `28081`
 - [x] 已确认开发环境默认关闭打印机监控任务：`farm.tasks.enabled=false`
 - [x] 已执行 `mvn test`：1 个上下文测试通过
 - [ ] 增加真实 HTTP 接口和权限测试
@@ -217,8 +217,8 @@ startPrint()
 
 ### P1.5 前端基础层
 
-- [ ] 配置 API 基础地址：`http://<server-host>:8080/api/v1`。
-- [ ] 配置 WebSocket 地址：`ws://<server-host>:8080/ws/farm-status`。
+- [ ] 配置 API 基础地址：`http://<server-host>:28081/api/v1`。
+- [ ] 配置 WebSocket 地址：`ws://<server-host>:28081/ws/farm-status`。
 - [ ] 封装 HTTP 客户端，统一添加 Bearer Token。
 - [ ] 统一解析 `{code,message,data,timestamp}`。
 - [ ] 处理 401：清除 Token 并跳转登录页。
@@ -344,4 +344,3 @@ WebSocket 快照/离线/任务消息
 - [ ] 新旧数据库状态完成迁移，接口返回结构稳定。
 - [ ] Klipper 与 RRF 均通过适配器接入，而不是在业务层写协议分支。
 - [ ] 核心接口、权限、状态机和 WebSocket 有自动化测试。
-
