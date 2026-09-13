@@ -597,11 +597,10 @@ const handleChangePassword = config => {
   const id = getPath(config.url).split('/').at(-2)
   if (String(session.userId) !== String(id)) fail(403, 403, '鍙兘淇敼鑷繁鐨勫瘑鐮?')
   const body = getBody(config)
+  if (!isValidPassword(body.newPassword)) fail(400, 400, PASSWORD_RULE_MESSAGE)
+  if (body.newPassword !== body.confirmPassword) fail(500, 500, '两次输入的新密码不一致')
   const user = mockState.users.find(item => sameMockId(item.id, session.userId))
   if (!user || user.password !== body.oldPassword) fail(422, 422, '鏃у瘑鐮侀敊璇?')
-  if (!isValidPassword(body.newPassword) || body.newPassword !== body.confirmPassword) {
-    fail(422, 422, '鏂板瘑鐮佹牸寮忔垨纭涓嶆纭?')
-  }
   user.password = body.newPassword
   user.updatedAt = now()
   return null

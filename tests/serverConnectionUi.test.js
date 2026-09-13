@@ -5,7 +5,7 @@ import test from 'node:test'
 const connectionSource = await readFile(new URL('../src/views/ServerConnection.vue', import.meta.url), 'utf8')
 const loginSource = await readFile(new URL('../src/views/Login.vue', import.meta.url), 'utf8')
 
-test('服务器连接页保持单屏布局、可选 WebSocket 地址和四按钮操作区', () => {
+test('服务器连接页保持单屏布局、自动推导或可选 WebSocket 地址和四按钮操作区', () => {
   assert.match(connectionSource, /label="服务器 IP \/ 主机"/)
   assert.match(connectionSource, /label="端口"/)
   assert.match(connectionSource, /placeholder="28081"/)
@@ -16,6 +16,7 @@ test('服务器连接页保持单屏布局、可选 WebSocket 地址和四按钮
   assert.match(connectionSource, /watch\(/)
   assert.match(connectionSource, /syncAutomaticWebSocketFields/)
   assert.match(connectionSource, /initialFormWsEndpoint = initialConfig\.wsUrl \? initialWsEndpoint : initialAutoWsEndpoint/)
+  assert.match(connectionSource, /const wsEndpoint = config\.wsUrl \? parseWebSocketEndpoint\(config\.wsUrl\) : deriveWebSocketEndpoint\(endpoint\)/)
   assert.match(connectionSource, /wsProtocol: initialFormWsEndpoint\.protocol/)
   assert.match(connectionSource, /wsAddress: initialFormWsEndpoint\.address/)
   assert.match(connectionSource, /customWsUrlEnabled: Boolean\(initialConfig\.wsUrl\)/)

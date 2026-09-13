@@ -6,4 +6,5 @@ export const isValidPassword = value => (
   typeof value === 'string'
   && value.length >= PASSWORD_MIN_LENGTH
   && value.length <= PASSWORD_MAX_LENGTH
+  && /\S/.test(value)
 )

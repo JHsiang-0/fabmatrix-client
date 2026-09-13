@@ -113,11 +113,24 @@ test('启动配置读取不受已保存地址影响', () => {
 test('桌面模式在无显式环境变量时使用 tracked 28081 默认值', () => {
   const expected = {
     apiBaseUrl: 'http://localhost:28081',
-    wsUrl: 'ws://localhost:28081/ws/farm-status'
+    wsUrl: ''
   }
   assert.deepEqual(resolveEnvironmentServerConfig({ mode: 'desktop' }), expected)
   assert.deepEqual(resolveEnvironmentServerConfig({ mode: 'desktop-mock' }), expected)
   assert.deepEqual(resolveEnvironmentServerConfig({ mode: 'production' }), { apiBaseUrl: '', wsUrl: '' })
+})
+
+test('桌面模式自定义 API 未配置 WebSocket 时保留空 wsUrl 并由运行时跟随新地址推导', () => {
+  assert.deepEqual(resolveEnvironmentServerConfig({
+    mode: 'desktop',
+    apiBaseUrl: 'http://farm.example:29090'
+  }), {
+    apiBaseUrl: 'http://farm.example:29090',
+    wsUrl: ''
+  })
+
+  saveServerConfig({ apiBaseUrl: 'http://farm.example:29090' })
+  assert.equal(getWebSocketBaseUrl(), 'ws://farm.example:29090/ws/farm-status')
 })
 
 test('桌面模式显式环境变量优先于 tracked 默认值', () => {

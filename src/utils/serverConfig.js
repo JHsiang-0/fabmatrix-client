@@ -1,6 +1,5 @@
 const STORAGE_KEY = 'fabmatrix.server.connection'
 const DESKTOP_API_BASE_URL = 'http://localhost:28081'
-const DESKTOP_WS_URL = 'ws://localhost:28081/ws/farm-status'
 
 const envApiBaseUrl = import.meta.env?.VITE_API_BASE_URL || ''
 const envWsUrl = import.meta.env?.VITE_WS_URL || ''
@@ -28,7 +27,7 @@ export const resolveEnvironmentServerConfig = ({ mode = '', apiBaseUrl = '', wsU
   const explicitWsUrl = String(wsUrl || '').trim()
   return {
     apiBaseUrl: normalizeServerUrl(explicitApiBaseUrl || (desktopMode ? DESKTOP_API_BASE_URL : '')),
-    wsUrl: explicitWsUrl || (desktopMode ? DESKTOP_WS_URL : '')
+    wsUrl: explicitWsUrl
   }
 }
 

@@ -4,18 +4,20 @@ import { isValidPassword, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../sr
 import { mockRequest } from '../src/mock/index.js'
 import { mockState, resetMockState } from '../src/mock/data.js'
 
-test('password validation accepts only the inclusive 7-20 character length range', () => {
+test('password validation accepts any non-whitespace password in the inclusive 7-20 character range', () => {
   assert.equal(isValidPassword('123456'), false)
   assert.equal(isValidPassword('1234567'), true)
   assert.equal(isValidPassword('12345678901234567890'), true)
   assert.equal(isValidPassword('123456789012345678901'), false)
   assert.equal(isValidPassword('abcdefg'), true)
   assert.equal(isValidPassword('ABCDEFG'), true)
+  assert.equal(isValidPassword('       '), false)
+  assert.equal(isValidPassword('      a'), true)
   assert.equal(PASSWORD_MIN_LENGTH, 7)
   assert.equal(PASSWORD_MAX_LENGTH, 20)
 })
 
-test('Mock login and first-admin setup accept length-only boundary passwords', async () => {
+test('Mock login and first-admin setup accept non-whitespace boundary passwords without character-class rules', async () => {
   resetMockState()
   mockState.users[0].password = '1234567'
 
@@ -43,6 +45,15 @@ test('Mock login and first-admin setup accept length-only boundary passwords', a
     error => error.response.status === 400
   )
 
+  await assert.rejects(
+    mockRequest({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      data: { username: 'admin', password: '       ' }
+    }),
+    error => error.response.status === 400
+  )
+
   resetMockState({ initialized: false })
   const setup = await mockRequest({
     method: 'POST',
@@ -52,7 +63,7 @@ test('Mock login and first-admin setup accept length-only boundary passwords', a
   assert.equal(setup.data.role, 'ADMIN')
 })
 
-test('Mock auth paths use the same length-only rule and keep confirmation checks', async () => {
+test('Mock auth paths use the same non-whitespace length rule and keep confirmation checks', async () => {
   resetMockState()
   const adminHeaders = { Authorization: 'Bearer password-validation-admin' }
   mockState.sessions['password-validation-admin'] = { userId: 1, username: 'admin', role: 'ADMIN' }
@@ -92,7 +103,27 @@ test('Mock auth paths use the same length-only rule and keep confirmation checks
       data: { oldPassword: '1234567', newPassword: '123456', confirmPassword: '123456' },
       headers: { Authorization: `Bearer ${userToken}` }
     }),
-    error => error.response.status === 422
+    error => error.response.status === 400
+  )
+
+  await assert.rejects(
+    mockRequest({
+      method: 'POST',
+      url: `/api/v1/auth/${userId}/change-password`,
+      data: { oldPassword: '1234567', newPassword: '       ', confirmPassword: '       ' },
+      headers: { Authorization: `Bearer ${userToken}` }
+    }),
+    error => error.response.status === 400
+  )
+
+  await assert.rejects(
+    mockRequest({
+      method: 'POST',
+      url: `/api/v1/auth/${userId}/change-password`,
+      data: { oldPassword: '1234567', newPassword: 'abcdefg', confirmPassword: 'different' },
+      headers: { Authorization: `Bearer ${userToken}` }
+    }),
+    error => error.response.status === 500
   )
 
   const changed = await mockRequest({

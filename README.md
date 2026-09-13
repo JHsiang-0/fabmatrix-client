@@ -76,7 +76,7 @@ npm run desktop:build     # 生成 release/ 下的 Windows 安装包
 npm run desktop:build:dir # 生成未安装目录，便于快速验收
 ```
 
-桌面端构建使用 hash 路由，并要求 `VITE_API_BASE_URL` 配置为后端 HTTP 地址，`VITE_WS_URL` 配置为 WebSocket 地址。安装包只包含前端客户端，不包含后端服务；后端需要单独部署并允许桌面客户端访问。
+桌面端构建使用 hash 路由，并要求 `VITE_API_BASE_URL` 配置为后端 HTTP 地址；`VITE_WS_URL` 可选，留空时由前端根据 API 地址自动推导 `/ws/farm-status`。安装包只包含前端客户端，不包含后端服务；后端需要单独部署并允许桌面客户端访问。
 # Mock 开发模式
 
 复制 `.env.example` 为本地环境文件并设置 `VITE_USE_MOCK=true`，即可在不依赖后端的情况下开发页面。
