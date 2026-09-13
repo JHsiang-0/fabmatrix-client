@@ -227,7 +227,7 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 
 `FirstAdminSetupStatusDTO` 字段：`initialized` 表示数据库是否已有用户，`setupAvailable` 表示当前是否允许创建首个管理员。Local Edition 开启该能力，其他 Profile 默认关闭。
 
-创建请求复用 `UserRegisterDTO`：用户名 3-20 位，只能使用字母、数字、下划线；密码总长度 7-20 位且不能全为空白，不要求大小写字母或数字；`confirmPassword` 必须一致。服务端固定将首个用户创建为 `ADMIN`，密码只保存 BCrypt 哈希，不提供固定默认密码。
+创建请求复用 `UserRegisterDTO`：用户名 3-20 位，只能使用字母、数字、下划线；密码总长度 6-20 位且不能全为空白，不要求大小写字母或数字；`confirmPassword` 必须一致。服务端固定将首个用户创建为 `ADMIN`，密码只保存 BCrypt 哈希，不提供固定默认密码。
 
 创建成功后直接返回登录结果（包含 `data.token`、`userId`、`username`、`role=ADMIN`），前端可以直接保存 Token。创建成功后再次调用初始化接口返回 HTTP 409、业务码 `409`；如果初始化能力未开启返回 HTTP 404、业务码 `404`。服务层会在数据库写入前再次检查用户数量，并在单进程内串行化初始化请求。
 
@@ -250,7 +250,7 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 | PUT | `/auth/{userId}/profile` | 本人 | 邮箱、手机号 | `Result<null>` |
 | POST | `/auth/{userId}/change-password` | 本人 | 旧密码、新密码、确认密码 | `Result<null>` |
 
-密码规则由后端强制校验：总长度 7-20 位且不能全为空白，不要求大小写字母或数字；确认密码必须一致。`CUSTOMER` 不再使用。
+密码规则由后端强制校验：总长度 6-20 位且不能全为空白，不要求大小写字母或数字；确认密码必须一致。`CUSTOMER` 不再使用。
 
 管理员密码迁移和状态检查接口只接受 `X-Admin-Secret` 请求头，不接受 URL 查询参数，避免管理员密钥进入浏览器、代理或访问日志。
 
@@ -390,7 +390,7 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 | DTO | 字段 | 规则 |
 |---|---|---|
 | `UserLoginDTO` | `username,password` | 均必填；密码不写入日志 |
-| `UserRegisterDTO` | `username,password,confirmPassword,email?,phone?` | 用户名 3-20 位，仅字母/数字/下划线；密码总长度 7-20 位且不能全为空白；确认密码一致 |
+| `UserRegisterDTO` | `username,password,confirmPassword,email?,phone?` | 用户名 3-20 位，仅字母/数字/下划线；密码总长度 6-20 位且不能全为空白；确认密码一致 |
 | `UserUpdateDTO` | `id,email?,phone?,role?` | `id` 必填；`role` 只能为 `ADMIN` 或 `OPERATOR`；仅 ADMIN 可修改角色 |
 | `ChangePasswordDTO` | `oldPassword,newPassword,confirmPassword` | 三项必填；新密码遵循注册密码规则 |
 | `UserQueryDTO` | `pageNum?,pageSize?,username?,role?,email?,enabled?` | 默认 `pageNum=1,pageSize=10`；`role` 为 `ADMIN|OPERATOR`；`enabled` 不传表示全部 |

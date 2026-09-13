@@ -1,6 +1,6 @@
-export const PASSWORD_MIN_LENGTH = 7
+export const PASSWORD_MIN_LENGTH = 6
 export const PASSWORD_MAX_LENGTH = 20
-export const PASSWORD_RULE_MESSAGE = '密码长度必须为 7-20 位，仅限制长度。'
+export const PASSWORD_RULE_MESSAGE = '密码长度必须为 6-20 位，仅限制长度。'
 
 export const isValidPassword = value => (
   typeof value === 'string'
