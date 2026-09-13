@@ -88,6 +88,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { confirmMessage, message } from '@/utils/message'
 import { createAdminUser, getAdminUsers, setAdminUserEnabled, updateAdminUser } from '@/api/user'
 import { useUserStore } from '@/stores/user'
+import { isValidPassword, PASSWORD_RULE_MESSAGE } from '@/utils/password'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import TdTable from '@/components/TdTable.vue'
@@ -112,7 +113,6 @@ const form = reactive({ id: null, username: '', password: '', confirmPassword: '
 const editingUserId = ref(null)
 const isEditing = computed(() => editingUserId.value !== null)
 const dialogTitle = computed(() => isEditing.value ? '编辑用户' : '新增操作员')
-const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,20}$/
 const formRules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
@@ -121,7 +121,7 @@ const formRules = {
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { validator: value => passwordPattern.test(value || '') ? true : { result: false, message: '密码必须为 6-20 位且包含大小写字母和数字' }, trigger: 'blur' }
+    { validator: value => isValidPassword(value) ? true : { result: false, message: PASSWORD_RULE_MESSAGE }, trigger: 'blur' }
   ],
   confirmPassword: [
     { required: true, message: '请确认密码', trigger: 'blur' },

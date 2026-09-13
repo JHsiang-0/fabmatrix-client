@@ -159,6 +159,7 @@ import { message } from '@/utils/message'
 import { useUserStore } from '@/stores/user'
 import { getFirstAdminSetupStatus, setupFirstAdmin } from '@/api/user'
 import { isSetupConflict, resolveSetupStatus, SETUP_MODE } from '@/utils/setupStatus'
+import { isValidPassword, PASSWORD_RULE_MESSAGE } from '@/utils/password'
 import AnimatedCharacters from '@/components/login/AnimatedCharacters.vue'
 
 const router = useRouter()
@@ -219,11 +220,8 @@ const validateForm = () => {
   if (!loginForm.password) {
     errors.password = '请输入密码'
     valid = false
-  } else if (loginForm.password.length < 6 || loginForm.password.length > 20) {
-    errors.password = '密码长度应为 6-20 个字符'
-    valid = false
-  } else if (setupMode.value && !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,20}$/.test(loginForm.password)) {
-    errors.password = '初始化密码必须为 6-20 位，且包含大小写字母和数字'
+  } else if (!isValidPassword(loginForm.password)) {
+    errors.password = PASSWORD_RULE_MESSAGE
     valid = false
   }
 

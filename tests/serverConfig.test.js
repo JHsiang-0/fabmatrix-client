@@ -18,6 +18,8 @@ const {
   getEnvironmentServerConfig,
   getServerConfig,
   getWebSocketBaseUrl,
+  deriveWebSocketEndpoint,
+  deriveWebSocketUrl,
   isValidServerHost,
   normalizeServerUrl,
   parseServerEndpoint,
@@ -62,6 +64,19 @@ test('uses the saved server endpoint for HTTP and derives its WebSocket endpoint
   })
 })
 
+test('derives WebSocket protocol, host, port and path from the current API endpoint', () => {
+  assert.equal(deriveWebSocketUrl('http://farm.example:28081/api'), 'ws://farm.example:28081/ws/farm-status')
+  assert.equal(deriveWebSocketUrl('https://farm.example:8443'), 'wss://farm.example:8443/ws/farm-status')
+  assert.deepEqual(deriveWebSocketEndpoint({ protocol: 'http', host: '192.168.0.10', port: '28081' }), {
+    protocol: 'ws',
+    address: '192.168.0.10:28081/ws/farm-status'
+  })
+  assert.deepEqual(deriveWebSocketEndpoint({ protocol: 'https', host: 'farm.example', port: '8443' }), {
+    protocol: 'wss',
+    address: 'farm.example:8443/ws/farm-status'
+  })
+})
+
 test('prefers an explicitly saved WebSocket endpoint and clears only connection settings', () => {
   saveServerConfig({
     apiBaseUrl: 'https://farm.example.com',
@@ -70,6 +85,24 @@ test('prefers an explicitly saved WebSocket endpoint and clears only connection 
   assert.equal(getWebSocketBaseUrl(), 'wss://socket.example.com/ws/farm-status')
   clearServerConfig()
   assert.equal(getServerConfig().apiBaseUrl, '')
+})
+
+test('preserves legal custom WebSocket ports and rejects invalid ports', () => {
+  assert.deepEqual(saveServerConfig({
+    apiBaseUrl: 'http://farm.example.com:28081',
+    wsUrl: 'ws://socket.example.com:29090/ws/farm-status'
+  }), {
+    apiBaseUrl: 'http://farm.example.com:28081',
+    wsUrl: 'ws://socket.example.com:29090/ws/farm-status'
+  })
+  assert.throws(
+    () => saveServerConfig({ apiBaseUrl: 'http://farm.example.com:28081', wsUrl: 'ws://socket.example.com:0/ws/farm-status' }),
+    /WebSocket 端口必须是 1 到 65535 的数字/
+  )
+  assert.throws(
+    () => saveServerConfig({ apiBaseUrl: 'http://farm.example.com:28081', wsUrl: 'ws://socket.example.com:65536/ws/farm-status' }),
+    /请输入有效的 WebSocket 地址/
+  )
 })
 
 test('启动配置读取不受已保存地址影响', () => {

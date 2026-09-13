@@ -77,6 +77,15 @@ export const parseServerEndpoint = value => {
   }
 }
 
+export const parseWebSocketEndpoint = wsUrl => {
+  const value = String(wsUrl || '').trim()
+  const match = value.match(/^(wss?):\/\/(.*)$/i)
+  return {
+    protocol: match?.[1]?.toLowerCase() || 'ws',
+    address: match?.[2] || ''
+  }
+}
+
 const normalizeEndpointHost = value => String(value || '').trim().replace(/^\[|\]$/g, '')
 
 export const isValidServerHost = value => {
@@ -112,22 +121,33 @@ export const buildServerBaseUrl = ({ protocol = 'http', host, port }) => {
   return normalizeServerUrl(`${normalizedProtocol}://${hostWithBrackets}:${normalizedPort}`)
 }
 
+export const deriveWebSocketUrl = apiBaseUrl => {
+  const normalizedApiBaseUrl = normalizeServerUrl(apiBaseUrl)
+  if (!normalizedApiBaseUrl) return ''
+
+  try {
+    const parsed = new URL(normalizedApiBaseUrl)
+    parsed.protocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:'
+    parsed.pathname = '/ws/farm-status'
+    parsed.search = ''
+    parsed.hash = ''
+    return parsed.toString().replace(/\/$/, '')
+  } catch {
+    return ''
+  }
+}
+
+export const deriveWebSocketEndpoint = endpoint => parseWebSocketEndpoint(
+  deriveWebSocketUrl(buildServerBaseUrl(endpoint))
+)
+
 export const getApiBaseUrl = () => getServerConfig().apiBaseUrl
 
 export const getWebSocketBaseUrl = () => {
   const { wsUrl, apiBaseUrl } = getServerConfig()
   if (wsUrl) return wsUrl
-  if (apiBaseUrl) {
-    try {
-      const parsed = new URL(apiBaseUrl)
-      parsed.protocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:'
-      parsed.pathname = '/ws/farm-status'
-      parsed.search = ''
-      return parsed.toString().replace(/\/$/, '')
-    } catch {
-      return ''
-    }
-  }
+  const derived = deriveWebSocketUrl(apiBaseUrl)
+  if (derived) return derived
 
   if (typeof window !== 'undefined' && ['http:', 'https:'].includes(window.location.protocol)) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -142,8 +162,19 @@ export const saveServerConfig = ({ apiBaseUrl, wsUrl = '' }) => {
   if (!normalizedApiBaseUrl) throw new Error('请输入有效的 HTTP/HTTPS 服务器地址')
 
   const normalizedWsUrl = String(wsUrl || '').trim()
-  if (normalizedWsUrl && !/^wss?:\/\//i.test(normalizedWsUrl)) {
-    throw new Error('WebSocket 地址必须以 ws:// 或 wss:// 开头')
+  if (normalizedWsUrl) {
+    try {
+      const parsed = new URL(normalizedWsUrl)
+      if (!['ws:', 'wss:'].includes(parsed.protocol) || parsed.username || parsed.password || !parsed.hostname) {
+        throw new Error('WebSocket 地址必须使用 ws:// 或 wss://，且不能包含账号密码')
+      }
+      if (parsed.port && (Number(parsed.port) < 1 || Number(parsed.port) > 65535)) {
+        throw new Error('WebSocket 端口必须是 1 到 65535 的数字')
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('WebSocket')) throw error
+      throw new Error('请输入有效的 WebSocket 地址', { cause: error })
+    }
   }
 
   const config = { apiBaseUrl: normalizedApiBaseUrl, wsUrl: normalizedWsUrl }

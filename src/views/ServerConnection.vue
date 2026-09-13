@@ -109,9 +109,9 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { buildServerBaseUrl, getEnvironmentServerConfig, getServerConfig, isValidServerHost, parseServerEndpoint, saveServerConfig } from '@/utils/serverConfig'
+import { buildServerBaseUrl, deriveWebSocketEndpoint, getEnvironmentServerConfig, getServerConfig, isValidServerHost, parseServerEndpoint, parseWebSocketEndpoint, saveServerConfig } from '@/utils/serverConfig'
 
 defineOptions({ name: 'ServerConnectionView' })
 
@@ -119,12 +119,14 @@ const router = useRouter()
 const initialConfig = getServerConfig()
 const initialEndpoint = parseServerEndpoint(initialConfig.apiBaseUrl)
 const initialWsEndpoint = parseWebSocketEndpoint(initialConfig.wsUrl)
+const initialAutoWsEndpoint = deriveWebSocketEndpoint(initialEndpoint)
+const initialFormWsEndpoint = initialConfig.wsUrl ? initialWsEndpoint : initialAutoWsEndpoint
 const form = reactive({
   protocol: initialEndpoint.protocol,
   host: initialEndpoint.host,
   port: initialEndpoint.port,
-  wsProtocol: initialWsEndpoint.protocol,
-  wsAddress: initialWsEndpoint.address,
+  wsProtocol: initialFormWsEndpoint.protocol,
+  wsAddress: initialFormWsEndpoint.address,
   customWsUrlEnabled: Boolean(initialConfig.wsUrl)
 })
 const testing = ref(false)
@@ -134,14 +136,18 @@ const successMessage = ref('')
 
 const displayBaseUrl = computed(() => buildServerBaseUrl(form) || '尚未填写完整')
 
-function parseWebSocketEndpoint(wsUrl) {
-  const value = String(wsUrl || '').trim()
-  const match = value.match(/^(wss?):\/\/(.*)$/i)
-  return {
-    protocol: match?.[1]?.toLowerCase() || 'ws',
-    address: match?.[2] || ''
-  }
+const syncAutomaticWebSocketFields = () => {
+  if (form.customWsUrlEnabled) return
+  const endpoint = deriveWebSocketEndpoint(form)
+  form.wsProtocol = endpoint.protocol
+  form.wsAddress = endpoint.address
 }
+
+watch(
+  () => [form.protocol, form.host, form.port, form.customWsUrlEnabled],
+  syncAutomaticWebSocketFields,
+  { immediate: true }
+)
 
 const getHealthUrl = baseUrl => `${baseUrl}/actuator/health`
 
@@ -168,6 +174,9 @@ const resolveWebSocketUrl = () => {
     const parsed = new URL(wsUrl)
     if (!['ws:', 'wss:'].includes(parsed.protocol) || parsed.username || parsed.password || !parsed.hostname) {
       throw new Error('WebSocket 地址必须使用 ws:// 或 wss://，且不能包含账号密码')
+    }
+    if (parsed.port && (Number(parsed.port) < 1 || Number(parsed.port) > 65535)) {
+      throw new Error('WebSocket 端口必须是 1 到 65535 的数字')
     }
     return wsUrl
   } catch (error) {
@@ -223,7 +232,7 @@ const resetToEnvironment = () => {
   form.protocol = endpoint.protocol
   form.host = endpoint.host
   form.port = endpoint.port
-  const wsEndpoint = parseWebSocketEndpoint(config.wsUrl)
+  const wsEndpoint = config.wsUrl ? parseWebSocketEndpoint(config.wsUrl) : deriveWebSocketEndpoint(endpoint)
   form.wsProtocol = wsEndpoint.protocol
   form.wsAddress = wsEndpoint.address
   form.customWsUrlEnabled = Boolean(config.wsUrl)

@@ -38,7 +38,7 @@
           <t-form-item name="confirmPassword" label="确认新密码">
             <t-input v-model="passwordForm.confirmPassword" type="password" autocomplete="new-password" />
           </t-form-item>
-          <p class="profile-password-hint">密码长度 6-20 位，必须包含大写字母、小写字母和数字。</p>
+          <p class="profile-password-hint">{{ PASSWORD_RULE_MESSAGE }}</p>
           <t-button theme="primary" type="submit" :loading="passwordLoading">修改密码</t-button>
         </t-form>
       </t-card>
@@ -52,6 +52,7 @@ import { useRouter } from 'vue-router'
 import { changePassword, getProfile, updateProfile } from '@/api/user'
 import { useUserStore } from '@/stores/user'
 import { confirmMessage, message } from '@/utils/message'
+import { isValidPassword, PASSWORD_RULE_MESSAGE } from '@/utils/password'
 import PageHeader from '@/components/layout/PageHeader.vue'
 
 defineOptions({ name: 'ProfileView' })
@@ -70,7 +71,6 @@ const savedProfile = reactive({ email: '', phone: '' })
 const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
 const profileDirty = computed(() => profileForm.email !== savedProfile.email || profileForm.phone !== savedProfile.phone)
 
-const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,20}$/
 const profileRules = {
   email: [{ email: true, message: '邮箱格式不正确', trigger: 'blur' }],
   phone: [{ pattern: /^$|^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: 'blur' }]
@@ -78,7 +78,7 @@ const profileRules = {
 const passwordRules = {
   oldPassword: [{ required: true, message: '请输入当前密码', trigger: 'blur' }],
   newPassword: [{ required: true, message: '请输入新密码', trigger: 'blur' }, {
-    validator: value => passwordPattern.test(value) ? true : { result: false, message: '密码必须为6-20位且包含大小写字母和数字' },
+    validator: value => isValidPassword(value) ? true : { result: false, message: PASSWORD_RULE_MESSAGE },
     trigger: 'blur'
   }],
   confirmPassword: [{ required: true, message: '请再次输入新密码', trigger: 'blur' }, {

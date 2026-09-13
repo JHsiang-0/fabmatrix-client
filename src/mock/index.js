@@ -16,6 +16,7 @@ import { resolveMockErrorScenario } from './scenarios.js'
 import { toPublicFile, toPublicJob, toPublicPrinter, toPublicSemanticIds } from './server.js'
 import { transitionMockJob } from './stateMachine.js'
 import { publishMockWebSocketEvent } from './websocket.js'
+import { isValidPassword, PASSWORD_RULE_MESSAGE } from '../utils/password.js'
 
 const runtimeEnv = import.meta.env || {}
 const MOCK_DELAY = 120
@@ -380,6 +381,7 @@ const makeMockFileUrl = name => {
 
 const handleLogin = config => {
   const { username, password } = getBody(config)
+  if (!isValidPassword(password)) fail(400, 400, PASSWORD_RULE_MESSAGE)
   if (username === 'disabled') {
     fail(403, 403, '用户已被禁用')
   }
@@ -424,8 +426,8 @@ const handleFirstAdminSetup = config => {
   if (!body.username || !body.password || body.password !== body.confirmPassword) {
     fail(400, 400, '用户名、密码和确认密码不能为空且必须一致')
   }
-  if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,20}$/.test(body.password)) {
-    fail(400, 400, '密码必须为 6-20 位且包含大小写字母和数字')
+  if (!isValidPassword(body.password)) {
+    fail(400, 400, PASSWORD_RULE_MESSAGE)
   }
 
   const user = {
@@ -460,8 +462,8 @@ const handleRegister = config => {
   if (!body.username || !body.password || body.password !== body.confirmPassword) {
     fail(400, 400, '用户名、密码和确认密码不能为空且必须一致')
   }
-  if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,20}$/.test(body.password)) {
-    fail(400, 400, '密码必须为 6-20 位且包含大小写字母和数字')
+  if (!isValidPassword(body.password)) {
+    fail(400, 400, PASSWORD_RULE_MESSAGE)
   }
   if (mockState.users.some(item => item.username === body.username)) {
     fail(409, 409, '用户名已存在')
@@ -597,7 +599,7 @@ const handleChangePassword = config => {
   const body = getBody(config)
   const user = mockState.users.find(item => sameMockId(item.id, session.userId))
   if (!user || user.password !== body.oldPassword) fail(422, 422, '鏃у瘑鐮侀敊璇?')
-  if (!body.newPassword || body.newPassword !== body.confirmPassword || !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,20}$/.test(body.newPassword)) {
+  if (!isValidPassword(body.newPassword) || body.newPassword !== body.confirmPassword) {
     fail(422, 422, '鏂板瘑鐮佹牸寮忔垨纭涓嶆纭?')
   }
   user.password = body.newPassword

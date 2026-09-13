@@ -22,7 +22,7 @@
   - `POST /api/v1/auth/login`：请求体 `{ username, password }`，响应 `data` 中包含 `token, expiresIn, userId, username, role, email, phone`。
   - `POST /api/v1/auth/register`：请求体 `{ username, password, confirmPassword, email, phone }`。
 - 后端统一响应格式为 `{ code, message, data }`，认证错误返回 `code = 401`。
-- 实作提示：注册页面需要收集并校验 `confirmPassword`、`email`、`phone`，并按文档校验规则（用户名 3-20 位，密码需包含大小写字母和数字，手机号为中国大陆格式）。
+- 实作提示：注册页面需要收集并校验 `confirmPassword`、`email`、`phone`，并按文档校验规则（用户名 3-20 位，密码长度 7-20 位，手机号为中国大陆格式）。
 
 
 9. 快速文件参考（示例）
