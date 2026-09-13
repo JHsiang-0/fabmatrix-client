@@ -15,6 +15,13 @@ test('login keeps the existing visual structure while using TDesign feedback', (
   assert.match(loginSource, /autocomplete="new-password"/)
 })
 
+test('初始化模式由服务端状态锁定且没有手工降级入口', () => {
+  assert.match(loginSource, /resolveSetupStatus\(\{ data: response\?\.data \}\)/)
+  assert.match(loginSource, /setSetupMode\(status\.mode\)/)
+  assert.doesNotMatch(loginSource, /已有账号，返回登录/)
+  assert.doesNotMatch(loginSource, /@click="[^"]*setupMode/)
+})
+
 test('route guard exposes authenticated 403 and public 404 results', () => {
   assert.match(routerSource, /name: 'forbidden'/)
   assert.match(routerSource, /name: 'not-found'/)

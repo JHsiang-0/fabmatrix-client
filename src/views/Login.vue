@@ -133,9 +133,6 @@
           </button>
         </form>
 
-        <button v-if="setupMode" class="text-link setup-switch" type="button" @click="setupMode = false">
-          已有账号，返回登录
-        </button>
       </div>
 
       <t-button
@@ -161,6 +158,7 @@ import { SettingIcon } from 'tdesign-icons-vue-next'
 import { message } from '@/utils/message'
 import { useUserStore } from '@/stores/user'
 import { getFirstAdminSetupStatus, setupFirstAdmin } from '@/api/user'
+import { isSetupConflict, resolveSetupStatus, SETUP_MODE } from '@/utils/setupStatus'
 import AnimatedCharacters from '@/components/login/AnimatedCharacters.vue'
 
 const router = useRouter()
@@ -181,6 +179,23 @@ const loginForm = reactive({ username: '', password: '', confirmPassword: '' })
 const errors = reactive({ username: '', password: '', confirmPassword: '' })
 
 let feedbackTimer
+let setupStatusPromise = null
+
+const resetModeState = () => {
+  loginForm.confirmPassword = ''
+  errors.username = ''
+  errors.password = ''
+  errors.confirmPassword = ''
+  errorMessage.value = ''
+}
+
+const setSetupMode = mode => {
+  const nextSetupMode = mode === SETUP_MODE.SETUP
+  if (setupMode.value === nextSetupMode) return
+
+  setupMode.value = nextSetupMode
+  resetModeState()
+}
 
 const validateForm = () => {
   errors.username = ''
@@ -232,18 +247,30 @@ const showForgotMessage = () => {
 const goServerConnection = () => router.push({ name: 'server-connection' })
 
 const loadSetupStatus = async () => {
+  if (setupStatusPromise) return setupStatusPromise
+
   setupStatusLoading.value = true
   setupStatusError.value = false
-  try {
-    const response = await getFirstAdminSetupStatus()
-    setupMode.value = response?.data?.setupAvailable === true
-  } catch (error) {
-    setupStatusError.value = true
-    // 初始化状态查询失败时仍保留普通登录入口，避免后端临时不可用导致页面无法使用。
-    console.warn('[Login] 首次管理员初始化状态查询失败', error)
-  } finally {
-    setupStatusLoading.value = false
-  }
+  setupStatusPromise = (async () => {
+    try {
+      const response = await getFirstAdminSetupStatus()
+      const status = resolveSetupStatus({ data: response?.data })
+      setSetupMode(status.mode)
+      return status
+    } catch (error) {
+      const status = resolveSetupStatus({ failed: true })
+      setSetupMode(status.mode)
+      setupStatusError.value = true
+      // 初始化状态查询失败时仍保留普通登录入口，避免后端临时不可用导致页面无法使用。
+      console.warn('[Login] 首次管理员初始化状态查询失败', error)
+      return status
+    } finally {
+      setupStatusLoading.value = false
+      setupStatusPromise = null
+    }
+  })()
+
+  return setupStatusPromise
 }
 
 const handleLogin = async () => {
@@ -277,8 +304,19 @@ const handleLogin = async () => {
       : '/'
     await router.push(redirect)
   } catch (error) {
-    if (Number(error?.status || error?.code) === 409) setupMode.value = false
-    errorMessage.value = error.message || '登录失败，请检查用户名和密码'
+    if (isSetupConflict(error)) {
+      errorMessage.value = '初始化状态已发生变化，正在重新检测，请稍候。'
+      const latestStatus = await loadSetupStatus()
+      if (latestStatus.statusError) {
+        errorMessage.value = '初始化状态重新检测失败，请点击“重试”或使用普通登录。'
+      } else if (latestStatus.mode === SETUP_MODE.LOGIN) {
+        errorMessage.value = '系统已完成初始化，请使用普通登录。'
+      } else {
+        errorMessage.value = '初始化状态仍可用，请确认填写内容后重试。'
+      }
+    } else {
+      errorMessage.value = error?.message || '登录失败，请检查用户名和密码'
+    }
     loginFailed.value = true
     clearTimeout(feedbackTimer)
     feedbackTimer = setTimeout(() => {
@@ -532,12 +570,6 @@ onUnmounted(() => clearTimeout(feedbackTimer))
 
 .text-link:hover {
   text-decoration: underline;
-}
-
-.setup-switch {
-  display: block;
-  width: fit-content;
-  margin: 1rem auto 0;
 }
 
 .connection-link {

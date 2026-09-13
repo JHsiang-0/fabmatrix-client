@@ -33,7 +33,10 @@ test('服务器连接页保持单屏布局、可选 WebSocket 地址和四按钮
 
 test('初始化入口通过正式状态接口原位切换并提供重试', () => {
   assert.match(loginSource, /getFirstAdminSetupStatus\(\)/)
-  assert.match(loginSource, /setupMode\.value = response\?\.data\?\.setupAvailable === true/)
+  assert.match(loginSource, /if \(setupStatusPromise\) return setupStatusPromise/)
+  assert.match(loginSource, /resolveSetupStatus\(\{ data: response\?\.data \}\)/)
+  assert.match(loginSource, /const latestStatus = await loadSetupStatus\(\)/)
+  assert.match(loginSource, /isSetupConflict\(error\)/)
   assert.match(loginSource, /@click="loadSetupStatus"/)
   assert.match(loginSource, /setupFirstAdmin\(\{[\s\S]*confirmPassword:/)
 })

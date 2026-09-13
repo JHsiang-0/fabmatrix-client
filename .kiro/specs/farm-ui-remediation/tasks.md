@@ -1800,3 +1800,21 @@ git status --short、`git diff --check`：提交前执行并仅暂存本任务�
 验证：专项 `node --test tests/printerCenter.test.js`（17/17）、UI-010 Browser E2E（1/1）、全量 `npm test`（273/273）、`npm run lint`、`npm run build`、完整 Browser E2E（17/17）、Electron E2E（3/3）和 `git diff --check` 均通过；构建保留既有 realtimeStore 动静态导入与大 chunk 警告，不影响退出码。
 
 提交：完成最终验证后创建独立本地 Conventional Commit，不执行 push。
+
+### [x] UI-011 首次管理员初始化入口状态收敛
+
+状态：DONE（2026-09-13）
+
+优先级：P1
+
+目标：收敛首次管理员初始化与普通登录的入口状态，确保初始化是否可用由服务端 `GET /api/v1/auth/setup/status` 决定；状态读取失败时仍保留可用登录路径，初始化提交发生 409 时重新读取正式状态后再决定页面模式。
+
+范围：`src/views/Login.vue`、`src/utils/setupStatus.js`、`tests/setupStatus.test.js`、`tests/loginAndRoutes.test.js`、`tests/serverConnectionUi.test.js` 和本任务记录；不修改后端、依赖锁、环境文件、router/API/Store、Mock 或 `src/stores/printerStore.js.backup`。
+
+完成记录：首次管理员表单仅在成功状态返回 `setupAvailable=true` 时展示并由服务端状态锁定，不再显示手工降级到普通登录的入口；`setupAvailable=false` 和状态查询失败均保持普通登录可用，失败场景提供 TDesign Alert 的重试反馈。初始化请求 409 不再直接猜测切换模式，而是复用进行中的状态请求或重新调用正式状态接口，并根据最新状态显示可行动错误提示；模式变化会清理 `confirmPassword`、字段错误和页面错误消息。服务器连接页返回登录仍沿用 Login 的既有 `onMounted` 检测流程，未扩大路由范围。
+
+验收：静态/逻辑测试覆盖 `setupAvailable=true/false`、状态查询失败、409 冲突识别与重检调用、无手工降级按钮；保持 Login 双栏视觉结构和 TDesign loading/alert/错误反馈。
+
+验证：专项 `node --test tests/setupStatus.test.js tests/loginAndRoutes.test.js tests/serverConnectionUi.test.js`；交付前执行 `npm test`、`npm run lint`、`npm run build` 和 `git diff --check`，并复核 lint 自动修复 diff。
+
+提交：完成最终验证后创建独立本地 Conventional Commit `fix: 完成 UI-011 首次管理员初始化状态收敛`，不执行 push。

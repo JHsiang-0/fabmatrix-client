@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { isSetupConflict, resolveSetupStatus, SETUP_MODE } from '../src/utils/setupStatus.js'
+
+test('setupAvailable=true locks the first-admin setup mode', () => {
+  assert.deepEqual(resolveSetupStatus({
+    data: { initialized: false, setupAvailable: true }
+  }), {
+    mode: SETUP_MODE.SETUP,
+    statusError: false
+  })
+})
+
+test('setupAvailable=false keeps normal login available', () => {
+  assert.deepEqual(resolveSetupStatus({
+    data: { initialized: true, setupAvailable: false }
+  }), {
+    mode: SETUP_MODE.LOGIN,
+    statusError: false
+  })
+})
+
+test('a failed setup status check fails open to normal login', () => {
+  assert.deepEqual(resolveSetupStatus({ failed: true }), {
+    mode: SETUP_MODE.LOGIN,
+    statusError: true
+  })
+})
+
+test('setup conflicts are detected for normalized HTTP or business errors', () => {
+  assert.equal(isSetupConflict({ status: 409 }), true)
+  assert.equal(isSetupConflict({ code: 409 }), true)
+  assert.equal(isSetupConflict({ response: { status: 409 } }), true)
+  assert.equal(isSetupConflict({ status: 400, code: 400 }), false)
+})
