@@ -19,11 +19,24 @@ function setupSession() {
     email: null,
     phone: null,
     enabled: true,
+    tokenVersion: 0,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z'
+  })
+  mockState.users.push({
+    id: 4,
+    username: 'second-admin',
+    password: 'SecondAdmin123',
+    role: 'ADMIN',
+    email: null,
+    phone: null,
+    enabled: true,
+    tokenVersion: 0,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z'
   })
   mockState.sessions['file-preview-admin'] = { userId: 1, username: 'admin', role: 'ADMIN' }
-  mockState.sessions['file-preview-second-admin'] = { userId: 3, username: 'second-admin', role: 'ADMIN' }
+  mockState.sessions['file-preview-second-admin'] = { userId: 4, username: 'second-admin', role: 'ADMIN' }
   mockState.sessions['file-preview-operator'] = { userId: 2, username: 'operator', role: 'OPERATOR' }
   mockState.sessions['file-preview-third-user'] = { userId: 3, username: 'third-user', role: 'OPERATOR' }
 }

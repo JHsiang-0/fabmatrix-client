@@ -7,6 +7,7 @@ import { normalizeProgress } from '@/utils/formatters'
 import { isMockEnabled } from '@/mock'
 import { useUserStore } from '@/stores/user'
 import { useJobStore } from '@/stores/jobStore'
+import router from '@/router'
 import { createMockWebSocketStream } from '@/mock/websocket'
 import { getPrinterList } from '@/api/printer'
 import { collectAllPages } from '@/utils/pagination'
@@ -517,8 +518,13 @@ export const useRealtimeStore = defineStore('realtime', () => {
       console.log('[RealtimeStore] WebSocket 连接已建立')
     })
 
-    wsClient.on('close', () => {
+    wsClient.on('close', event => {
       if (generation !== lifecycleGeneration) return
+      if (Number(event?.code) === 1008) {
+        userStore.logout()
+        void router.push({ name: 'login' }).catch(() => {})
+        return
+      }
       connectionState.value = wsClient?.getState() || 'CLOSED'
       isRealtimeStale.value = true
       cancelRecovery()

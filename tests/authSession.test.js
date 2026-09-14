@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
 import {
   calculateExpiresAt,
   createAuthSession,
@@ -7,6 +8,10 @@ import {
   normalizeAuthIdentity,
   refreshAuthSession
 } from '../src/utils/authSession.js'
+
+const requestSource = fs.readFileSync(new URL('../src/utils/request.js', import.meta.url), 'utf8')
+const realtimeStoreSource = fs.readFileSync(new URL('../src/stores/printer/realtimeStore.js', import.meta.url), 'utf8')
+const mockSource = fs.readFileSync(new URL('../src/mock/index.js', import.meta.url), 'utf8')
 
 test('normalizes login identity and keeps Long IDs as strings', () => {
   const identity = normalizeAuthIdentity({
@@ -65,4 +70,18 @@ test('refreshes the stored session from the trusted /auth/me profile', () => {
   assert.equal(refreshed.userInfo.email, 'admin@farm.local')
   assert.equal(refreshed.token, 'token-value')
   assert.equal(refreshAuthSession(session, { id: 1, username: 'x', role: 'CUSTOMER' }), null)
+})
+
+test('clears the local session when the WebSocket reports policy invalidation', () => {
+  assert.match(realtimeStoreSource, /Number\(event\?\.code\) === 1008/)
+  assert.match(realtimeStoreSource, /userStore\.logout\(\)/)
+  assert.match(realtimeStoreSource, /router\.push\(\{ name: 'login' \}\)/)
+  assert.ok(requestSource.indexOf('userStore.logout()') < requestSource.indexOf("router.push({ name: 'login' })"))
+})
+
+test('Mock auth checks the current role and session version before route permissions', () => {
+  const sessionBranch = mockSource.slice(mockSource.indexOf('const requireSession'), mockSource.indexOf('const getPath'))
+  assert.ok(sessionBranch.indexOf('session.role !== user.role') < sessionBranch.indexOf('roles.length > 0'))
+  assert.match(sessionBranch, /tokenVersion/)
+  assert.match(mockSource, /user\.tokenVersion = Number\(user\.tokenVersion \|\| 0\) \+ 1/)
 })

@@ -7,7 +7,7 @@ const request = (method, url, data, headers) => mockRequest({ method, url, data,
 const adminHeaders = { Authorization: 'Bearer user-management-admin' }
 const operatorHeaders = { Authorization: 'Bearer user-management-operator' }
 
-test('returns enabled from me and blocks disabled sessions until re-enabled', async () => {
+test('returns enabled from me and invalidates sessions across disable and enable', async () => {
   resetMockState()
   mockState.sessions['user-management-admin'] = { userId: 1, username: 'admin', role: 'ADMIN' }
   mockState.sessions['user-management-operator'] = { userId: 2, username: 'operator', role: 'OPERATOR' }
@@ -24,7 +24,17 @@ test('returns enabled from me and blocks disabled sessions until re-enabled', as
 
   const enabled = await request('POST', '/api/v1/auth/admin/users/2/enable', undefined, adminHeaders)
   assert.equal(enabled.data.enabled, true)
-  const restored = await request('GET', '/api/v1/auth/me', undefined, operatorHeaders)
+  await assert.rejects(
+    request('GET', '/api/v1/auth/me', undefined, operatorHeaders),
+    error => error.response.status === 401
+  )
+  const freshOperator = await request('POST', '/api/v1/auth/login', {
+    username: 'operator',
+    password: 'Operator123'
+  })
+  const restored = await request('GET', '/api/v1/auth/me', undefined, {
+    Authorization: `Bearer ${freshOperator.data.token}`
+  })
   assert.equal(restored.data.enabled, true)
 })
 

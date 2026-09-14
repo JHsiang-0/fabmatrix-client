@@ -340,11 +340,20 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
     sessionHeaders
   ))
   assert.equal(enabledUser.enabled, true)
+  await assert.rejects(
+    request('GET', '/api/v1/auth/me', undefined, operatorSessionHeaders),
+    error => error.response.status === 401 && error.response.data.code === 401
+  )
+  const freshOperatorToken = assertSuccessEnvelope(await request(
+    'POST',
+    '/api/v1/auth/login',
+    { username: 'operator', password: 'Operator123' }
+  )).token
   assert.equal(assertSuccessEnvelope(await request(
     'GET',
     '/api/v1/auth/me',
     undefined,
-    operatorSessionHeaders
+    { Authorization: `Bearer ${freshOperatorToken}` }
   )).enabled, true)
 
   const history = assertSuccessEnvelope(await request(

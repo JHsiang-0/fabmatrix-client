@@ -66,12 +66,15 @@ const requireSession = (config, roles = []) => {
   if (!session) {
     fail(401, 401, '未登录或登录已过期')
   }
-  if (roles.length > 0 && !roles.includes(session.role)) {
-    fail(403, 403, '没有权限执行此操作')
-  }
   const user = mockState.users.find(item => String(item.id) === String(session.userId))
   if (!user || user.enabled === false) {
     fail(403, 403, '用户已被禁用')
+  }
+  if (session.role !== user.role || Number(session.tokenVersion || 0) !== Number(user.tokenVersion || 0)) {
+    fail(401, 401, '登录状态已失效，请重新登录')
+  }
+  if (roles.length > 0 && !roles.includes(user.role)) {
+    fail(403, 403, '没有权限执行此操作')
   }
   return session
 }
@@ -370,8 +373,16 @@ const resolveUploadParent = (session, parentId) => {
 const publicUser = user => {
   const data = cloneMockData(user)
   delete data.password
+  delete data.tokenVersion
   if (data.id !== undefined && data.id !== null) data.id = String(data.id)
   return data
+}
+
+const assertNotLastActiveAdmin = user => {
+  if (user.role === 'ADMIN' && user.enabled !== false
+    && mockState.users.filter(item => item.role === 'ADMIN' && item.enabled !== false).length <= 1) {
+    fail(409, 409, '系统至少需要保留一个启用的管理员账号')
+  }
 }
 
 const makeMockFileUrl = name => {
@@ -398,7 +409,8 @@ const handleLogin = config => {
   mockState.sessions[token] = {
     userId: user.id,
     username: user.username,
-    role: user.role
+    role: user.role,
+    tokenVersion: user.tokenVersion || 0
   }
 
   return {
@@ -438,13 +450,19 @@ const handleFirstAdminSetup = config => {
     email: body.email || null,
     phone: body.phone || null,
     enabled: true,
+    tokenVersion: 0,
     createdAt: now(),
     updatedAt: now()
   }
   mockState.users.push(user)
   mockState.files.push(createMockDefaultFolder(user.id))
   const token = `mock-token-${user.id}`
-  mockState.sessions[token] = { userId: user.id, username: user.username, role: user.role }
+  mockState.sessions[token] = {
+    userId: user.id,
+    username: user.username,
+    role: user.role,
+    tokenVersion: user.tokenVersion
+  }
   return {
     token,
     expiresIn: 604800,
@@ -477,6 +495,7 @@ const handleRegister = config => {
     email: body.email || null,
     phone: body.phone || null,
     enabled: true,
+    tokenVersion: 0,
     createdAt: now(),
     updatedAt: now()
   }
@@ -542,17 +561,20 @@ const handleAdminUserCreate = config => {
 }
 
 const handleAdminUserUpdate = config => {
-  const session = requireSession(config, ['ADMIN'])
+  requireSession(config, ['ADMIN'])
   const id = getPath(config.url).split('/').at(-1)
   const user = mockState.users.find(item => String(item.id) === String(id))
   if (!user) fail(404, 404, '鐢ㄦ埛涓嶅瓨鍦?')
   const body = getBody(config)
   if (body.email !== undefined) user.email = body.email || null
   if (body.phone !== undefined) user.phone = body.phone || null
-  if (body.role && ['ADMIN', 'OPERATOR'].includes(body.role)) user.role = body.role
-  if (body.password) user.password = body.password
+  const roleChanged = body.role && ['ADMIN', 'OPERATOR'].includes(body.role) && body.role !== user.role
+  const passwordChanged = Boolean(body.password) && body.password !== user.password
+  if (roleChanged && user.role === 'ADMIN' && body.role !== 'ADMIN') assertNotLastActiveAdmin(user)
+  if (roleChanged) user.role = body.role
+  if (passwordChanged) user.password = body.password
+  if (roleChanged || passwordChanged) user.tokenVersion = Number(user.tokenVersion || 0) + 1
   user.updatedAt = now()
-  if (session.userId === user.id && body.role) session.role = body.role
   return null
 }
 
@@ -565,7 +587,10 @@ const handleAdminUserToggle = config => {
   if (String(session.userId) === String(user.id) && parts.at(-1) === 'disable') {
     fail(409, 409, '不能禁用当前登录账号')
   }
-  user.enabled = parts.at(-1) === 'enable'
+  const enabled = parts.at(-1) === 'enable'
+  if (!enabled) assertNotLastActiveAdmin(user)
+  if (user.enabled !== enabled) user.tokenVersion = Number(user.tokenVersion || 0) + 1
+  user.enabled = enabled
   user.updatedAt = now()
   return publicUser(user)
 }
@@ -602,6 +627,7 @@ const handleChangePassword = config => {
   const user = mockState.users.find(item => sameMockId(item.id, session.userId))
   if (!user || user.password !== body.oldPassword) fail(422, 422, '鏃у瘑鐮侀敊璇?')
   user.password = body.newPassword
+  user.tokenVersion = Number(user.tokenVersion || 0) + 1
   user.updatedAt = now()
   return null
 }
