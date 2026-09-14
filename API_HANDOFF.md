@@ -6,6 +6,8 @@
 
 > 本文以当前 Java 源码、`SecurityConfig` 和当前 OpenAPI 注解为准。第 4 节列出的正式 Farm API 均已有对应 Controller；开发环境兼容用路由单独列在第 4.6 节。v2 不提供后台自动派单接口，相关能力延期到 v3。SYNC-002 收口：布局坐标按服务端当前动态布局校验，布局上限为 30×60 且物理槽位总数不超过 1800；Long 语义 ID 的 JSON 值为十进制字符串，非 ID 数值保持 number。
 
+> 版本说明：本文的 `v2.2` 是接口契约修订号，不是产品版本。当前对外产品为 `1.0.0` 准正式版，接口路径继续使用 `/api/v1` 以保持兼容。版本和规格归属见 [`docs/VERSION_AND_ROADMAP.md`](./docs/VERSION_AND_ROADMAP.md)。
+
 项目执行入口：[PROJECT.md](./.kiro/specs/farm-ui-v2/PROJECT.md)；Kiro 需求、设计和任务清单位于 `.kiro/specs/farm-ui-v2/`。
 
 ## TC-001 冻结契约：任务查询与状态机

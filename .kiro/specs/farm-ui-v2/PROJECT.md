@@ -2,8 +2,10 @@
 
 ## 1. 文档基线
 
-- 前端仓库：`D:\WorkSpace\Vue\Farm`
-- 后端仓库：`D:\WorkSpace\Java\Farm`
+> 版本归属：本目录是 v2 功能基线和实施来源，不是当前产品发布版本。当前产品版本为 `1.0.0` 准正式版，发布范围由 `.kiro/specs/farm-v1-release-readiness/` 决定；后台自动派单继续归入 v3，不在 1.0.0 默认开放。
+
+- 前端仓库：`D:\WorkSpace\Vue\fabmatrix-client`
+- 后端仓库：`D:\WorkSpace\Java\fabmatrix-server`
 - 契约基准：后端 `API_HANDOFF.md`、Controller/OpenAPI 注解、DTO/VO、Service/ServiceImpl、`SecurityConfig`、WebSocket 实现
 - 审计日期：2026-09-04
 - 前端与后端仓库中的 `API_HANDOFF.md` 当前内容一致；若文档与实现冲突，以后端 Controller、DTO/VO、Service 和安全配置的共同结论为准，并把冲突列为契约阻塞项。

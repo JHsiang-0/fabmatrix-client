@@ -1,5 +1,7 @@
 # FabMatrix Client 项目协作说明
 
+当前产品发布基线为 `1.0.0` 准正式版。版本、Kiro 规格和文档状态的统一解释见 [`docs/VERSION_AND_ROADMAP.md`](./docs/VERSION_AND_ROADMAP.md)。
+
 ## 项目简介
 
 本仓库是面向 3D 打印生产管理场景的 FabMatrix Vue 单页应用，提供登录、打印机管理、文件库、任务队列/历史和实时设备看板等页面。
@@ -14,12 +16,12 @@
 - ESLint 10、Vue ESLint、Oxlint、Prettier 3
 - Node.js：`^20.19.0 || >=22.12.0`
 
-项目未配置 TypeScript；当前也未发现自动化测试框架或测试目录。
+项目未配置 TypeScript；自动化测试使用 Node.js 内置测试运行器和 Playwright，测试目录为 `tests/`。
 
 ## 目录结构
 
 ```text
-D:\WorkSpace\Vue\Farm\
+D:\WorkSpace\Vue\fabmatrix-client\
 ├─ AGENTS.md
 ├─ public/                     静态资源
 ├─ src/
@@ -62,11 +64,17 @@ npm run dev
 ```sh
 npm run build       # 生产构建
 npm run preview     # 预览构建产物
-npm run lint        # 运行 Oxlint 和 ESLint（脚本会执行 --fix）
+npm run lint:check  # 只读运行 Oxlint 和 ESLint，发布门禁使用此命令
+npm run lint        # 运行带自动修复的 lint，仅在确认 diff 后使用
 npm run format      # 格式化 src/
+npm test             # Node.js 内置回归测试
+npm run test:mock    # Mock HTTP 集成回归
+npm run build:mock   # Mock 构建
+npm run build:desktop # Electron 正式构建
+npm run release:gate # 1.0.0 发布门禁
 ```
 
-当前提供 `npm test`，使用 Node.js 内置测试运行器执行 `tests/` 下的测试文件；`npm run test:electron:dist` 会先构建 desktop 产物，再验证 Electron 的 `dist-file` 入口。新增测试时应同步补充 `package.json` 命令和本文件说明。
+`npm run test:electron:dist` 会先构建 desktop 产物，再验证 Electron 的 `dist-file` 入口；`npm run verify` 还会执行全量构建和 Playwright。新增测试时应同步补充 `package.json` 命令和本文件说明。正式构建不应启用 Mock 环境。
 
 ## 代码规范
 
@@ -76,7 +84,7 @@ npm run format      # 格式化 src/
 - 路由集中维护于 `src/router/index.js`；共享状态使用 Pinia，不要在组件间复制全局状态。
 - 后端调用统一通过 `src/utils/request.js` 的 Axios 实例，并在对应 `src/api` 模块新增方法；不要在组件中重复实现鉴权、错误提示或请求拦截。
 - 实时设备状态通过 `src/utils/websocket.js` 和 printer 相关 Store 管理；修改连接生命周期时检查断线重连和清理逻辑。
-- 提交或交付前至少执行 `npm run build`；涉及 JavaScript/Vue 时执行 `npm run lint`，并人工检查 lint 自动修复产生的改动。
+- 提交或交付前至少执行 `npm run lint:check`、`npm test` 和 `npm run build`；涉及 Electron、Mock 或发布时追加对应构建和 `npm run release:gate`。`npm run lint` 会自动修复，执行后必须人工检查 diff。
 
 ## API 和环境变量
 

@@ -1,8 +1,10 @@
-# Farm 前端开发 TODO
+# Farm 前端历史开发 TODO
 
-版本：v1.0
-依据：[`TODO.md`](./TODO.md)、[`API_HANDOFF.md`](./API_HANDOFF.md)
-更新时间：2026-09-03
+版本：历史 v1/v2 功能基线；当前产品：`1.0.0` 准正式版
+依据：[`TODO.md`](./TODO.md)、[`API_HANDOFF.md`](./API_HANDOFF.md)、[`docs/VERSION_AND_ROADMAP.md`](./docs/VERSION_AND_ROADMAP.md)
+更新时间：2026-09-14
+
+> 当前发布门禁是 `.kiro/specs/farm-v1-release-readiness/`。本清单用于保留历史拆解和待验收项，不将“v1/v2”解释为产品发布版本。
 
 ## 使用说明
 
@@ -24,7 +26,7 @@
 - [x] 已有打印机 Store、网格 Store、实时状态 Store 和 WebSocket 重连基础能力。
 - [x] 清理 `src/api/file.js` 与 `src/api/printFile.js` 的重复职责，统一文件 API 模块。
 - [x] 更新 API 模块中的 JSDoc，使字段、状态和接口地址与 `API_HANDOFF.md` 一致。
-- [x] 用户管理、个人资料和修改密码页面及 API 已接入，实际前端仓库为 `/home/codex/workspace/farm-ui`。
+- [x] 用户管理、个人资料和修改密码页面及 API 已接入，实际前端仓库为 `D:\WorkSpace\Vue\fabmatrix-client`。
 - [ ] 将当前页面中的临时 TODO、假数据映射和直接 `console` 调试逻辑收敛到正式实现。
 
 ## P0：联调前契约对齐

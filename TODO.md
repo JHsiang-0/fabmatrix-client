@@ -1,8 +1,10 @@
-# Farm 开发 TODO
+# Farm 前端历史开发 TODO
 
-版本：v1.0  
-依据：[API_HANDOFF.md](./API_HANDOFF.md) 与当前 Java 源码  
-更新时间：2026-09-02
+版本：历史 v1 基线；当前产品：`1.0.0` 准正式版
+依据：[API_HANDOFF.md](./API_HANDOFF.md) 与 [`docs/VERSION_AND_ROADMAP.md`](./docs/VERSION_AND_ROADMAP.md)
+更新时间：2026-09-14
+
+> 本清单保留早期开发任务，不能作为当前发布门禁。当前 1.0.0 的必做项、范围和验收状态以 `.kiro/specs/farm-v1-release-readiness/` 与 `npm run release:gate` 为准。
 
 ## 使用说明
 
@@ -12,7 +14,7 @@
 - `P1`：第一版农场管理功能需要完成。
 - `P2`：稳定性、体验和生产环境加固。
 
-当前仓库只有 Java 后端，没有 Vue、React 或其他前端工程。前端部分记录页面和联调任务，不填写不存在的前端文件路径。
+当前仓库是 Vue 前端工程；后端位于 `D:\WorkSpace\Java\fabmatrix-server`。本文件中的部分 P0/P1 条目来自早期前后端交接阶段，若与当前代码、R100 门禁冲突，以当前实现和发布门禁为准。
 
 ## 当前基线
 

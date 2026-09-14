@@ -3,7 +3,7 @@
 版本：1.0.0
 对应需求：`.kiro/specs/farm-v1-release-readiness/requirements.md`
 任务标识：R100
-状态：待实施
+状态：代码整改基本完成；R100-07 与真实环境验收待完成
 
 ## 1. 设计原则
 

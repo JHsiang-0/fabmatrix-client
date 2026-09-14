@@ -1,6 +1,8 @@
-# farm-ui
+# FabMatrix Client
 
-This template should help get you started developing with Vue 3 in Vite.
+嘉东三维联动 3D 打印机实时控制系统的 Vue 3 / Electron 客户端。当前产品版本为 `1.0.0` 准正式版，默认连接本地服务端 `28081`。
+
+版本、路线和文档入口见 [`docs/README.md`](./docs/README.md)；本文件下方保留了 Vite/Electron 的基础运行说明。
 
 ## Recommended IDE Setup
 
@@ -40,7 +42,7 @@ npm run build
 ### Lint with [ESLint](https://eslint.org/)
 
 ```sh
-npm run lint
+npm run lint:check
 ```
 
 ### 交付前验证门禁
@@ -91,3 +93,10 @@ npm run desktop:build:dir # 生成未安装目录，便于快速验收
 以上账号仅用于本地 Mock，不得用于真实环境。开发者可在浏览器控制台执行 `window.__FARM_RESET_MOCK__()` 重置当前 Mock 数据。
 
 Mock 错误演示可在请求参数中加入 `mockError=401`、`403`、`404`、`409`、`422`、`10001`、`10002`、`5003` 或 `5004`。
+
+## 当前文档与发布入口
+
+- [`docs/README.md`](./docs/README.md)：前端文档索引。
+- [`docs/VERSION_AND_ROADMAP.md`](./docs/VERSION_AND_ROADMAP.md)：产品版本与 Kiro 路线地图。
+- [`API_HANDOFF.md`](./API_HANDOFF.md)：前后端接口契约；`/api/v1` 是兼容路径，不是产品版本。
+- `.kiro/specs/farm-v1-release-readiness/`：当前 1.0.0 发布门禁；V3 批量派发仍是后续路线。
