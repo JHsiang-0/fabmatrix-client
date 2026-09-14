@@ -7,6 +7,22 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, fileURLToPath(new URL('.', import.meta.url)), '')
   const isDesktopMode = mode.startsWith('desktop')
   const isExplicitMockMode = ['mock', 'desktop-mock'].includes(mode)
+  const srcRoot = fileURLToPath(new URL('./src', import.meta.url))
+  const mockAliases = isExplicitMockMode ? {} : {
+    '@/mock/websocket': fileURLToPath(new URL('./src/mock/disabled-websocket.js', import.meta.url)),
+    '@/mock': fileURLToPath(new URL('./src/mock/disabled.js', import.meta.url))
+  }
+  const formalMockDiagnosticPlugin = {
+    name: 'farm-formal-mock-diagnostic-isolation',
+    transform(code, id) {
+      if (isExplicitMockMode || !/[\\/]src[\\/]main\.js$/.test(id)) return null
+      const transformedCode = code.replace(
+        /\['mock', 'desktop-mock'\]\.includes\(import\.meta\.env\.MODE\)/g,
+        'false'
+      )
+      return transformedCode === code ? null : { code: transformedCode, map: null }
+    }
+  }
 
   if (env.VITE_USE_MOCK === 'true' && !isExplicitMockMode) {
     throw new Error('正式构建禁止通过 VITE_USE_MOCK 启用 Mock，请使用显式 mock 脚本')
@@ -25,10 +41,11 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: mode.startsWith('desktop') ? './' : '/',
-    plugins: [vue(), contentSecurityPolicyPlugin],
+    plugins: [vue(), formalMockDiagnosticPlugin, contentSecurityPolicyPlugin],
     resolve: {
       alias: {
-        '@': fileURLToPath(new URL('./src', import.meta.url))
+        ...mockAliases,
+        '@': srcRoot
       }
     },
     server: {
