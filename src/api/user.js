@@ -38,6 +38,14 @@ export function getFirstAdminSetupStatus() {
   })
 }
 
+/** 读取仅允许服务端本机访问的短期首次初始化凭据。 */
+export function getFirstAdminBootstrapToken() {
+  return request({
+    url: '/api/v1/auth/setup/bootstrap-token',
+    method: 'get'
+  })
+}
+
 /**
  * 创建 Local Edition 的首个管理员，成功后返回可直接使用的登录结果。
  */

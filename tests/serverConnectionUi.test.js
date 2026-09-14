@@ -44,4 +44,6 @@ test('初始化入口通过正式状态接口原位切换并提供重试', () =>
   assert.match(loginSource, /isSetupConflict\(error\)/)
   assert.match(loginSource, /@click="loadSetupStatus"/)
   assert.match(loginSource, /setupFirstAdmin\(\{[\s\S]*confirmPassword:/)
+  assert.match(loginSource, /getFirstAdminBootstrapToken\(\)/)
+  assert.match(loginSource, /bootstrapToken/)
 })

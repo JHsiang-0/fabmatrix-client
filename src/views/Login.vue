@@ -38,6 +38,9 @@
             </t-button>
           </template>
         </t-alert>
+        <t-alert v-if="setupBootstrapError" class="setup-status-alert" theme="warning" :close-btn="false">
+          <template #message>首次管理员初始化必须在服务器本机完成，请在服务器电脑上的 FabMatrix 客户端重试。</template>
+        </t-alert>
 
         <form class="login-form" @submit.prevent="handleLogin">
           <div class="form-group">
@@ -157,7 +160,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { SettingIcon } from 'tdesign-icons-vue-next'
 import { message } from '@/utils/message'
 import { useUserStore } from '@/stores/user'
-import { getFirstAdminSetupStatus, setupFirstAdmin } from '@/api/user'
+import { getFirstAdminBootstrapToken, getFirstAdminSetupStatus, setupFirstAdmin } from '@/api/user'
 import { isSetupConflict, resolveSetupStatus, SETUP_MODE } from '@/utils/setupStatus'
 import { isValidPassword, PASSWORD_RULE_MESSAGE } from '@/utils/password'
 import AnimatedCharacters from '@/components/login/AnimatedCharacters.vue'
@@ -173,11 +176,13 @@ const showPassword = ref(false)
 const isTyping = ref(false)
 const setupStatusLoading = ref(false)
 const setupStatusError = ref(false)
+const setupBootstrapError = ref(false)
 const loginFailed = ref(false)
 const loginSuccess = ref(false)
 const errorMessage = ref('')
 const loginForm = reactive({ username: '', password: '', confirmPassword: '' })
 const errors = reactive({ username: '', password: '', confirmPassword: '' })
+let bootstrapToken = ''
 
 let feedbackTimer
 let setupStatusPromise = null
@@ -188,6 +193,7 @@ const resetModeState = () => {
   errors.password = ''
   errors.confirmPassword = ''
   errorMessage.value = ''
+  setupBootstrapError.value = false
 }
 
 const setSetupMode = mode => {
@@ -195,6 +201,7 @@ const setSetupMode = mode => {
   if (setupMode.value === nextSetupMode) return
 
   setupMode.value = nextSetupMode
+  if (!nextSetupMode) bootstrapToken = ''
   resetModeState()
 }
 
@@ -249,11 +256,26 @@ const loadSetupStatus = async () => {
 
   setupStatusLoading.value = true
   setupStatusError.value = false
+  bootstrapToken = ''
   setupStatusPromise = (async () => {
     try {
       const response = await getFirstAdminSetupStatus()
-      const status = resolveSetupStatus({ data: response?.data })
+      let status = resolveSetupStatus({ data: response?.data })
       setSetupMode(status.mode)
+      if (status.mode === SETUP_MODE.SETUP) {
+        try {
+          const bootstrapResponse = await getFirstAdminBootstrapToken()
+          bootstrapToken = String(bootstrapResponse?.data?.token || '')
+          if (!bootstrapToken) throw new Error('初始化凭据为空')
+          setupBootstrapError.value = false
+        } catch (bootstrapError) {
+          bootstrapToken = ''
+          setSetupMode(SETUP_MODE.LOGIN)
+          setupBootstrapError.value = true
+          status = { ...status, mode: SETUP_MODE.LOGIN }
+          console.warn('[Login] 首次管理员初始化凭据只能从服务器本机获取', bootstrapError)
+        }
+      }
       return status
     } catch (error) {
       const status = resolveSetupStatus({ failed: true })
@@ -285,7 +307,8 @@ const handleLogin = async () => {
       const response = await setupFirstAdmin({
         username: loginForm.username,
         password: loginForm.password,
-        confirmPassword: loginForm.confirmPassword
+        confirmPassword: loginForm.confirmPassword,
+        bootstrapToken
       })
       userStore.userLoginWithResult(response.data, { remember: true })
       message.success('管理员初始化成功')
