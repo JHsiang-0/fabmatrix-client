@@ -81,6 +81,8 @@ npm run desktop:build:dir # 生成未安装目录，便于快速验收
 
 复制 `.env.example` 为本地环境文件并设置 `VITE_USE_MOCK=true`，即可在不依赖后端的情况下开发页面。
 
+批量派发属于 V3 预留能力，准正式版默认关闭。需要联调已保留的页面、API 和 Mock 时，显式设置 `VITE_FEATURE_BATCH_DISPATCH=true`；生产构建不要开启该变量，直到后端同步设置 `FARM_BATCH_DISPATCH_ENABLED=true` 并完成 V3 验收。
+
 内置演示账号：
 
 - ADMIN：`admin` / `Admin123`

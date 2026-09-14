@@ -1,4 +1,5 @@
 import request from '@/utils/request'
+import { assertFeatureEnabled } from '@/config/features'
 import {
   mapResponseData,
   normalizePageParams,
@@ -148,6 +149,7 @@ export function updateJobPriority(id, priority) {
 
 /** 预览用户确认的批量派发计划，不产生上传或打印副作用。 */
 export function previewBatchDispatch(data) {
+  assertFeatureEnabled('batchDispatch')
   return request({
     url: '/api/v1/print-jobs/batch/preview',
     method: 'post',
@@ -157,6 +159,7 @@ export function previewBatchDispatch(data) {
 
 /** 确认并执行批量派发计划。 */
 export function confirmBatchDispatch(data) {
+  assertFeatureEnabled('batchDispatch')
   return request({
     url: '/api/v1/print-jobs/batch/confirm',
     method: 'post',
@@ -166,6 +169,7 @@ export function confirmBatchDispatch(data) {
 
 /** 为批量确认失败项生成新的恢复预览，不复用旧计划。 */
 export function retryPreviewBatchDispatch(data) {
+  assertFeatureEnabled('batchDispatch')
   return request({
     url: '/api/v1/print-jobs/batch/retry-preview',
     method: 'post',

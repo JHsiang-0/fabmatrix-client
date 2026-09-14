@@ -19,8 +19,8 @@ const request = (method, url, data, headers, params) => mockRequest({ method, ur
 const adminHeaders = { Authorization: 'Bearer sync-0011-admin' }
 const operatorHeaders = { Authorization: 'Bearer sync-0011-operator' }
 
-function setupSessions() {
-  resetMockState()
+function setupSessions(options = {}) {
+  resetMockState(options)
   mockState.sessions['sync-0011-admin'] = { userId: 1, username: 'admin', role: 'ADMIN' }
   mockState.sessions['sync-0011-operator'] = { userId: 2, username: 'operator', role: 'OPERATOR' }
 }
@@ -233,6 +233,7 @@ test('急停进入 RECONCILING，人工核对重新排队时释放打印机绑�
 })
 
 test('批量派发 Preview 无副作用且 Confirm 重复提交幂等', async () => {
+  setupSessions({ batchDispatchEnabled: true })
   const initialJobCount = mockState.jobs.length
   const printer = mockState.printers.find(item => item.id === 408)
   const initialPrinterJobId = printer.currentJobId

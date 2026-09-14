@@ -21,7 +21,7 @@ function assertDispatchPlanItemVO(item) {
 }
 
 function setupSession() {
-  resetMockState()
+  resetMockState({ batchDispatchEnabled: true })
   mockState.users.push({
     id: 3,
     username: 'third-user',
@@ -36,8 +36,32 @@ function setupSession() {
   mockState.sessions['batch-flow-session'] = { userId: 1, username: 'admin', role: 'ADMIN' }
 }
 
-test('allows an operator to create and confirm its own plan containing another users public file', async () => {
+test('Mock 默认关闭批量派发并为三个入口返回稳定 FEATURE_DISABLED 契约', async () => {
   resetMockState()
+  mockState.sessions['batch-disabled-session'] = { userId: 1, username: 'admin', role: 'ADMIN' }
+  const disabledHeaders = { Authorization: 'Bearer batch-disabled-session' }
+  const requests = [
+    ['POST', '/api/v1/print-jobs/batch/preview', { fileIds: [20], printerIds: [404], strategy: 'ONE_TO_ONE' }],
+    ['POST', '/api/v1/print-jobs/batch/confirm', {
+      planId: 'plan-1', version: 1, itemIds: ['item-1'], confirmationToken: 'token-1'
+    }],
+    ['POST', '/api/v1/print-jobs/batch/retry-preview', {
+      sourcePlanId: 'plan-1', sourceItemIds: ['item-1'], retryKey: 'retry-1'
+    }]
+  ]
+
+  for (const [method, url, data] of requests) {
+    await assert.rejects(request(method, url, data, disabledHeaders), error => (
+      error.response.status === 404
+      && error.response.data.code === 10004
+      && error.response.data.message === '功能暂未开放'
+    ))
+  }
+  assert.equal(mockState.batchPlans.length, 0)
+})
+
+test('allows an operator to create and confirm its own plan containing another users public file', async () => {
+  resetMockState({ batchDispatchEnabled: true })
   mockState.users.push({
     id: 3,
     username: 'third-user',
@@ -73,7 +97,7 @@ test('allows an operator to create and confirm its own plan containing another u
 })
 
 test('rejects a different operator from confirming the public-file owners plan', async () => {
-  resetMockState()
+  resetMockState({ batchDispatchEnabled: true })
   mockState.users.push({
     id: 3,
     username: 'third-user',

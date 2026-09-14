@@ -55,7 +55,7 @@ const assertPublicJob = job => {
 }
 
 test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', async () => {
-  resetMockState()
+  resetMockState({ batchDispatchEnabled: true })
   mockState.sessions['p1-admin-session'] = { userId: 1, username: 'admin', role: 'ADMIN' }
   mockState.sessions['p1-operator-session'] = { userId: 2, username: 'operator', role: 'OPERATOR' }
 

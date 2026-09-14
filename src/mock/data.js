@@ -1,3 +1,5 @@
+import { isFeatureEnabled } from '../config/features.js'
+
 const clone = value => JSON.parse(JSON.stringify(value))
 
 const mockFileUrl = name => {
@@ -11,7 +13,8 @@ const createSeedData = ({
   dashboardLayoutError = null,
   printers: printersOverride = null,
   batchAddFailures = [],
-  jobs: jobsOverride = null
+  jobs: jobsOverride = null,
+  batchDispatchEnabled = isFeatureEnabled('batchDispatch')
 } = {}) => ({
   users: initialized ? [
     {
@@ -593,6 +596,9 @@ const createSeedData = ({
       traceId: 'mock-trace-001'
     }
   ] : [],
+  features: {
+    batchDispatch: batchDispatchEnabled === true
+  },
   batchPlans: [],
   mockDebug: {
     requestCounts: {}

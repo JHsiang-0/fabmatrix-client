@@ -79,6 +79,14 @@ const requireSession = (config, roles = []) => {
   return session
 }
 
+const requireBatchDispatchSession = config => {
+  const session = requireSession(config, ['ADMIN', 'OPERATOR'])
+  if (mockState.features?.batchDispatch !== true) {
+    fail(404, 10004, '功能暂未开放')
+  }
+  return session
+}
+
 const getPath = url => {
   try {
     return new URL(url, 'http://mock.local').pathname
@@ -827,7 +835,7 @@ const handlePrinterStatistics = config => {
 }
 
 const handleBatchRetryPreview = config => {
-  const session = requireSession(config, ['ADMIN', 'OPERATOR'])
+  const session = requireBatchDispatchSession(config)
   const body = getBody(config)
   const sourcePlan = mockState.batchPlans.find(item => item.planId === body.sourcePlanId)
   if (!sourcePlan || !canReadResource(session, sourcePlan.userId)) {
@@ -2114,7 +2122,7 @@ const isPrinterAvailable = printer => Boolean(
 )
 
 const handleBatchPreview = config => {
-  const session = requireSession(config, ['ADMIN', 'OPERATOR'])
+  const session = requireBatchDispatchSession(config)
   const body = getBody(config)
   const fileIds = normalizeBatchIds(body.fileIds)
   const printerIds = normalizeBatchIds(body.printerIds)
@@ -2254,7 +2262,7 @@ const createBatchJob = (session, item, action) => {
 }
 
 const handleBatchConfirm = config => {
-  const session = requireSession(config, ['ADMIN', 'OPERATOR'])
+  const session = requireBatchDispatchSession(config)
   const body = getBody(config)
   const plan = mockState.batchPlans.find(item => item.planId === body.planId)
   if (!plan) fail(404, 404, '批量派发计划不存在')

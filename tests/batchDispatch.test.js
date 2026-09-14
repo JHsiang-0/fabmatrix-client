@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { isFeatureEnabled } from '../src/config/features.js'
+import { FEATURE_DISABLED, isFeatureEnabled } from '../src/config/features.js'
 import { getNavigationItem } from '../src/config/navigation.js'
 import {
   acquireBatchConfirmLock,
@@ -13,16 +13,19 @@ import {
 } from '../src/utils/batchDispatch.js'
 
 const routerSource = await readFile(new URL('../src/router/index.js', import.meta.url), 'utf8')
+const jobApiSource = await readFile(new URL('../src/api/job.js', import.meta.url), 'utf8')
 const browserE2ESource = await readFile(new URL('./e2e/browser.spec.js', import.meta.url), 'utf8')
 const electronE2ESource = await readFile(new URL('./e2e/electron.spec.js', import.meta.url), 'utf8')
 
 test('当前版本隐藏批量派发入口并拒绝直接路由访问', () => {
   assert.equal(isFeatureEnabled('batchDispatch'), false)
+  assert.deepEqual(FEATURE_DISABLED, { code: 10004, message: '功能暂未开放' })
   assert.equal(getNavigationItem('/batch-dispatch'), null)
   assert.match(routerSource, /feature: 'batchDispatch'/)
   assert.match(routerSource, /isFeatureEnabled\(record\.meta\.feature\)/)
   assert.match(routerSource, /if \(disabledFeatureRoute\) return \{ name: 'not-found' \}/)
   assert.match(routerSource, /skipSessionRestore: true/)
+  assert.match(jobApiSource, /assertFeatureEnabled\('batchDispatch'\)/)
 })
 
 test('批量派发导航、路由和业务 E2E 共享同一个功能开关', () => {
