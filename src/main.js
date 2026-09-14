@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import TDesign from 'tdesign-vue-next'
 import { getEnvironmentServerConfig, getWebSocketBaseUrl } from '@/utils/serverConfig'
+import '@/utils/rootFontSize'
 
 // Tailwind 仅提供布局工具；应用主题层在 TDesign 样式之后映射语义 Token。
 import '@/styles/index.css'
@@ -12,14 +13,15 @@ import '@/styles/theme.css'
 import App from './App.vue'
 import router from './router'
 
-if (typeof window !== 'undefined' && (import.meta.env.DEV || import.meta.env.MODE.startsWith('desktop'))) {
+if (typeof window !== 'undefined' && !window.farmDesktop?.isPackaged
+  && (import.meta.env.DEV || import.meta.env.MODE.startsWith('desktop'))) {
   window.__FARM_RUNTIME_DIAGNOSTICS__ = () => {
     const environmentConfig = getEnvironmentServerConfig()
 
     return {
       mode: import.meta.env.MODE,
       baseUrl: import.meta.env.BASE_URL,
-      useMock: import.meta.env.VITE_USE_MOCK === 'true' || ['mock', 'desktop-mock'].includes(import.meta.env.MODE),
+      useMock: ['mock', 'desktop-mock'].includes(import.meta.env.MODE),
       apiBaseUrl: environmentConfig.apiBaseUrl,
       wsUrl: getWebSocketBaseUrl()
     }

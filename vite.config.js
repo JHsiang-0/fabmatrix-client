@@ -1,18 +1,31 @@
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { getContentSecurityPolicy } from './electron/security.cjs'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, fileURLToPath(new URL('.', import.meta.url)), '')
   const isDesktopMode = mode.startsWith('desktop')
+  const isExplicitMockMode = ['mock', 'desktop-mock'].includes(mode)
 
-  if (mode === 'production' && env.VITE_USE_MOCK === 'true') {
-    throw new Error('生产环境禁止启用 VITE_USE_MOCK，请检查环境变量配置')
+  if (env.VITE_USE_MOCK === 'true' && !isExplicitMockMode) {
+    throw new Error('正式构建禁止通过 VITE_USE_MOCK 启用 Mock，请使用显式 mock 脚本')
+  }
+
+  const contentSecurityPolicyPlugin = {
+    name: 'farm-content-security-policy',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html, context) {
+        const policy = getContentSecurityPolicy({ isDevelopment: Boolean(context.server) })
+        return html.replace('__FARM_CONTENT_SECURITY_POLICY__', policy)
+      }
+    }
   }
 
   return {
     base: mode.startsWith('desktop') ? './' : '/',
-    plugins: [vue()],
+    plugins: [vue(), contentSecurityPolicyPlugin],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url))

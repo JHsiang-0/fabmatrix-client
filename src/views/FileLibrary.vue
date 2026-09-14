@@ -747,6 +747,7 @@ const uploadProgress = ref(0)
 const uploadError = ref('')
 let uploadController = null
 let searchTimer = null
+let isUnmounted = false
 // 打印任务对话框状态
 const createJobDialogVisible = ref(false)
 const submittingJob = ref(false)
@@ -1443,7 +1444,8 @@ const submitBatchUpload = async () => {
   batchUploading.value = true
   uploadError.value = ''
   uploadProgress.value = 0
-  uploadController = new AbortController()
+  const controller = new AbortController()
+  uploadController = controller
   try {
     const queueResults = await runUploadQueue(files, async (file, index) => {
       const state = uploadFileStates.value[index]
@@ -1457,7 +1459,7 @@ const submitBatchUpload = async () => {
           state.loaded = Number(event?.loaded) || 0
           if (total > 0) state.progress = Math.min(Math.round((state.loaded / total) * 100), 99)
           updateUploadOverallProgress()
-        }, { signal: uploadController.signal })
+        }, { signal: controller.signal })
         const item = {
           index,
           fileId: response.data?.id ?? null,
@@ -1495,8 +1497,9 @@ const submitBatchUpload = async () => {
       }
     }, {
       concurrency: 3,
-      signal: uploadController.signal
+      signal: controller.signal
     })
+    if (isUnmounted || controller.signal.aborted) return
 
     const result = {
       items: queueResults.map((queueResult, index) => {
@@ -1549,6 +1552,7 @@ const submitBatchUpload = async () => {
       message.error(unknownResultCount ? '上传结果未知，请刷新文件列表确认' : '文件上传失败，请检查失败项')
     }
   } catch (error) {
+    if (isUnmounted) return
     console.error('批量上传失败:', error)
     if (isUploadCanceled(error)) {
       const completedItems = uploadFileStates.value
@@ -2033,8 +2037,10 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  isUnmounted = true
   fileRequestSequence += 1
   if (searchTimer) clearTimeout(searchTimer)
+  cancelUpload()
 })
 </script>
 

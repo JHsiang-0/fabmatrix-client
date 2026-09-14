@@ -8,6 +8,7 @@ test('项目验证门禁覆盖测试、lint、浏览器和桌面构建', async (
   const sidebarSource = await readFile(new URL('../src/components/layout/AppSidebar.vue', import.meta.url), 'utf8')
   const mainSource = await readFile(new URL('../electron/main.cjs', import.meta.url), 'utf8')
   const preloadSource = await readFile(new URL('../electron/preload.cjs', import.meta.url), 'utf8')
+  const mockBuilderSource = await readFile(new URL('../electron-builder.mock.yml', import.meta.url), 'utf8')
 
   assert.equal(packageJson.version, '1.0.0')
   assert.equal(packageJson.build.appId, 'com.jiadong3d.fabmatrix.client')
@@ -20,7 +21,9 @@ test('项目验证门禁覆盖测试、lint、浏览器和桌面构建', async (
   assert.match(scripts.verify, /npm run build:desktop/)
   assert.match(scripts.verify, /npm run build:desktop:mock/)
   assert.equal(packageJson.main, 'electron/main.cjs')
-  assert.match(mainSource, /const APP_ID = 'com\.jiadong3d\.fabmatrix\.client'/)
+  assert.match(mainSource, /const APP_ID = FARM_MODE === 'mock'[\s\S]*'com\.jiadong3d\.fabmatrix\.client\.mock'[\s\S]*'com\.jiadong3d\.fabmatrix\.client'/)
+  assert.match(mockBuilderSource, /appId: com\.jiadong3d\.fabmatrix\.client\.mock/)
+  assert.match(mockBuilderSource, /farmMode: mock/)
   assert.match(scripts['desktop:run'], /electron \. --farm-dist/)
   assert.match(scripts['desktop:run:mock'], /electron \. --farm-dist/)
   assert.match(mainSource, /frame: false/)

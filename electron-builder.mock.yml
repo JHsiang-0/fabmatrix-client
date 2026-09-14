@@ -1,0 +1,22 @@
+appId: com.jiadong3d.fabmatrix.client.mock
+productName: FabMatrix Desktop Mock
+artifactName: FabMatrix-Client-Mock-Setup-${version}.${ext}
+directories:
+  output: release-mock
+files:
+  - dist/**/*
+  - electron/**/*
+asar: true
+extraMetadata:
+  farmMode: mock
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: public/icon.png
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true

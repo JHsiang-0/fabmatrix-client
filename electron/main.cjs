@@ -2,9 +2,29 @@ const path = require('node:path')
 const fs = require('node:fs')
 const { pathToFileURL } = require('node:url')
 const { app, BrowserWindow, ipcMain, screen, shell } = require('electron')
+const {
+  getAllowedDevServerUrl,
+  getContentSecurityPolicy,
+  isAllowedExternalUrl,
+  isAllowedRendererUrl
+} = require('./security.cjs')
 
-const APP_ID = 'com.jiadong3d.fabmatrix.client'
-const DEV_SERVER_URL = process.env.FARM_ELECTRON_DEV_SERVER_URL || 'http://127.0.0.1:5176'
+const getPackagedFarmMode = () => {
+  if (!app.isPackaged) return null
+
+  try {
+    const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'))
+    return packageJson.farmMode || null
+  } catch {
+    return null
+  }
+}
+
+const FARM_MODE = getPackagedFarmMode()
+const APP_ID = FARM_MODE === 'mock'
+  ? 'com.jiadong3d.fabmatrix.client.mock'
+  : 'com.jiadong3d.fabmatrix.client'
+const DEV_SERVER_URL = getAllowedDevServerUrl(process.env.FARM_ELECTRON_DEV_SERVER_URL)
 const DIST_INDEX_PATH = path.join(__dirname, '..', 'dist', 'index.html')
 const WINDOW_SIZE = {
   minWidth: 800,
@@ -20,7 +40,7 @@ app.setAppUserModelId(APP_ID)
 
 // Playwright Electron smoke runs use an isolated profile so a developer's
 // running FabMatrix window cannot steal the single-instance lock.
-if (process.env.FARM_ELECTRON_E2E_USER_DATA) {
+if (!app.isPackaged && process.env.FARM_ELECTRON_E2E_USER_DATA) {
   app.setPath('userData', process.env.FARM_ELECTRON_E2E_USER_DATA)
 }
 
@@ -28,8 +48,10 @@ let mainWindow = null
 
 const shouldUseDistRenderer = () => (
   app.isPackaged
-  || process.env.FARM_ELECTRON_E2E_DIST === '1'
-  || process.argv.includes('--farm-dist')
+  || (!app.isPackaged && (
+    process.env.FARM_ELECTRON_E2E_DIST === '1'
+    || process.argv.includes('--farm-dist')
+  ))
 )
 
 const getPlannedRenderer = () => shouldUseDistRenderer()
@@ -61,8 +83,8 @@ const getRuntimeInfo = () => {
     appVersion: app.getVersion(),
     isPackaged: app.isPackaged,
     rendererMode: getRenderer().mode,
-    rendererSource: getRenderer().source,
-    userDataPath: app.getPath('userData'),
+    rendererSource: app.isPackaged ? null : getRenderer().source,
+    userDataPath: app.isPackaged ? null : app.getPath('userData'),
     window: {
       contentSize,
       isFullscreen: Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFullScreen()),
@@ -70,6 +92,48 @@ const getRuntimeInfo = () => {
       maxSize: [WINDOW_SIZE.maxWidth, WINDOW_SIZE.maxHeight]
     }
   }
+}
+
+const isTrustedRendererEvent = event => (
+  Boolean(mainWindow)
+  && !mainWindow.isDestroyed()
+  && event?.sender === mainWindow.webContents
+  && isAllowedRendererUrl(event?.senderFrame?.url, getRenderer())
+)
+
+const registerWindowIpcHandler = (channel, handler) => {
+  ipcMain.handle(channel, (event, ...args) => {
+    if (!isTrustedRendererEvent(event)) throw new Error('拒绝来自未授权渲染器的 IPC 请求')
+    return handler(event, ...args)
+  })
+}
+
+const openExternalUrl = url => {
+  if (!isAllowedExternalUrl(url)) return false
+  void shell.openExternal(url).catch(() => {})
+  return true
+}
+
+const installContentSecurityPolicy = () => {
+  const policy = getContentSecurityPolicy({ isDevelopment: !app.isPackaged })
+  mainWindow.webContents.session.webRequest.onHeadersReceived(
+    {
+      urls: [
+        'http://127.0.0.1:*/*',
+        'http://localhost:*/*',
+        'http://[::1]:*/*',
+        'file://*/*'
+      ]
+    },
+    (details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [policy]
+        }
+      })
+    }
+  )
 }
 
 const loadRenderer = async () => {
@@ -106,7 +170,7 @@ const getAppIconPath = () => {
   return candidates.find(candidate => fs.existsSync(candidate))
 }
 
-ipcMain.handle('farm-window:set-fullscreen', (_event, fullscreen) => {
+registerWindowIpcHandler('farm-window:set-fullscreen', (_event, fullscreen) => {
   if (!mainWindow || mainWindow.isDestroyed()) return false
 
   mainWindow.setFullScreen(Boolean(fullscreen))
@@ -114,16 +178,16 @@ ipcMain.handle('farm-window:set-fullscreen', (_event, fullscreen) => {
   return getWindowState().isFullscreen
 })
 
-ipcMain.handle('farm-window:get-state', () => getWindowState())
+registerWindowIpcHandler('farm-window:get-state', () => getWindowState())
 
-ipcMain.handle('farm-window:minimize', () => {
+registerWindowIpcHandler('farm-window:minimize', () => {
   if (!mainWindow || mainWindow.isDestroyed()) return getWindowState()
 
   mainWindow.minimize()
   return getWindowState()
 })
 
-ipcMain.handle('farm-window:toggle-maximize', () => {
+registerWindowIpcHandler('farm-window:toggle-maximize', () => {
   if (!mainWindow || mainWindow.isDestroyed()) return getWindowState()
 
   if (mainWindow.isMaximized()) mainWindow.unmaximize()
@@ -132,14 +196,14 @@ ipcMain.handle('farm-window:toggle-maximize', () => {
   return getWindowState()
 })
 
-ipcMain.handle('farm-window:close', () => {
+registerWindowIpcHandler('farm-window:close', () => {
   if (!mainWindow || mainWindow.isDestroyed()) return false
 
   mainWindow.close()
   return true
 })
 
-ipcMain.handle('farm-runtime:get-info', () => getRuntimeInfo())
+registerWindowIpcHandler('farm-runtime:get-info', () => getRuntimeInfo())
 
 const getWindowSize = () => {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize
@@ -151,7 +215,7 @@ const getWindowSize = () => {
   }
 }
 
-const hasSingleInstanceLock = process.env.FARM_ELECTRON_E2E === '1'
+const hasSingleInstanceLock = !app.isPackaged && process.env.FARM_ELECTRON_E2E === '1'
   ? true
   : app.requestSingleInstanceLock()
 
@@ -187,6 +251,7 @@ if (!hasSingleInstanceLock) {
         sandbox: true
       }
     })
+    installContentSecurityPolicy()
 
     mainWindow.once('ready-to-show', () => {
       mainWindow.show()
@@ -197,11 +262,16 @@ if (!hasSingleInstanceLock) {
     mainWindow.on('enter-full-screen', notifyWindowStateChange)
     mainWindow.on('leave-full-screen', notifyWindowStateChange)
 
-    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-      if (/^https?:\/\//i.test(url)) {
-        shell.openExternal(url)
-      }
+    const handleUnauthorizedNavigation = (event, url) => {
+      if (isAllowedRendererUrl(url, getRenderer())) return
+      event.preventDefault()
+      openExternalUrl(url)
+    }
 
+    mainWindow.webContents.on('will-navigate', handleUnauthorizedNavigation)
+    mainWindow.webContents.on('will-redirect', handleUnauthorizedNavigation)
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+      openExternalUrl(url)
       return { action: 'deny' }
     })
 

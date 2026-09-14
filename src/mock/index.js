@@ -2499,7 +2499,7 @@ const route = async config => {
   fail(404, 404, `Mock 未实现接口：${method} ${path}`)
 }
 
-export const isMockEnabled = runtimeEnv.VITE_USE_MOCK === 'true' || [
+export const isMockEnabled = [
   'mock',
   'desktop-mock'
 ].includes(runtimeEnv.MODE)

@@ -8,58 +8,10 @@
     <!-- 针对 Windows 高缩放屏幕的优化 -->
     <meta name="msapplication-TileColor" content="#262626">
     <meta name="theme-color" content="#262626">
+    <meta http-equiv="Content-Security-Policy" content="__FARM_CONTENT_SECURITY_POLICY__">
     <!-- 禁止电话号码自动检测（iOS） -->
     <meta name="format-detection" content="telephone=no">
     <title>FabMatrix Desktop | 嘉东 3D 打印生产管理平台</title>
-    <!-- 根字体大小动态计算脚本：实现流式排版 -->
-    <script>
-      (function() {
-        // 基准设计稿宽度：1920px（1080p 标准桌面）
-        const BASE_WIDTH = 1920;
-        // 最小根字体：12px（保证可读性）
-        const MIN_FONT_SIZE = 12;
-        // 最大根字体：20px（防止 4K 屏幕上字体过大）
-        const MAX_FONT_SIZE = 20;
-        // 基准根字体：16px（对应 1920px 宽度）
-        const BASE_FONT_SIZE = 16;
-
-        function setRootFontSize() {
-          const width = window.innerWidth;
-          // 计算根字体大小：基于宽度的线性插值
-          let fontSize = (width / BASE_WIDTH) * BASE_FONT_SIZE;
-          // 应用 clamp 限制：MIN_FONT_SIZE <= fontSize <= MAX_FONT_SIZE
-          fontSize = Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, fontSize));
-          document.documentElement.style.fontSize = fontSize + 'px';
-          // 存储当前缩放比例，供 JavaScript 计算使用
-          document.documentElement.dataset.scale = (fontSize / BASE_FONT_SIZE).toFixed(3);
-        }
-
-        // 初始设置
-        setRootFontSize();
-
-        // 防抖函数
-        function debounce(func, wait) {
-          let timeout;
-          return function executedFunction(...args) {
-            const later = () => {
-              clearTimeout(timeout);
-              func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-          };
-        }
-
-        // 监听窗口大小变化（防抖 100ms）
-        window.addEventListener('resize', debounce(setRootFontSize, 100));
-
-        // 监听屏幕方向变化（移动端）
-        window.addEventListener('orientationchange', setRootFontSize);
-      })();
-    </script>
-    <!-- 预加载关键字体 -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   </head>
   <body>
     <div id="app"></div>

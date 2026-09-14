@@ -250,6 +250,7 @@ const resultTab = ref('all')
 const strategy = ref('ONE_TO_ONE')
 const action = ref('QUEUE')
 const activeStep = ref(0)
+let isUnmounted = false
 let previewExpiryTimer = null
 
 const currentStep = computed(() => {
@@ -419,7 +420,8 @@ async function uploadSelected() {
   uploadProgress.value = 0
   const files = [...uploadFiles.value]
   lastBatchUploadFiles.value = files
-  uploadController.value = new AbortController()
+  const controller = new AbortController()
+  uploadController.value = controller
   try {
     const chunks = chunkItemsByBytes(files, MAX_UPLOAD_REQUEST_BYTES)
     const chunkLoaded = new Map()
@@ -431,12 +433,13 @@ async function uploadSelected() {
         if (totalBytes) uploadProgress.value = Math.min(Math.round((loaded / totalBytes) * 100), 99)
       }
       return batchUploadFiles(chunk, null, chunkProgress, {
-        signal: uploadController.value.signal
+        signal: controller.signal
       })
     }, {
       concurrency: 3,
-      signal: uploadController.value.signal
+      signal: controller.signal
     })
+    if (isUnmounted || controller.signal.aborted) return
     const items = []
     queueResults.forEach((queueResult, chunkIndex) => {
       const chunk = chunks[chunkIndex]
@@ -466,6 +469,7 @@ async function uploadSelected() {
     uploadFiles.value = []
     await loadResources()
   } catch (error) {
+    if (isUnmounted) return
     console.error('批量上传失败:', error)
     if (error?.name === 'CanceledError' || error?.name === 'AbortError' || error?.code === 'ERR_CANCELED') {
       message.info('批量上传已取消')
@@ -620,7 +624,11 @@ watch([selectedFileIds, selectedPrinterIds, strategy, action], () => {
   invalidatePreview()
   if (activeStep.value > 1) activeStep.value = 1
 }, { deep: true })
-onUnmounted(stopPreviewExpiryTimer)
+onUnmounted(() => {
+  isUnmounted = true
+  cancelUpload()
+  stopPreviewExpiryTimer()
+})
 </script>
 
 <style scoped>

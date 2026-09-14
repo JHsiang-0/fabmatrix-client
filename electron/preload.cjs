@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('farmDesktop', Object.freeze({
   isDesktop: true,
+  isPackaged: process.isPackaged,
   setFullscreen: fullscreen => ipcRenderer.invoke('farm-window:set-fullscreen', Boolean(fullscreen)),
   getWindowState: () => ipcRenderer.invoke('farm-window:get-state'),
   minimize: () => ipcRenderer.invoke('farm-window:minimize'),
