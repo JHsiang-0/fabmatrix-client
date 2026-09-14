@@ -436,9 +436,10 @@ test('keeps Mock error scenarios aligned with HTTP and business codes', async ()
       request('GET', '/api/v1/auth/me', undefined, undefined, { mockError: code }),
       error => {
         assert.equal(error.response.status, status)
-        assert.deepEqual(Object.keys(error.response.data).sort(), ['code', 'data', 'message', 'timestamp'])
+        assert.deepEqual(Object.keys(error.response.data).sort(), ['code', 'data', 'message', 'timestamp', 'traceId'])
         assert.equal(error.response.data.code, Number(code))
         assert.equal(error.response.data.data, null)
+        assert.equal(error.response.data.traceId, error.response.headers['X-Trace-Id'])
         return true
       }
     )

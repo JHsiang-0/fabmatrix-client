@@ -6,6 +6,9 @@ import { toPublicSemanticIds } from './server.js'
  */
 
 export const MOCK_SUCCESS_CODE = 200
+let mockTraceSequence = 0
+
+const createMockTraceId = () => `mock-trace-${Date.now().toString(36)}-${++mockTraceSequence}`
 
 export const createMockSuccess = data => ({
   code: MOCK_SUCCESS_CODE,
@@ -15,15 +18,18 @@ export const createMockSuccess = data => ({
 })
 
 export class MockRequestError extends Error {
-  constructor(status, code, message, data = null) {
+  constructor(status, code, message, data = null, traceId = createMockTraceId()) {
     super(message)
     this.name = 'MockRequestError'
+    this.traceId = traceId
     this.response = {
       status,
+      headers: { 'X-Trace-Id': traceId },
       data: createMockSuccess(toPublicSemanticIds(data))
     }
     this.response.data.code = code
     this.response.data.message = message
+    this.response.data.traceId = traceId
   }
 }
 

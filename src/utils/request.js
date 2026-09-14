@@ -8,6 +8,7 @@ import { getApiBaseUrl } from './serverConfig'
 import {
   getErrorContext,
   getErrorMessage,
+  getTraceId,
   isBinaryResponse,
   isSuccessfulEnvelope,
   normalizeResponseEnvelope,
@@ -18,6 +19,8 @@ export { RequestError } from './requestCore'
 export {
   getErrorContext,
   getErrorMessage,
+  getTraceId,
+  isSafeErrorMessage,
   isBinaryResponse,
   isSuccessfulEnvelope,
   normalizeResponseEnvelope
@@ -135,6 +138,7 @@ const createCanceledError = (error, config) => {
         status: error.response.status,
         statusText: error.response.statusText,
         data: error.response.data,
+        headers: getSafeResponseHeaders(error.response.headers),
         config: safeConfig
       }
     : undefined
@@ -144,6 +148,7 @@ const createCanceledError = (error, config) => {
     businessCode: 'ERR_CANCELED',
     status: response?.status ?? null,
     context: 'canceled',
+    traceId: getTraceId(error?.response),
     method: requestConfig?.method,
     url: requestConfig?.url,
     axiosCode: 'ERR_CANCELED',
@@ -197,6 +202,7 @@ const createErrorFromFailure = (error, config) => {
         status: response.status,
         statusText: response.statusText,
         data: envelope || responsePayload,
+        headers: getSafeResponseHeaders(response.headers),
         config: safeConfig
       }
     : undefined
@@ -208,6 +214,7 @@ const createErrorFromFailure = (error, config) => {
     status,
     data: envelope?.data ?? null,
     timestamp: envelope?.timestamp ?? null,
+    traceId: envelope?.traceId || getTraceId(response),
     context: getErrorContext(code, status, error?.code),
     method: requestConfig?.method,
     url: requestConfig?.url,
@@ -234,6 +241,11 @@ const handleUnauthorized = (error, requestConfig) => {
   return false
 }
 
+const getSafeResponseHeaders = headers => {
+  const traceId = getTraceId({ headers })
+  return traceId ? { 'X-Trace-Id': traceId } : undefined
+}
+
 export const handleRequestError = (error, config) => {
   const requestConfig = config || error?.config || error?.response?.config
   if (isCanceledError(error)) return Promise.reject(createCanceledError(error, requestConfig))
@@ -254,7 +266,7 @@ export const handleRequestError = (error, config) => {
   return Promise.reject(requestError)
 }
 
-const normalizeSuccess = (responseData, config, status = 200) => {
+const normalizeSuccess = (responseData, config, status = 200, headers) => {
   if (isBinaryResponse(responseData, config)) return responseData
 
   const envelope = normalizeResponseEnvelope(responseData, status)
@@ -270,8 +282,9 @@ const normalizeSuccess = (responseData, config, status = 200) => {
       status,
       data: envelope.data,
       timestamp: envelope.timestamp,
+      traceId: envelope.traceId || getTraceId({ headers }),
       context: getErrorContext(envelope.code, status),
-      response: { status, data: envelope },
+      response: { status, data: envelope, headers: getSafeResponseHeaders(headers) },
       config
     })
   }
@@ -281,7 +294,7 @@ const normalizeSuccess = (responseData, config, status = 200) => {
 
 const validateAxiosResponse = response => {
   try {
-    return normalizeSuccess(response.data, response.config, response.status)
+    return normalizeSuccess(response.data, response.config, response.status, response.headers)
   } catch (error) {
     return handleRequestError(error)
   }

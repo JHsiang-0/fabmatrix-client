@@ -3,7 +3,9 @@ import assert from 'node:assert/strict'
 import {
   getErrorContext,
   getErrorMessage,
+  getTraceId,
   isBinaryResponse,
+  isSafeErrorMessage,
   isSuccessfulEnvelope,
   normalizeResponseEnvelope,
   RequestError
@@ -73,6 +75,26 @@ test('maps HTTP and business errors to contextual RequestError fields', () => {
   assert.equal(error.context, 'service-unavailable')
   assert.equal(error.response.data.code, 5003)
   assert.equal(error.isRequestError, true)
+})
+
+test('reads trace IDs from response headers and keeps them on RequestError', () => {
+  const headers = { 'X-Trace-Id': 'trace-frontend-001' }
+  assert.equal(getTraceId({ headers }), 'trace-frontend-001')
+
+  const error = new RequestError({
+    message: '服务暂时不可用，请稍后重试',
+    code: 5003,
+    status: 503,
+    traceId: getTraceId({ headers })
+  })
+  assert.equal(error.traceId, 'trace-frontend-001')
+})
+
+test('rejects internal exception text while preserving safe business messages', () => {
+  assert.equal(isSafeErrorMessage('名称已存在'), true)
+  assert.equal(isSafeErrorMessage('系统内部异常: ### SQL syntax error'), false)
+  assert.equal(getErrorMessage({ code: 500, status: 500, responseMessage: '系统内部异常: java.sql.SQLException' }), '服务器内部错误，请稍后重试')
+  assert.equal(getErrorMessage({ code: 409, status: 409, responseMessage: '名称已存在' }), '名称已存在')
 })
 
 test('prefers backend message and maps important error contexts', () => {

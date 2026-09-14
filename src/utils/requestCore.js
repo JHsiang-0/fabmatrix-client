@@ -3,6 +3,8 @@ const ERROR_MESSAGES = Object.freeze({
   401: '登录已过期，请重新登录',
   403: '当前账号没有执行此操作的权限',
   404: '请求的资源不存在',
+  10004: '功能暂未开放',
+  405: '当前请求方法不受支持',
   409: '当前资源存在冲突，请刷新后重试',
   422: '当前状态不允许执行此操作',
   500: '服务器内部错误，请稍后重试',
@@ -15,6 +17,24 @@ const ERROR_MESSAGES = Object.freeze({
   5003: '文件存储服务暂不可用，请稍后重试',
   5004: '打印设备网络异常，请检查设备连接'
 })
+
+const UNSAFE_ERROR_MESSAGE = /###|\b(?:sql|mybatis|jdbc|stack trace|connection refused)\b|(?:[A-Za-z]:\\|\/var\/|\/tmp\/|\/home\/|org\.|java\.)/i
+
+export const isSafeErrorMessage = message => (
+  typeof message === 'string'
+  && message.trim().length > 0
+  && message.length <= 256
+  && !UNSAFE_ERROR_MESSAGE.test(message)
+)
+
+export const getTraceId = response => {
+  const headers = response?.headers
+  if (!headers) return ''
+  const value = typeof headers.get === 'function'
+    ? headers.get('X-Trace-Id') || headers.get('x-trace-id')
+    : headers['X-Trace-Id'] || headers['x-trace-id']
+  return typeof value === 'string' ? value.trim() : ''
+}
 
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key)
 
@@ -101,7 +121,7 @@ export function getErrorContext(code, status, originalCode) {
 }
 
 export function getErrorMessage({ code, status, originalCode, originalMessage, responseMessage } = {}) {
-  if (responseMessage) return responseMessage
+  if (isSafeErrorMessage(responseMessage)) return responseMessage.trim()
   if (ERROR_MESSAGES[code]) return ERROR_MESSAGES[code]
 
   const context = getErrorContext(code, status, originalCode)
@@ -109,7 +129,7 @@ export function getErrorMessage({ code, status, originalCode, originalMessage, r
   if (context === 'network') return '网络连接异常，请检查服务地址和网络连接'
   if (context === 'service-unavailable') return '服务暂时不可用，请稍后重试'
   if (status) return `请求失败 (${status})`
-  return originalMessage || '请求失败'
+  return isSafeErrorMessage(originalMessage) ? originalMessage.trim() : '请求失败'
 }
 
 /**
@@ -131,6 +151,7 @@ export class RequestError extends Error {
     this.httpStatus = this.status
     this.data = details.data ?? null
     this.timestamp = details.timestamp ?? null
+    this.traceId = details.traceId || null
     this.context = details.context || getErrorContext(this.code, this.status, details.axiosCode)
     this.method = details.method || null
     this.url = details.url || null

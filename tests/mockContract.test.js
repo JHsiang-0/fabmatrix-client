@@ -31,8 +31,10 @@ test('keeps HTTP and business codes in mock error envelopes', () => {
     code: 10002,
     message: '模拟设备忙碌',
     data: { retryable: true },
-    timestamp: error.response.data.timestamp
+    timestamp: error.response.data.timestamp,
+    traceId: error.traceId
   })
+  assert.equal(error.response.headers['X-Trace-Id'], error.traceId)
   assert.deepEqual(resolveMockErrorScenario({ params: { mockError: '503' } }), MOCK_ERROR_SCENARIOS['503'])
   assert.deepEqual(resolveMockErrorScenario({ headers: { 'X-Mock-Error': '400' } }), MOCK_ERROR_SCENARIOS['400'])
 })
