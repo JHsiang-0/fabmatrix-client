@@ -56,7 +56,7 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
     await expect(page).toHaveTitle(/FabMatrix Desktop/)
 
     const mainRuntime = await page.evaluate(() => window.farmDesktop.getRuntimeInfo())
-    expect(mainRuntime.appId).toBe('com.example.farmui')
+    expect(mainRuntime.appId).toBe('com.jiadong3d.fabmatrix.client')
     expect(mainRuntime.isPackaged).toBe(false)
     expect(mainRuntime.rendererMode).toBe('dev-server')
     expect(mainRuntime.rendererSource).toBe(E2E_DESKTOP_URL)

@@ -59,7 +59,7 @@ test('brand and profile entry are real FabMatrix routes', () => {
   assert.doesNotMatch(sidebarSource, /:is="item.icon"/)
   assert.match(sidebarSource, /expand-type="normal"/)
   assert.match(sidebarSource, /import packageJson from '\.\.\/\.\.\/\.\.\/package\.json'/)
-  assert.match(sidebarSource, /<span>FabMatrix<\/span>[\s\S]*<t-tag[^>]*>v{{ appVersion }}<\/t-tag>/)
+  assert.match(sidebarSource, /<span>FabMatrix<\/span>[\s\S]*<t-tag[^>]*>v{{ appVersion }} 准正式版<\/t-tag>/)
   assert.match(sidebarSource, /\.app-sidebar__footer {[\s\S]*align-items: center;[\s\S]*white-space: nowrap;/)
   assert.match(userMenuSource, /router\.push\('\/profile'\)/)
   assert.doesNotMatch(userMenuSource, /后续版本开放/)

@@ -46,7 +46,7 @@
 
     <div v-if="!props.collapsed || props.isMobile" class="app-sidebar__footer">
       <span>FabMatrix</span>
-      <t-tag class="app-sidebar__version" size="small" theme="default" variant="light" shape="round">v{{ appVersion }}</t-tag>
+      <t-tag class="app-sidebar__version" size="small" theme="default" variant="light" shape="round">v{{ appVersion }} 准正式版</t-tag>
     </div>
   </t-aside>
 </template>

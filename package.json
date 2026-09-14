@@ -64,8 +64,9 @@
   },
   "main": "electron/main.cjs",
   "build": {
-    "appId": "com.example.farmui",
+    "appId": "com.jiadong3d.fabmatrix.client",
     "productName": "FabMatrix Desktop",
+    "artifactName": "FabMatrix-Client-Setup-${version}.${ext}",
     "directories": {
       "output": "release"
     },
