@@ -51,6 +51,7 @@ test('runs the P0 Mock printer and job contract through a legal lifecycle', asyn
   assert.equal(assignedDetail.machineNumberSnapshot, assignedDetail.machineNumber)
 
   const confirmed = await request('POST', '/api/v1/print-jobs/safe/confirm', {
+    jobId: queuedId,
     printerId: 404
   }, headers)
   assert.equal(confirmed.data, null)

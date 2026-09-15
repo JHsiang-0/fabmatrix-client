@@ -160,7 +160,7 @@ test('Mock reconcile、safe assign 和 safe start 成功响应的 data 均为 nu
     })
     assert.equal(assign.data, null)
 
-    await request('POST', '/api/v1/print-jobs/safe/confirm', { printerId: '404' })
+    await request('POST', '/api/v1/print-jobs/safe/confirm', { jobId: '1003', printerId: '404' })
     const start = await request('POST', '/api/v1/print-jobs/safe/start', {
       jobId: '1003',
       action: 'START_PRINT'

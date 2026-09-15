@@ -302,14 +302,15 @@ export function emergencyStopPrinter(printerId) {
 
 /**
  * 确认打印机热床已清理完毕 - 安全模式第二步之一
+ * @param {number|string} jobId - 当前绑定的任务ID
  * @param {number} printerId - 打印机ID
  * @returns {Promise<{code: number, message: string, data: null}>} 更新结果；成功后由前端重新查询打印机状态
  */
-export function confirmSafe(printerId) {
+export function confirmSafe(jobId, printerId) {
   return request({
     url: '/api/v1/print-jobs/safe/confirm',
     method: 'post',
-    data: { printerId }
+    data: { jobId, printerId }
   }).then(normalizePrinterResponse)
 }
 

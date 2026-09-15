@@ -213,6 +213,10 @@ test('打印机详情抽屉标题有稳定回退且详情内容由 Drawer Body �
   assert.doesNotMatch(detailSource, /undefined - 详细信息/)
   assert.match(detailSource, /device\.machineNumber \|\| '-'/)
   assert.doesNotMatch(detailSource, /device\.machineNumber \|\| `#\$\{device\.id\}`/)
+  assert.match(detailSource, /isRrfDevice \? '打开 DWC 界面' : '打开 Mainsail 界面'/)
+  assert.match(detailSource, /const deviceConsoleUrl = computed/)
+  assert.match(detailSource, /confirmSafe\(jobId, props\.device\.id\)/)
+  assert.match(printerApiSource, /data: \{ jobId, printerId \}/)
 })
 
 test('表格适配层保持自然高度并把横向滚动交给 TDesign Table 内容区', () => {

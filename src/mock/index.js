@@ -2345,12 +2345,17 @@ const handleBatchConfirm = config => {
 
 const handleConfirmSafe = config => {
   const session = requireSession(config, ['ADMIN', 'OPERATOR'])
-  const printer = findPrinter(getBody(config).printerId)
+  const body = getBody(config)
+  const printer = findPrinter(body.printerId)
   if (!printer) fail(404, 404, '打印机不存在')
   if (!printer.currentJobId) fail(422, 422, '打印机没有待确认任务')
-  const job = findJob(printer.currentJobId)
+  const job = findJob(body.jobId)
   if (!job || !canReadResource(session, job.userId)) fail(404, 404, '任务不存在')
   if (!['ASSIGNED', 'READY'].includes(job.status)) fail(422, 422, '当前任务状态不允许安全确认')
+  if (String(job.printerId) !== String(printer.id)
+    || String(printer.currentJobId) !== String(job.id)) {
+    fail(409, 409, '任务与打印机当前绑定不一致，请刷新后重试')
+  }
   printer.isSafeToPrint = true
   printer.updatedAt = now()
   return null

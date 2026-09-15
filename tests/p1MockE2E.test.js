@@ -173,7 +173,7 @@ test('runs the repeatable P1 Mock HTTP main flow without automatic dispatch', as
   const safetyConfirmation = assertSuccessEnvelope(await request(
     'POST',
     '/api/v1/print-jobs/safe/confirm',
-    { printerId: '404' },
+    { jobId: assignedJob.id, printerId: '404' },
     sessionHeaders
   ))
   assert.equal(safetyConfirmation, null)

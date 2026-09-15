@@ -211,7 +211,7 @@ export const JOB_STATUS_VALUES = Object.freeze(Object.values(JOB_STATUS))
  */
 export const JOB_STATUS_MAP = Object.freeze({
   [JOB_STATUS.QUEUED]: { label: '排队中', type: 'default' },
-  [JOB_STATUS.ASSIGNED]: { label: '已派发', type: 'primary' },
+  [JOB_STATUS.ASSIGNED]: { label: '已分配', type: 'primary' },
   [JOB_STATUS.UPLOADING]: { label: '上传中', type: 'warning' },
   [JOB_STATUS.READY]: { label: '待启动', type: 'success' },
   [JOB_STATUS.PRINTING]: { label: '打印中', type: 'primary' },

@@ -792,6 +792,10 @@ const shouldShowStartButton = (printer) => {
 // 确认热床已清理
 const handleConfirmSafe = async (printer) => {
   try {
+    if (!printer.currentJobId) {
+      message.error('当前打印机没有可确认的绑定任务')
+      return
+    }
     await confirmMessage(
       `确认 ${printer.name} 热床已清理完毕，可以开始打印了吗？`,
       '安全确认',
@@ -803,7 +807,7 @@ const handleConfirmSafe = async (printer) => {
     )
 
     confirmingSafeIds.value.push(printer.id)
-    await confirmSafe(printer.id)
+    await confirmSafe(printer.currentJobId, printer.id)
     message.success('安全确认成功！')
     fetchData()
   } catch (error) {

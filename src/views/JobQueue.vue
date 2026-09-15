@@ -380,7 +380,7 @@
               :value="printer.id"
             />
           </t-select>
-          <div class="text-xs text-gray-500 mt-1">指定打印机只进入已派发状态，不会绕过现场安全确认。</div>
+          <div class="text-xs text-gray-500 mt-1">指定打印机只进入已分配状态，不会绕过现场安全确认。</div>
         </t-form-item>
         <t-form-item label="优先级" name="priority">
           <t-input-number
@@ -959,7 +959,7 @@ const handleConfirmSafe = job => runConfirmedJobAction(job, 'confirm-safe', {
   message: `请确认打印机 #${job.printerId} 的热床已清理且可以安全打印。`,
   title: '现场安全确认',
   options: { confirmButtonText: '确认安全', cancelButtonText: '返回检查', type: 'warning' }
-}, () => confirmSafe(job.printerId), '已确认安全，可以启动打印')
+}, () => confirmSafe(job.id, job.printerId), '已确认安全，可以启动打印')
 
 const handleStart = job => runConfirmedJobAction(job, 'start', {
   message: `确认启动任务 #${job.id}？这会向打印机发送上传并启动请求。`,

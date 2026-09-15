@@ -353,7 +353,7 @@
                 </t-card>
             </div>
 
-            <!-- Moonraker / Mainsail 快捷操作 -->
+            <!-- 设备原生管理界面快捷操作 -->
             <div class="flex flex-col gap-fluid-sm">
                 <div class="flex items-center gap-2 text-fluid-sm font-semibold text-gray-900">
                     <span class="text-gray-600">
@@ -362,12 +362,12 @@
                     远程控制
                 </div>
                 <div class="flex flex-col gap-fluid-sm">
-                    <t-button v-if="device.ipAddress && device.firmwareType !== 'RRF'" theme="primary" size="large" tag="a" :href="mainsailUrl"
+                    <t-button v-if="device.ipAddress" theme="primary" size="large" tag="a" :href="deviceConsoleUrl"
                         target="_blank" rel="noopener noreferrer" class="w-full justify-center h-11 text-fluid-sm">
                         <span>
                             <Monitor />
                         </span>
-                        打开 Mainsail 界面
+                        {{ isRrfDevice ? '打开 DWC 界面' : '打开 Mainsail 界面' }}
                     </t-button>
 
                     <!-- 操作按钮网格 - 移动端单列，桌面 3列 -->
@@ -772,11 +772,13 @@ const bedTemp = computed(() => {
     return props.realTimeData?.bedTemperature
 })
 
-/** Mainsail 访问地址 */
-const mainsailUrl = computed(() => {
+/** 设备原生管理界面地址（RRF=DWC，Klipper=Mainsail） */
+const deviceConsoleUrl = computed(() => {
     if (!props.device?.ipAddress) return '#'
     return `http://${props.device.ipAddress}`
 })
+
+const isRrfDevice = computed(() => String(props.device?.firmwareType || '').toUpperCase() === 'RRF')
 
 /** 进度条状态 */
 const progressStatus = computed(() => {
@@ -835,7 +837,12 @@ function handleRemove() {
 async function handleConfirmSafe() {
     try {
         isLoading.value = true
-        await confirmSafe(props.device.id)
+        const jobId = props.realTimeData?.currentJobId || props.device?.currentJobId
+        if (!jobId) {
+            message.error('找不到当前绑定的任务')
+            return
+        }
+        await confirmSafe(jobId, props.device.id)
         message.success('现场安全确认成功！')
         isSafetyConfirmed.value = true
     } catch {
