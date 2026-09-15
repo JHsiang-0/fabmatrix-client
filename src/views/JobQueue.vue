@@ -814,6 +814,9 @@ const getQueueActionOptions = job => {
 
 const getActiveActionOptions = job => {
   const options = []
+  if (job.status === 'RECONCILING') {
+    options.push({ content: '人工核对', value: 'reconcile', theme: 'warning' })
+  }
   if (['ASSIGNED', 'READY'].includes(job.status)) options.push({ content: '重新排队', value: 'requeue' })
   if (['ASSIGNED', 'READY'].includes(job.status) && job.printerId) {
     options.push({ content: '确认安全', value: 'confirm-safe', theme: 'warning' })
@@ -837,6 +840,7 @@ const handleQueueAction = async (job, item) => {
 
 const handleActiveAction = async (job, item) => {
   switch (item.value) {
+    case 'reconcile': return openTaskDetail(job)
     case 'requeue': return handleRequeue(job.id)
     case 'confirm-safe': return handleConfirmSafe(job)
     case 'start': return handleStart(job)

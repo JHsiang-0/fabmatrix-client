@@ -32,6 +32,12 @@ test('任务中心动作受正式状态限制且历史查询不发送未定义 k
   assert.match(historySource, /hasValue\(scope\.row\.progress\)/)
 })
 
+test('活动任务列表为待人工核对任务提供可发现的操作入口', () => {
+  assert.match(queueSource, /job\.status === 'RECONCILING'/)
+  assert.match(queueSource, /content: '人工核对', value: 'reconcile'/)
+  assert.match(queueSource, /case 'reconcile': return openTaskDetail\(job\)/)
+})
+
 test('任务详情只展示后端任务字段并对缺失值使用占位', () => {
   assert.match(detailSource, /资源与人员/)
   assert.match(detailSource, /打印机名称/)
