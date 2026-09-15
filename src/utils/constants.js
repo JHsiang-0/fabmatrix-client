@@ -288,6 +288,7 @@ export const PAGINATION = {
  */
 export const REQUEST_TIMEOUT = {
   DEFAULT: 10000,
+  DEVICE_BATCH: 2 * 60 * 1000, // 局域网设备批量导入/同步最多等待 2 分钟
   UPLOAD: 30 * 60 * 1000, // 上传文件超时时间（30分钟）
   DOWNLOAD: 30000 // 下载文件超时时间
 }

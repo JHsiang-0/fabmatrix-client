@@ -1304,8 +1304,8 @@ const handleBatchAdd = async () => {
       return
     }
     message.success(`${resultMessage}：新增 ${result.insertedCount || 0} 台，更新 ${result.updatedCount || 0} 台`)
-    await fetchData()
     scanDialogVisible.value = false
+    await fetchData()
   } catch (error) {
     const errorMsg = error.response?.data?.message || error?.message || '批量处理失败'
     message.error(errorMsg)

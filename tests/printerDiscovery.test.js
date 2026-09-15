@@ -2,12 +2,17 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { mockRequest } from '../src/mock/index.js'
 import { mockState, resetMockState } from '../src/mock/data.js'
+import { REQUEST_TIMEOUT } from '../src/utils/constants.js'
 import {
   applyBatchUpsertResult,
   createScanDeviceKey,
   getDiscoveryStats,
   getDiscoveryStatus
 } from '../src/utils/printerDiscovery.js'
+
+test('设备批量导入使用独立长超时，避免服务端成功后前端误报失败', () => {
+  assert.equal(REQUEST_TIMEOUT.DEVICE_BATCH, 120_000)
+})
 
 test('扫描发现状态分别统计 NEW、EXISTING 和 UNKNOWN_MAC', () => {
   const devices = [

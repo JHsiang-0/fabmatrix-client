@@ -1,4 +1,5 @@
 import request from '@/utils/request'
+import { REQUEST_TIMEOUT } from '@/utils/constants'
 import {
   mapResponseData,
   normalizePageParams,
@@ -217,7 +218,8 @@ export function batchAddPrinters(devices) {
   return request({
     url: '/api/v1/printers/batch-add',
     method: 'post',
-    data: devices
+    data: devices,
+    timeout: REQUEST_TIMEOUT.DEVICE_BATCH
   })
 }
 
