@@ -5,6 +5,9 @@ const sameSegment = (left, right) => (
   && normalizedText(left.rawState).toLowerCase() === normalizedText(right.rawState).toLowerCase()
   && normalizedText(left.filename) === normalizedText(right.filename)
   && normalizedText(left.systemMessage) === normalizedText(right.systemMessage)
+  && normalizedText(left.taskSource).toUpperCase() === normalizedText(right.taskSource).toUpperCase()
+  && normalizedText(left.farmJobId) === normalizedText(right.farmJobId)
+  && normalizedText(left.taskMatchReason) === normalizedText(right.taskMatchReason)
 )
 
 const numericProgress = value => {

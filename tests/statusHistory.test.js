@@ -26,3 +26,38 @@ test('文件或错误信息变化时保留独立历史节点', () => {
 
   assert.equal(result.length, 3)
 })
+
+test('同一设备状态下任务来源变化时保留独立历史节点', () => {
+  const result = compactStatusHistory([
+    {
+      id: 3,
+      status: 'PRINTING',
+      filename: 'external.gcode',
+      taskSource: 'EXTERNAL',
+      farmJobId: 1001,
+      taskMatchReason: 'FILENAME_MISMATCH',
+      recordedAt: '3'
+    },
+    {
+      id: 2,
+      status: 'PRINTING',
+      filename: 'external.gcode',
+      taskSource: 'UNKNOWN',
+      farmJobId: 1001,
+      taskMatchReason: 'DEVICE_FILENAME_UNAVAILABLE',
+      recordedAt: '2'
+    },
+    {
+      id: 1,
+      status: 'PRINTING',
+      filename: 'external.gcode',
+      taskSource: 'FARM',
+      farmJobId: 1001,
+      taskMatchReason: 'FILENAME_MATCHED',
+      recordedAt: '1'
+    }
+  ])
+
+  assert.equal(result.length, 3)
+  assert.deepEqual(result.map(item => item.taskSource), ['EXTERNAL', 'UNKNOWN', 'FARM'])
+})

@@ -92,7 +92,11 @@ const normalizeStatusHistory = record => {
   const normalized = { ...record }
   if (Object.prototype.hasOwnProperty.call(normalized, 'id')) normalized.id = normalizeId(normalized.id)
   if (Object.prototype.hasOwnProperty.call(normalized, 'printerId')) normalized.printerId = normalizeId(normalized.printerId)
+  if (Object.prototype.hasOwnProperty.call(normalized, 'farmJobId')) normalized.farmJobId = normalizeId(normalized.farmJobId)
   if (Object.prototype.hasOwnProperty.call(normalized, 'status')) normalized.status = normalizePrinterStatus(normalized.status)
+  if (Object.prototype.hasOwnProperty.call(normalized, 'taskSource')) {
+    normalized.taskSource = String(normalized.taskSource || 'UNKNOWN').toUpperCase()
+  }
   if (Object.prototype.hasOwnProperty.call(normalized, 'progress')) {
     const progress = Number(normalized.progress)
     normalized.progress = Number.isFinite(progress) ? Math.min(Math.max(progress, 0), 100) : 0

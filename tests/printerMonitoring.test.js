@@ -112,12 +112,25 @@ test('监控和人工核对界面保留业务状态与通信状态的独立语�
 })
 
 test('打印机视觉适配不让离线通信状态覆盖业务状态和任务字段', () => {
-  assert.match(printerSource, /const healthFields = \[[\s\S]*'currentJobId'[\s\S]*'currentJobFileName'[\s\S]*'currentJobStatus'[\s\S]*'progress'/)
+  assert.match(printerSource, /const healthFields = \[[\s\S]*'currentJobId'[\s\S]*'currentJobFileName'[\s\S]*'currentJobStatus'[\s\S]*'observedFilename'[\s\S]*'taskSource'[\s\S]*'progress'/)
   assert.match(printerSource, /if \(realtimeState && String\(realtimeState\)\.toUpperCase\(\) !== PRINTER_STATUS\.OFFLINE\)/)
   assert.match(drawerSource, /const sourceState = props\.realTimeData\?\.businessStatus \|\| props\.realTimeData\?\.unifiedState \|\| props\.device\?\.status/)
   assert.match(printerSource, /:monitor-config="monitorConfig"/)
   assert.match(printerSource, /@monitor-change="handleDetailMonitorChange"/)
   assert.match(drawerSource, /:disabled="!canManageMonitor \|\| monitorLoading \|\| monitorUpdating"/)
+})
+
+test('外部设备任务与平台任务在列表、详情和实时状态中保持区分', () => {
+  assert.match(printerSource, /isExternalTask/)
+  assert.match(printerSource, /外部任务/)
+  assert.match(printerSource, /平台任务 #[^\n]*仍待启动/)
+  assert.match(drawerSource, /deviceTaskSource/)
+  assert.match(drawerSource, /observedTaskFilename/)
+  assert.match(drawerSource, /平台任务 #[^\n]*未与本次打印关联/)
+  assert.match(drawerSource, /colKey: 'taskSource'/)
+  assert.match(realtimeSource, /assignIfPresent\('observedFilename'/)
+  assert.match(realtimeSource, /assignIfPresent\('taskSource'/)
+  assert.match(realtimeSource, /assignIfPresent\('farmJobId'/)
 })
 
 test('打印机管理顶部批量监控操作使用单个状态切换按钮', () => {

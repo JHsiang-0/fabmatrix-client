@@ -194,19 +194,29 @@
           <template #default="scope">{{ getFirmwareLabel(scope.row.firmwareType) }}</template>
         </TdTableColumn>
 
-        <TdTableColumn label="当前任务" width="180" align="center">
+        <TdTableColumn label="当前任务" width="220" align="center">
           <template #default="scope">
             <div class="printer-management-task">
-              <span class="printer-management-task__icon" :class="{ 'printer-management-task__icon--active': scope.row.currentJobId }">
+              <span class="printer-management-task__icon" :class="{ 'printer-management-task__icon--active': hasObservedTask(scope.row) }">
                 <printer size="13" />
               </span>
               <div class="printer-management-task__content">
-                <span v-if="scope.row.currentJobId" class="printer-management-task__name" :title="scope.row.currentJobFileName || `任务 #${scope.row.currentJobId}`">
-                  {{ scope.row.currentJobFileName || `任务 #${scope.row.currentJobId}` }}
-                </span>
+                <div v-if="hasObservedTask(scope.row)" class="printer-management-task__heading">
+                  <span class="printer-management-task__name" :title="getObservedTaskName(scope.row)">
+                    {{ getObservedTaskName(scope.row) }}
+                  </span>
+                  <t-tag v-if="isExternalTask(scope.row)" size="small" theme="warning" variant="light">外部任务</t-tag>
+                  <t-tag v-else-if="isUnknownTask(scope.row)" size="small" theme="default" variant="light">来源待确认</t-tag>
+                </div>
                 <span v-else class="printer-management-muted">无活动任务</span>
-                <span v-if="scope.row.currentJobId" class="printer-management-muted">任务 #{{ scope.row.currentJobId }}</span>
-                <t-progress v-if="scope.row.currentJobId && scope.row.progress !== undefined" :percentage="getProgress(scope.row)" :label="false" :stroke-width="4" :status="getProgressStatus(scope.row)" />
+                <span v-if="isExternalTask(scope.row) && scope.row.currentJobId" class="printer-management-muted">
+                  平台任务 #{{ scope.row.currentJobId }} 仍待启动
+                </span>
+                <span v-else-if="isUnknownTask(scope.row) && scope.row.currentJobId" class="printer-management-muted">
+                  未关联平台任务 #{{ scope.row.currentJobId }}
+                </span>
+                <span v-else-if="scope.row.currentJobId" class="printer-management-muted">平台任务 #{{ scope.row.currentJobId }}</span>
+                <t-progress v-if="hasObservedTask(scope.row) && scope.row.progress !== undefined" :percentage="getProgress(scope.row)" :label="false" :stroke-width="4" :status="getProgressStatus(scope.row)" />
               </div>
             </div>
           </template>
@@ -695,6 +705,11 @@ const displayTableData = computed(() => tableData.value.map(printer => {
     'currentJobId',
     'currentJobFileName',
     'currentJobStatus',
+    'farmJobId',
+    'filename',
+    'observedFilename',
+    'taskSource',
+    'taskMatchReason',
     'progress'
   ]
   healthFields.forEach(field => {
@@ -777,6 +792,21 @@ const getProgressStatus = printer => {
   if (String(printer.status || '').toUpperCase() === PRINTER_STATUS.ERROR) return 'error'
   if (getProgress(printer) >= 100) return 'success'
   return 'active'
+}
+
+const getTaskSource = printer => String(printer?.taskSource || '').toUpperCase()
+const isExternalTask = printer => getTaskSource(printer) === 'EXTERNAL'
+const isUnknownTask = printer => getTaskSource(printer) === 'UNKNOWN'
+const hasObservedTask = printer => (
+  isExternalTask(printer)
+  || isUnknownTask(printer)
+  || Boolean(printer?.currentJobId)
+)
+const getObservedTaskName = printer => {
+  if (isExternalTask(printer) || isUnknownTask(printer)) {
+    return printer?.observedFilename || printer?.filename || '设备端打印文件'
+  }
+  return printer?.currentJobFileName || `任务 #${printer?.currentJobId}`
 }
 
 // 判断是否应该显示"确认清理"按钮
@@ -1581,6 +1611,22 @@ const handleBatchAdd = async () => {
 .printer-management-task__content {
   flex-direction: column;
   gap: 2px;
+}
+
+.printer-management-task__heading {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: var(--app-spacing-1);
+}
+
+.printer-management-task__heading .printer-management-task__name {
+  flex: 1 1 auto;
+}
+
+.printer-management-task__heading :deep(.t-tag) {
+  flex: 0 0 auto;
 }
 
 .printer-management-task__content :deep(.t-progress) {

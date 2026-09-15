@@ -180,10 +180,17 @@ export function normalizePrinterDetail(data) {
   if (!data || typeof data !== 'object') return data
   if (!data.printer || typeof data.printer !== 'object') return normalizePrinter(data)
 
+  const realtimeStatus = data.realtimeStatus && typeof data.realtimeStatus === 'object'
+    ? normalizeIdFields(data.realtimeStatus, ['farmJobId'])
+    : null
+  const currentJob = data.currentJob && typeof data.currentJob === 'object'
+    ? normalizeIdFields(data.currentJob, ['id', 'printerId', 'fileId', 'userId', 'operatorId'])
+    : null
+
   return {
     ...normalizePrinter(data.printer),
-    realtimeStatus: data.realtimeStatus || null,
-    currentJob: data.currentJob || null
+    realtimeStatus,
+    currentJob
   }
 }
 

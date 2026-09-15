@@ -60,6 +60,15 @@
                     </span>
                 </div>
 
+                <div v-if="isDeviceTaskActive" class="printer-detail-drawer__task-observation">
+                    <t-tag size="small" :theme="deviceTaskSourceMeta.theme" variant="light">
+                        {{ deviceTaskSourceMeta.label }}
+                    </t-tag>
+                    <span class="printer-detail-drawer__task-filename" :title="observedTaskFilename">
+                        {{ observedTaskFilename || '设备未返回文件名' }}
+                    </span>
+                </div>
+
                 <!-- 系统错误信息 -->
                 <div v-if="realTimeData?.systemMessage && isErrorState"
                     class="mt-3 p-fluid-sm bg-red-50 border border-red-300 rounded text-fluid-xs text-red-700 leading-tight flex items-start gap-2">
@@ -69,6 +78,9 @@
                     <span class="line-clamp-3" :title="realTimeData.systemMessage">{{ realTimeData.systemMessage }}</span>
                 </div>
             </div>
+
+            <t-alert v-if="externalTaskNotice" theme="warning" :close-btn="false"
+                :title="externalTaskNotice" />
 
             <section class="printer-detail-drawer__monitor-section" aria-labelledby="printer-monitor-title">
                 <div class="flex items-center justify-between gap-2 text-fluid-sm font-semibold text-gray-900">
@@ -337,6 +349,11 @@
                                     {{ slotProps.row.sampleCount }} 次
                                 </span>
                             </div>
+                        </template>
+                        <template #taskSource="slotProps">
+                            <t-tag size="small" :theme="getTaskSourceMeta(slotProps.row.taskSource).theme" variant="light">
+                                {{ getTaskSourceMeta(slotProps.row.taskSource).label }}
+                            </t-tag>
                         </template>
                         <template #progress="slotProps">
                             {{ formatHistoryProgress(slotProps.row) }}
@@ -629,7 +646,8 @@ const historyColumns = computed(() => {
     if (isMobile.value) {
         return [
             { colKey: 'status', title: '状态', width: 82 },
-            { colKey: 'filename', title: '文件', width: 112, ellipsis: true },
+            { colKey: 'taskSource', title: '来源', width: 72 },
+            { colKey: 'filename', title: '文件', width: 104, ellipsis: true },
             { colKey: 'progress', title: '进度', width: 60 },
             { colKey: 'recordedAt', title: '记录区间', width: 148 }
         ]
@@ -637,7 +655,8 @@ const historyColumns = computed(() => {
 
     return [
         { colKey: 'status', title: '状态', width: 92 },
-        { colKey: 'filename', title: '文件', width: 136, ellipsis: true },
+        { colKey: 'taskSource', title: '来源', width: 78 },
+        { colKey: 'filename', title: '文件', width: 124, ellipsis: true },
         { colKey: 'progress', title: '进度', width: 72 },
         { colKey: 'recordedAt', title: '记录区间', width: 152 }
     ]
@@ -767,8 +786,52 @@ const connectionTheme = computed(() => ({
     UNKNOWN: 'default'
 }[String(monitorValue.value.connectionStatus || 'UNKNOWN').toUpperCase()] || 'default'))
 const currentJobStatus = computed(() => String(
-    props.realTimeData?.currentJobStatus || props.device?.currentJobStatus || ''
+    props.realTimeData?.currentJobStatus
+    || props.device?.realtimeStatus?.farmJobStatus
+    || props.device?.currentJob?.status
+    || props.device?.currentJobStatus
+    || ''
 ).toUpperCase())
+
+const getTaskSourceMeta = source => ({
+    FARM: { label: '平台任务', theme: 'primary' },
+    EXTERNAL: { label: '外部任务', theme: 'warning' },
+    UNKNOWN: { label: '来源待确认', theme: 'default' },
+    NONE: { label: '无任务', theme: 'default' }
+}[String(source || 'UNKNOWN').toUpperCase()] || { label: '来源待确认', theme: 'default' })
+
+const deviceTaskSource = computed(() => String(
+    props.realTimeData?.taskSource
+    || props.device?.realtimeStatus?.taskSource
+    || 'NONE'
+).toUpperCase())
+const deviceTaskSourceMeta = computed(() => getTaskSourceMeta(deviceTaskSource.value))
+const observedTaskFilename = computed(() => (
+    props.realTimeData?.observedFilename
+    || props.realTimeData?.filename
+    || props.device?.realtimeStatus?.filename
+    || ''
+))
+const linkedFarmJobId = computed(() => (
+    props.realTimeData?.farmJobId
+    || props.realTimeData?.currentJobId
+    || props.device?.realtimeStatus?.farmJobId
+    || props.device?.currentJob?.id
+    || props.device?.currentJobId
+    || null
+))
+const isDeviceTaskActive = computed(() => (
+    isPrintingOrRelated.value && ['FARM', 'EXTERNAL', 'UNKNOWN'].includes(deviceTaskSource.value)
+))
+const externalTaskNotice = computed(() => {
+    if (!isDeviceTaskActive.value || !['EXTERNAL', 'UNKNOWN'].includes(deviceTaskSource.value)) return ''
+    const sourceText = deviceTaskSource.value === 'EXTERNAL' ? '检测到设备端外部任务' : '设备任务来源暂时无法确认'
+    const fileText = observedTaskFilename.value ? `：${observedTaskFilename.value}` : ''
+    const farmText = linkedFarmJobId.value
+        ? `。平台任务 #${linkedFarmJobId.value} 保持“${currentJobStatus.value || '待启动'}”，未与本次打印关联`
+        : '。本次打印未关联平台任务'
+    return `${sourceText}${fileText}${farmText}`
+})
 /** 当前状态类名 */
 const currentStateClass = computed(() => {
     return currentState.value.toLowerCase()
@@ -823,9 +886,7 @@ const progressStatus = computed(() => {
 
 /** 是否为已分配状态（等待安全确认） */
 const isAssignedState = computed(() => {
-    const state = String(props.realTimeData?.state || '').toUpperCase()
-    const hasJob = props.realTimeData?.currentJobId || props.device?.currentJobId
-    return state === 'ASSIGNED' && !!hasJob
+    return currentJobStatus.value === 'ASSIGNED' && !!linkedFarmJobId.value
 })
 
 /** 是否已确认安全 */
@@ -955,6 +1016,23 @@ async function handleStartPrint(action) {
     margin-top: var(--app-spacing-3);
 }
 
+.printer-detail-drawer__task-observation {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--app-spacing-2);
+    margin-top: var(--app-spacing-3);
+}
+
+.printer-detail-drawer__task-filename {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--app-text-secondary);
+    font-size: var(--td-font-size-body-small);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .printer-detail-drawer__sub-card {
     overflow: hidden;
 }
@@ -985,7 +1063,7 @@ async function handleStartPrint(action) {
     table-layout: fixed;
 }
 
-.printer-detail-drawer :deep(.printer-history-table td:nth-child(2)) {
+.printer-detail-drawer :deep(.printer-history-table td:nth-child(3)) {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

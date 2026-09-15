@@ -255,3 +255,34 @@ test('maps the backend SNAPSHOT data.printers payload into printer entries', () 
     data: { id: 62, name: 'RRF-01', status: 'IDLE' }
   }])
 })
+
+test('merges cached task observations into the initial printer snapshot', () => {
+  assert.deepEqual(toRealtimeSnapshotEntries({
+    printers: [{ id: '403', name: 'RRF-01', status: 'IDLE', currentJobId: '1001' }],
+    printerStatuses: [{
+      printerId: '403',
+      data: {
+        unifiedState: 'PRINTING',
+        filename: 'external.gcode',
+        taskSource: 'EXTERNAL',
+        farmJobId: '1001',
+        farmJobStatus: 'READY',
+        taskMatchReason: 'FILENAME_MISMATCH'
+      }
+    }]
+  }), [{
+    printerId: '403',
+    data: {
+      id: '403',
+      name: 'RRF-01',
+      status: 'IDLE',
+      currentJobId: '1001',
+      unifiedState: 'PRINTING',
+      filename: 'external.gcode',
+      taskSource: 'EXTERNAL',
+      farmJobId: '1001',
+      farmJobStatus: 'READY',
+      taskMatchReason: 'FILENAME_MISMATCH'
+    }
+  }])
+})

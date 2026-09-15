@@ -217,9 +217,15 @@ export const useRealtimeStore = defineStore('realtime', () => {
       assignIfPresent('printDuration', data.printDuration)
       assignIfPresent('filamentUsed', data.filamentUsed)
       assignIfPresent('systemMessage', data.systemMessage)
+      assignIfPresent('filename', data.filename)
+      assignIfPresent('observedFilename', data.observedFilename ?? data.filename)
+      assignIfPresent('taskSource', data.taskSource, value => String(value).toUpperCase())
+      assignIfPresent('taskMatchReason', data.taskMatchReason)
+      assignIfPresent('farmJobId', data.farmJobId, normalizeId)
+      assignIfPresent('farmJobStatus', data.farmJobStatus, value => String(value).toUpperCase())
       assignIfPresent('currentJobId', data.currentJobId, normalizeId)
       assignIfPresent('currentJobFileName', data.currentJobFileName)
-      assignIfPresent('currentJobStatus', data.currentJobStatus)
+      assignIfPresent('currentJobStatus', data.currentJobStatus ?? data.farmJobStatus, value => String(value).toUpperCase())
       if (next.toolTemperature !== undefined || next.toolTarget !== undefined) {
         next.extruder = {
           ...previous.extruder,

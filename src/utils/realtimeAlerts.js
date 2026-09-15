@@ -35,11 +35,24 @@ export function toRealtimeAlert(message = {}) {
  */
 export function toRealtimeSnapshotEntries(snapshotData) {
   if (Array.isArray(snapshotData?.printers)) {
+    const realtimeByPrinterId = new Map(
+      (Array.isArray(snapshotData.printerStatuses) ? snapshotData.printerStatuses : [])
+        .filter(entry => entry && typeof entry === 'object'
+          && (entry.printerId ?? entry.id) !== undefined
+          && (entry.printerId ?? entry.id) !== null)
+        .map(entry => [
+          String(entry.printerId ?? entry.id),
+          entry.data && typeof entry.data === 'object' ? entry.data : entry
+        ])
+    )
     return snapshotData.printers
       .filter(printer => printer && typeof printer === 'object')
       .map(printer => ({
         printerId: printer.printerId ?? printer.id,
-        data: printer.data && typeof printer.data === 'object' ? printer.data : printer
+        data: {
+          ...(printer.data && typeof printer.data === 'object' ? printer.data : printer),
+          ...realtimeByPrinterId.get(String(printer.printerId ?? printer.id))
+        }
       }))
       .filter(entry => entry.printerId !== undefined && entry.printerId !== null)
   }
