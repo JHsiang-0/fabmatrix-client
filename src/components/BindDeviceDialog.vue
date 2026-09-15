@@ -3,18 +3,17 @@
     :visible="visible"
     @update:visible="$emit('update:visible', $event)"
     :header="`绑定设备至 ${targetSlotLabel}`"
-    width="700px"
+    width="min(760px, calc(100vw - 32px))"
     destroy-on-close
     :footer="false"
     :close-on-overlay-click="false"
   >
     <!-- 搜索框 -->
-    <div class="mb-4">
+    <div class="bind-device-dialog__search">
       <t-input
         v-model="searchKeyword"
         placeholder="请输入 IP 或机器编号搜索"
         clearable
-        @change="handleSearch"
         class="w-full"
       >
         <template #prefixIcon>
@@ -25,10 +24,11 @@
 
     <!-- 未分配设备列表 -->
     <TdTable
+      v-if="loading || filteredList.length > 0"
       :loading="loading"
       :data="filteredList"
-      height="400"
-      style="width: 100%"
+      height="320"
+      class="bind-device-dialog__table"
       highlight-current-row
       @row-click="handleRowClick"
     >
@@ -48,7 +48,9 @@
     </TdTable>
 
     <!-- 空状态提示 -->
-    <t-empty v-if="!loading && filteredList.length === 0" description="暂无可绑定的设备" />
+    <div v-else class="bind-device-dialog__empty">
+      <t-empty description="暂无可绑定的设备" />
+    </div>
   </t-dialog>
 </template>
 
@@ -60,6 +62,7 @@ import { SearchIcon as Search } from 'tdesign-icons-vue-next'
 import TdTable from './TdTable.vue'
 import TdTableColumn from './TdTableColumn.vue'
 import StatusTag from './StatusTag.vue'
+import { mergeDraftAvailableDevices } from '@/utils/dashboardBinding'
 
 defineOptions({ name: 'BindDeviceDialog' })
 
@@ -73,6 +76,11 @@ const props = defineProps({
   targetSlotLabel: {
     type: String,
     default: ''
+  },
+  /** 已应用布局草稿坐标的完整设备列表 */
+  draftDevices: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -100,16 +108,21 @@ const searchKeyword = ref('')
 /**
  * 根据搜索关键词过滤未分配设备列表
  */
+const availableList = computed(() => mergeDraftAvailableDevices(
+  unallocatedList.value,
+  props.draftDevices
+))
+
 const filteredList = computed(() => {
   if (!searchKeyword.value.trim()) {
-    return unallocatedList.value
+    return availableList.value
   }
 
   const keyword = searchKeyword.value.toLowerCase().trim()
-  return unallocatedList.value.filter(device => {
-    const ipMatch = device.ipAddress?.toLowerCase().includes(keyword)
-    const machineNumMatch = device.machineNumber?.toLowerCase().includes(keyword)
-    const nameMatch = device.name?.toLowerCase().includes(keyword)
+  return availableList.value.filter(device => {
+    const ipMatch = String(device.ipAddress || '').toLowerCase().includes(keyword)
+    const machineNumMatch = String(device.machineNumber || '').toLowerCase().includes(keyword)
+    const nameMatch = String(device.name || '').toLowerCase().includes(keyword)
     return ipMatch || machineNumMatch || nameMatch
   })
 })
@@ -147,13 +160,6 @@ async function fetchUnallocatedDevices() {
 }
 
 /**
- * 处理搜索输入
- */
-function handleSearch() {
-  // 搜索逻辑由 computed 属性 filteredList 自动处理
-}
-
-/**
  * 处理表格行点击 - 直接确认绑定
  * @param {Object} row - 点击的行数据
  */
@@ -177,4 +183,43 @@ function handleRowClick(row) {
 </script>
 
 <style scoped>
+.bind-device-dialog__search {
+  margin-bottom: var(--app-spacing-3);
+}
+
+.bind-device-dialog__table {
+  width: 100%;
+  height: 320px;
+}
+
+.bind-device-dialog__table :deep(.t-table th),
+.bind-device-dialog__table :deep(.t-table td) {
+  height: 42px;
+  padding-top: var(--app-spacing-2);
+  padding-bottom: var(--app-spacing-2);
+  white-space: nowrap;
+}
+
+.bind-device-dialog__table :deep(.t-table tbody tr) {
+  cursor: pointer;
+}
+
+.bind-device-dialog__table :deep(.t-table tbody td) {
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.bind-device-dialog__table :deep(.t-table tbody tr:hover td) {
+  background: var(--td-bg-color-container-hover);
+}
+
+.bind-device-dialog__table :deep(.t-table tbody tr:hover td:first-child) {
+  box-shadow: inset 3px 0 var(--td-brand-color);
+}
+
+.bind-device-dialog__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+}
 </style>

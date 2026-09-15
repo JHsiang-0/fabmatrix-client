@@ -1145,6 +1145,31 @@ test('UI-006 打印机选择不跨筛选分页且两个抽屉在 800x560 可用'
     await expect(page.getByText('点击空槽位选择并绑定设备', { exact: true })).toBeVisible()
     await expect(unallocatedDrawer).toBeHidden()
 
+    await page.getByText('点击绑定', { exact: true }).first().click()
+    const bindDialog = page.locator('.t-dialog').filter({ hasText: /绑定设备至/ }).last()
+    await expect(bindDialog).toBeVisible()
+    await expect(bindDialog.getByText('UI005_Printer_01', { exact: true })).toBeVisible()
+    const bindRowMetrics = await bindDialog.locator('.t-table tbody tr').first().evaluate(element => ({
+      height: element.getBoundingClientRect().height,
+      cursor: getComputedStyle(element).cursor
+    }))
+    expect(bindRowMetrics.height).toBeLessThanOrEqual(44)
+    expect(bindRowMetrics.cursor).toBe('pointer')
+    await bindDialog.getByText('UI005_Printer_01', { exact: true }).click()
+    const confirmDialog = page.locator('.t-dialog').filter({ hasText: '确认绑定' }).last()
+    await confirmDialog.getByRole('button', { name: '确定', exact: true }).click()
+    await expect(bindDialog).toBeHidden()
+
+    await page.getByText('点击绑定', { exact: true }).first().click()
+    const reopenedBindDialog = page.locator('.t-dialog').filter({ hasText: /绑定设备至/ }).last()
+    await expect(reopenedBindDialog.getByText('UI005_Printer_01', { exact: true })).toHaveCount(0)
+    await expect(reopenedBindDialog.getByText('暂无可绑定的设备', { exact: true })).toBeVisible()
+    await reopenedBindDialog.locator('.t-dialog__close').click()
+    await expect(reopenedBindDialog).toBeHidden()
+    await page.getByRole('button', { name: '取消', exact: true }).click()
+    const discardDialog = page.locator('.t-dialog').filter({ hasText: '取消布局编辑' }).last()
+    await discardDialog.getByRole('button', { name: '放弃修改', exact: true }).click()
+
     await page.goBack()
     await expect(page.getByRole('heading', { name: '打印机管理' })).toBeVisible()
     await expect(page.getByRole('button', { name: '未分配设备', exact: true })).toHaveCount(0)

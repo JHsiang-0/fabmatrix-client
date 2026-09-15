@@ -198,6 +198,7 @@
 
     <!-- 绑定设备弹窗 -->
     <bind-device-dialog v-model:visible="bindDialogVisible" :target-slot-label="targetSlotLabel"
+      :draft-devices="displayDevices"
       @confirm="performBind" />
 
     <unallocated-printer-drawer

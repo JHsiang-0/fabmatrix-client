@@ -286,7 +286,7 @@ test('文件详情仅展示安全元数据并区分缩略图不可用', () => {
   assert.match(detailSource, /file.thumbnailError/)
   assert.doesNotMatch(detailSource, /rustfsKey|safeName|fileUrl/)
   assert.doesNotMatch(detailSource, /上传用户ID/)
-  assert.match(source, /getThumbnailUrl\(fileId\)/)
+  assert.match(source, /getThumbnailSource\(fileId\)/)
 })
 
 test('文件库使用 TDesign 视图分段并永久显示选择列', () => {
@@ -590,7 +590,7 @@ test('文件列表异步补齐缩略图并保护旧页结果与失败占位', ()
   const fetchDataSource = source.match(/const fetchData = async \(\{ preserveSelectedIds = \[\] \} = \{\}\) =>[\s\S]*?\n}\n\nconst refreshLibrary/)?.[0] || ''
 
   assert.match(source, /const loadListThumbnails = async \(records, requestSequence\) =>/)
-  assert.match(source, /Promise\.allSettled\([\s\S]*getThumbnailUrl\(file\.id\)/)
+  assert.match(source, /Promise\.allSettled\([\s\S]*getThumbnailSource\(file\.id\)/)
   assert.match(source, /if \(requestSequence !== fileRequestSequence\) return/)
   assert.match(source, /thumbnailUrl: result\.status === 'fulfilled' \? result\.value\?\.data \|\| null : null/)
   assert.match(fetchDataSource, /fileList\.value = records\.map\(file => \(\{/)
@@ -599,6 +599,15 @@ test('文件列表异步补齐缩略图并保护旧页结果与失败占位', ()
   assert.match(source, /<template #error>[\s\S]*file-table__file-icon/)
   assert.match(source, /\.file-table__icon[\s\S]*width: 32px[\s\S]*height: 32px/)
   assert.match(source, /\.file-table__thumbnail :deep\(\.t-image__img\)[\s\S]*object-fit: cover/)
+})
+
+test('Local Edition 缩略图通过鉴权请求转换为图片数据', () => {
+  const apiSource = fs.readFileSync(new URL('../src/api/printFile.js', import.meta.url), 'utf8')
+
+  assert.match(apiSource, /export async function getThumbnailSource/)
+  assert.match(apiSource, /startsWith\('\/api\/v1\/print-files\/storage\?'\)/)
+  assert.match(apiSource, /url: thumbnailUrl,[\s\S]*responseType: 'blob'/)
+  assert.match(apiSource, /reader\.readAsDataURL\(blob\)/)
 })
 
 test('新建文件夹和创建打印任务弹窗使用响应式语义布局', () => {

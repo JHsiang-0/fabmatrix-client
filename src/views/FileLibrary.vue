@@ -700,7 +700,7 @@ import {
   moveFolder,
   deleteFolder,
   getFilePreview,
-  getThumbnailUrl,
+  getThumbnailSource,
   getFileJobs
 } from '@/api/printFile'
 import { createPrintJob } from '@/api/job'
@@ -1034,7 +1034,7 @@ const loadListThumbnails = async (records, requestSequence) => {
   if (!thumbnailRecords.length) return
 
   const thumbnailResults = await Promise.allSettled(
-    thumbnailRecords.map(file => Promise.resolve().then(() => getThumbnailUrl(file.id)))
+    thumbnailRecords.map(file => Promise.resolve().then(() => getThumbnailSource(file.id)))
   )
   if (requestSequence !== fileRequestSequence) return
 
@@ -1893,7 +1893,7 @@ const loadFileDetail = async fileId => {
   try {
     const [previewResult, thumbnailResult] = await Promise.allSettled([
       getFilePreview(fileId),
-      getThumbnailUrl(fileId)
+      getThumbnailSource(fileId)
     ])
     if (selectedFile.value && String(selectedFile.value.id) === String(fileId)) {
       if (previewResult.status === 'fulfilled') {

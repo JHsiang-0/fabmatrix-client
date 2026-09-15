@@ -74,6 +74,38 @@ export function getThumbnailUrl(id, expires = 60) {
   }).then(response => mapResponseData(response, data => typeof data === 'string' ? data : null))
 }
 
+const isProtectedLocalStorageUrl = value => (
+  typeof value === 'string' && value.startsWith('/api/v1/print-files/storage?')
+)
+
+const readBlobAsDataUrl = blob => new Promise((resolve, reject) => {
+  const reader = new FileReader()
+  reader.addEventListener('load', () => resolve(typeof reader.result === 'string' ? reader.result : null), { once: true })
+  reader.addEventListener('error', () => reject(reader.error || new Error('缩略图读取失败')), { once: true })
+  reader.readAsDataURL(blob)
+})
+
+/**
+ * 获取可直接用于图片组件的缩略图地址。
+ * Local Edition 的文件流需要鉴权，因此通过 Axios 携带令牌读取后转换为 data URL；
+ * Server Edition 的对象存储预签名地址仍直接返回，避免跨域读取限制。
+ */
+export async function getThumbnailSource(id, expires = 60) {
+  const response = await getThumbnailUrl(id, expires)
+  const thumbnailUrl = response.data
+  if (!thumbnailUrl || !isProtectedLocalStorageUrl(thumbnailUrl)) return response
+
+  const blob = await request({
+    url: thumbnailUrl,
+    method: 'get',
+    responseType: 'blob'
+  })
+  return {
+    ...response,
+    data: await readBlobAsDataUrl(blob)
+  }
+}
+
 /** 获取文件关联的打印任务。 */
 export function getFileJobs(id, params = {}) {
   return request({
