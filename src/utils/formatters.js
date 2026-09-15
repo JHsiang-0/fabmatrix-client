@@ -112,6 +112,7 @@ export function formatFileSize(bytes) {
 const DISPLAY_TIME_ZONE = 'Asia/Shanghai'
 
 const parseDate = date => {
+  if (date === null || date === undefined || (typeof date === 'string' && date.trim() === '')) return null
   if (date instanceof Date) return date
   if (typeof date === 'string') {
     // 后端 LocalDateTime 不带时区，按契约解释为 Asia/Shanghai。
@@ -124,7 +125,7 @@ const parseDate = date => {
 
 const getDateParts = date => {
   const value = parseDate(date)
-  if (Number.isNaN(value.getTime())) return null
+  if (!value || Number.isNaN(value.getTime())) return null
 
   const parts = new Intl.DateTimeFormat('zh-CN', {
     timeZone: DISPLAY_TIME_ZONE,
