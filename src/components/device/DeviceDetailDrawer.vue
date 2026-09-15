@@ -324,20 +324,25 @@
                     <t-table
                         v-else-if="statusHistory.length > 0"
                         class="printer-history-table"
-                        :data="statusHistory"
+                        :data="displayStatusHistory"
                         :columns="historyColumns"
-                        row-key="id"
+                        row-key="historyRowKey"
                         size="small"
                         bordered
                     >
                         <template #status="slotProps">
-                            <StatusTag domain="printer" :status="slotProps.row.status" />
+                            <div class="printer-history-status">
+                                <StatusTag domain="printer" :status="slotProps.row.status" />
+                                <span v-if="slotProps.row.sampleCount > 1" class="printer-history-samples">
+                                    {{ slotProps.row.sampleCount }} 次
+                                </span>
+                            </div>
                         </template>
                         <template #progress="slotProps">
-                            {{ slotProps.row.progress ?? 0 }}%
+                            {{ formatHistoryProgress(slotProps.row) }}
                         </template>
                         <template #recordedAt="slotProps">
-                            {{ formatDateTime(slotProps.row.recordedAt) }}
+                            {{ formatHistoryPeriod(slotProps.row) }}
                         </template>
                     </t-table>
                     <t-empty v-else description="暂无状态历史" />
@@ -453,6 +458,7 @@ import { formatTemp, formatDuration, formatFilament, formatDateTime } from '@/ut
 import { confirmSafe } from '@/api/printer'
 import { startJob } from '@/api/job'
 import { message } from '@/utils/message'
+import { compactStatusHistory } from '@/utils/statusHistory'
 
 defineOptions({ name: 'DeviceDetailDrawer' })
 
@@ -625,7 +631,7 @@ const historyColumns = computed(() => {
             { colKey: 'status', title: '状态', width: 82 },
             { colKey: 'filename', title: '文件', width: 112, ellipsis: true },
             { colKey: 'progress', title: '进度', width: 60 },
-            { colKey: 'recordedAt', title: '记录时间', width: 148 }
+            { colKey: 'recordedAt', title: '记录区间', width: 148 }
         ]
     }
 
@@ -633,9 +639,29 @@ const historyColumns = computed(() => {
         { colKey: 'status', title: '状态', width: 92 },
         { colKey: 'filename', title: '文件', width: 136, ellipsis: true },
         { colKey: 'progress', title: '进度', width: 72 },
-        { colKey: 'recordedAt', title: '记录时间', width: 152 }
+        { colKey: 'recordedAt', title: '记录区间', width: 152 }
     ]
 })
+
+const displayStatusHistory = computed(() => compactStatusHistory(props.statusHistory))
+
+const formatProgressValue = value => {
+    const number = Number(value)
+    if (!Number.isFinite(number)) return '-'
+    return `${Number(number.toFixed(2))}%`
+}
+
+const formatHistoryProgress = row => {
+    const earliest = formatProgressValue(row.earliestProgress)
+    const latest = formatProgressValue(row.latestProgress)
+    return earliest === latest ? latest : `${earliest} → ${latest}`
+}
+
+const formatHistoryPeriod = row => {
+    const earliest = formatDateTime(row.earliestRecordedAt)
+    const latest = formatDateTime(row.latestRecordedAt)
+    return earliest === latest ? latest : `${earliest} – ${latest}`
+}
 
 const statisticCards = computed(() => {
     const stats = props.statistics || {}
@@ -714,7 +740,17 @@ const currentState = computed(() => {
 const monitorValue = computed(() => ({
     ...props.device,
     ...props.monitorConfig,
-    ...props.realTimeData
+    ...props.device?.realtimeStatus,
+    ...props.realTimeData,
+    lastKnownStatus: props.realTimeData?.lastKnownStatus
+        || props.realTimeData?.unifiedState
+        || props.device?.realtimeStatus?.unifiedState
+        || props.monitorConfig?.lastKnownStatus
+        || props.device?.lastKnownStatus,
+    lastProtocolState: props.realTimeData?.lastProtocolState
+        || props.device?.realtimeStatus?.state
+        || props.monitorConfig?.lastProtocolState
+        || props.device?.lastProtocolState
 }))
 
 const monitorEnabled = computed(() => (
@@ -764,12 +800,12 @@ const isFatalError = computed(() => {
 
 /** 喷头温度 */
 const nozzleTemp = computed(() => {
-    return props.realTimeData?.toolTemperature
+    return props.realTimeData?.toolTemperature ?? props.device?.realtimeStatus?.toolTemperature
 })
 
 /** 热床温度 */
 const bedTemp = computed(() => {
-    return props.realTimeData?.bedTemperature
+    return props.realTimeData?.bedTemperature ?? props.device?.realtimeStatus?.bedTemperature
 })
 
 /** 设备原生管理界面地址（RRF=DWC，Klipper=Mainsail） */
@@ -952,6 +988,20 @@ async function handleStartPrint(action) {
 .printer-detail-drawer :deep(.printer-history-table td:nth-child(2)) {
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.printer-history-status {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+}
+
+.printer-history-samples {
+    color: var(--app-text-placeholder);
+    font-size: var(--td-font-size-body-extra-small);
     white-space: nowrap;
 }
 

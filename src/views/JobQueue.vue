@@ -245,22 +245,10 @@
         <TdTableColumn prop="updatedAt" label="最近更新" min-width="160" align="center">
           <template #default="scope">{{ formatDateTime(scope.row.updatedAt) }}</template>
         </TdTableColumn>
-        <TdTableColumn label="操作" width="300" align="center" fixed="right">
+        <TdTableColumn label="操作" width="150" align="center" fixed="right">
           <template #default="scope">
             <t-space size="small" class="task-action-group" @mousedown.stop @click.stop>
               <t-button size="small" variant="text" @click.stop="openTaskDetail(scope.row)">详情</t-button>
-              <t-button
-                v-if="scope.row.status === 'ASSIGNED'"
-                size="small"
-                theme="primary"
-                variant="outline"
-                :loading="isActionLoading('upload', scope.row)"
-                :disabled="actionLoadingKey !== ''"
-                @click.stop="handleUpload(scope.row)"
-              >
-                <template #icon><Upload /></template>
-                上传文件
-              </t-button>
               <t-dropdown
                 trigger="click"
                 :options="getActiveActionOptions(scope.row)"
@@ -477,8 +465,7 @@ import {
   RefreshIcon as Refresh,
   TimeIcon as Clock,
   SendIcon as Promotion,
-  CheckIcon as Check,
-  UploadIcon as Upload
+  CheckIcon as Check
 } from 'tdesign-icons-vue-next'
 import { cancelJob, assignJobToPrinter, requeueJob, updateJobPriority, startJob, createPrintJob, reconcilePrintJob } from '@/api/job'
 import { confirmSafe, getPrinterList, pausePrinter, resumePrinter } from '@/api/printer'
@@ -817,6 +804,7 @@ const getActiveActionOptions = job => {
   if (job.status === 'RECONCILING') {
     options.push({ content: '人工核对', value: 'reconcile', theme: 'warning' })
   }
+  if (job.status === 'ASSIGNED') options.push({ content: '上传文件', value: 'upload', theme: 'primary' })
   if (['ASSIGNED', 'READY'].includes(job.status)) options.push({ content: '重新排队', value: 'requeue' })
   if (['ASSIGNED', 'READY'].includes(job.status) && job.printerId) {
     options.push({ content: '确认安全', value: 'confirm-safe', theme: 'warning' })
@@ -841,6 +829,7 @@ const handleQueueAction = async (job, item) => {
 const handleActiveAction = async (job, item) => {
   switch (item.value) {
     case 'reconcile': return openTaskDetail(job)
+    case 'upload': return handleUpload(job)
     case 'requeue': return handleRequeue(job.id)
     case 'confirm-safe': return handleConfirmSafe(job)
     case 'start': return handleStart(job)

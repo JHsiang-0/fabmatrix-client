@@ -57,7 +57,9 @@ test('JobQueue 所有确认型设备写操作在弹窗前复用 action+job 锁',
 })
 
 test('活动任务支持仅上传，长耗时下发使用上传级超时且 READY 启动提示不重复上传', () => {
-  assert.match(queueSource, /scope\.row\.status === 'ASSIGNED'[\s\S]*handleUpload\(scope\.row\)/)
+  assert.match(queueSource, /job\.status === 'ASSIGNED'[\s\S]*content: '上传文件', value: 'upload'/)
+  assert.match(queueSource, /case 'upload': return handleUpload\(job\)/)
+  assert.doesNotMatch(queueSource, /@click\.stop="handleUpload\(scope\.row\)"/)
   assert.match(queueSource, /startJob\(job\.id, 'UPLOAD_ONLY'\)/)
   assert.match(queueSource, /job\.status === 'READY'[\s\S]*本次只发送启动打印命令/)
   assert.match(jobApiSource, /timeout: REQUEST_TIMEOUT\.UPLOAD/)
