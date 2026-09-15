@@ -249,6 +249,18 @@
           <template #default="scope">
             <t-space size="small" class="task-action-group" @mousedown.stop @click.stop>
               <t-button size="small" variant="text" @click.stop="openTaskDetail(scope.row)">详情</t-button>
+              <t-button
+                v-if="scope.row.status === 'ASSIGNED'"
+                size="small"
+                theme="primary"
+                variant="outline"
+                :loading="isActionLoading('upload', scope.row)"
+                :disabled="actionLoadingKey !== ''"
+                @click.stop="handleUpload(scope.row)"
+              >
+                <template #icon><Upload /></template>
+                上传文件
+              </t-button>
               <t-dropdown
                 trigger="click"
                 :options="getActiveActionOptions(scope.row)"
@@ -465,7 +477,8 @@ import {
   RefreshIcon as Refresh,
   TimeIcon as Clock,
   SendIcon as Promotion,
-  CheckIcon as Check
+  CheckIcon as Check,
+  UploadIcon as Upload
 } from 'tdesign-icons-vue-next'
 import { cancelJob, assignJobToPrinter, requeueJob, updateJobPriority, startJob, createPrintJob, reconcilePrintJob } from '@/api/job'
 import { confirmSafe, getPrinterList, pausePrinter, resumePrinter } from '@/api/printer'
@@ -961,8 +974,16 @@ const handleConfirmSafe = job => runConfirmedJobAction(job, 'confirm-safe', {
   options: { confirmButtonText: '确认安全', cancelButtonText: '返回检查', type: 'warning' }
 }, () => confirmSafe(job.id, job.printerId), '已确认安全，可以启动打印')
 
+const handleUpload = job => runConfirmedJobAction(job, 'upload', {
+  message: `确认将“${getActiveDisplay(job).fileName}”上传到 ${getActiveDisplay(job).printerName}？上传完成后不会自动开始打印。`,
+  title: '仅上传文件',
+  options: { confirmButtonText: '开始上传', cancelButtonText: '取消', type: 'info' }
+}, () => startJob(job.id, 'UPLOAD_ONLY'), '文件已上传到打印机，可确认安全后启动打印')
+
 const handleStart = job => runConfirmedJobAction(job, 'start', {
-  message: `确认启动任务 #${job.id}？这会向打印机发送上传并启动请求。`,
+  message: job.status === 'READY'
+    ? `确认启动任务 #${job.id}？文件已经上传，本次只发送启动打印命令。`
+    : `确认启动任务 #${job.id}？系统会先上传文件，上传成功后立即启动打印。`,
   title: '启动打印确认',
   options: { confirmButtonText: '启动打印', cancelButtonText: '取消', type: 'danger' }
 }, () => startJob(job.id, 'START_PRINT'), '启动请求已发送，请观察设备状态')

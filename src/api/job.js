@@ -8,6 +8,7 @@ import {
 } from '@/utils/dataAdapters'
 import { toBatchPreviewPayload } from '@/utils/batchDispatch'
 import { validateJobPageParams } from '@/utils/jobQuery'
+import { REQUEST_TIMEOUT } from '@/utils/constants'
 
 export { validateJobPageParams }
 
@@ -96,7 +97,8 @@ export function startJob(jobId, action = 'START_PRINT') {
   return request({
     url: '/api/v1/print-jobs/safe/start',
     method: 'post',
-    data: { jobId, action }
+    data: { jobId, action },
+    timeout: REQUEST_TIMEOUT.UPLOAD
   }).then(response => mapResponseData(response, normalizePrintJob))
 }
 
