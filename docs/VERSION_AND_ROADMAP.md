@@ -39,6 +39,7 @@
 | `farm-v3-batch-dispatch` | 后续规划 | 后台自动派单、批量执行和恢复模型；不进入 1.0.0 发布门禁 |
 | `farm-dashboard-dynamic-layout` | 功能规格/验收记录 | 看板动态行列和过道编辑，按 R100 范围决定是否随版本交付 |
 | `farm-task-center-readability` | 功能规格/验收记录 | 任务可读名称、快照和历史显示 |
+| `farm-ardot-tdesign-prototype` | 规划中的原型规格 | 使用 Ardot 与 TDesign for web 建立可评审前端原型；评审通过后再进入 Vue 编码 |
 | `printer-*` | 协议、监控和 WebSocket 规格 | 以真实设备联调状态为准 |
 | `farm-ui-remediation`、`farm-ui-selective-integration` | 历史整改/合并记录 | 只作为变更依据和回归证据 |
 
@@ -64,6 +65,7 @@
 ## 6. 新任务维护规则
 
 - 新任务先注明产品版本和 Kiro 规格归属，再写实现任务。
+- Ardot/TDesign 原型任务必须区分“原型完成”和“Vue 编码完成”，不得只因组件已拖入画布就标记前端功能完成。
 - 产品版本统一写 `1.0.0`；历史阶段可写“v2 功能基线”，不要写成“产品 v2 发布”。
 - 涉及接口时保留 `/api/v1`，并说明这是 API 路径而非产品版本。
 - 完成任务后同步对应 `tasks.md`、接口契约、验证记录和本索引；不要批量改名历史目录。

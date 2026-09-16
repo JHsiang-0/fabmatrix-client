@@ -24,6 +24,7 @@
 
 - `farm-v1-release-readiness`：当前 1.0.0 发布整改和门禁。
 - `farm-ui-v2`：手动优先、文件库/任务中心等功能基线；目录名是历史开发阶段，不是产品版本。
+- `farm-ardot-tdesign-prototype`：使用 Ardot 与 TDesign for web 建立完整前端原型，评审通过后再进入 Vue 编码。
 - `farm-v3-batch-dispatch`：后台自动派单及更高风险批量能力的后续规划，1.0.0 不发布。
 - 其他 `farm-*`、`printer-*` 规格：按功能拆分的历史设计、联调或验收记录，状态以各自文档为准。
 
