@@ -37,22 +37,28 @@
         <t-alert v-if="reconcileStale" theme="error" :close-btn="false" class="task-detail-drawer__stale-alert">
           当前任务详情刷新失败，已停止人工核对操作，请刷新任务详情后再试。
         </t-alert>
-        <t-alert
+        <div
           v-if="task.status === 'RECONCILING'"
-          theme="warning"
-          :close-btn="false"
-          class="task-detail-drawer__reconcile-alert"
+          class="task-detail-drawer__reconcile-panel"
+          role="region"
+          aria-label="人工核对操作"
         >
-          <template #default>设备状态无法自动确认，请人工核对打印结果。</template>
-          <template #operation>
+          <t-alert
+            theme="warning"
+            title="设备状态无法自动确认，请人工核对打印结果。"
+            :close-btn="false"
+          />
+          <div class="task-detail-drawer__reconcile-operation">
+            <span class="task-detail-drawer__reconcile-label">现场核对结果</span>
             <t-space size="small" break-line class="task-detail-drawer__reconcile-actions">
               <t-button size="small" theme="success" :disabled="reconcileLoading || reconcileStale" @click="openReconcile('COMPLETED')">确认完成</t-button>
               <t-button size="small" theme="danger" variant="outline" :disabled="reconcileLoading || reconcileStale" @click="openReconcile('FAILED')">确认失败</t-button>
               <t-button size="small" theme="warning" variant="outline" :disabled="reconcileLoading || reconcileStale" @click="openReconcile('CANCELLED')">确认取消</t-button>
               <t-button size="small" variant="outline" :disabled="reconcileLoading || reconcileStale" @click="openReconcile('QUEUED')">重新排队</t-button>
             </t-space>
-          </template>
-        </t-alert>
+            <span class="task-detail-drawer__reconcile-hint">提交核对结果后会刷新任务、队列和打印机状态。</span>
+          </div>
+        </div>
 
         <section class="task-detail-drawer__section" aria-labelledby="task-detail-resources">
           <h2 id="task-detail-resources">资源与人员</h2>
@@ -409,10 +415,23 @@ const submitReconcile = async () => {
   font-size: var(--td-font-size-title-small);
 }
 
-.task-detail-drawer__reconcile-alert {
+.task-detail-drawer__reconcile-panel,
+.task-detail-drawer__reconcile-operation {
   display: flex;
   flex-direction: column;
   gap: var(--app-spacing-3);
+}
+
+.task-detail-drawer__reconcile-label {
+  color: var(--app-text-primary);
+  font-size: var(--td-font-size-body-medium);
+  font-weight: 600;
+}
+
+.task-detail-drawer__reconcile-hint {
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+  line-height: var(--td-line-height-body-small);
 }
 
 .task-detail-drawer__stale-alert,

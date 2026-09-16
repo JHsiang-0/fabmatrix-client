@@ -69,10 +69,21 @@ test('任务详情标题和技术信息遵循可读优先、默认折叠与长�
 
 test('任务详情加载、错误、空状态与核对链路均有显式回归护栏', () => {
   const submitSource = detailSource.slice(detailSource.indexOf('const submitReconcile'))
+  const reconcilePanelSource = detailSource.slice(
+    detailSource.indexOf('class="task-detail-drawer__reconcile-panel"'),
+    detailSource.indexOf('<section class="task-detail-drawer__section"')
+  )
   assert.match(detailSource, /任务详情加载中/)
   assert.match(detailSource, /v-else-if="error"[^>]*theme="error"/)
   assert.match(detailSource, /description="未选择任务"/)
   assert.match(detailSource, /设备状态无法自动确认，请人工核对打印结果。/)
+  assert.match(reconcilePanelSource, /title="设备状态无法自动确认，请人工核对打印结果。"/)
+  assert.match(reconcilePanelSource, /现场核对结果/)
+  assert.match(reconcilePanelSource, /确认完成/)
+  assert.match(reconcilePanelSource, /确认失败/)
+  assert.match(reconcilePanelSource, /确认取消/)
+  assert.match(reconcilePanelSource, /重新排队/)
+  assert.doesNotMatch(reconcilePanelSource, /#operation/)
   assert.match(detailSource, /reconcileLoading/)
   assert.match(detailSource, /validationResult = await reconcileFormRef\.value\?\.validate\(\)/)
   assert.match(detailSource, /validationResult !== true/)
