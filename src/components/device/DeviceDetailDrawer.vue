@@ -50,14 +50,15 @@
                 @change="handleDetailTabChange">
                 <t-tab-panel value="overview" label="设备概览">
                     <div class="printer-detail-drawer__panel printer-detail-drawer__overview app-scroll-region">
-                        <section class="printer-detail-drawer__status-card" :class="[
-                            currentStateClass === 'error' ? 'is-error' : '',
-                            currentStateClass === 'preparing' || currentStateClass === 'paused' ? 'is-warning' : '',
-                            currentStateClass === 'printing' ? 'is-printing' : ''
-                        ]">
-                            <div class="printer-detail-drawer__status-main">
-                                <div class="printer-detail-drawer__status-copy">
-                                    <StatusTag domain="printer" :status="currentState" variant="dark" size="large" />
+                        <section class="printer-detail-drawer__status-card" :class="`is-${currentStateClass}`">
+                            <div class="printer-detail-drawer__status-layout">
+                                <div class="printer-detail-drawer__status-context">
+                                    <div class="printer-detail-drawer__status-heading">
+                                        <StatusTag domain="printer" :status="currentState" variant="dark" size="large" />
+                                        <t-tag size="small" :theme="connectionTheme" variant="light">
+                                            通信{{ connectionLabel }}
+                                        </t-tag>
+                                    </div>
                                     <div v-if="isDeviceTaskActive" class="printer-detail-drawer__task-observation">
                                         <t-tag size="small" :theme="deviceTaskSourceMeta.theme" variant="light">
                                             {{ deviceTaskSourceMeta.label }}
@@ -66,14 +67,30 @@
                                             {{ observedTaskFilename || '设备未返回文件名' }}
                                         </span>
                                     </div>
+                                    <div v-else-if="isAssignedState" class="printer-detail-drawer__task-observation">
+                                        <t-tag size="small" theme="warning" variant="light">待打印任务</t-tag>
+                                        <span class="printer-detail-drawer__task-filename" :title="assignedFileName">
+                                            {{ assignedFileName }}
+                                        </span>
+                                    </div>
+                                    <span v-else class="printer-detail-drawer__status-description">
+                                        {{ statusDescription }}
+                                    </span>
+                                    <div v-if="isPrintingOrRelated" class="printer-detail-drawer__progress-summary">
+                                        <span>打印进度</span>
+                                        <strong>{{ currentProgress }}%</strong>
+                                    </div>
                                 </div>
-                                <div v-if="realTimeData?.progress !== undefined && isPrintingState"
-                                    class="printer-detail-drawer__progress-summary">
-                                    <strong>{{ realTimeData.progress }}%</strong>
-                                    <span>打印进度</span>
+
+                                <div class="printer-detail-drawer__device-info-grid" aria-label="设备信息">
+                                    <div v-for="item in deviceInfoItems" :key="item.label"
+                                        class="printer-detail-drawer__device-info-item">
+                                        <span>{{ item.label }}</span>
+                                        <strong :title="item.value">{{ item.value }}</strong>
+                                    </div>
                                 </div>
                             </div>
-                            <t-progress v-if="isPrintingState" :percentage="realTimeData?.progress || 0"
+                            <t-progress v-if="isPrintingOrRelated" :percentage="currentProgress"
                                 :status="progressStatus" :stroke-width="6" :label="false" />
                             <div v-if="realTimeData?.systemMessage && isErrorState"
                                 class="printer-detail-drawer__inline-error">
@@ -169,18 +186,6 @@
                             </div>
                         </section>
 
-                        <section class="printer-detail-drawer__detail-section" aria-labelledby="printer-device-info-title">
-                            <div id="printer-device-info-title" class="printer-detail-drawer__section-heading">
-                                <span>设备信息</span>
-                            </div>
-                            <t-descriptions :column="descriptionColumn" size="small" bordered
-                                class="printer-detail-drawer__device-descriptions">
-                                <t-descriptions-item label="机器编号">{{ device.machineNumber || '-' }}</t-descriptions-item>
-                                <t-descriptions-item label="IP 地址">{{ device.ipAddress || '-' }}</t-descriptions-item>
-                                <t-descriptions-item label="固件类型">{{ device.firmwareType || '-' }}</t-descriptions-item>
-                                <t-descriptions-item label="喷头尺寸">{{ device.nozzleSize ? device.nozzleSize + 'mm' : '-' }}</t-descriptions-item>
-                            </t-descriptions>
-                        </section>
                     </div>
                 </t-tab-panel>
 
@@ -251,14 +256,20 @@
         <!-- 抽屉底部操作区 -->
         <template #footer>
             <div v-if="device" class="printer-detail-drawer__footer">
-                <t-button v-if="device.ipAddress" theme="default" variant="outline" size="medium" tag="a"
-                    :href="deviceConsoleUrl" target="_blank" rel="noopener noreferrer"
-                    class="printer-detail-drawer__console-button">
-                    <Monitor />{{ isRrfDevice ? '打开 DWC' : '打开 Mainsail' }}
-                </t-button>
-                <t-button v-else theme="default" variant="outline" size="medium" disabled>
-                    <Monitor />设备地址不可用
-                </t-button>
+                <div class="printer-detail-drawer__footer-primary">
+                    <t-button v-if="device.ipAddress" theme="primary" size="medium" tag="a"
+                        :href="deviceConsoleUrl" target="_blank" rel="noopener noreferrer"
+                        class="printer-detail-drawer__console-button">
+                        <Monitor />{{ isRrfDevice ? '打开 DWC' : '打开 Mainsail' }}
+                    </t-button>
+                    <t-button v-else theme="default" size="medium" disabled>
+                        <Monitor />设备地址不可用
+                    </t-button>
+                    <t-button theme="default" variant="base" size="medium"
+                        :disabled="detailLoading || monitorLoading" @click="emit('retry')">
+                        <Refresh />刷新状态
+                    </t-button>
+                </div>
                 <div class="printer-detail-drawer__footer-actions">
                     <t-button v-if="canPause" theme="warning" size="medium" :disabled="actionLoading"
                         :loading="actionLoading" @click="handleAction('pause')">
@@ -268,22 +279,25 @@
                         :loading="actionLoading" @click="handleAction('resume')">
                         <VideoPlay />恢复
                     </t-button>
-                    <t-button v-if="canCancel" theme="danger" variant="outline" size="medium"
+                    <t-button v-if="canCancel" theme="danger" size="medium"
                         :disabled="actionLoading" :loading="actionLoading" @click="handleAction('cancel')">
                         <CircleClose />取消
                     </t-button>
-                    <t-button v-if="isFatalError" theme="danger" size="medium"
+                    <t-button v-if="canEmergencyStop" theme="danger" size="medium"
                         :disabled="actionLoading" :loading="actionLoading" @click="handleEmergencyStop">
                         <Warning />紧急停机
                     </t-button>
-                <t-popconfirm v-if="canManageDevice" content="确定要将此设备从该物理位置下架吗？" confirm-btn="确认下架" cancel-btn="取消"
-                    theme="danger" @confirm="handleRemove">
-                    <template>
+                    <span v-if="!hasTaskControls" class="printer-detail-drawer__footer-hint">
+                        {{ connectionLabel === '在线' ? '当前状态无需任务控制' : '设备离线，控制操作不可用' }}
+                    </span>
+                    <t-popconfirm v-if="canManageDevice" content="确定要将此设备从该物理位置下架吗？"
+                        confirm-btn="确认下架" cancel-btn="取消" theme="danger" @confirm="handleRemove">
+                        <template>
                             <t-button theme="danger" variant="text" size="medium">
                                 <Delete />下架
                             </t-button>
-                    </template>
-                </t-popconfirm>
+                        </template>
+                    </t-popconfirm>
                 </div>
             </div>
         </template>
@@ -302,7 +316,8 @@ import {
     CloseCircleIcon as CircleClose,
     ErrorCircleFilledIcon as Warning,
     LockOnIcon as Lock,
-    FileAddIcon as DocumentAdd
+    FileAddIcon as DocumentAdd,
+    RefreshIcon as Refresh
 } from 'tdesign-icons-vue-next'
 import IconNozzle from '../icons/IconNozzle.vue'
 import IconBed from '../icons/IconBed.vue'
@@ -333,11 +348,6 @@ const drawerSize = computed(() => {
     if (isTablet.value) return '70%'       // 平板：70% 宽度
     if (isLargeScreen.value) return '680px' // 大屏：为历史表格保留完整列宽
     return '640px'                          // 桌面：概览与历史共用稳定宽度
-})
-
-// 响应式描述列表列数
-const descriptionColumn = computed(() => {
-    return isMobile.value ? 1 : 2
 })
 
 // 监听窗口大小变化
@@ -699,11 +709,6 @@ const currentStateClass = computed(() => {
     return currentState.value.toLowerCase()
 })
 
-/** 是否为打印中状态 */
-const isPrintingState = computed(() => {
-    return currentState.value === PRINTER_STATUS.PRINTING
-})
-
 /** 是否为打印中或相关状态 */
 const isPrintingOrRelated = computed(() => {
     const relatedStates = [
@@ -713,13 +718,46 @@ const isPrintingOrRelated = computed(() => {
     return relatedStates.includes(currentState.value)
 })
 
-/** 是否为错误状态 */
-const isErrorState = computed(() => {
-    return currentState.value === PRINTER_STATUS.ERROR
+const currentProgress = computed(() => {
+    const value = Number(
+        props.realTimeData?.progress
+        ?? props.device?.realtimeStatus?.progress
+        ?? props.device?.progress
+        ?? 0
+    )
+    if (!Number.isFinite(value)) return 0
+    return Number(Math.min(Math.max(value, 0), 100).toFixed(2))
 })
 
-/** 是否为致命错误 */
-const isFatalError = computed(() => {
+const statusDescription = computed(() => ({
+    [PRINTER_STATUS.IDLE]: '设备空闲，可接收新的打印任务',
+    [PRINTER_STATUS.PREPARING]: '设备正在准备打印任务',
+    [PRINTER_STATUS.PRINTING]: '设备正在执行打印任务',
+    [PRINTER_STATUS.PAUSED]: '当前打印任务已暂停',
+    [PRINTER_STATUS.ERROR]: '设备存在异常，请检查后处理',
+    [PRINTER_STATUS.OFFLINE]: '设备当前无法通信',
+    [PRINTER_STATUS.UNKNOWN]: '暂时无法确认设备状态'
+}[currentState.value] || '暂时无法确认设备状态'))
+
+const devicePosition = computed(() => {
+    const row = props.device?.gridRow
+    const col = props.device?.gridCol
+    if (row == null && col == null) return '未分配'
+    return `${row ?? '-'} 行 / ${col ?? '-'} 列`
+})
+
+const deviceInfoItems = computed(() => [
+    { label: '机器编号', value: props.device?.machineNumber || '未设置' },
+    { label: 'IP 地址', value: props.device?.ipAddress || '-' },
+    { label: 'MAC 地址', value: props.device?.macAddress || monitorValue.value.macAddress || '未获取' },
+    { label: '设备协议', value: props.device?.firmwareType || '-' },
+    { label: '当前耗材', value: props.device?.currentMaterial || '未设置' },
+    { label: '喷嘴尺寸', value: props.device?.nozzleSize ? `${props.device.nozzleSize}mm` : '未设置' },
+    { label: '看板位置', value: devicePosition.value }
+])
+
+/** 是否为错误状态 */
+const isErrorState = computed(() => {
     return currentState.value === PRINTER_STATUS.ERROR
 })
 
@@ -771,6 +809,20 @@ const canResume = computed(() => {
 const canCancel = computed(() => {
     return [PRINTER_STATUS.PRINTING, PRINTER_STATUS.PAUSED].includes(currentState.value)
 })
+
+const canEmergencyStop = computed(() => {
+    const controllableStates = [
+        PRINTER_STATUS.PREPARING,
+        PRINTER_STATUS.PRINTING,
+        PRINTER_STATUS.PAUSED,
+        PRINTER_STATUS.ERROR
+    ]
+    return connectionLabel.value === '在线' && controllableStates.includes(currentState.value)
+})
+
+const hasTaskControls = computed(() => (
+    canPause.value || canResume.value || canCancel.value || canEmergencyStop.value
+))
 
 // ============================================
 // Event Handlers
@@ -846,6 +898,7 @@ async function handleStartPrint(action) {
 
 .printer-detail-drawer :deep(.t-drawer__footer) {
     padding: 0;
+    border-top: 1px solid var(--app-border);
 }
 
 .printer-detail-drawer__panel {
@@ -915,6 +968,7 @@ async function handleStartPrint(action) {
 }
 
 .printer-detail-drawer__status-card {
+    --printer-status-accent: var(--app-text-secondary);
     display: grid;
     gap: var(--app-spacing-2);
     padding: var(--app-spacing-3) var(--app-spacing-4);
@@ -923,23 +977,56 @@ async function handleStartPrint(action) {
     border-radius: var(--app-radius);
 }
 
+.printer-detail-drawer__status-card.is-idle {
+    --printer-status-accent: var(--td-success-color-7);
+    background: var(--td-success-color-1);
+    border-color: var(--td-success-color-3);
+}
+
 .printer-detail-drawer__status-card.is-error {
+    --printer-status-accent: var(--td-error-color-7);
     background: var(--td-error-color-1);
     border-color: var(--td-error-color-3);
 }
 
-.printer-detail-drawer__status-card.is-warning {
+.printer-detail-drawer__status-card.is-preparing,
+.printer-detail-drawer__status-card.is-paused {
+    --printer-status-accent: var(--td-warning-color-7);
     background: var(--td-warning-color-1);
     border-color: var(--td-warning-color-3);
 }
 
 .printer-detail-drawer__status-card.is-printing {
+    --printer-status-accent: var(--td-brand-color-7);
+    background: var(--td-brand-color-1);
     border-color: var(--td-brand-color-3);
 }
 
-.printer-detail-drawer__status-main,
+.printer-detail-drawer__status-card.is-offline,
+.printer-detail-drawer__status-card.is-unknown {
+    --printer-status-accent: var(--app-text-secondary);
+    background: var(--app-surface-muted);
+    border-color: var(--app-border);
+}
+
+.printer-detail-drawer__status-layout {
+    display: grid;
+    grid-template-columns: minmax(180px, 0.85fr) minmax(0, 1.6fr);
+    gap: var(--app-spacing-3);
+}
+
+.printer-detail-drawer__status-context {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--app-spacing-2);
+}
+
+.printer-detail-drawer__status-heading,
 .printer-detail-drawer__section-heading,
 .printer-detail-drawer__footer,
+.printer-detail-drawer__footer-primary,
 .printer-detail-drawer__footer-actions,
 .printer-detail-drawer__monitor-toggle,
 .printer-detail-drawer__assigned-actions {
@@ -947,31 +1034,67 @@ async function handleStartPrint(action) {
     align-items: center;
 }
 
-.printer-detail-drawer__status-main,
 .printer-detail-drawer__section-heading,
 .printer-detail-drawer__footer {
     justify-content: space-between;
 }
 
-.printer-detail-drawer__status-main {
+.printer-detail-drawer__status-heading {
     min-width: 0;
-    gap: var(--app-spacing-3);
+    flex-wrap: wrap;
+    gap: var(--app-spacing-2);
 }
 
-.printer-detail-drawer__status-copy {
-    min-width: 0;
+.printer-detail-drawer__status-description {
+    color: var(--app-text-secondary);
+    font-size: var(--td-font-size-body-small);
+    line-height: 1.5;
 }
 
 .printer-detail-drawer__progress-summary {
     display: flex;
-    flex: 0 0 auto;
     align-items: baseline;
+    justify-content: space-between;
     gap: var(--app-spacing-2);
 }
 
 .printer-detail-drawer__progress-summary strong {
-    color: var(--app-text-primary);
+    color: var(--printer-status-accent);
     font-size: var(--td-font-size-title-large);
+}
+
+.printer-detail-drawer__device-info-grid {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--app-spacing-2);
+}
+
+.printer-detail-drawer__device-info-item {
+    display: flex;
+    min-width: 0;
+    min-height: 44px;
+    padding: var(--app-spacing-2) var(--app-spacing-3);
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    background: var(--td-bg-color-container);
+    border: 1px solid var(--td-component-border);
+    border-radius: var(--app-radius-small);
+}
+
+.printer-detail-drawer__device-info-item > span {
+    color: var(--app-text-secondary);
+    font-size: var(--td-font-size-body-small);
+}
+
+.printer-detail-drawer__device-info-item > strong {
+    overflow: hidden;
+    color: var(--app-text-primary);
+    font-size: var(--td-font-size-body-medium);
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .printer-detail-drawer__progress-summary span,
@@ -1144,10 +1267,6 @@ async function handleStartPrint(action) {
     white-space: nowrap;
 }
 
-.printer-detail-drawer__device-descriptions {
-    margin-top: var(--app-spacing-2);
-}
-
 .printer-detail-drawer__history-panel {
     display: flex;
     flex-direction: column;
@@ -1268,11 +1387,35 @@ async function handleStartPrint(action) {
 .printer-detail-drawer__footer {
     min-height: 64px;
     padding: var(--app-spacing-3) var(--app-spacing-4);
+    flex-wrap: wrap;
     gap: var(--app-spacing-3);
-    border-top: 1px solid var(--app-border);
+    border-top: 0;
 }
 
 .printer-detail-drawer__console-button {
+    flex: 0 0 auto;
+}
+
+.printer-detail-drawer__footer-primary,
+.printer-detail-drawer__footer-actions {
+    flex-wrap: wrap;
+    gap: var(--app-spacing-2);
+}
+
+.printer-detail-drawer__footer-hint {
+    color: var(--app-text-secondary);
+    font-size: var(--td-font-size-body-small);
+}
+
+.printer-detail-drawer__footer :deep(.t-button__text) {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--app-spacing-1);
+}
+
+.printer-detail-drawer__footer :deep(.t-button__text > svg) {
+    width: 16px;
+    height: 16px;
     flex: 0 0 auto;
 }
 
@@ -1289,8 +1432,13 @@ async function handleStartPrint(action) {
     }
 
     .printer-detail-drawer__monitor-summary,
-    .printer-detail-drawer__statistics-grid {
+    .printer-detail-drawer__statistics-grid,
+    .printer-detail-drawer__device-info-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .printer-detail-drawer__status-layout {
+        grid-template-columns: 1fr;
     }
 
     .printer-detail-drawer__assigned-card,
@@ -1300,11 +1448,13 @@ async function handleStartPrint(action) {
     }
 
     .printer-detail-drawer__assigned-actions,
+    .printer-detail-drawer__footer-primary,
     .printer-detail-drawer__footer-actions {
         width: 100%;
     }
 
     .printer-detail-drawer__assigned-actions > *,
+    .printer-detail-drawer__footer-primary > *,
     .printer-detail-drawer__footer-actions > * {
         flex: 1 1 auto;
     }

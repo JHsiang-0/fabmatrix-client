@@ -89,6 +89,17 @@ test('UI-005 打印机管理压缩字段、固定首尾列并按条件显示批�
   assert.match(tableAdapterSource, /\{ tableContentWidth: props\.tableContentWidth \}/)
 })
 
+test('打印机机器编号是独立自定义字段并支持管理员原位编辑', () => {
+  assert.match(source, /v-if="isAdmin && editingMachineNumberId === scope\.row\.id"/)
+  assert.match(source, /@click\.stop="startMachineNumberEdit\(scope\.row\)"/)
+  assert.match(source, /const MACHINE_NUMBER_PATTERN = \/\^\[A-Za-z0-9_-\]\*\$\//)
+  assert.match(source, /machineNumber: machineNumber \|\| null/)
+  assert.match(source, /<t-form-item label="机器编号" name="machineNumber"/)
+  assert.match(source, /仅支持字母、数字、下划线和短横线/)
+  assert.doesNotMatch(dashboardSource, /machineNumber:\s*targetSlotLabel\.value/)
+  assert.match(dashboardSource, /positionChanges/)
+})
+
 test('UI-006 扫描使用右侧 Drawer、纵向列表和独立发现状态', () => {
   assert.match(source, /<t-radio-group v-model="form\.firmwareType" variant="default-filled" size="medium"/)
   assert.match(source, /<t-radio-button value="RRF">RRF<\/t-radio-button>/)
@@ -227,12 +238,27 @@ test('打印机详情抽屉以概览和历史双标签压缩信息并固定底�
   assert.match(detailSource, /'is-single-panel': !showAnalytics/)
   assert.match(detailSource, /\.printer-detail-drawer__tabs\.is-single-panel/)
   assert.doesNotMatch(detailSource, /undefined - 详细信息/)
-  assert.match(detailSource, /device\.machineNumber \|\| '-'/)
+  assert.match(detailSource, /props\.device\?\.machineNumber \|\| '未设置'/)
   assert.doesNotMatch(detailSource, /device\.machineNumber \|\| `#\$\{device\.id\}`/)
   assert.match(detailSource, /isRrfDevice \? '打开 DWC' : '打开 Mainsail'/)
   assert.match(detailSource, /const deviceConsoleUrl = computed/)
   assert.match(detailSource, /confirmSafe\(jobId, props\.device\.id\)/)
   assert.match(printerApiSource, /data: \{ jobId, printerId \}/)
+})
+
+test('打印机详情使用状态主题卡整合任务和设备信息并统一底部操作', () => {
+  assert.match(detailSource, /:class="`is-\$\{currentStateClass\}`"/)
+  assert.match(detailSource, /printer-detail-drawer__device-info-grid/)
+  assert.match(detailSource, /label: 'MAC 地址'/)
+  assert.match(detailSource, /label: '当前耗材'/)
+  assert.match(detailSource, /label: '看板位置'/)
+  assert.match(detailSource, /\.printer-detail-drawer__status-card\.is-idle[\s\S]*--td-success-color-1/)
+  assert.match(detailSource, /\.printer-detail-drawer__status-card\.is-printing[\s\S]*--td-brand-color-1/)
+  assert.doesNotMatch(detailSource, /printer-detail-drawer__device-descriptions/)
+  assert.match(detailSource, /<Refresh \/>刷新状态/)
+  assert.match(detailSource, /v-if="canEmergencyStop"/)
+  assert.match(detailSource, /\.printer-detail-drawer :deep\(\.t-drawer__footer\)[\s\S]*border-top:/)
+  assert.match(detailSource, /\.printer-detail-drawer__footer[\s\S]*border-top: 0/)
 })
 
 test('表格适配层保持自然高度并把横向滚动交给 TDesign Table 内容区', () => {

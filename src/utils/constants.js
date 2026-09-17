@@ -96,7 +96,7 @@ export const PRINTER_STATUS_VALUES = Object.freeze(Object.values(PRINTER_STATUS)
  */
 export const PRINTER_STATUS_MAP = Object.freeze({
   [PRINTER_STATUS.OFFLINE]: { label: '离线', type: 'default', level: 'unknown', icon: 'QuestionFilled' },
-  [PRINTER_STATUS.IDLE]: { label: '待机', type: 'default', level: 'normal', icon: 'Coffee' },
+  [PRINTER_STATUS.IDLE]: { label: '待机', type: 'success', level: 'normal', icon: 'Coffee' },
   [PRINTER_STATUS.PREPARING]: { label: '准备中', type: 'warning', level: 'warning', icon: 'Loading' },
   [PRINTER_STATUS.PRINTING]: { label: '打印中', type: 'primary', level: 'normal', icon: 'VideoPlay' },
   [PRINTER_STATUS.PAUSED]: { label: '已暂停', type: 'warning', level: 'warning', icon: 'VideoPause' },

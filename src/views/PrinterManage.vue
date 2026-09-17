@@ -145,9 +145,56 @@
           </template>
         </TdTableColumn>
 
-        <TdTableColumn prop="machineNumber" label="机器编号" width="110" align="center">
+        <TdTableColumn prop="machineNumber" label="机器编号" width="168" align="center">
           <template #default="scope">
-            <span class="font-mono text-sm">{{ scope.row.machineNumber || '-' }}</span>
+            <div
+              v-if="isAdmin && editingMachineNumberId === scope.row.id"
+              class="printer-machine-number-editor"
+              @click.stop
+            >
+              <t-input
+                v-model="machineNumberDraft"
+                size="small"
+                maxlength="50"
+                autofocus
+                placeholder="自定义编号"
+                :disabled="machineNumberSavingId === scope.row.id"
+                @enter="saveMachineNumber(scope.row)"
+              />
+              <t-button
+                theme="primary"
+                variant="text"
+                shape="square"
+                size="small"
+                aria-label="保存机器编号"
+                :loading="machineNumberSavingId === scope.row.id"
+                @click.stop="saveMachineNumber(scope.row)"
+              >
+                <check />
+              </t-button>
+              <t-button
+                theme="default"
+                variant="text"
+                shape="square"
+                size="small"
+                aria-label="取消编辑机器编号"
+                :disabled="machineNumberSavingId === scope.row.id"
+                @click.stop="cancelMachineNumberEdit"
+              >
+                <close />
+              </t-button>
+            </div>
+            <button
+              v-else-if="isAdmin"
+              type="button"
+              class="printer-machine-number-value"
+              title="点击编辑机器编号"
+              @click.stop="startMachineNumberEdit(scope.row)"
+            >
+              <span class="font-mono text-sm">{{ scope.row.machineNumber || '-' }}</span>
+              <edit class="printer-machine-number-value__edit" />
+            </button>
+            <span v-else class="font-mono text-sm">{{ scope.row.machineNumber || '-' }}</span>
           </template>
         </TdTableColumn>
 
@@ -301,6 +348,10 @@
               <span><printer /></span>
             </template>
           </t-input>
+        </t-form-item>
+
+        <t-form-item label="机器编号" name="machineNumber" help="仅支持字母、数字、下划线和短横线，最多 50 位">
+          <t-input v-model="form.machineNumber" maxlength="50" placeholder="例：A-01（可选）" />
         </t-form-item>
 
         <t-form-item label="IP 地址" name="ipAddress">
@@ -538,6 +589,7 @@ import {
   EditIcon as Edit,
   DeleteIcon as Delete,
   CheckIcon as Check,
+  CloseIcon as Close,
   SearchIcon as Search,
   FolderAddIcon as FolderAdd
 } from 'tdesign-icons-vue-next'
@@ -648,6 +700,9 @@ const monitorUpdatingIds = ref([])
 const monitorBatchLoading = ref(false)
 const selectedPrinterIds = ref([])
 const detailActionLoading = ref(false)
+const editingMachineNumberId = ref(null)
+const machineNumberDraft = ref('')
+const machineNumberSavingId = ref(null)
 
 // ===== 表单与弹窗状态 =====
 const dialogVisible = ref(false)
@@ -658,6 +713,7 @@ const formRef = ref(null)
 const defaultForm = {
   id: null,
   name: '',
+  machineNumber: '',
   ipAddress: '',
   firmwareType: 'KLIPPER',
   currentMaterial: 'ABS',
@@ -667,6 +723,10 @@ const form = reactive({ ...defaultForm })
 
 const rules = {
   name: [{ required: true, message: '请输入机器名称', trigger: 'blur' }],
+  machineNumber: [
+    { max: 50, message: '机器编号最多 50 位', trigger: 'blur' },
+    { pattern: /^[A-Za-z0-9_-]*$/, message: '机器编号仅支持字母、数字、下划线和短横线', trigger: 'blur' }
+  ],
   ipAddress: [{ required: true, message: '请输入IP地址', trigger: 'blur' }]
 }
 
@@ -921,6 +981,62 @@ const handleRowClick = (row) => {
   detailDrawerVisible.value = true
   loadPrinterDetail(row.id)
   loadPrinterMonitor(row.id)
+}
+
+const MACHINE_NUMBER_PATTERN = /^[A-Za-z0-9_-]*$/
+
+const startMachineNumberEdit = printer => {
+  if (!isAdmin.value || machineNumberSavingId.value) return
+  editingMachineNumberId.value = printer.id
+  machineNumberDraft.value = printer.machineNumber || ''
+}
+
+const cancelMachineNumberEdit = () => {
+  if (machineNumberSavingId.value) return
+  editingMachineNumberId.value = null
+  machineNumberDraft.value = ''
+}
+
+const saveMachineNumber = async printer => {
+  if (!isAdmin.value || machineNumberSavingId.value === printer.id) return
+
+  const machineNumber = machineNumberDraft.value.trim()
+  if (machineNumber.length > 50) {
+    message.warning('机器编号最多 50 位')
+    return
+  }
+  if (!MACHINE_NUMBER_PATTERN.test(machineNumber)) {
+    message.warning('机器编号仅支持字母、数字、下划线和短横线')
+    return
+  }
+  if (machineNumber === String(printer.machineNumber || '')) {
+    cancelMachineNumberEdit()
+    return
+  }
+
+  machineNumberSavingId.value = printer.id
+  try {
+    await updatePrinter({
+      id: printer.id,
+      name: printer.name,
+      machineNumber: machineNumber || null,
+      ipAddress: printer.ipAddress,
+      firmwareType: printer.firmwareType,
+      currentMaterial: printer.currentMaterial,
+      nozzleSize: printer.nozzleSize
+    })
+    printer.machineNumber = machineNumber || null
+    if (String(selectedDevice.value?.id) === String(printer.id)) {
+      selectedDevice.value = { ...selectedDevice.value, machineNumber: machineNumber || null }
+    }
+    message.success('机器编号已更新')
+    editingMachineNumberId.value = null
+    machineNumberDraft.value = ''
+  } catch (error) {
+    if (!error?.toastShown) message.error(error?.message || '机器编号更新失败')
+  } finally {
+    machineNumberSavingId.value = null
+  }
 }
 
 const loadPrinterDetail = async deviceId => {
@@ -1258,6 +1374,7 @@ const handleEdit = (row) => {
   Object.assign(form, {
     id: row.id,
     name: row.name,
+    machineNumber: row.machineNumber || '',
     ipAddress: row.ipAddress,
     firmwareType: row.firmwareType || 'KLIPPER',
     currentMaterial: row.currentMaterial,
@@ -1274,6 +1391,7 @@ const submitForm = async () => {
     const payload = {
       id: form.id,
       name: form.name,
+      machineNumber: form.machineNumber.trim() || null,
       ipAddress: form.ipAddress,
       firmwareType: form.firmwareType,
       currentMaterial: form.currentMaterial,
@@ -1527,6 +1645,61 @@ const handleBatchAdd = async () => {
 .printer-firmware-options :deep(.t-radio-button) {
   flex: 1 1 0;
   justify-content: center;
+}
+
+.printer-machine-number-editor,
+.printer-machine-number-value {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.printer-machine-number-editor {
+  width: 100%;
+  gap: 2px;
+}
+
+.printer-machine-number-editor :deep(.t-input__wrap) {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.printer-machine-number-editor :deep(.t-input) {
+  padding-right: var(--app-spacing-2);
+  padding-left: var(--app-spacing-2);
+  font-family: var(--td-font-family-mono, ui-monospace, SFMono-Regular, Consolas, monospace);
+}
+
+.printer-machine-number-value {
+  max-width: 100%;
+  padding: 3px var(--app-spacing-1);
+  gap: var(--app-spacing-1);
+  color: var(--app-text-primary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--app-radius-small);
+  cursor: pointer;
+}
+
+.printer-machine-number-value:hover,
+.printer-machine-number-value:focus-visible {
+  color: var(--app-primary);
+  background: var(--app-primary-light);
+  outline: none;
+}
+
+.printer-machine-number-value__edit {
+  width: 14px;
+  height: 14px;
+  color: currentColor;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.printer-machine-number-value:hover .printer-machine-number-value__edit,
+.printer-machine-number-value:focus-visible .printer-machine-number-value__edit {
+  opacity: 1;
 }
 
 .printer-manage-card {

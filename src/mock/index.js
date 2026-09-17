@@ -935,6 +935,7 @@ const handleAddPrinter = config => {
   const printer = {
     id: nextMockId('printer'),
     name: body.name || `Mock_Printer_${Date.now()}`,
+    machineNumber: body.machineNumber || null,
     ipAddress: body.ipAddress || '192.168.1.100',
     macAddress: body.macAddress || 'AA:BB:CC:DD:EE:99',
     firmwareType: body.firmwareType || 'KLIPPER',
