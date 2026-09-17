@@ -109,6 +109,6 @@ test('T208-10 页面契约使用可见字段和危险操作语义', async () => 
   assert.match(files, /selectedIds\.value\.slice\(\)/)
   assert.match(files, /batchDeleting/)
   assert.match(users, /<t-form[\s\S]*label="用户名"/)
-  assert.match(audit, /<t-form[\s\S]*label="时间范围"/)
+  assert.match(audit, /<QueryToolbar[\s\S]*audit-filter-field__label">时间范围/)
   assert.doesNotMatch(sources.join('\n'), /apiKey|rustfsKey/)
 })

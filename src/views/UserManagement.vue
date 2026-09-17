@@ -6,28 +6,36 @@
       </template>
     </PageHeader>
 
-    <t-card class="app-page-card management-card">
-      <t-form :data="query" layout="inline" label-align="top" class="app-query-toolbar">
-        <t-form-item label="用户名">
-          <t-input v-model="query.username" placeholder="按用户名搜索" clearable @enter="fetchUsers" />
-        </t-form-item>
-        <t-form-item label="邮箱">
-          <t-input v-model="query.email" placeholder="按邮箱搜索" clearable @enter="fetchUsers" />
-        </t-form-item>
-        <t-form-item label="角色">
-          <t-select v-model="query.role" placeholder="全部角色" clearable style="width: 150px" @change="fetchUsers">
-            <t-option label="管理员" value="ADMIN" /><t-option label="操作员" value="OPERATOR" />
+    <t-card class="app-page-card management-card user-management-card">
+      <QueryToolbar class="user-filter-toolbar" label="用户筛选条件">
+        <div class="user-filter-field user-filter-field--role">
+          <span class="user-filter-field__label">角色</span>
+          <t-radio-group v-model="query.role" variant="default-filled" @change="handleQuery">
+            <t-radio-button value="">全部</t-radio-button>
+            <t-radio-button value="ADMIN">管理员</t-radio-button>
+            <t-radio-button value="OPERATOR">操作员</t-radio-button>
+          </t-radio-group>
+        </div>
+        <div class="user-filter-field">
+          <span class="user-filter-field__label">账号状态</span>
+          <t-select v-model="query.enabled" placeholder="全部状态" clearable @change="handleQuery">
+            <t-option label="启用" :value="true" />
+            <t-option label="停用" :value="false" />
           </t-select>
-        </t-form-item>
-        <t-form-item label="启用状态">
-          <t-select v-model="query.enabled" placeholder="全部状态" clearable style="width: 150px" @change="fetchUsers">
-            <t-option label="启用" :value="true" /><t-option label="停用" :value="false" />
-          </t-select>
-        </t-form-item>
-        <t-form-item label="查询">
-          <t-button theme="primary" @click="fetchUsers" :loading="loading">查询</t-button>
-        </t-form-item>
-      </t-form>
+        </div>
+        <div class="user-filter-field user-filter-field--search">
+          <span class="user-filter-field__label">用户名</span>
+          <t-input v-model="query.username" placeholder="搜索用户名" clearable @enter="handleQuery" />
+        </div>
+        <div class="user-filter-field user-filter-field--search">
+          <span class="user-filter-field__label">邮箱</span>
+          <t-input v-model="query.email" placeholder="搜索邮箱" clearable @enter="handleQuery" />
+        </div>
+        <template #actions>
+          <t-button theme="primary" :loading="loading" @click="handleQuery">查询</t-button>
+          <t-button theme="default" variant="outline" @click="handleReset">重置</t-button>
+        </template>
+      </QueryToolbar>
       <AsyncState
         v-if="users.length === 0"
         :loading="loading"
@@ -40,23 +48,65 @@
         {{ loadError }}
         <template #operation><t-button size="small" variant="outline" @click="fetchUsers">重试</t-button></template>
       </t-alert>
-      <TdTable v-if="users.length" :data="users" :loading="loading" :height="usersTableHeight" class="management-table">
-        <TdTableColumn prop="id" label="ID" width="80" />
-        <TdTableColumn prop="username" label="用户名" />
-        <TdTableColumn prop="role" label="角色" />
-        <TdTableColumn prop="email" label="邮箱" />
-        <TdTableColumn prop="phone" label="手机号" />
-        <TdTableColumn prop="enabled" label="状态">
-          <template #default="{ row }"><t-tag :theme="row.enabled ? 'success' : 'default'">{{ row.enabled ? '启用' : '停用' }}</t-tag></template>
-        </TdTableColumn>
-        <TdTableColumn label="操作" width="190">
+      <TdTable v-if="users.length" :data="users" :loading="loading" :height="usersTableHeight" class="management-table user-management-table" hover>
+        <TdTableColumn prop="username" label="用户信息" min-width="220">
           <template #default="{ row }">
-            <t-button size="small" variant="text" @click="openEdit(row)">编辑</t-button>
-            <t-button size="small" variant="text" :disabled="isCurrentUser(row)" @click="toggleUser(row)">{{ row.enabled ? '停用' : '启用' }}</t-button>
+            <div class="user-table-cell">
+              <span class="user-table-cell__primary">{{ row.username || '未命名用户' }}</span>
+              <span class="user-table-cell__secondary">用户 #{{ row.id }}</span>
+            </div>
+          </template>
+        </TdTableColumn>
+        <TdTableColumn prop="email" label="联系方式" min-width="280">
+          <template #default="{ row }">
+            <div class="user-table-cell">
+              <span class="user-table-cell__primary user-table-cell__ellipsis">{{ row.email || '未填写邮箱' }}</span>
+              <span class="user-table-cell__secondary">{{ row.phone || '未填写手机号' }}</span>
+            </div>
+          </template>
+        </TdTableColumn>
+        <TdTableColumn prop="role" label="角色" width="130" align="center">
+          <template #default="{ row }">
+            <t-tag :theme="row.role === 'ADMIN' ? 'primary' : 'default'" variant="light">{{ getRoleLabel(row.role) }}</t-tag>
+          </template>
+        </TdTableColumn>
+        <TdTableColumn prop="enabled" label="账号状态" width="120" align="center">
+          <template #default="{ row }"><t-tag :theme="row.enabled ? 'success' : 'default'" variant="light">{{ row.enabled ? '启用' : '停用' }}</t-tag></template>
+        </TdTableColumn>
+        <TdTableColumn prop="createdAt" label="创建时间" min-width="180">
+          <template #default="{ row }"><span class="user-table-time">{{ row.createdAt ? formatDateTime(row.createdAt) : '—' }}</span></template>
+        </TdTableColumn>
+        <TdTableColumn label="操作" width="176" align="center" fixed="right">
+          <template #default="{ row }">
+            <t-space size="small" class="user-table-actions">
+              <t-button size="small" theme="primary" @click="openEdit(row)">编辑</t-button>
+              <t-tooltip :content="isCurrentUser(row) ? '当前登录管理员不能停用自己的账号' : ''" :disabled="!isCurrentUser(row)">
+                <span>
+                  <t-button
+                    size="small"
+                    :theme="row.enabled ? 'danger' : 'success'"
+                    :variant="row.enabled ? 'outline' : 'base'"
+                    :disabled="isCurrentUser(row)"
+                    @click="toggleUser(row)"
+                  >
+                    {{ row.enabled ? '停用' : '启用' }}
+                  </t-button>
+                </span>
+              </t-tooltip>
+            </t-space>
           </template>
         </TdTableColumn>
       </TdTable>
-      <t-pagination v-if="pagination.total > pagination.pageSize" v-model:current="pagination.pageNum" v-model:pageSize="pagination.pageSize" :total="pagination.total" class="mt-4 justify-center" @change="fetchUsers" />
+      <div class="user-management-footer">
+        <span class="user-management-footer__summary">共 <strong>{{ pagination.total }}</strong> 个用户</span>
+        <t-pagination
+          v-if="pagination.total > pagination.pageSize"
+          v-model:current="pagination.pageNum"
+          v-model:pageSize="pagination.pageSize"
+          :total="pagination.total"
+          @change="fetchUsers"
+        />
+      </div>
     </t-card>
 
     <t-dialog v-model:visible="dialogVisible" :header="dialogTitle" @confirm="submitUser" @cancel="closeDialog"
@@ -91,8 +141,10 @@ import { useUserStore } from '@/stores/user'
 import { isValidPassword, PASSWORD_RULE_MESSAGE } from '@/utils/password'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
+import QueryToolbar from '@/components/layout/QueryToolbar.vue'
 import TdTable from '@/components/TdTable.vue'
 import TdTableColumn from '@/components/TdTableColumn.vue'
+import { formatDateTime } from '@/utils/formatters'
 
 defineOptions({ name: 'UserManagement' })
 const userStore = useUserStore()
@@ -140,6 +192,7 @@ const getUserErrorMessage = (error, fallback) => {
   if (error?.status === 403) return '当前账号无权执行此操作。'
   return error?.message || fallback
 }
+const getRoleLabel = role => ({ ADMIN: '管理员', OPERATOR: '操作员' })[role] || '未知角色'
 
 const fetchUsers = async () => {
   loading.value = true
@@ -151,6 +204,15 @@ const fetchUsers = async () => {
   } catch (error) {
     loadError.value = error?.message || '用户列表加载失败，请重试'
   } finally { loading.value = false }
+}
+const handleQuery = () => {
+  pagination.pageNum = 1
+  fetchUsers()
+}
+const handleReset = () => {
+  Object.assign(query, { username: '', email: '', role: '', enabled: undefined })
+  pagination.pageNum = 1
+  fetchUsers()
 }
 const resetForm = () => {
   Object.assign(form, { id: null, username: '', password: '', confirmPassword: '', email: '', phone: '', role: 'OPERATOR' })
@@ -229,3 +291,171 @@ const toggleUser = async user => {
 }
 onMounted(fetchUsers)
 </script>
+
+<style scoped>
+.user-management-card :deep(.t-card__body) {
+  display: flex;
+  padding: var(--app-spacing-4);
+}
+
+.user-filter-toolbar {
+  flex: 0 0 auto;
+}
+
+.user-filter-field {
+  display: flex;
+  min-width: 148px;
+  align-items: center;
+  gap: var(--app-spacing-2);
+}
+
+.user-filter-field--role {
+  min-width: 288px;
+}
+
+.user-filter-field--search {
+  min-width: 210px;
+  flex: 1 1 210px;
+  max-width: 260px;
+}
+
+.user-filter-field__label {
+  flex: 0 0 auto;
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+  white-space: nowrap;
+}
+
+.user-filter-field :deep(.t-select) {
+  width: 140px;
+}
+
+.user-filter-field :deep(.t-input) {
+  width: 100%;
+}
+
+.user-management-table :deep(.t-table) {
+  width: 100%;
+  min-width: 0;
+}
+
+.user-management-table :deep(.t-table__content) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+.user-management-table :deep(.t-table th) {
+  height: 48px;
+  padding: 0 var(--app-spacing-3);
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+  font-weight: 500;
+  background: var(--app-surface-muted);
+}
+
+.user-management-table :deep(.t-table td) {
+  height: 58px;
+  padding: var(--app-spacing-2) var(--app-spacing-3);
+  color: var(--app-text-primary);
+  font-size: var(--td-font-size-body-small);
+  vertical-align: middle;
+  border-bottom-color: var(--app-border);
+}
+
+.user-management-table :deep(.t-table__body tr) {
+  transition: background-color 180ms ease;
+}
+
+.user-management-table :deep(.t-table__body tr:hover > td) {
+  background: var(--app-surface-hover);
+}
+
+.user-management-table :deep(.t-table__body tr:hover > td:first-child) {
+  box-shadow: inset 3px 0 0 var(--td-brand-color);
+}
+
+.user-table-cell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+
+.user-table-cell__primary {
+  color: var(--app-text-primary);
+  font-weight: 600;
+}
+
+.user-table-cell__secondary,
+.user-table-time {
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+}
+
+.user-table-cell__ellipsis {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-table-actions {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-table-actions :deep(.t-button) {
+  min-width: 58px;
+}
+
+.user-management-footer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-spacing-4);
+  min-width: 0;
+  margin-top: var(--app-spacing-3);
+  padding-top: var(--app-spacing-3);
+  border-top: 1px solid var(--app-border);
+}
+
+.user-management-footer__summary {
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+  white-space: nowrap;
+}
+
+.user-management-footer__summary strong {
+  color: var(--app-text-primary);
+}
+
+@media (max-width: 900px) {
+  .user-filter-field,
+  .user-filter-field--role,
+  .user-filter-field--search {
+    width: 100%;
+    max-width: none;
+  }
+
+  .user-filter-field :deep(.t-input),
+  .user-filter-field :deep(.t-select),
+  .user-filter-field :deep(.t-radio-group) {
+    flex: 1 1 auto;
+    width: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .user-management-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+</style>

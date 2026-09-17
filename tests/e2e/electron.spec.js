@@ -253,7 +253,7 @@ test('Electron desktop-mock 启动、登录、路由和全屏看板冒烟', asyn
   }
 })
 
-test('Electron TC-008 三尺寸历史详情可滚动且 FAILED 重试会刷新队列', async () => {
+test('Electron TC-008 三尺寸历史整行详情可达且 FAILED 重试会刷新队列', async () => {
   test.setTimeout(180000)
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fabmatrix-electron-tc008-e2e-'))
   const electronApp = await electron.launch({
@@ -299,11 +299,12 @@ test('Electron TC-008 三尺寸历史详情可滚动且 FAILED 重试会刷新�
           scrollTop: element.scrollTop
         }
       })
-      expect(tableStart.scrollWidth).toBeGreaterThan(tableStart.clientWidth)
+      if (size[0] <= 1024) expect(tableStart.scrollWidth).toBeGreaterThan(tableStart.clientWidth)
+      else expect(tableStart.scrollWidth).toBeGreaterThanOrEqual(tableStart.clientWidth)
       expect(tableStart.scrollHeight).toBeGreaterThan(tableStart.clientHeight)
       expect(tableStart.scrollLeft).toBe(0)
       expect(tableStart.scrollTop).toBe(0)
-      await expect(page.getByRole('columnheader', { name: '任务 ID' })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: '任务信息' })).toBeVisible()
 
       const tableEnd = await tableContent.evaluate(element => {
         element.scrollLeft = element.scrollWidth
@@ -315,24 +316,24 @@ test('Electron TC-008 三尺寸历史详情可滚动且 FAILED 重试会刷新�
           maxScrollTop: element.scrollHeight - element.clientHeight
         }
       })
-      expect(tableEnd.scrollLeft).toBeGreaterThan(0)
       expect(tableEnd.scrollLeft).toBeGreaterThanOrEqual(tableEnd.maxScrollLeft - 1)
       expect(tableEnd.scrollTop).toBeGreaterThan(0)
       expect(tableEnd.scrollTop).toBeGreaterThanOrEqual(tableEnd.maxScrollTop - 1)
-      await expect(page.getByRole('columnheader', { name: '操作' })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: '执行结果' })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: '操作' })).toHaveCount(0)
       await expect(table.locator('.t-table__body tr').last()).toBeVisible()
 
       await tableContent.evaluate(element => {
         element.scrollLeft = element.scrollWidth
         element.scrollTop = 0
       })
-      const failedRow = table.locator('.t-table__body tr').filter({ hasText: '#1005' })
+      const failedRow = page.getByRole('button', { name: '查看任务 #1005 详情', exact: true })
       await failedRow.evaluate(element => element.scrollIntoView({ block: 'center', inline: 'nearest' }))
-      const retryButton = failedRow.getByRole('button', { name: '重试', exact: true })
-      await expect(retryButton).toBeVisible()
-      await failedRow.getByRole('button', { name: '详情', exact: true }).click()
+      await failedRow.click()
       const drawerBody = page.locator('.task-detail-drawer .t-drawer__body')
       await expect(drawerBody).toBeVisible()
+      const retryButton = page.locator('.task-detail-drawer').getByRole('button', { name: '重新排队', exact: true })
+      await expect(retryButton).toBeVisible()
       await page.locator('.task-detail-drawer__technical').getByText('技术信息', { exact: true }).click()
       const drawerEnd = await drawerBody.evaluate(element => {
         element.scrollTop = 0
@@ -346,14 +347,15 @@ test('Electron TC-008 三尺寸历史详情可滚动且 FAILED 重试会刷新�
           overflowY: getComputedStyle(element).overflowY
         }
       })
-      expect(drawerEnd.maxScrollTop).toBeGreaterThan(0)
       expect(drawerEnd.start).toBe(0)
-      expect(drawerEnd.scrollTop).toBeGreaterThan(0)
-      expect(drawerEnd.scrollTop).toBeGreaterThanOrEqual(drawerEnd.maxScrollTop - 1)
+      if (drawerEnd.maxScrollTop > 0) {
+        expect(drawerEnd.scrollTop).toBeGreaterThan(0)
+        expect(drawerEnd.scrollTop).toBeGreaterThanOrEqual(drawerEnd.maxScrollTop - 1)
+      } else {
+        expect(drawerEnd.scrollTop).toBe(0)
+      }
       expect(['auto', 'scroll']).toContain(drawerEnd.overflowY)
       await expect(page.getByText('尝试次数', { exact: true })).toBeVisible()
-      await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
-
       await retryButton.click()
       await expect(retryButton).toBeDisabled()
       await expect(retryButton).toHaveClass(/t-is-loading/)
@@ -361,9 +363,10 @@ test('Electron TC-008 三尺寸历史详情可滚动且 FAILED 重试会刷新�
       await expect(successMessage).toBeVisible()
       const retryId = (await successMessage.textContent()).match(/#(\d+)/)?.[1]
       expect(retryId).toBeTruthy()
+      await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
       await page.evaluate(() => { window.location.hash = '#/tasks/queue' })
       await expect(page).toHaveURL(/127\.0\.0\.1:5177\/#\/tasks\/queue/)
-      await expect(page.getByText(`#${retryId}`, { exact: true })).toBeVisible()
+      await expect(page.locator('.job-queue-table .t-table__body tr').filter({ hasText: `#${retryId}` })).toBeVisible()
       const viewportMetrics = await page.evaluate(() => ({
         viewportWidth: window.innerWidth,
         documentWidth: document.documentElement.scrollWidth

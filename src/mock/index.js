@@ -542,6 +542,10 @@ const handleAdminUserPage = config => {
   if (params.username) records = records.filter(user => user.username.includes(String(params.username)))
   if (params.role) records = records.filter(user => user.role === params.role)
   if (params.email) records = records.filter(user => (user.email || '').includes(String(params.email)))
+  if (params.enabled !== undefined && params.enabled !== '') {
+    const enabled = params.enabled === true || String(params.enabled).toLowerCase() === 'true'
+    records = records.filter(user => (user.enabled !== false) === enabled)
+  }
   return createMockPage(records.map(publicUser), params)
 }
 

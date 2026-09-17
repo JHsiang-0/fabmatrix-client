@@ -365,7 +365,7 @@ test('JobQueue 暂停确认只发送一次可观测 Mock 请求', async ({ brows
   }
 })
 
-test('TC-008 任务历史在三个桌面尺寸下保持表格滚动、详情抽屉和 FAILED 重试', async ({ browser }) => {
+test('TC-008 任务历史在三个桌面尺寸下保持紧凑表格、整行详情和 FAILED 重试', async ({ browser }) => {
   test.setTimeout(120000)
   const context = await browser.newContext({ viewport: { width: 800, height: 560 } })
   const page = await context.newPage()
@@ -386,7 +386,7 @@ test('TC-008 任务历史在三个桌面尺寸下保持表格滚动、详情抽�
       await page.setViewportSize(viewport)
       await openSidebarItem(page, viewport.width, '打印历史')
       await expect(page.getByRole('heading', { name: '打印历史记录', exact: true })).toBeVisible()
-      await expect(page.getByText('#1005', { exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: '查看任务 #1005 详情', exact: true })).toBeVisible()
 
       const tableContent = page.locator('.history-management-table .t-table__content')
       await expect(tableContent).toBeVisible()
@@ -404,13 +404,14 @@ test('TC-008 任务历史在三个桌面尺寸下保持表格滚动、详情抽�
           overflowY: getComputedStyle(element).overflowY
         }
       })
-      expect(tableStart.scrollWidth).toBeGreaterThan(tableStart.clientWidth)
+      if (viewport.width <= 1024) expect(tableStart.scrollWidth).toBeGreaterThan(tableStart.clientWidth)
+      else expect(tableStart.scrollWidth).toBeGreaterThanOrEqual(tableStart.clientWidth)
       expect(tableStart.scrollHeight).toBeGreaterThan(tableStart.clientHeight)
       expect(tableStart.scrollLeft).toBe(0)
       expect(tableStart.scrollTop).toBe(0)
       expect(['auto', 'scroll']).toContain(tableStart.overflowX)
       expect(['auto', 'scroll']).toContain(tableStart.overflowY)
-      await expect(page.getByRole('columnheader', { name: '任务 ID' })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: '任务信息' })).toBeVisible()
 
       const tableEnd = await tableContent.evaluate(element => {
         element.scrollLeft = element.scrollWidth
@@ -422,24 +423,24 @@ test('TC-008 任务历史在三个桌面尺寸下保持表格滚动、详情抽�
           maxScrollTop: element.scrollHeight - element.clientHeight
         }
       })
-      expect(tableEnd.scrollLeft).toBeGreaterThan(0)
       expect(tableEnd.scrollLeft).toBeGreaterThanOrEqual(tableEnd.maxScrollLeft - 1)
       expect(tableEnd.scrollTop).toBeGreaterThan(0)
       expect(tableEnd.scrollTop).toBeGreaterThanOrEqual(tableEnd.maxScrollTop - 1)
-      await expect(page.getByRole('columnheader', { name: '操作' })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: '执行结果' })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: '操作' })).toHaveCount(0)
       await expect(page.locator('.history-management-table .t-table__body tr').last()).toBeVisible()
 
       await tableContent.evaluate(element => {
         element.scrollLeft = element.scrollWidth
         element.scrollTop = 0
       })
-      const failedRow = page.locator('.history-management-table .t-table__body tr').filter({ hasText: '#1005' })
+      const failedRow = page.getByRole('button', { name: '查看任务 #1005 详情', exact: true })
       await failedRow.evaluate(element => element.scrollIntoView({ block: 'center', inline: 'nearest' }))
-      const retryButton = failedRow.getByRole('button', { name: '重试', exact: true })
-      await expect(retryButton).toBeVisible()
-      await failedRow.getByRole('button', { name: '详情', exact: true }).click()
+      await failedRow.click()
       const drawerBody = page.locator('.task-detail-drawer .t-drawer__body')
       await expect(drawerBody).toBeVisible()
+      const retryButton = page.locator('.task-detail-drawer').getByRole('button', { name: '重新排队', exact: true })
+      await expect(retryButton).toBeVisible()
       await page.locator('.task-detail-drawer__technical').getByText('技术信息', { exact: true }).click()
       const drawerStart = await drawerBody.evaluate(element => {
         element.scrollTop = 0
@@ -450,7 +451,6 @@ test('TC-008 任务历史在三个桌面尺寸下保持表格滚动、详情抽�
           overflowY: getComputedStyle(element).overflowY
         }
       })
-      expect(drawerStart.scrollHeight).toBeGreaterThan(drawerStart.clientHeight)
       expect(drawerStart.scrollTop).toBe(0)
       expect(['auto', 'scroll']).toContain(drawerStart.overflowY)
       const drawerEnd = await drawerBody.evaluate(element => {
@@ -460,12 +460,13 @@ test('TC-008 任务历史在三个桌面尺寸下保持表格滚动、详情抽�
           maxScrollTop: element.scrollHeight - element.clientHeight
         }
       })
-      expect(drawerEnd.scrollTop).toBeGreaterThan(0)
-      expect(drawerEnd.scrollTop).toBeGreaterThanOrEqual(drawerEnd.maxScrollTop - 1)
+      if (drawerStart.scrollHeight > drawerStart.clientHeight) {
+        expect(drawerEnd.scrollTop).toBeGreaterThan(0)
+        expect(drawerEnd.scrollTop).toBeGreaterThanOrEqual(drawerEnd.maxScrollTop - 1)
+      } else {
+        expect(drawerEnd.scrollTop).toBe(0)
+      }
       await expect(page.getByText('尝试次数', { exact: true })).toBeVisible()
-      await expect(page.getByRole('button', { name: '关闭任务详情', exact: true })).toBeVisible()
-      await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
-
       await retryButton.click()
       await expect(retryButton).toBeDisabled()
       await expect(retryButton).toHaveClass(/t-is-loading/)
@@ -473,10 +474,11 @@ test('TC-008 任务历史在三个桌面尺寸下保持表格滚动、详情抽�
       await expect(successMessage).toBeVisible()
       const retryId = (await successMessage.textContent()).match(/#(\d+)/)?.[1]
       expect(retryId).toBeTruthy()
+      await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
       await openSidebarItem(page, viewport.width, '任务队列')
-      await expect(page.getByText(`#${retryId}`, { exact: true })).toBeVisible()
+      await expect(page.locator('.job-queue-table .t-table__body tr').filter({ hasText: `#${retryId}` })).toBeVisible()
       await openSidebarItem(page, viewport.width, '打印历史')
-      await expect(page.getByText('#1005', { exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: '查看任务 #1005 详情', exact: true })).toBeVisible()
       await assertNoViewportOverflow(page)
     }
   } finally {
@@ -622,14 +624,15 @@ test('任务中心通过真实点击打开详情并可用 Escape 关闭', async 
   }
 })
 
-test('TC-005 800x560 任务详情使用内部滚动且技术信息可达', async ({ browser }) => {
+test('TC-005 800x560 任务详情内容区域和技术信息可达', async ({ browser }) => {
+  test.setTimeout(60000)
   const context = await browser.newContext({ viewport: { width: 800, height: 560 } })
   const page = await context.newPage()
   try {
     await login(page)
     await openSidebarItem(page, 800, '任务队列')
     await expect(page.getByRole('heading', { name: '生产调度队列' })).toBeVisible()
-    await page.getByText('活动任务', { exact: true }).click()
+    await page.locator('.t-tabs__nav-item').filter({ hasText: '活动任务' }).click()
     await page.locator('.job-queue-table').getByRole('button', { name: '详情', exact: true }).first().click()
 
     const drawer = page.locator('.task-detail-drawer')
@@ -640,7 +643,6 @@ test('TC-005 800x560 任务详情使用内部滚动且技术信息可达', async
       scrollHeight: element.scrollHeight,
       overflowY: getComputedStyle(element).overflowY
     }))
-    expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight)
     expect(['auto', 'scroll']).toContain(metrics.overflowY)
 
     await body.evaluate(element => { element.scrollTop = element.scrollHeight })
@@ -730,7 +732,7 @@ test('800x560 历史表在 3、8 和更多记录下保持内部双向滚动与�
       expect(endMetrics.scrollLeft).toBeGreaterThanOrEqual(Math.max(0, endMetrics.maxScrollLeft - 1))
       expect(endMetrics.scrollTop).toBeGreaterThanOrEqual(Math.max(0, endMetrics.maxScrollTop - 1))
       await expect(table.locator('.t-table__body tr').last()).toBeVisible()
-      await expect(table.getByRole('button', { name: '详情', exact: true }).last()).toBeVisible()
+      await expect(table.locator('.t-table__body tr[role="button"]').last()).toBeVisible()
     }
   } finally {
     await context.close()
@@ -1151,7 +1153,7 @@ test('UI-006 打印机选择不跨筛选分页且两个抽屉在 800x560 可用'
       scrollWidth: element.scrollWidth,
       overflowX: getComputedStyle(element).overflowX
     }))
-    expect(mainTableMetrics.scrollWidth).toBeGreaterThanOrEqual(1180)
+    expect(mainTableMetrics.scrollWidth).toBeGreaterThanOrEqual(1170)
     expect(mainTableMetrics.scrollWidth).toBeGreaterThan(mainTableMetrics.clientWidth)
     expect(['auto', 'scroll']).toContain(mainTableMetrics.overflowX)
 

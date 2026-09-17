@@ -24,6 +24,14 @@ const TARGET_LABELS = Object.freeze({
   USER: '用户'
 })
 
+export const AUDIT_ACTION_OPTIONS = Object.freeze(
+  Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label }))
+)
+
+export const AUDIT_TARGET_OPTIONS = Object.freeze(
+  Object.entries(TARGET_LABELS).map(([value, label]) => ({ value, label }))
+)
+
 export function getAuditActionLabel(action) {
   const code = String(action || '').trim().toUpperCase()
   return ACTION_LABELS[code] || (code ? '其他操作' : '未记录动作')

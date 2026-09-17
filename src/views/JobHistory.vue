@@ -68,7 +68,7 @@
               <span><search /></span>
               查询
             </t-button>
-            <t-button @click="handleReset">
+            <t-button theme="default" variant="outline" @click="handleReset">
               <span><refresh /></span>
               重置
             </t-button>
@@ -100,30 +100,22 @@
             table-content-width="max-content"
             style="width: 100%"
             class="history-table history-management-table"
+            :row-attributes="getHistoryRowAttributes"
+            :row-class-name="getHistoryRowClassName"
             hover
           >
-        <TdTableColumn prop="id" label="任务 ID" width="130" align="center">
-          <template #default="scope">
-            <t-tooltip :content="`#${getHistoryDisplay(scope.row).jobId}`" class="job-display-tooltip">
-              <span class="job-display__secondary job-display__ellipsis font-mono">#{{ getHistoryDisplay(scope.row).jobId }}</span>
-            </t-tooltip>
-          </template>
-        </TdTableColumn>
-
-        <TdTableColumn label="文件" min-width="220">
+        <TdTableColumn label="任务信息" min-width="260">
           <template #default="scope">
             <div class="job-display-cell">
               <t-tooltip :content="getHistoryDisplay(scope.row).fileName" class="job-display-tooltip">
                 <span class="job-display__primary job-display__ellipsis">{{ getHistoryDisplay(scope.row).fileName }}</span>
               </t-tooltip>
-              <span v-if="getHistoryDisplay(scope.row).fileId" class="job-display__secondary job-display__ellipsis">
-                文件 ID {{ getHistoryDisplay(scope.row).fileId }}
-              </span>
+              <span class="job-display__secondary job-display__ellipsis">任务 #{{ getHistoryDisplay(scope.row).jobId }}</span>
             </div>
           </template>
         </TdTableColumn>
 
-        <TdTableColumn label="打印设备" min-width="210">
+        <TdTableColumn label="打印设备" min-width="200">
           <template #default="scope">
             <div class="job-display-cell">
               <t-tooltip :content="getHistoryDisplay(scope.row).printerName" class="job-display-tooltip">
@@ -132,9 +124,6 @@
               <t-tooltip :content="getHistoryDisplay(scope.row).machineNumber" class="job-display-tooltip">
                 <span class="job-display__secondary job-display__ellipsis">{{ getHistoryDisplay(scope.row).machineNumber }}</span>
               </t-tooltip>
-              <span v-if="getHistoryDisplay(scope.row).printerId" class="job-display__secondary job-display__ellipsis">
-                打印机 ID {{ getHistoryDisplay(scope.row).printerId }}
-              </span>
             </div>
           </template>
         </TdTableColumn>
@@ -152,75 +141,41 @@
           </template>
         </TdTableColumn>
 
-        <TdTableColumn prop="status" label="状态" width="120" align="center">
+        <TdTableColumn prop="status" label="执行结果" min-width="230">
           <template #default="scope">
-            <StatusTag domain="job" :status="scope.row.status" />
-          </template>
-        </TdTableColumn>
-
-        <TdTableColumn prop="progress" label="打印进度" width="140" align="center">
-          <template #default="scope">
-            <t-progress
-              v-if="hasValue(scope.row.progress)"
-              :percentage="scope.row.progress"
-              :status="getProgressStatus(scope.row.status, scope.row.progress)"
-              :stroke-width="6"
-              :label="true"
-            />
-            <span v-else>-</span>
-          </template>
-        </TdTableColumn>
-
-        <TdTableColumn label="创建时间" min-width="160" prop="createdAt" align="center">
-          <template #default="scope">
-            <div class="flex items-center justify-center gap-2 text-sm text-gray-600">
-              <span><clock /></span>
-              <span>{{ formatDateTime(scope.row.createdAt) }}</span>
+            <div class="history-result-cell">
+              <div class="history-result-cell__heading">
+                <StatusTag domain="job" :status="scope.row.status" />
+                <span v-if="hasValue(scope.row.progress)" class="job-display__secondary">{{ scope.row.progress }}%</span>
+              </div>
+              <t-progress
+                v-if="hasValue(scope.row.progress)"
+                :percentage="scope.row.progress"
+                :status="getProgressStatus(scope.row.status, scope.row.progress)"
+                :stroke-width="4"
+                :label="false"
+              />
+              <t-tooltip v-if="scope.row.errorReason" :content="String(scope.row.errorReason)" class="job-display-tooltip">
+                <span class="job-display__error job-display__ellipsis">{{ scope.row.errorReason }}</span>
+              </t-tooltip>
             </div>
           </template>
         </TdTableColumn>
 
-        <TdTableColumn label="结束时间" min-width="160" prop="completedAt" align="center">
+        <TdTableColumn label="时间" min-width="210" prop="createdAt">
           <template #default="scope">
-            <div class="flex items-center justify-center gap-2 text-sm text-gray-600">
-              <span><timer /></span>
-              <span>{{ scope.row.completedAt ? formatDateTime(scope.row.completedAt) : '-' }}</span>
+            <div class="history-time-cell">
+              <span class="history-time-cell__item"><clock />创建 {{ formatDateTime(scope.row.createdAt) }}</span>
+              <span class="history-time-cell__item"><timer />结束 {{ scope.row.completedAt ? formatDateTime(scope.row.completedAt) : '-' }}</span>
             </div>
-          </template>
-        </TdTableColumn>
-
-        <TdTableColumn prop="errorReason" label="报错原因" min-width="180" show-overflow-tooltip>
-          <template #default="scope">
-            <t-tooltip v-if="scope.row.errorReason" :content="String(scope.row.errorReason)" class="job-display-tooltip">
-              <span class="job-display__error job-display__ellipsis">{{ scope.row.errorReason }}</span>
-            </t-tooltip>
-            <span v-else class="job-display__secondary">-</span>
-          </template>
-        </TdTableColumn>
-
-        <TdTableColumn label="操作" width="160" align="center" fixed="right">
-          <template #default="scope">
-            <t-space size="small" class="task-action-group" @mousedown.stop @click.stop>
-              <t-button size="small" variant="text" @click.stop="openTaskDetail(scope.row)">详情</t-button>
-              <t-button
-                v-if="scope.row.status === 'FAILED'"
-                size="small"
-                variant="text"
-                theme="warning"
-                :loading="isActionLoading('retry', scope.row)"
-                :disabled="actionLoadingKey !== ''"
-                @click.stop="handleRetry(scope.row)"
-              >
-                重试
-              </t-button>
-            </t-space>
           </template>
         </TdTableColumn>
           </TdTable>
         </div>
 
         <!-- 底部分页区 -->
-        <div class="history-pagination-footer mt-4 flex justify-center px-4">
+        <div class="history-pagination-footer">
+          <span class="history-pagination-footer__summary">共 <strong>{{ pagination.total }}</strong> 条历史记录</span>
           <t-pagination
             v-model:current="pagination.pageNum"
             v-model:pageSize="pagination.pageSize"
@@ -239,8 +194,10 @@
       :reconcile-loading="reconcileSubmitting"
       :reconcile-success-key="reconcileSuccessKey"
       :reconcile-stale="reconcileStale"
+      :retry-loading="isActionLoading('retry', selectedJob)"
       @update:model-value="handleTaskDetailVisibility"
       @reconcile="handleReconcile"
+      @retry="handleRetry(selectedJob)"
     />
   </div>
 </template>
@@ -304,6 +261,27 @@ const openTaskDetail = job => {
   }).catch(() => {
     // 保留列表中的真实任务数据，详情请求错误由请求层统一提示。
   })
+}
+
+const getHistoryRowClassName = ({ row, type }) => {
+  if (type !== 'body') return ''
+  return selectedJob.value && String(selectedJob.value.id) === String(row.id)
+    ? 'history-table-row history-table-row--selected'
+    : 'history-table-row'
+}
+
+const getHistoryRowAttributes = ({ row, type }) => {
+  if (type !== 'body') return {}
+  return {
+    tabindex: 0,
+    role: 'button',
+    'aria-label': `查看任务 #${row.id} 详情`,
+    onKeydown: event => {
+      if (!['Enter', ' '].includes(event.key)) return
+      event.preventDefault()
+      openTaskDetail(row)
+    }
+  }
 }
 
 const handleTaskDetailVisibility = visible => {
@@ -647,6 +625,7 @@ loadCreatorOptions()
 }
 
 .history-management-table :deep(.t-table__body tr) {
+  cursor: pointer;
   transition: background-color 160ms ease;
 }
 
@@ -656,6 +635,20 @@ loadCreatorOptions()
 
 .history-management-table :deep(.t-table__body tr:hover > td:first-child) {
   box-shadow: inset 3px 0 0 var(--td-brand-color);
+}
+
+.history-management-table :deep(.history-table-row--selected > td),
+.history-management-table :deep(.history-table-row:focus > td) {
+  background: var(--app-primary-light);
+}
+
+.history-management-table :deep(.history-table-row--selected > td:first-child),
+.history-management-table :deep(.history-table-row:focus > td:first-child) {
+  box-shadow: inset 3px 0 0 var(--td-brand-color);
+}
+
+.history-management-table :deep(.history-table-row:focus) {
+  outline: none;
 }
 
 .job-display-cell {
@@ -694,10 +687,64 @@ loadCreatorOptions()
   font-size: var(--td-font-size-body-small);
 }
 
-.history-pagination-footer {
+.history-result-cell,
+.history-time-cell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.history-result-cell__heading,
+.history-time-cell__item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.history-result-cell__heading {
+  justify-content: space-between;
+  gap: var(--app-spacing-2);
+}
+
+.history-result-cell :deep(.t-progress) {
+  width: 100%;
+}
+
+.history-time-cell__item {
+  gap: var(--app-spacing-1);
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+  white-space: nowrap;
+}
+
+.history-time-cell__item :deep(svg) {
+  width: 14px;
+  height: 14px;
   flex: 0 0 auto;
-  padding-top: var(--app-spacing-1);
+}
+
+.history-pagination-footer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-spacing-4);
+  min-width: 0;
+  margin-top: var(--app-spacing-3);
+  padding: var(--app-spacing-3) var(--app-spacing-2) 0;
   border-top: 1px solid var(--app-border);
+}
+
+.history-pagination-footer__summary {
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+  white-space: nowrap;
+}
+
+.history-pagination-footer__summary strong {
+  color: var(--app-text-primary);
 }
 
 @media (max-width: 900px) {
@@ -752,6 +799,11 @@ loadCreatorOptions()
 
   .history-filter-toolbar :deep(.flex.items-center.gap-2.ml-auto) > * {
     flex: 1 1 0;
+  }
+
+  .history-pagination-footer {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

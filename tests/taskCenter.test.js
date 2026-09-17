@@ -134,7 +134,8 @@ test('任务中心视觉适配保留 TDesign 分区、表格反馈和详情核�
   assert.match(historySource, /class="history-content"/)
   assert.match(historySource, /class="history-table-wrapper"/)
   assert.match(historySource, /class="history-table history-management-table"/)
-  assert.match(historySource, /class="history-pagination-footer mt-4 flex justify-center px-4"/)
+  assert.match(historySource, /class="history-pagination-footer"/)
+  assert.match(historySource, /class="history-pagination-footer__summary"/)
   assert.match(historySource, /history-inline-error/)
   assert.match(historySource, /\bhover\b/)
 

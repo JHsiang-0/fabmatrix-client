@@ -7,6 +7,7 @@ import { mockState, resetMockState } from '../src/mock/data.js'
 
 const queueSource = fs.readFileSync(new URL('../src/views/JobQueue.vue', import.meta.url), 'utf8')
 const historySource = fs.readFileSync(new URL('../src/views/JobHistory.vue', import.meta.url), 'utf8')
+const detailSource = fs.readFileSync(new URL('../src/components/TaskDetailDrawer.vue', import.meta.url), 'utf8')
 const request = (method, url, data, headers) => mockRequest({ method, url, data, headers })
 const headers = { Authorization: 'Bearer job-display-session' }
 
@@ -181,22 +182,25 @@ test('详情适配器以打印机整体关联决定来源，部分快照不会�
   assert.equal(unassigned.sources.machineNumber, '未分配')
 })
 
-test('800×560 窄视口保留组件视口、内部横向滚动和固定操作列（静态 DOM/CSS 护栏）', () => {
+test('800×560 窄视口保留组件视口与内部横向滚动，队列固定操作列且历史整行进入详情', () => {
   for (const source of [queueSource, historySource]) {
     assert.match(source, /<t-tooltip/)
     assert.match(source, /job-display__ellipsis/)
     assert.match(source, /table-content-width="max-content"/)
     assert.match(source, /style="width: 100%"/)
-    assert.match(source, /fixed="right"/)
     assert.match(source, /\.t-table__content[\s\S]*overflow-x: auto/)
     assert.match(source, /\.t-table__content[\s\S]*width: 100%[\s\S]*min-width: 0[\s\S]*max-width: 100%/)
   }
+  assert.match(queueSource, /fixed="right"/)
+  assert.doesNotMatch(historySource, /fixed="right"/)
+  assert.match(historySource, /@row-click="openTaskDetail"/)
+  assert.match(historySource, /:row-attributes="getHistoryRowAttributes"/)
   assert.match(queueSource, /\.job-queue-table :deep\(\.t-table\)\s*\{[\s\S]*width: 100%[\s\S]*min-width: 0/)
   assert.match(historySource, /\.history-management-table :deep\(\.t-table\)\s*\{[\s\S]*width: 100%[\s\S]*min-width: 0/)
   assert.doesNotMatch(queueSource, /\.job-queue-table :deep\(\.t-table\)\s*\{[^}]*min-width:\s*\d+px/)
   assert.doesNotMatch(historySource, /\.history-management-table :deep\(\.t-table\)\s*\{[^}]*min-width:\s*\d+px/)
   assert.match(historySource, /class="history-table-wrapper"[\s\S]*height="100%"/)
-  assert.match(historySource, /报错原因[\s\S]*<t-tooltip[\s\S]*String\(scope\.row\.errorReason\)/)
+  assert.match(historySource, /<t-tooltip v-if="scope\.row\.errorReason"[\s\S]*String\(scope\.row\.errorReason\)/)
 })
 
 test('JobQueue 行内控件阻止冒泡，静态护栏覆盖选择、分配和更多菜单', () => {
@@ -207,12 +211,14 @@ test('JobQueue 行内控件阻止冒泡，静态护栏覆盖选择、分配和�
   assert.match(queueSource, /@click\.stop="openTaskDetail\(scope\.row\)"/)
 })
 
-test('历史列表保留详情入口，并只为 FAILED 提供重试操作', () => {
-  assert.match(historySource, /<t-button size="small" variant="text" @click\.stop="openTaskDetail\(scope\.row\)">详情<\/t-button>/)
+test('历史列表整行进入详情，并把 FAILED 重试操作迁移到详情抽屉', () => {
+  assert.match(historySource, /@row-click="openTaskDetail"/)
+  assert.match(historySource, /role: 'button'/)
+  assert.match(historySource, /\['Enter', ' '\]/)
+  assert.doesNotMatch(historySource, /<TdTableColumn label="操作"/)
   assert.match(historySource, /TaskTimeIcon as Timer/)
   assert.match(historySource, /<timer \/>/)
   for (const pattern of [
-    />\s*重新排队\s*</,
     />\s*暂停打印\s*</,
     />\s*恢复打印\s*</,
     />\s*取消\s*</,
@@ -222,7 +228,9 @@ test('历史列表保留详情入口，并只为 FAILED 提供重试操作', () 
   ]) {
     assert.doesNotMatch(historySource, pattern)
   }
-  assert.match(historySource, /v-if="scope\.row\.status === 'FAILED'"/)
+  assert.match(detailSource, /showRetryFooter/)
+  assert.match(detailSource, />\s*重新排队\s*</)
+  assert.match(detailSource, /emit\('retry'\)/)
   assert.match(historySource, /retryJob\(job\.id\)/)
 })
 

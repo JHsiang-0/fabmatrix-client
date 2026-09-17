@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mockRequest } from '../src/mock/index.js'
 import { mockState, resetMockState } from '../src/mock/data.js'
 
-const request = (method, url, data, headers) => mockRequest({ method, url, data, headers })
+const request = (method, url, data, headers, params) => mockRequest({ method, url, data, headers, params })
 const adminHeaders = { Authorization: 'Bearer user-management-admin' }
 const operatorHeaders = { Authorization: 'Bearer user-management-operator' }
 
@@ -69,4 +69,16 @@ test('protects the current administrator and only creates operators', async () =
   const user = mockState.users.find(item => item.id === created.data)
   assert.equal(user.role, 'OPERATOR')
   assert.equal(user.enabled, true)
+})
+
+test('admin user page applies role, identity and enabled filters together', async () => {
+  resetMockState()
+  mockState.sessions['user-management-admin'] = { userId: 1, username: 'admin', role: 'ADMIN' }
+  mockState.users.find(user => String(user.id) === '2').enabled = false
+
+  const disabled = await request('GET', '/api/v1/auth/admin/users', undefined, adminHeaders, {
+    enabled: false
+  })
+  assert.equal(disabled.data.records.length, 1)
+  assert.equal(disabled.data.records[0].username, 'operator')
 })

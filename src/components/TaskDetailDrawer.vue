@@ -4,7 +4,7 @@
     :destroy-on-close="true"
     :close-btn="false"
     :close-on-esc-keydown="true"
-    :footer="showReconcileFooter"
+    :footer="showActionFooter"
     size="min(560px, 100vw)"
     class="task-detail-drawer"
     @close="handleClose"
@@ -191,6 +191,20 @@
           人工核对
         </t-button>
       </div>
+      <div v-else-if="showRetryFooter" class="task-detail-drawer__footer">
+        <div>
+          <strong>任务执行失败</strong>
+          <span>确认原因后，可基于当前任务创建新的排队任务</span>
+        </div>
+        <t-button
+          theme="warning"
+          :loading="retryLoading"
+          :disabled="retryLoading"
+          @click="emit('retry')"
+        >
+          重新排队
+        </t-button>
+      </div>
     </template>
   </t-drawer>
 
@@ -246,10 +260,11 @@ const props = defineProps({
   error: { type: String, default: '' },
   reconcileLoading: { type: Boolean, default: false },
   reconcileSuccessKey: { type: [String, Number], default: 0 },
-  reconcileStale: { type: Boolean, default: false }
+  reconcileStale: { type: Boolean, default: false },
+  retryLoading: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['update:modelValue', 'reconcile'])
+const emit = defineEmits(['update:modelValue', 'reconcile', 'retry'])
 
 const drawerVisible = computed({
   get: () => props.modelValue,
@@ -260,6 +275,8 @@ const isTerminal = computed(() => ['COMPLETED', 'FAILED', 'CANCELLED'].includes(
 const detailDisplay = computed(() => getJobDetailDisplay(props.task || {}, isTerminal.value ? 'history' : 'current'))
 const statusView = computed(() => getStatusView('job', props.task?.status))
 const showReconcileFooter = computed(() => props.task?.status === 'RECONCILING')
+const showRetryFooter = computed(() => props.task?.status === 'FAILED')
+const showActionFooter = computed(() => showReconcileFooter.value || showRetryFooter.value)
 
 const priorityLabel = computed(() => {
   const priority = Number(props.task?.priority)

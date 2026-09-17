@@ -35,7 +35,7 @@ test('异步状态和批量文件操作提供 TDesign 状态语义与操作中�
   assert.match(fileSource, /const ids = selectedIds\.value\.slice\(\)/)
   assert.match(queueSource, /value: 'cancel'/)
   assert.match(userSource, /<t-form[\s\S]*label="用户名"/)
-  assert.match(auditSource, /<t-form[\s\S]*label="时间范围"/)
+  assert.match(auditSource, /<QueryToolbar[\s\S]*audit-filter-field__label">时间范围/)
 })
 
 test('请求层保留统一错误上下文并覆盖标准错误码', () => {

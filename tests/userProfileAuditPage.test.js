@@ -22,6 +22,17 @@ test('用户管理覆盖正式筛选、完整表单规则、编辑和当前管�
   assert.doesNotMatch(userSource, /X-Admin-Secret/)
 })
 
+test('用户管理使用紧凑筛选和可读信息列，并保留明确的账号操作', () => {
+  assert.match(userSource, /<QueryToolbar class="user-filter-toolbar"/)
+  assert.match(userSource, /<TdTableColumn prop="username" label="用户信息"/)
+  assert.match(userSource, /<TdTableColumn prop="email" label="联系方式"/)
+  assert.doesNotMatch(userSource, /<TdTableColumn prop="id" label="ID"/)
+  assert.match(userSource, /getRoleLabel\(row\.role\)/)
+  assert.match(userSource, /label="操作" width="176" align="center" fixed="right"/)
+  assert.match(userSource, /class="user-management-footer__summary"/)
+  assert.match(userSource, /\.user-management-table :deep\(\.t-table__body tr:hover > td\)/)
+})
+
 test('个人中心使用真实资料接口、脏状态取消和改密后重新登录', () => {
   assert.match(profileSource, /<PageHeader title="个人中心"/)
   assert.match(profileSource, /profileSaveError/)
@@ -62,11 +73,24 @@ test('个人中心和审计页面使用 TDesign 视觉容器并保护响应式�
   assert.match(profileSource, /profile-password-hint/)
   assert.match(profileSource, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
   assert.match(auditSource, /<t-card bordered hover-shadow class="app-page-card management-card audit-log-card"/)
-  assert.match(auditSource, /audit-filter-form/)
+  assert.match(auditSource, /audit-filter-toolbar/)
+  assert.match(auditSource, /showAdvancedFilters/)
   assert.match(auditSource, /audit-log-table/)
   assert.match(auditSource, /audit-cell__text/)
   assert.match(auditSource, /audit-detail-drawer/)
   assert.match(auditSource, /audit-log-pagination/)
+})
+
+test('操作日志使用可读筛选、整行详情和紧凑管理表格', () => {
+  assert.match(auditSource, /AUDIT_ACTION_OPTIONS/)
+  assert.match(auditSource, /AUDIT_TARGET_OPTIONS/)
+  assert.match(auditSource, /showAdvancedFilters/)
+  assert.match(auditSource, /:row-attributes="getAuditRowAttributes"/)
+  assert.match(auditSource, /@row-click="openDetail"/)
+  assert.doesNotMatch(auditSource, /<TdTableColumn label="详情"/)
+  assert.doesNotMatch(auditSource, />查看<\/t-button>/)
+  assert.match(auditSource, /class="audit-log-footer__summary"/)
+  assert.match(auditSource, /\.audit-log-table :deep\(\.t-table__body tr:hover > td\)/)
 })
 
 test('全局 Header 显示真实实时连接状态并提供恢复入口', () => {
