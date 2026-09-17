@@ -16,15 +16,21 @@
             <t-tooltip :content="detailDisplay.fileName" class="task-detail-drawer__name-tooltip">
               <span class="task-detail-drawer__title">{{ detailDisplay.fileName }}</span>
             </t-tooltip>
-            <StatusTag domain="job" :status="task.status" />
           </div>
           <span v-else class="task-detail-drawer__title">任务详情</span>
           <span v-if="task" class="task-detail-drawer__subtitle">
             任务 #{{ formatTechnicalValue(task.id) }}
           </span>
         </div>
-        <t-button variant="text" shape="square" aria-label="关闭任务详情" @click="handleClose">
-          <Close />
+        <t-button
+          class="task-detail-drawer__close"
+          variant="text"
+          shape="square"
+          size="large"
+          aria-label="关闭任务详情"
+          @click="handleClose"
+        >
+          <Close size="20px" />
         </t-button>
       </div>
     </template>
@@ -149,21 +155,54 @@
           <t-empty v-else description="暂无时间记录" />
         </section>
 
-        <t-collapse class="task-detail-drawer__technical" :default-value="[]">
+        <t-collapse class="task-detail-drawer__technical" :default-value="[]" borderless>
           <t-collapse-panel value="technical" header="技术信息">
-            <t-descriptions class="task-detail-drawer__technical-descriptions" bordered :column="1" size="small">
-              <t-descriptions-item label="任务 ID">{{ formatTechnicalValue(task.id) }}</t-descriptions-item>
-              <t-descriptions-item label="文件 ID">{{ formatTechnicalValue(task.fileId) }}</t-descriptions-item>
-              <t-descriptions-item label="打印机 ID">{{ formatTechnicalValue(task.printerId) }}</t-descriptions-item>
-              <t-descriptions-item label="发起用户 ID">{{ formatTechnicalValue(task.userId) }}</t-descriptions-item>
-              <t-descriptions-item label="现场操作员 ID">{{ formatTechnicalValue(task.operatorId) }}</t-descriptions-item>
-              <t-descriptions-item label="重试来源任务 ID">{{ formatTechnicalValue(task.retryOfJobId) }}</t-descriptions-item>
-              <t-descriptions-item label="根任务 ID">{{ formatTechnicalValue(task.rootJobId) }}</t-descriptions-item>
-              <t-descriptions-item label="尝试次数">{{ formatValue(task.attemptNumber) }}</t-descriptions-item>
-              <t-descriptions-item v-if="hasValue(task.idempotencyKey)" label="幂等键">{{ formatTechnicalValue(task.idempotencyKey) }}</t-descriptions-item>
-              <t-descriptions-item v-if="hasValue(task.eventId)" label="事件 ID">{{ formatTechnicalValue(task.eventId) }}</t-descriptions-item>
-              <t-descriptions-item v-if="hasValue(task.sequence)" label="事件序号">{{ formatTechnicalValue(task.sequence) }}</t-descriptions-item>
-            </t-descriptions>
+            <div class="task-detail-drawer__technical-grid">
+              <div class="task-detail-drawer__technical-item">
+                <span>任务 ID</span>
+                <strong>{{ formatTechnicalValue(task.id) }}</strong>
+              </div>
+              <div class="task-detail-drawer__technical-item">
+                <span>文件 ID</span>
+                <strong>{{ formatTechnicalValue(task.fileId) }}</strong>
+              </div>
+              <div class="task-detail-drawer__technical-item">
+                <span>打印机 ID</span>
+                <strong>{{ formatTechnicalValue(task.printerId) }}</strong>
+              </div>
+              <div class="task-detail-drawer__technical-item">
+                <span>发起用户 ID</span>
+                <strong>{{ formatTechnicalValue(task.userId) }}</strong>
+              </div>
+              <div class="task-detail-drawer__technical-item">
+                <span>现场操作员 ID</span>
+                <strong>{{ formatTechnicalValue(task.operatorId) }}</strong>
+              </div>
+              <div class="task-detail-drawer__technical-item">
+                <span>重试来源任务 ID</span>
+                <strong>{{ formatTechnicalValue(task.retryOfJobId) }}</strong>
+              </div>
+              <div class="task-detail-drawer__technical-item">
+                <span>根任务 ID</span>
+                <strong>{{ formatTechnicalValue(task.rootJobId) }}</strong>
+              </div>
+              <div class="task-detail-drawer__technical-item">
+                <span>尝试次数</span>
+                <strong>{{ formatValue(task.attemptNumber) }}</strong>
+              </div>
+              <div v-if="hasValue(task.idempotencyKey)" class="task-detail-drawer__technical-item">
+                <span>幂等键</span>
+                <strong>{{ formatTechnicalValue(task.idempotencyKey) }}</strong>
+              </div>
+              <div v-if="hasValue(task.eventId)" class="task-detail-drawer__technical-item">
+                <span>事件 ID</span>
+                <strong>{{ formatTechnicalValue(task.eventId) }}</strong>
+              </div>
+              <div v-if="hasValue(task.sequence)" class="task-detail-drawer__technical-item">
+                <span>事件序号</span>
+                <strong>{{ formatTechnicalValue(task.sequence) }}</strong>
+              </div>
+            </div>
           </t-collapse-panel>
         </t-collapse>
       </template>
@@ -251,7 +290,6 @@ import { CloseIcon as Close } from 'tdesign-icons-vue-next'
 import { formatDateTime } from '@/utils/formatters'
 import { getJobDetailDisplay, JOB_DISPLAY_SOURCE } from '@/utils/jobDisplay'
 import { getStatusView } from '@/utils/statusView'
-import StatusTag from './StatusTag.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -415,7 +453,7 @@ const submitReconcile = async () => {
 
 .task-detail-drawer__header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   width: 100%;
   min-width: 0;
@@ -435,6 +473,24 @@ const submitReconcile = async () => {
   align-items: center;
   min-width: 0;
   gap: var(--app-spacing-2);
+}
+
+.task-detail-drawer__close {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  color: var(--app-text-secondary);
+  border-radius: var(--app-radius);
+}
+
+.task-detail-drawer__close :deep(.t-icon) {
+  width: 22px;
+  height: 22px;
+}
+
+.task-detail-drawer__close:hover {
+  color: var(--app-text-primary);
+  background: var(--app-surface-hover);
 }
 
 .task-detail-drawer__name-tooltip,
@@ -631,19 +687,53 @@ const submitReconcile = async () => {
 
 .task-detail-drawer__technical {
   flex-shrink: 0;
-}
-
-.task-detail-drawer__technical-descriptions {
-  min-width: 0;
   overflow: hidden;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
   border-radius: var(--app-radius);
 }
 
-.task-detail-drawer__technical-descriptions :deep(.t-descriptions__label),
-.task-detail-drawer__technical-descriptions :deep(.t-descriptions__content) {
+.task-detail-drawer__technical :deep(.t-collapse-panel__header) {
+  min-height: 44px;
+  padding: var(--app-spacing-2) var(--app-spacing-3);
+  background: var(--app-surface);
+}
+
+.task-detail-drawer__technical :deep(.t-collapse-panel__content) {
+  padding: 0 var(--app-spacing-3) var(--app-spacing-3);
+}
+
+.task-detail-drawer__technical-grid {
+  display: grid;
   min-width: 0;
-  max-width: 100%;
-  vertical-align: top;
+  padding-top: var(--app-spacing-2);
+  border-top: 1px solid var(--app-border);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--app-spacing-5);
+  row-gap: var(--app-spacing-1);
+}
+
+.task-detail-drawer__technical-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+  gap: var(--app-spacing-2);
+  padding: var(--app-spacing-1) 0;
+}
+
+.task-detail-drawer__technical-item span {
+  flex: 0 0 auto;
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+}
+
+.task-detail-drawer__technical-item strong {
+  min-width: 0;
+  color: var(--app-text-primary);
+  font-size: var(--td-font-size-body-small);
+  font-weight: 500;
+  text-align: right;
   overflow-wrap: anywhere;
 }
 
@@ -668,7 +758,8 @@ const submitReconcile = async () => {
 @media (max-width: 600px) {
   .task-detail-drawer__resource-grid,
   .task-detail-drawer__people-grid,
-  .task-detail-drawer__timeline-grid {
+  .task-detail-drawer__timeline-grid,
+  .task-detail-drawer__technical-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 

@@ -62,9 +62,13 @@ test('任务详情只展示后端任务字段并对缺失值使用占位', () =>
 test('任务详情标题和技术信息遵循可读优先、默认折叠与长文本安全契约', () => {
   assert.match(detailSource, /<t-tooltip[^>]+task-detail-drawer__name-tooltip/)
   assert.match(detailSource, /detailDisplay\.fileName/)
-  assert.match(detailSource, /<StatusTag domain="job" :status="task\.status" \/>/)
+  assert.doesNotMatch(detailSource, /<StatusTag domain="job" :status="task\.status" \/>/)
+  assert.match(detailSource, /class="task-detail-drawer__close"[\s\S]*size="large"/)
   assert.match(detailSource, /<t-collapse[^>]+task-detail-drawer__technical/)
   assert.match(detailSource, /:default-value="\[\]"/)
+  assert.match(detailSource, /class="task-detail-drawer__technical-grid"/)
+  assert.doesNotMatch(detailSource, /task-detail-drawer__technical-descriptions/)
+  assert.doesNotMatch(detailSource, /<t-descriptions/)
   assert.match(detailSource, /技术信息/)
   for (const field of ['task.id', 'task.fileId', 'task.printerId', 'task.userId', 'task.operatorId', 'task.retryOfJobId', 'task.rootJobId', 'task.attemptNumber']) {
     assert.match(detailSource, new RegExp(`format(?:Technical)?Value\\(${field}\\)`))
