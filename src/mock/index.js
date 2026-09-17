@@ -199,6 +199,7 @@ const toMockJobSummary = job => {
     fileName: printableFile?.originalName ?? null,
     printerName: printer?.name ?? null,
     machineNumber: printer?.machineNumber ?? null,
+    safeToPrint: sameMockId(printer?.currentJobId, job?.id) && printer?.isSafeToPrint === true,
     creatorUsername: creator?.username ?? null,
     operatorUsername: operator?.username ?? null,
     materialType: printableFile?.materialType ?? null,

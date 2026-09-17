@@ -221,6 +221,7 @@ export function getJobPage(params = {}) {
  * @property {string} [fileName] - 当前文件名称；关联文件缺失时为 null
  * @property {string} [printerName] - 当前打印机名称；未分配或关联打印机缺失时为 null
  * @property {string} [machineNumber] - 当前机器编号；关联打印机缺失时为 null
+ * @property {boolean} [safeToPrint] - 当前任务是否已完成现场安全确认
  * @property {string} [creatorUsername] - 创建人用户名；关联用户缺失时为 null
  * @property {string} [operatorUsername] - 操作员用户名；关联用户缺失时为 null
  * @property {string} [materialType] - 文件摘要中的耗材类型

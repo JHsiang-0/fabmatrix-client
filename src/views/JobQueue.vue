@@ -234,7 +234,6 @@
         <TdTableColumn label="操作" width="224" align="center" fixed="right">
           <template #default="scope">
             <t-space size="small" class="task-action-group" @mousedown.stop @click.stop>
-              <t-button class="task-action-button" size="small" theme="default" variant="base" @click.stop="openTaskDetail(scope.row)">详情</t-button>
               <t-button
                 v-if="getActivePrimaryAction(scope.row)"
                 class="task-action-button"
@@ -295,44 +294,48 @@
         />
       </div>
 
-      <t-form label-width="100px">
+      <t-form label-width="100px" class="assign-dialog__form">
         <t-form-item label="空闲打印机">
-          <t-select
-            v-model="selectedPrinterId"
-            placeholder="请选择可用的打印机"
-            style="width: 100%"
-            :loading="loadingPrinters"
-          >
-            <t-option
-              v-for="printer in idlePrinters"
-              :key="printer.id"
-              :label="`${printer.name} (${printer.ipAddress})`"
-              :value="printer.id"
+          <div class="assign-dialog__control">
+            <t-select
+              v-model="selectedPrinterId"
+              placeholder="请选择可用的打印机"
+              style="width: 100%"
+              :loading="loadingPrinters"
             >
-              <div class="flex flex-col py-2">
-                <span class="font-medium text-gray-900">{{ printer.name }}</span>
-                <span class="text-sm text-gray-600 mt-0.5">IP: {{ printer.ipAddress }} | 耗材: {{ printer.currentMaterial }}</span>
-              </div>
-            </t-option>
-          </t-select>
+              <t-option
+                v-for="printer in idlePrinters"
+                :key="printer.id"
+                :label="`${printer.name} (${printer.ipAddress})`"
+                :value="printer.id"
+              >
+                <div class="flex flex-col py-2">
+                  <span class="font-medium text-gray-900">{{ printer.name }}</span>
+                  <span class="text-sm text-gray-600 mt-0.5">IP: {{ printer.ipAddress }} | 耗材: {{ printer.currentMaterial }}</span>
+                </div>
+              </t-option>
+            </t-select>
 
-          <t-alert
-            v-if="idlePrinters.length === 0 && !loadingPrinters"
-            title="当前没有空闲的打印机，请等待其他任务完成" theme="warning"
-            :close-btn="false"
-
-            class="mt-3"
-          />
-          <t-alert
-            v-else-if="assignWarnings.length"
-            theme="warning"
-            title="打印参数不一致提醒"
-            :close-btn="false"
-            class="mt-3"
-          >
-            <div v-for="warning in assignWarnings" :key="warning">{{ warning }}</div>
-            <div class="mt-1">仅作风险提醒，不会阻止任务分配；请确认现场已更换或接受当前喷嘴/耗材。</div>
-          </t-alert>
+            <t-alert
+              v-if="idlePrinters.length === 0 && !loadingPrinters"
+              title="当前没有空闲的打印机，请等待其他任务完成"
+              theme="warning"
+              :close-btn="false"
+              class="assign-dialog__alert"
+            />
+            <t-alert
+              v-else-if="assignWarnings.length"
+              theme="warning"
+              title="打印参数不一致提醒"
+              :close-btn="false"
+              class="assign-dialog__alert"
+            >
+              <ul class="assign-dialog__warning-list">
+                <li v-for="warning in assignWarnings" :key="warning">{{ warning }}</li>
+              </ul>
+              <p class="assign-dialog__warning-hint">仅作风险提醒，不会阻止任务分配。请确认现场已更换，或接受当前喷嘴与耗材配置。</p>
+            </t-alert>
+          </div>
         </t-form-item>
       </t-form>
 
@@ -899,10 +902,6 @@ const getActiveActionOptions = job => {
   }
   if (job.status === 'ASSIGNED') options.push({ content: '上传文件', value: 'upload', theme: 'primary' })
   if (['ASSIGNED', 'READY'].includes(job.status)) options.push({ content: '重新排队', value: 'requeue' })
-  if (['ASSIGNED', 'READY'].includes(job.status) && job.printerId) {
-    options.push({ content: '确认安全', value: 'confirm-safe', theme: 'warning' })
-    options.push({ content: '启动打印', value: 'start', theme: 'success' })
-  }
   if (job.status === 'PRINTING' && job.printerId) options.push({ content: '暂停打印', value: 'pause', theme: 'warning' })
   if (job.status === 'PAUSED' && job.printerId) options.push({ content: '恢复打印', value: 'resume', theme: 'success' })
   if (canCancel(job.status)) options.push({ content: '取消任务', value: 'cancel', theme: 'error' })
@@ -913,8 +912,11 @@ const getActiveActionOptions = job => {
 
 const getActivePrimaryAction = job => {
   if (job.status === 'RECONCILING') return { content: '人工核对', value: 'reconcile', theme: 'warning' }
-  if (job.status === 'ASSIGNED') return { content: '上传文件', value: 'upload', theme: 'primary' }
-  if (job.status === 'READY') return { content: '启动打印', value: 'start', theme: 'success' }
+  if (['ASSIGNED', 'READY'].includes(job.status) && job.printerId) {
+    return job.safeToPrint === true
+      ? { content: '开始打印', value: 'start', theme: 'success' }
+      : { content: '确认安全', value: 'confirm-safe', theme: 'warning' }
+  }
   if (job.status === 'PRINTING') return { content: '暂停打印', value: 'pause', theme: 'warning' }
   if (job.status === 'PAUSED') return { content: '恢复打印', value: 'resume', theme: 'success' }
   return null
@@ -1329,6 +1331,39 @@ onMounted(() => {
 .job-queue-page :deep(.t-dialog__body) {
   max-height: min(60vh, 520px);
   overflow-y: auto;
+}
+
+.assign-dialog__control {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: var(--app-spacing-3);
+}
+
+.assign-dialog__form :deep(.t-form__controls-content) {
+  min-width: 0;
+}
+
+.assign-dialog__alert {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.assign-dialog__alert :deep(.t-alert__content) {
+  min-width: 0;
+}
+
+.assign-dialog__warning-list {
+  display: grid;
+  margin: 0;
+  padding-left: 18px;
+  gap: var(--app-spacing-1);
+}
+
+.assign-dialog__warning-hint {
+  margin: var(--app-spacing-2) 0 0;
+  color: var(--app-text-secondary);
+  line-height: 1.6;
 }
 
 @media (max-width: 900px) {

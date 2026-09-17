@@ -41,6 +41,27 @@ test('活动任务列表为待人工核对任务提供可发现的操作入口',
   assert.match(queueSource, /case 'reconcile': return openTaskDetail\(job\)/)
 })
 
+test('活动任务主操作按持久化安全确认状态切换且详情由行点击承载', () => {
+  const activePanel = queueSource.slice(
+    queueSource.indexOf('<t-tab-panel value="active"'),
+    queueSource.indexOf('</t-tab-panel>', queueSource.indexOf('<t-tab-panel value="active"'))
+  )
+  assert.doesNotMatch(activePanel, />\s*详情\s*</)
+  assert.match(queueSource, /job\.safeToPrint === true/)
+  assert.match(queueSource, /content: '确认安全', value: 'confirm-safe'/)
+  assert.match(queueSource, /content: '开始打印', value: 'start'/)
+  assert.match(queueSource, /if \(job\.status === 'ASSIGNED'\) options\.push\(\{ content: '上传文件'/)
+  assert.match(fs.readFileSync(new URL('../src/mock/index.js', import.meta.url), 'utf8'),
+    /safeToPrint: sameMockId\(printer\?\.currentJobId, job\?\.id\)/)
+})
+
+test('指派打印机参数提醒使用整行容器而非与选择框横向挤压', () => {
+  assert.match(queueSource, /class="assign-dialog__control"/)
+  assert.match(queueSource, /class="assign-dialog__alert"/)
+  assert.match(queueSource, /class="assign-dialog__warning-list"/)
+  assert.match(queueSource, /\.assign-dialog__control\s*\{[\s\S]*?width: 100%;/)
+})
+
 test('任务详情只展示后端任务字段并对缺失值使用占位', () => {
   assert.match(detailSource, /资源与人员/)
   assert.match(detailSource, /打印文件/)
