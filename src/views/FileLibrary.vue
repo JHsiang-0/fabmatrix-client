@@ -552,6 +552,7 @@
       :loading="detailLoading"
       :error="detailError"
       :jobs="detailJobs"
+      :jobs-total="detailJobsTotal"
       :jobs-loading="detailJobsLoading"
       :jobs-error="detailJobsError"
       @download="handleFileDownload"
@@ -767,6 +768,7 @@ const selectedFile = ref(null)
 const detailLoading = ref(false)
 const detailError = ref('')
 const detailJobs = ref([])
+const detailJobsTotal = ref(0)
 const detailJobsLoading = ref(false)
 const detailJobsError = ref('')
 const FILE_DETAIL_CONTEXT_KEY = 'farm-ui:file-detail'
@@ -1925,6 +1927,8 @@ const loadFileJobs = async fileId => {
     const response = await getFileJobs(fileId, { pageNum: 1, pageSize: 10 })
     if (selectedFile.value && String(selectedFile.value.id) === String(fileId)) {
       detailJobs.value = response.data?.records || []
+      const total = Number(response.data?.total)
+      detailJobsTotal.value = Number.isFinite(total) ? total : detailJobs.value.length
     }
   } catch {
     if (selectedFile.value && String(selectedFile.value.id) === String(fileId)) {
@@ -1944,6 +1948,7 @@ const openFileDetail = (file, event) => {
   if (event) event.stopPropagation()
   selectedFile.value = { ...file, thumbnailUrl: null, thumbnailError: false }
   detailJobs.value = []
+  detailJobsTotal.value = 0
   sessionStorage.setItem(FILE_DETAIL_CONTEXT_KEY, String(file.id))
   detailDrawerVisible.value = true
   loadFileDetail(file.id)
@@ -1965,7 +1970,10 @@ const closeFileDetail = () => {
   detailDrawerVisible.value = false
   selectedFile.value = null
   detailLoading.value = false
+  detailJobs.value = []
+  detailJobsTotal.value = 0
   detailJobsLoading.value = false
+  detailJobsError.value = ''
   sessionStorage.removeItem(FILE_DETAIL_CONTEXT_KEY)
 }
 

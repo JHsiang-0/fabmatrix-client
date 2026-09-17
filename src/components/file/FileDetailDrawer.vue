@@ -12,8 +12,15 @@
     <template #header>
       <div class="file-detail-drawer__header">
         <span class="file-detail-drawer__title">文件详情</span>
-        <t-button variant="text" shape="square" aria-label="关闭文件详情" @click="handleClose">
-          <Close />
+        <t-button
+          class="file-detail-drawer__close"
+          variant="text"
+          shape="square"
+          size="large"
+          aria-label="关闭文件详情"
+          @click="handleClose"
+        >
+          <Close size="20px" />
         </t-button>
       </div>
     </template>
@@ -81,79 +88,38 @@
         >
           <div class="file-detail-drawer__info-section" aria-labelledby="file-detail-metrics">
             <h3 id="file-detail-metrics">切片摘要</h3>
-            <t-descriptions
-              class="file-detail-drawer__descriptions"
-              :column="3"
-              colon
-              layout="horizontal"
-              item-layout="horizontal"
-              table-layout="auto"
-              size="small"
-              :bordered="false"
-            >
-              <t-descriptions-item label="预计耗时">
-                <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDurationValue(file.estTime)"><span class="file-detail-drawer__value">{{ formatDurationValue(file.estTime) }}</span></t-tooltip>
-              </t-descriptions-item>
-              <t-descriptions-item label="文件大小">
-                <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatFileSizeValue(file.fileSize)"><span class="file-detail-drawer__value">{{ formatFileSizeValue(file.fileSize) }}</span></t-tooltip>
-              </t-descriptions-item>
-              <t-descriptions-item label="耗材重量">
-                <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatWeight(file.filamentWeight)"><span class="file-detail-drawer__value">{{ formatWeight(file.filamentWeight) }}</span></t-tooltip>
-              </t-descriptions-item>
-              <t-descriptions-item label="所需线长">
-                <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatLength(file.filamentLength)"><span class="file-detail-drawer__value">{{ formatLength(file.filamentLength) }}</span></t-tooltip>
-              </t-descriptions-item>
-              <t-descriptions-item label="喷嘴要求">
-                <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatNozzle(file.nozzleSize)"><span class="file-detail-drawer__value">{{ formatNozzle(file.nozzleSize) }}</span></t-tooltip>
-              </t-descriptions-item>
-              <t-descriptions-item label="上传时间">
-                <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDateTimeValue(file.createdAt)"><span class="file-detail-drawer__value">{{ formatDateTimeValue(file.createdAt) }}</span></t-tooltip>
-              </t-descriptions-item>
-            </t-descriptions>
+            <div class="file-detail-drawer__metric-grid">
+              <div
+                v-for="item in summaryItems"
+                :key="item.label"
+                class="file-detail-drawer__metric-item"
+                :class="{ 'is-compact': item.compact }"
+              >
+                <span class="file-detail-drawer__metric-label">{{ item.label }}</span>
+                <t-tooltip class="file-detail-drawer__value-tooltip" :content="item.value">
+                  <strong class="file-detail-drawer__metric-value">{{ item.value }}</strong>
+                </t-tooltip>
+              </div>
+            </div>
           </div>
 
           <t-divider class="file-detail-drawer__info-divider" />
 
           <div class="file-detail-drawer__info-section" aria-labelledby="file-detail-parameters">
             <h3 id="file-detail-parameters">切片参数</h3>
-            <t-descriptions
-              class="file-detail-drawer__descriptions"
-              :column="3"
-              colon
-              layout="horizontal"
-              item-layout="horizontal"
-              table-layout="auto"
-              size="small"
-              :bordered="false"
-            >
-              <t-descriptions-item label="常规层高">
-                <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatHeight(file.layerHeight)"><span class="file-detail-drawer__value">{{ formatHeight(file.layerHeight) }}</span></t-tooltip>
-              </t-descriptions-item>
-              <t-descriptions-item label="首层层高">
-                <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatHeight(file.firstLayerHeight)"><span class="file-detail-drawer__value">{{ formatHeight(file.firstLayerHeight) }}</span></t-tooltip>
-              </t-descriptions-item>
-              <t-descriptions-item label="喷嘴温度">
-                <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatTemperature(file.nozzleTemp)"><span class="file-detail-drawer__value">{{ formatTemperature(file.nozzleTemp) }}</span></t-tooltip>
-              </t-descriptions-item>
-              <t-descriptions-item label="首层喷嘴温度">
-                <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatTemperature(file.firstLayerNozzleTemp)"><span class="file-detail-drawer__value">{{ formatTemperature(file.firstLayerNozzleTemp) }}</span></t-tooltip>
-              </t-descriptions-item>
-              <t-descriptions-item label="热床温度">
-                <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatTemperature(file.bedTemp)"><span class="file-detail-drawer__value">{{ formatTemperature(file.bedTemp) }}</span></t-tooltip>
-              </t-descriptions-item>
-              <t-descriptions-item label="首层热床温度">
-                <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatTemperature(file.firstLayerBedTemp)"><span class="file-detail-drawer__value">{{ formatTemperature(file.firstLayerBedTemp) }}</span></t-tooltip>
-              </t-descriptions-item>
-            </t-descriptions>
+            <div class="file-detail-drawer__parameter-grid">
+              <div v-for="item in parameterItems" :key="item.label" class="file-detail-drawer__parameter-item">
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
+              </div>
+            </div>
           </div>
         </section>
 
-        <t-divider />
-
-        <section class="file-detail-drawer__section" aria-labelledby="file-detail-jobs">
+        <section class="file-detail-drawer__section file-detail-drawer__jobs-section" aria-labelledby="file-detail-jobs">
           <div class="file-detail-drawer__section-heading">
             <h3 id="file-detail-jobs">关联打印任务</h3>
-            <t-tag v-if="!jobsLoading" theme="default" variant="light" size="small">{{ jobs.length }} 条</t-tag>
+            <span v-if="!jobsLoading" class="file-detail-drawer__jobs-count">共 {{ displayJobCount }} 条</span>
           </div>
           <t-alert v-if="jobsError" theme="error" :title="jobsError" :close-btn="false">
             <template #operation>
@@ -162,16 +128,17 @@
           </t-alert>
           <t-skeleton v-else-if="jobsLoading" :loading="true" theme="paragraph" />
           <div v-else-if="jobs.length > 0" class="file-detail-drawer__jobs-table">
-            <t-table :data="jobs" :columns="jobColumns" row-key="id" table-layout="fixed" size="small" bordered>
+            <t-table :data="jobs" :columns="jobColumns" row-key="id" table-layout="fixed" size="small" hover>
             <template #id="slotProps">
-              <t-tooltip class="file-detail-drawer__value-tooltip" :content="String(slotProps.row.id ?? '-')"><span class="file-detail-drawer__value">{{ slotProps.row.id ?? '-' }}</span></t-tooltip>
+              <div class="file-detail-drawer__job-identity">
+                <strong>#{{ slotProps.row.id ?? '-' }}</strong>
+                <t-tooltip class="file-detail-drawer__value-tooltip" :content="getJobPrinterLabel(slotProps.row)">
+                  <span>{{ getJobPrinterLabel(slotProps.row) }}</span>
+                </t-tooltip>
+              </div>
             </template>
             <template #status="slotProps">
-              <t-tooltip class="file-detail-drawer__job-status-tooltip" :content="String(slotProps.row.status || '-')">
-                <t-tag :theme="getJobStatusTagType(slotProps.row.status)" size="small" class="file-detail-drawer__job-status-tag">
-                  {{ slotProps.row.status || '-' }}
-                </t-tag>
-              </t-tooltip>
+              <StatusTag domain="job" :status="slotProps.row.status" :show-icon="false" />
             </template>
             <template #createdAt="slotProps">
               <t-tooltip class="file-detail-drawer__value-tooltip" :content="formatDateTimeValue(slotProps.row.createdAt)"><span class="file-detail-drawer__value">{{ formatDateTimeValue(slotProps.row.createdAt) }}</span></t-tooltip>
@@ -207,6 +174,7 @@ import {
 } from 'tdesign-icons-vue-next'
 import { renderIcon } from '@/utils/tdesign'
 import { formatDuration, formatFileSize, formatDateTime } from '@/utils/formatters'
+import StatusTag from '@/components/StatusTag.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -214,6 +182,7 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   error: { type: String, default: '' },
   jobs: { type: Array, default: () => [] },
+  jobsTotal: { type: Number, default: 0 },
   jobsLoading: { type: Boolean, default: false },
   jobsError: { type: String, default: '' }
 })
@@ -226,10 +195,28 @@ const drawerVisible = computed({
 })
 
 const jobColumns = [
-  { colKey: 'id', title: '任务 ID', width: '25%', ellipsis: true },
-  { colKey: 'status', title: '状态', width: '25%', ellipsis: true },
-  { colKey: 'createdAt', title: '创建时间', width: '50%', ellipsis: true }
+  { colKey: 'id', title: '任务', width: '38%', ellipsis: true },
+  { colKey: 'status', title: '状态', width: '24%', ellipsis: true },
+  { colKey: 'createdAt', title: '创建时间', width: '38%', ellipsis: true }
 ]
+
+const displayJobCount = computed(() => Math.max(props.jobsTotal || 0, props.jobs.length))
+const summaryItems = computed(() => [
+  { label: '预计耗时', value: formatDurationValue(props.file?.estTime) },
+  { label: '耗材重量', value: formatWeight(props.file?.filamentWeight) },
+  { label: '所需线长', value: formatLength(props.file?.filamentLength) },
+  { label: '文件大小', value: formatFileSizeValue(props.file?.fileSize) },
+  { label: '喷嘴要求', value: formatNozzle(props.file?.nozzleSize) },
+  { label: '上传时间', value: formatDateTimeValue(props.file?.createdAt), compact: true }
+])
+const parameterItems = computed(() => [
+  { label: '常规层高', value: formatHeight(props.file?.layerHeight) },
+  { label: '首层层高', value: formatHeight(props.file?.firstLayerHeight) },
+  { label: '喷嘴温度', value: formatTemperature(props.file?.nozzleTemp) },
+  { label: '首层喷嘴温度', value: formatTemperature(props.file?.firstLayerNozzleTemp) },
+  { label: '热床温度', value: formatTemperature(props.file?.bedTemp) },
+  { label: '首层热床温度', value: formatTemperature(props.file?.firstLayerBedTemp) }
+])
 
 const handleVisibleChange = value => {
   emit('update:modelValue', value)
@@ -251,6 +238,10 @@ const formatLength = value => value === undefined || value === null ? '-' : `${N
 const formatNozzle = value => value === undefined || value === null ? '-' : `${Number(value).toFixed(1)}mm`
 const formatHeight = value => value === undefined || value === null ? '-' : `${Number(value).toFixed(2)}mm`
 const formatTemperature = value => value === undefined || value === null ? '-' : `${Number(value).toFixed(0)}°C`
+const getJobPrinterLabel = job => {
+  if (!job?.printerName) return '未分配打印机'
+  return job.machineNumber ? `${job.printerName} · ${job.machineNumber}` : job.printerName
+}
 
 const getMaterialTagType = materialType => ({
   PLA: 'success',
@@ -260,15 +251,6 @@ const getMaterialTagType = materialType => ({
   尼龙: 'danger'
 }[materialType] || 'default')
 
-const getJobStatusTagType = status => ({
-  COMPLETED: 'success',
-  PRINTING: 'primary',
-  QUEUED: 'warning',
-  ASSIGNED: 'warning',
-  FAILED: 'danger',
-  CANCELLED: 'default',
-  PAUSED: 'warning'
-}[status] || 'default')
 </script>
 
 <style scoped>
@@ -285,18 +267,38 @@ const getJobStatusTagType = status => ({
   font-weight: 700;
 }
 
+.file-detail-drawer__close {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  color: var(--app-text-secondary);
+  border-radius: var(--app-radius);
+}
+
+.file-detail-drawer__close :deep(.t-icon) {
+  width: 22px;
+  height: 22px;
+}
+
+.file-detail-drawer__close:hover {
+  color: var(--app-text-primary);
+  background: var(--app-surface-hover);
+}
+
 .file-detail-drawer__body {
   display: flex;
   box-sizing: border-box;
   width: 100%;
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
   flex-direction: column;
-  gap: var(--app-spacing-1);
+  gap: var(--app-spacing-3);
   padding-bottom: var(--app-spacing-2);
+  overflow: hidden;
 }
 
-.file-detail-drawer :deep(.t-drawer__body) {
-  overflow-y: auto;
+:global(.file-detail-drawer .t-drawer__body) {
+  overflow: hidden;
   scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
   scrollbar-width: thin;
 }
@@ -311,16 +313,17 @@ const getJobStatusTagType = status => ({
 
 .file-detail-drawer__summary {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
+  grid-template-columns: 76px minmax(0, 1fr);
   align-items: center;
   min-width: 0;
-  gap: var(--app-spacing-2);
+  flex-shrink: 0;
+  gap: var(--app-spacing-3);
 }
 
 .file-detail-drawer__thumbnail {
   display: flex;
-  width: 88px;
-  height: 88px;
+  width: 76px;
+  height: 76px;
   align-items: center;
   justify-content: center;
   flex-direction: column;
@@ -352,8 +355,7 @@ const getJobStatusTagType = status => ({
   overflow: hidden;
 }
 
-.file-detail-drawer__material-tooltip,
-.file-detail-drawer__job-status-tooltip {
+.file-detail-drawer__material-tooltip {
   display: inline-flex;
   min-width: 0;
   max-width: 100%;
@@ -393,35 +395,29 @@ const getJobStatusTagType = status => ({
   font-size: var(--td-font-size-body-small);
 }
 
-.file-detail-drawer__job-status-tag {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .file-detail-drawer__section {
   display: flex;
   flex-direction: column;
-  gap: var(--app-spacing-1);
+  gap: var(--app-spacing-2);
 }
 
 .file-detail-drawer__info-card {
-  padding: var(--app-spacing-1) var(--app-spacing-2);
-  background: var(--td-bg-color-secondarycontainer);
-  border: 1px solid var(--td-component-border);
-  border-radius: var(--td-radius-medium);
+  flex-shrink: 0;
+  padding: var(--app-spacing-3);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
 }
 
 .file-detail-drawer__info-section {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: var(--app-spacing-1);
+  gap: var(--app-spacing-2);
 }
 
 .file-detail-drawer__info-divider {
-  margin: 0;
+  margin: var(--app-spacing-1) 0;
 }
 
 .file-detail-drawer__section h3 {
@@ -436,49 +432,74 @@ const getJobStatusTagType = status => ({
   gap: var(--app-spacing-2);
 }
 
-.file-detail-drawer :deep(.t-divider) {
+:global(.file-detail-drawer .t-divider) {
   flex: 0 0 1px;
   height: 1px;
   min-height: 1px;
-  margin: -2px 0;
+  margin: 0;
 }
 
-.file-detail-drawer__descriptions {
-  width: 100%;
+.file-detail-drawer__metric-grid,
+.file-detail-drawer__parameter-grid {
+  display: grid;
   min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--app-spacing-2);
 }
 
-.file-detail-drawer__descriptions :deep(.t-descriptions__body) {
-  width: 100%;
+.file-detail-drawer__metric-item {
+  display: flex;
+  min-height: 48px;
   min-width: 0;
-  max-width: 100%;
+  justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--app-spacing-2);
+  background: var(--app-surface-muted);
+  border-radius: var(--app-radius-small);
 }
 
-.file-detail-drawer__descriptions :deep(.t-descriptions__body > tbody > tr > td) {
-  padding: var(--app-spacing-1) 0;
+.file-detail-drawer__metric-label,
+.file-detail-drawer__parameter-item span {
+  overflow: hidden;
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
   line-height: 1.25;
-}
-
-.file-detail-drawer__descriptions :deep(.t-descriptions__label) {
-  min-width: 0;
-  width: 1%;
-  max-width: 100%;
-  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  word-break: keep-all;
 }
 
-.file-detail-drawer__descriptions :deep(.t-descriptions__content) {
-  min-width: 0;
-  width: auto;
-  max-width: 100%;
+.file-detail-drawer__metric-value {
+  display: block;
   overflow: hidden;
-  word-break: break-word;
+  color: var(--app-text-primary);
+  font-size: var(--td-font-size-title-small);
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.file-detail-drawer__descriptions :deep(.t-descriptions__content > *) {
+.file-detail-drawer__metric-item.is-compact .file-detail-drawer__metric-value {
+  font-size: var(--td-font-size-body-small);
+}
+
+.file-detail-drawer__parameter-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   min-width: 0;
-  max-width: 100%;
+  gap: var(--app-spacing-1);
+  padding: 6px var(--app-spacing-2);
+  background: var(--app-surface-muted);
+  border-radius: var(--app-radius-small);
+}
+
+.file-detail-drawer__parameter-item strong {
+  flex: 0 0 auto;
+  color: var(--app-text-primary);
+  font-size: var(--td-font-size-body-medium);
+  font-weight: 600;
 }
 
 .file-detail-drawer__value {
@@ -491,10 +512,29 @@ const getJobStatusTagType = status => ({
   white-space: nowrap;
 }
 
+.file-detail-drawer__jobs-section {
+  min-height: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+}
+
+.file-detail-drawer__jobs-count {
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+}
+
 .file-detail-drawer__jobs-table {
   width: 100%;
+  min-height: 0;
   min-width: 0;
-  overflow: hidden;
+  max-height: 220px;
+  flex: 0 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
+  scrollbar-width: thin;
 }
 
 .file-detail-drawer__jobs-table :deep(.t-table),
@@ -510,6 +550,42 @@ const getJobStatusTagType = status => ({
   table-layout: fixed;
 }
 
+.file-detail-drawer__jobs-table :deep(.t-table__th),
+.file-detail-drawer__jobs-table :deep(.t-table__td) {
+  padding: var(--app-spacing-2) var(--app-spacing-3);
+  border-right: 0;
+}
+
+.file-detail-drawer__jobs-table :deep(.t-table__th) {
+  color: var(--app-text-secondary);
+  font-weight: 500;
+}
+
+.file-detail-drawer__job-identity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.file-detail-drawer__job-identity strong {
+  color: var(--app-text-primary);
+  font-weight: 600;
+}
+
+.file-detail-drawer__job-identity span {
+  display: block;
+  overflow: hidden;
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-detail-drawer__jobs-table :deep(.app-status-tag) {
+  max-width: 100%;
+}
+
 .file-detail-drawer__footer-actions {
   display: flex;
   align-items: stretch;
@@ -518,6 +594,8 @@ const getJobStatusTagType = status => ({
   gap: var(--app-spacing-2);
   margin-top: auto;
   padding-top: var(--app-spacing-2);
+  flex-shrink: 0;
+  border-top: 1px solid var(--app-border);
 }
 
 .file-detail-drawer__footer-actions :deep(.t-button) {
@@ -535,12 +613,37 @@ const getJobStatusTagType = status => ({
     height: 72px;
   }
 
+  .file-detail-drawer__metric-grid,
+  .file-detail-drawer__parameter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .file-detail-drawer__footer-actions {
     flex-direction: column;
   }
 
   .file-detail-drawer__footer-actions :deep(.t-button) {
     width: 100%;
+  }
+}
+
+@media (max-height: 720px) {
+  :global(.file-detail-drawer .t-drawer__body) {
+    overflow-y: auto;
+  }
+
+  .file-detail-drawer__body {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+
+  .file-detail-drawer__jobs-section {
+    min-height: 0;
+  }
+
+  .file-detail-drawer__jobs-table {
+    max-height: 180px;
   }
 }
 </style>
