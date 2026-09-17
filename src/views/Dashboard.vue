@@ -262,7 +262,7 @@ import StatusTag from '@/components/StatusTag.vue'
 import { useJobStore } from '@/stores/jobStore'
 import { useRealtimeStore } from '@/stores/printer/realtimeStore'
 import { PRINTER_STATUS, PRINTER_STATUS_MAP } from '@/utils/constants'
-import { normalizePrinterStatus } from '@/utils/dataAdapters'
+import { resolveEffectivePrinterStatus } from '@/utils/dataAdapters'
 import { buildFarmDateRange, buildSevenDayJobTrend } from '@/utils/dashboardMetrics'
 import { ACTIVE_JOB_STATUSES } from '@/utils/jobSelectors'
 import { fetchAllPageRecords } from '@/utils/jobPagination'
@@ -299,7 +299,7 @@ const statusSegmentsConfig = [
 
 const effectivePrinters = computed(() => printers.value.map(printer => {
   const realtime = statusMap.value.get(String(printer.id))
-  const status = normalizePrinterStatus(realtime?.unifiedState || realtime?.state || printer.status)
+  const status = resolveEffectivePrinterStatus({ ...printer, ...realtime })
   return { ...printer, status, realtime }
 }))
 

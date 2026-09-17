@@ -138,7 +138,7 @@
           <template #default="scope">
             <div class="printer-management-primary">
               <div class="printer-management-name">
-                <span class="printer-management-status-dot" :class="`printer-management-status-dot--${getStatusClass(scope.row.status)}`" />
+                <span class="printer-management-status-dot" :class="`printer-management-status-dot--${getStatusClass(scope.row.effectiveStatus)}`" />
                 <span class="printer-management-ellipsis" :title="scope.row.name">{{ scope.row.name }}</span>
               </div>
             </div>
@@ -206,7 +206,12 @@
 
         <TdTableColumn prop="status" label="当前状态" width="120" align="center">
           <template #default="scope">
-            <StatusTag domain="printer" :status="scope.row.status" />
+            <div class="printer-management-state">
+              <StatusTag domain="printer" :status="scope.row.effectiveStatus" />
+              <span v-if="showLastKnownStatus(scope.row)" class="printer-management-muted">
+                最后：{{ getStatusLabel(scope.row.lastKnownStatus) }}
+              </span>
+            </div>
           </template>
         </TdTableColumn>
 
@@ -618,7 +623,11 @@ import { useUserStore } from '@/stores/user'
 import { useDeviceStore } from '@/stores/printer/deviceStore'
 import { useRealtimeStore } from '@/stores/printer/realtimeStore'
 import { PRINTER_STATUS, PRINTER_STATUS_MAP } from '@/utils/constants'
-import { normalizePrinterStatus } from '@/utils/dataAdapters'
+import {
+  normalizePrinterStatus,
+  resolveEffectivePrinterStatus,
+  resolveLastKnownPrinterStatus
+} from '@/utils/dataAdapters'
 import { formatDateTime } from '@/utils/formatters'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard'
 import {
@@ -761,8 +770,6 @@ const deletingIds = ref([])
 
 const displayTableData = computed(() => tableData.value.map(printer => {
   const realtime = statusMap.value.get(String(printer.id))
-  if (!realtime) return printer
-
   const merged = { ...printer }
   const healthFields = [
     'connectionStatus',
@@ -782,13 +789,15 @@ const displayTableData = computed(() => tableData.value.map(printer => {
     'taskMatchReason',
     'progress'
   ]
-  healthFields.forEach(field => {
-    if (realtime[field] !== undefined) merged[field] = realtime[field]
-  })
-  const realtimeState = realtime.businessStatus || realtime.unifiedState || realtime.state
-  if (realtimeState && String(realtimeState).toUpperCase() !== PRINTER_STATUS.OFFLINE) {
-    merged.status = normalizePrinterStatus(realtimeState)
+  if (realtime) {
+    healthFields.forEach(field => {
+      if (realtime[field] !== undefined) merged[field] = realtime[field]
+    })
+    const realtimeState = realtime.businessStatus || realtime.unifiedState || realtime.state
+    if (realtimeState) merged.businessStatus = normalizePrinterStatus(realtimeState)
   }
+  merged.effectiveStatus = resolveEffectivePrinterStatus(merged)
+  merged.lastKnownStatus = resolveLastKnownPrinterStatus(merged) || merged.lastKnownStatus
   return merged
 }))
 
@@ -851,6 +860,10 @@ const getStatusLabel = (status) => {
 }
 
 const getStatusClass = status => String(status || 'UNKNOWN').toLowerCase()
+const showLastKnownStatus = printer => (
+  [PRINTER_STATUS.OFFLINE, PRINTER_STATUS.UNKNOWN].includes(printer?.effectiveStatus)
+  && !!resolveLastKnownPrinterStatus(printer)
+)
 
 const getProgress = printer => {
   const progress = Number(printer.progress)
@@ -859,7 +872,7 @@ const getProgress = printer => {
 }
 
 const getProgressStatus = printer => {
-  if (String(printer.status || '').toUpperCase() === PRINTER_STATUS.ERROR) return 'error'
+  if (String(printer.effectiveStatus || printer.status || '').toUpperCase() === PRINTER_STATUS.ERROR) return 'error'
   if (getProgress(printer) >= 100) return 'success'
   return 'active'
 }
@@ -1434,7 +1447,7 @@ const handleDelete = async (id) => {
 }
 
 const getDeleteMessage = printer => {
-  const currentState = getStatusLabel(printer.status)
+  const currentState = getStatusLabel(printer.effectiveStatus || printer.status)
   return printer.currentJobId
     ? `该设备当前为“${currentState}”，并关联任务 #${printer.currentJobId}。删除可能被服务端拒绝，确定继续吗？`
     : `确定删除设备“${printer.name || printer.ipAddress}”吗？`
@@ -1782,10 +1795,18 @@ const handleBatchAdd = async () => {
 
 .printer-management-primary,
 .printer-management-connection,
+.printer-management-state,
 .printer-management-recent {
   align-items: center;
   flex-direction: column;
   gap: var(--app-spacing-1);
+}
+
+.printer-management-state {
+  display: flex;
+  min-width: 0;
+  justify-content: center;
+  line-height: 1.2;
 }
 
 .printer-management-name {

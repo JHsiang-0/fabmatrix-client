@@ -137,6 +137,42 @@ export function normalizePrinterStatus(value) {
 }
 
 /**
+ * 计算设备当前可用状态。
+ * 业务状态表示设备最后一次成功通信时的运行状态；一旦通信明确离线或监控停用，
+ * 当前界面和任务入口必须优先展示不可用状态，不能继续把历史 IDLE 当作可派发。
+ */
+export function resolveEffectivePrinterStatus(record = {}) {
+  if (!record || typeof record !== 'object') return PRINTER_STATUS.UNKNOWN
+
+  const connectionStatus = String(record.connectionStatus || '').trim().toUpperCase()
+  if (record.monitorEnabled === false) return PRINTER_STATUS.UNKNOWN
+  if (connectionStatus === 'OFFLINE') return PRINTER_STATUS.OFFLINE
+  if (connectionStatus === 'UNKNOWN') return PRINTER_STATUS.UNKNOWN
+
+  const sourceStatus = record.businessStatus
+    ?? record.unifiedState
+    ?? record.state
+    ?? record.effectiveStatus
+    ?? record.status
+    ?? record.lastKnownStatus
+
+  return normalizePrinterStatus(sourceStatus)
+}
+
+/** 返回可用于说明的最后已知业务状态；OFFLINE/UNKNOWN 不作为有效历史状态重复展示。 */
+export function resolveLastKnownPrinterStatus(record = {}) {
+  if (!record || typeof record !== 'object') return null
+  const status = normalizePrinterStatus(
+    record.businessStatus
+      ?? record.unifiedState
+      ?? record.state
+      ?? record.lastKnownStatus
+      ?? record.status
+  )
+  return [PRINTER_STATUS.OFFLINE, PRINTER_STATUS.UNKNOWN].includes(status) ? null : status
+}
+
+/**
  * 规范化固件协议。RRF 必须保留为 RRF，不得用默认值覆盖。
  */
 export function normalizeFirmwareType(value) {
@@ -164,6 +200,13 @@ export function normalizePrinter(record) {
   if (Object.prototype.hasOwnProperty.call(normalized, 'status')) {
     normalized.status = normalizePrinterStatus(normalized.status)
   }
+  if (Object.prototype.hasOwnProperty.call(normalized, 'effectiveStatus')) {
+    normalized.effectiveStatus = normalizePrinterStatus(normalized.effectiveStatus)
+  }
+  if (Object.prototype.hasOwnProperty.call(normalized, 'lastKnownStatus')) {
+    normalized.lastKnownStatus = normalizePrinterStatus(normalized.lastKnownStatus)
+  }
+  normalized.effectiveStatus = resolveEffectivePrinterStatus(normalized)
   if (Object.prototype.hasOwnProperty.call(normalized, 'firmwareType')) {
     normalized.firmwareType = normalizeFirmwareType(normalized.firmwareType)
   }

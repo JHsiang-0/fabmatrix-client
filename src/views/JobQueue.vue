@@ -743,7 +743,7 @@ const loadCreateTaskResources = async () => {
     createTaskError.value = '文件列表加载失败，请重试'
   }
   if (printerResult.status === 'fulfilled') {
-    taskPrinters.value = (printerResult.value.data?.records || []).filter(printer => printer.status === 'IDLE')
+    taskPrinters.value = (printerResult.value.data?.records || []).filter(printer => printer.effectiveStatus === 'IDLE')
   } else {
     taskPrinters.value = []
     createTaskError.value = createTaskError.value
@@ -1027,7 +1027,7 @@ const openAssignDialog = async (job) => {
   try {
     const res = await getPrinterList({ pageNum: 1, pageSize: 100 })
     const allPrinters = res.data?.records || []
-    idlePrinters.value = allPrinters.filter(p => p.status === 'IDLE')
+    idlePrinters.value = allPrinters.filter(p => p.effectiveStatus === 'IDLE')
   } catch {
     message.error('获取打印机列表失败')
   } finally {

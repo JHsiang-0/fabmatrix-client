@@ -10,6 +10,8 @@ import {
   normalizePrinter,
   normalizePrinterDetail,
   normalizePrinterStatus,
+  resolveEffectivePrinterStatus,
+  resolveLastKnownPrinterStatus,
   normalizePrintJob,
   normalizePrintFile,
   normalizeBatchMoveResult
@@ -105,6 +107,24 @@ test('uses one canonical printer status set and never persists ONLINE', () => {
   assert.equal(normalizePrinterStatus('preparing'), PRINTER_STATUS.PREPARING)
   assert.equal(normalizePrinterStatus('online'), PRINTER_STATUS.UNKNOWN)
   assert.equal(normalizePrinter({ id: 1, status: 'ONLINE' }).status, PRINTER_STATUS.UNKNOWN)
+})
+
+test('通信状态优先决定打印机当前可用状态，同时保留最后已知业务状态', () => {
+  const offlineIdle = {
+    monitorEnabled: true,
+    connectionStatus: 'OFFLINE',
+    status: 'IDLE',
+    lastKnownStatus: 'IDLE'
+  }
+  assert.equal(resolveEffectivePrinterStatus(offlineIdle), PRINTER_STATUS.OFFLINE)
+  assert.equal(resolveLastKnownPrinterStatus(offlineIdle), PRINTER_STATUS.IDLE)
+  assert.equal(resolveEffectivePrinterStatus({ ...offlineIdle, connectionStatus: 'ONLINE' }), PRINTER_STATUS.IDLE)
+  assert.equal(resolveEffectivePrinterStatus({ ...offlineIdle, connectionStatus: 'UNKNOWN' }), PRINTER_STATUS.UNKNOWN)
+  assert.equal(resolveEffectivePrinterStatus({ ...offlineIdle, monitorEnabled: false }), PRINTER_STATUS.UNKNOWN)
+
+  const normalized = normalizePrinter({ id: 1, ...offlineIdle })
+  assert.equal(normalized.status, PRINTER_STATUS.IDLE)
+  assert.equal(normalized.effectiveStatus, PRINTER_STATUS.OFFLINE)
 })
 
 test('flattens the formal printer detail aggregate without losing realtime and job data', () => {

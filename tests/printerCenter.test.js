@@ -68,7 +68,7 @@ test('打印机中心视觉适配保留紧凑筛选、表格反馈和响应式�
   assert.match(source, /const printerStatusTabs = \[\{ value: '', label: '全部' \}/)
   assert.match(source, /class="printer-management-table printer-table"[\s\S]*hover/)
   assert.doesNotMatch(source, /printer-management-status-card/)
-  assert.match(source, /<StatusTag domain="printer" :status="scope\.row\.status" \/>/)
+  assert.match(source, /<StatusTag domain="printer" :status="scope\.row\.effectiveStatus" \/>/)
   assert.match(source, /printer-management-ellipsis/)
   assert.match(source, /printer-management-table-footer/)
   assert.match(source, /\.printer-management-table :deep\(\.t-table__body tr:hover > td\)/)

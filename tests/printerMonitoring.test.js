@@ -100,7 +100,7 @@ test('监控和人工核对界面保留业务状态与通信状态的独立语�
   assert.match(printerSource, /monitorEnabled/)
   assert.match(printerSource, /lastCommunicationError/)
   assert.match(printerSource, /updatePrinterMonitorBatch/)
-  assert.match(drawerSource, /当前状态[\s\S]*businessStatus/)
+  assert.match(drawerSource, /resolveEffectivePrinterStatus\(\{[\s\S]*\.\.\.props\.realTimeData/)
   assert.match(drawerSource, /监控与通信/)
   assert.match(drawerSource, /currentJobStatus === 'RECONCILING'/)
   assert.match(taskSource, /设备状态无法自动确认，请人工核对打印结果。/)
@@ -111,10 +111,13 @@ test('监控和人工核对界面保留业务状态与通信状态的独立语�
   assert.match(realtimeSource, /refreshPrinterSnapshot/)
 })
 
-test('打印机视觉适配不让离线通信状态覆盖业务状态和任务字段', () => {
+test('打印机视觉适配以通信状态决定当前可用性并保留最后已知业务状态', () => {
   assert.match(printerSource, /const healthFields = \[[\s\S]*'currentJobId'[\s\S]*'currentJobFileName'[\s\S]*'currentJobStatus'[\s\S]*'observedFilename'[\s\S]*'taskSource'[\s\S]*'progress'/)
-  assert.match(printerSource, /if \(realtimeState && String\(realtimeState\)\.toUpperCase\(\) !== PRINTER_STATUS\.OFFLINE\)/)
-  assert.match(drawerSource, /const sourceState = props\.realTimeData\?\.businessStatus \|\| props\.realTimeData\?\.unifiedState \|\| props\.device\?\.status/)
+  assert.match(printerSource, /resolveEffectivePrinterStatus\(merged\)/)
+  assert.match(printerSource, /最后：\{\{ getStatusLabel\(scope\.row\.lastKnownStatus\) \}\}/)
+  assert.match(drawerSource, /resolveEffectivePrinterStatus\(\{/)
+  assert.match(drawerSource, /最后已知：\{\{ lastKnownStateLabel \}\}/)
+  assert.match(drawerSource, /控制和任务下发不可用/)
   assert.match(printerSource, /:monitor-config="monitorConfig"/)
   assert.match(printerSource, /@monitor-change="handleDetailMonitorChange"/)
   assert.match(drawerSource, /:disabled="!canManageMonitor \|\| monitorLoading \|\| monitorUpdating"/)

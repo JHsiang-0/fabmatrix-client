@@ -33,7 +33,7 @@ test('状态视图模型覆盖打印机与任务状态并提供统一图标和�
 
 test('业务页面状态标签复用公共 StatusTag', () => {
   assert.match(dashboardSource, /<StatusTag domain="job" :status="job\.status" \/>/)
-  assert.match(printerSource, /<StatusTag domain="printer" :status="scope\.row\.status" \/>/)
+  assert.match(printerSource, /<StatusTag domain="printer" :status="scope\.row\.effectiveStatus" \/>/)
   assert.match(queueSource, /<StatusTag domain="job" :status="scope\.row\.status" \/>/)
   assert.match(historySource, /<StatusTag domain="job" :status="scope\.row\.status" \/>/)
 })

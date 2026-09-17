@@ -76,7 +76,7 @@ test('全屏运行时使用 30adedc 的 Header、告警、四卡和车间网格�
   assert.match(farmDashboardSource, /dashboardStatusCounts/)
   assert.match(farmDashboardSource, /store\.rawDeviceList/)
   assert.match(farmDashboardSource, /store\.realTimeStatus/)
-  assert.match(farmDashboardSource, /normalizePrinterStatus/)
+  assert.match(farmDashboardSource, /resolveEffectivePrinterStatus/)
   assert.match(farmDashboardSource, /重新连接/)
   assert.match(farmDashboardSource, /reconnectRealtime/)
 })

@@ -58,8 +58,14 @@
                                         <t-tag size="small" :theme="connectionTheme" variant="light">
                                             通信{{ connectionLabel }}
                                         </t-tag>
+                                        <t-tag v-if="showLastKnownState" size="small" theme="default" variant="light">
+                                            最后已知：{{ lastKnownStateLabel }}
+                                        </t-tag>
                                     </div>
-                                    <div v-if="isDeviceTaskActive" class="printer-detail-drawer__task-observation">
+                                    <span v-if="isConnectionUnavailable" class="printer-detail-drawer__status-description">
+                                        {{ statusDescription }}
+                                    </span>
+                                    <div v-else-if="isDeviceTaskActive" class="printer-detail-drawer__task-observation">
                                         <t-tag size="small" :theme="deviceTaskSourceMeta.theme" variant="light">
                                             {{ deviceTaskSourceMeta.label }}
                                         </t-tag>
@@ -328,9 +334,12 @@ import {
 import IconNozzle from '../icons/IconNozzle.vue'
 import IconBed from '../icons/IconBed.vue'
 import IconSpool from '../icons/IconSpool.vue'
-import { PRINTER_STATUS, PROGRESS_STATUS_MAP } from '@/utils/constants'
+import { PRINTER_STATUS, PRINTER_STATUS_MAP, PROGRESS_STATUS_MAP } from '@/utils/constants'
 import StatusTag from '@/components/StatusTag.vue'
-import { normalizePrinterStatus } from '@/utils/dataAdapters'
+import {
+    resolveEffectivePrinterStatus,
+    resolveLastKnownPrinterStatus
+} from '@/utils/dataAdapters'
 import { formatTemp, formatDuration, formatFilament, formatDateTime } from '@/utils/formatters'
 import { confirmSafe } from '@/api/printer'
 import { startJob } from '@/api/job'
@@ -624,9 +633,12 @@ const drawerTitle = computed(() => {
 
 /** 当前状态 */
 const currentState = computed(() => {
-    const sourceState = props.realTimeData?.businessStatus || props.realTimeData?.unifiedState || props.device?.status
-    if (String(sourceState || '').toUpperCase() === 'ASSIGNED') return PRINTER_STATUS.IDLE
-    return normalizePrinterStatus(sourceState)
+    return resolveEffectivePrinterStatus({
+        ...props.device,
+        ...props.device?.realtimeStatus,
+        ...props.monitorConfig,
+        ...props.realTimeData
+    })
 })
 
 const monitorValue = computed(() => ({
@@ -658,6 +670,16 @@ const connectionTheme = computed(() => ({
     OFFLINE: 'danger',
     UNKNOWN: 'default'
 }[String(monitorValue.value.connectionStatus || 'UNKNOWN').toUpperCase()] || 'default'))
+const isConnectionUnavailable = computed(() => (
+    [PRINTER_STATUS.OFFLINE, PRINTER_STATUS.UNKNOWN].includes(currentState.value)
+))
+const lastKnownState = computed(() => resolveLastKnownPrinterStatus(monitorValue.value))
+const showLastKnownState = computed(() => (
+    isConnectionUnavailable.value && !!lastKnownState.value
+))
+const lastKnownStateLabel = computed(() => (
+    PRINTER_STATUS_MAP[lastKnownState.value]?.label || '未知'
+))
 const currentJobStatus = computed(() => String(
     props.realTimeData?.currentJobStatus
     || props.device?.realtimeStatus?.farmJobStatus
@@ -741,8 +763,12 @@ const statusDescription = computed(() => ({
     [PRINTER_STATUS.PRINTING]: '设备正在执行打印任务',
     [PRINTER_STATUS.PAUSED]: '当前打印任务已暂停',
     [PRINTER_STATUS.ERROR]: '设备存在异常，请检查后处理',
-    [PRINTER_STATUS.OFFLINE]: '设备当前无法通信',
-    [PRINTER_STATUS.UNKNOWN]: '暂时无法确认设备状态'
+    [PRINTER_STATUS.OFFLINE]: lastKnownState.value
+        ? `设备当前无法通信，最后已知状态为${lastKnownStateLabel.value}；控制和任务下发不可用`
+        : '设备当前无法通信；控制和任务下发不可用',
+    [PRINTER_STATUS.UNKNOWN]: monitorEnabled.value
+        ? '暂时无法确认设备当前状态；取得可靠状态前不可下发任务'
+        : '设备监控已停用；当前状态不可确认，任务下发不可用'
 }[currentState.value] || '暂时无法确认设备状态'))
 
 const devicePosition = computed(() => {

@@ -236,7 +236,7 @@ import { usePrinterStore } from '@/stores/printer'
 import { emergencyStopPrinter, pausePrinter, resumePrinter, cancelPrinter } from '@/api/printer'
 import { getJobPage } from '@/api/job'
 import { PRINTER_STATUS } from '@/utils/constants'
-import { normalizePrinterStatus } from '@/utils/dataAdapters'
+import { resolveEffectivePrinterStatus } from '@/utils/dataAdapters'
 import { analyzeDevicePositions, formatGridRowLabel } from '@/utils/gridLayout'
 import DashboardHeader from './DashboardHeader.vue'
 import GridMap from './grid/GridMap.vue'
@@ -450,10 +450,7 @@ const realtimeNotice = computed(() => props.realtimeNoticeOverride || (
 
 function getEffectiveStatus(device) {
   const realtime = store.realTimeStatus[String(device.id)]
-  if (realtime?.connectionStatus === 'OFFLINE') return PRINTER_STATUS.OFFLINE
-  return normalizePrinterStatus(
-    realtime?.businessStatus || realtime?.unifiedState || realtime?.state || device.status
-  )
+  return resolveEffectivePrinterStatus({ ...device, ...realtime })
 }
 
 const dashboardStatusCounts = computed(() => store.rawDeviceList.reduce((counts, device) => {

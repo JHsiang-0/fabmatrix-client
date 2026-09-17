@@ -1791,7 +1791,7 @@ const loadAssignablePrinters = async () => {
   loadingPrinters.value = true
   try {
     const res = await getPrinterList({ pageNum: 1, pageSize: 100, status: 'IDLE' })
-    availablePrinters.value = (res.data?.records || []).filter(printer => printer.status === 'IDLE')
+    availablePrinters.value = (res.data?.records || []).filter(printer => printer.effectiveStatus === 'IDLE')
   } catch (error) {
     availablePrinters.value = []
     console.error('获取可用打印机失败:', error)
