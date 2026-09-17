@@ -13,7 +13,7 @@ export default defineConfig([
 
   {
     name: 'electron/node-files',
-    files: ['electron/**/*.cjs'],
+    files: ['electron/**/*.cjs', 'scripts/**/*.cjs'],
     languageOptions: {
       globals: {
         ...globals.node,
