@@ -207,12 +207,9 @@
           </template>
         </TdTableColumn>
 
-        <TdTableColumn prop="ipAddress" label="网络信息" width="158" align="left">
+        <TdTableColumn prop="ipAddress" label="IP 地址" width="148" align="left">
           <template #default="scope">
-            <div class="printer-management-connection-meta">
-              <t-tag size="small" variant="light-outline" theme="default">{{ scope.row.ipAddress }}</t-tag>
-              <span class="printer-management-muted">{{ getFirmwareLabel(scope.row.firmwareType) }}</span>
-            </div>
+            <t-tag size="small" variant="light-outline" theme="default">{{ scope.row.ipAddress }}</t-tag>
           </template>
         </TdTableColumn>
 
@@ -1694,7 +1691,6 @@ const handleBatchAdd = async () => {
 .printer-management-device-name-row,
 .printer-inline-editor,
 .printer-inline-value,
-.printer-management-connection-meta,
 .printer-management-print-status,
 .printer-management-monitor-cell,
 .printer-management-monitor-cell__control,
@@ -1705,7 +1701,6 @@ const handleBatchAdd = async () => {
 }
 
 .printer-management-device-cell,
-.printer-management-connection-meta,
 .printer-management-monitor-cell {
   flex-direction: column;
 }
@@ -1789,15 +1784,8 @@ const handleBatchAdd = async () => {
   opacity: 1;
 }
 
-.printer-management-connection-meta,
 .printer-management-monitor-cell {
   gap: 2px;
-}
-
-.printer-management-connection-meta {
-  align-items: flex-start;
-  justify-content: center;
-  text-align: left;
 }
 
 .printer-management-monitor-cell {
