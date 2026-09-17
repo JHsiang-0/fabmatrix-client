@@ -365,7 +365,7 @@ test('JobQueue 暂停确认只发送一次可观测 Mock 请求', async ({ brows
   }
 })
 
-test('TC-008 任务历史在三个桌面尺寸下保持紧凑表格、整行详情和 FAILED 重试', async ({ browser }) => {
+test('TC-008 任务历史在四个桌面尺寸下铺满表格、整行详情和 FAILED 重试', async ({ browser }) => {
   test.setTimeout(120000)
   const context = await browser.newContext({ viewport: { width: 800, height: 560 } })
   const page = await context.newPage()
@@ -381,7 +381,8 @@ test('TC-008 任务历史在三个桌面尺寸下保持紧凑表格、整行详�
     for (const viewport of [
       { width: 800, height: 560 },
       { width: 1024, height: 640 },
-      { width: 1200, height: 760 }
+      { width: 1200, height: 760 },
+      { width: 1920, height: 855 }
     ]) {
       await page.setViewportSize(viewport)
       await openSidebarItem(page, viewport.width, '打印历史')
@@ -406,6 +407,7 @@ test('TC-008 任务历史在三个桌面尺寸下保持紧凑表格、整行详�
       })
       if (viewport.width <= 1024) expect(tableStart.scrollWidth).toBeGreaterThan(tableStart.clientWidth)
       else expect(tableStart.scrollWidth).toBeGreaterThanOrEqual(tableStart.clientWidth)
+      if (viewport.width === 1920) expect(Math.abs(tableStart.scrollWidth - tableStart.clientWidth)).toBeLessThanOrEqual(1)
       expect(tableStart.scrollHeight).toBeGreaterThan(tableStart.clientHeight)
       expect(tableStart.scrollLeft).toBe(0)
       expect(tableStart.scrollTop).toBe(0)

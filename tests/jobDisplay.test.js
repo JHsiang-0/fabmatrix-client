@@ -186,11 +186,12 @@ test('800×560 窄视口保留组件视口与内部横向滚动，队列固定�
   for (const source of [queueSource, historySource]) {
     assert.match(source, /<t-tooltip/)
     assert.match(source, /job-display__ellipsis/)
-    assert.match(source, /table-content-width="max-content"/)
     assert.match(source, /style="width: 100%"/)
     assert.match(source, /\.t-table__content[\s\S]*overflow-x: auto/)
     assert.match(source, /\.t-table__content[\s\S]*width: 100%[\s\S]*min-width: 0[\s\S]*max-width: 100%/)
   }
+  assert.match(queueSource, /table-content-width="max-content"/)
+  assert.match(historySource, /table-content-width="max\(100%, 1090px\)"/)
   assert.match(queueSource, /fixed="right"/)
   assert.doesNotMatch(historySource, /fixed="right"/)
   assert.match(historySource, /@row-click="openTaskDetail"/)

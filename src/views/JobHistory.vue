@@ -97,7 +97,7 @@
             @row-click="openTaskDetail"
             :loading="loading"
             height="100%"
-            table-content-width="max-content"
+            table-content-width="max(100%, 1090px)"
             style="width: 100%"
             class="history-table history-management-table"
             :row-attributes="getHistoryRowAttributes"
