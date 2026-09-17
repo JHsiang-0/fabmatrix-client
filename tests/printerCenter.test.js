@@ -71,7 +71,7 @@ test('打印机中心视觉适配保留紧凑筛选、表格反馈和响应式�
   assert.match(source, /const firmwareOptions = \[/)
   assert.match(source, /class="printer-management-table printer-table"[\s\S]*hover/)
   assert.doesNotMatch(source, /printer-management-status-card/)
-  assert.match(source, /<StatusTag domain="printer" :status="scope\.row\.effectiveStatus" \/>/)
+  assert.match(source, /<StatusTag domain="printer" :status="scope\.row\.printStatus" \/>/)
   assert.match(source, /printer-management-ellipsis/)
   assert.match(source, /printer-management-table-footer/)
   assert.match(source, /\.printer-management-table :deep\(\.t-table__body tr:hover > td\)/)
@@ -88,11 +88,22 @@ test('UI-005 打印机管理压缩字段、固定首尾列并按条件显示批�
   assert.doesNotMatch(source, /printer-management-muted">#\{\{ scope\.row\.id \}\}/)
   assert.match(source, /height: 58px/)
   assert.doesNotMatch(source, /table-content-width="1180px"/)
-  assert.match(source, /<TdTableColumn prop="name" label="设备" width="238">/)
-  assert.match(source, /<TdTableColumn prop="ipAddress" label="连接" width="158">/)
+  assert.match(source, /<TdTableColumn prop="name" label="设备信息" width="238" align="left">/)
+  assert.match(source, /<TdTableColumn prop="ipAddress" label="网络信息" width="158" align="left">/)
   assert.doesNotMatch(source, /label="最近通信"|label="协议"/)
   assert.match(tableAdapterSource, /\{ selectedRowKeys: props\.selectedRowKeys \}/)
   assert.match(tableAdapterSource, /\{ tableContentWidth: props\.tableContentWidth \}/)
+})
+
+test('打印机列表分离通信与打印状态并使用 TDesign 填充操作按钮', () => {
+  assert.doesNotMatch(source, /printer-management-status-dot/)
+  assert.match(source, /printer-management-device-name-row[\s\S]*getConnectionLabel\(scope\.row\.connectionStatus\)/)
+  assert.match(source, /<TdTableColumn prop="status" label="打印状态"[^>]*align="center">/)
+  assert.doesNotMatch(source, /最后：\{\{|scope\.row\.lastCommunicationError|formatDateTime\(scope\.row\.lastSeenAt\)|连续失败 \{\{/)
+  assert.doesNotMatch(source, />编号<|编号 \{\{ scope\.row\.machineNumber/)
+  assert.match(source, /theme="primary" variant="base" :icon="renderIcon\(Edit\)"[^>]*>[\s\S]*编辑/)
+  assert.match(source, /theme="danger" variant="base" :icon="renderIcon\(Delete\)"[^>]*>[\s\S]*删除/)
+  assert.match(source, /\.printer-management-print-status :deep\(\.app-status-tag__icon\)[\s\S]*width: 12px;[\s\S]*height: 12px;/)
 })
 
 test('打印机机器编号是独立自定义字段并支持管理员原位编辑', () => {

@@ -111,10 +111,12 @@ test('监控和人工核对界面保留业务状态与通信状态的独立语�
   assert.match(realtimeSource, /refreshPrinterSnapshot/)
 })
 
-test('打印机视觉适配以通信状态决定当前可用性并保留最后已知业务状态', () => {
+test('打印机列表分离通信与打印状态且详情保留最后已知业务状态', () => {
   assert.match(printerSource, /const healthFields = \[[\s\S]*'currentJobId'[\s\S]*'currentJobFileName'[\s\S]*'currentJobStatus'[\s\S]*'observedFilename'[\s\S]*'taskSource'[\s\S]*'progress'/)
   assert.match(printerSource, /resolveEffectivePrinterStatus\(merged\)/)
-  assert.match(printerSource, /最后：\{\{ getStatusLabel\(scope\.row\.lastKnownStatus\) \}\}/)
+  assert.match(printerSource, /printer-management-connection-indicator[\s\S]*getConnectionLabel\(scope\.row\.connectionStatus\)/)
+  assert.match(printerSource, /merged\.printStatus = merged\.monitorEnabled === false[\s\S]*PRINTER_STATUS\.UNKNOWN/)
+  assert.doesNotMatch(printerSource, /最后：\{\{ getStatusLabel\(scope\.row\.lastKnownStatus\) \}\}/)
   assert.match(drawerSource, /resolveEffectivePrinterStatus\(\{/)
   assert.match(drawerSource, /最后已知：\{\{ lastKnownStateLabel \}\}/)
   assert.match(drawerSource, /控制和任务下发不可用/)

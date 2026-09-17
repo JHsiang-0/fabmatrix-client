@@ -141,35 +141,43 @@
         >
         <TdTableColumn v-if="isAdmin" type="selection" width="52" align="center" fixed="left" />
 
-        <TdTableColumn prop="name" label="设备" width="238">
+        <TdTableColumn prop="name" label="设备信息" width="238" align="left">
           <template #default="scope">
             <div class="printer-management-device-cell">
-              <div v-if="isAdmin && editingNameId === scope.row.id" class="printer-inline-editor" @click.stop>
-                <t-input
-                  v-model="nameDraft"
+              <div class="printer-management-device-name-row">
+                <div v-if="isAdmin && editingNameId === scope.row.id" class="printer-inline-editor" @click.stop>
+                  <t-input
+                    v-model="nameDraft"
+                    size="small"
+                    maxlength="100"
+                    autofocus
+                    placeholder="设备名称"
+                    :disabled="nameSavingId === scope.row.id"
+                    @enter="savePrinterName(scope.row)"
+                    @blur="savePrinterName(scope.row)"
+                  />
+                </div>
+                <button
+                  v-else-if="isAdmin"
+                  type="button"
+                  class="printer-inline-value printer-inline-value--primary"
+                  title="点击编辑设备名称"
+                  @click.stop="startNameEdit(scope.row)"
+                >
+                  <span class="printer-management-ellipsis" :title="scope.row.name">{{ scope.row.name }}</span>
+                  <edit class="printer-inline-value__edit" />
+                </button>
+                <div v-else class="printer-management-name">
+                  <span class="printer-management-ellipsis" :title="scope.row.name">{{ scope.row.name }}</span>
+                </div>
+                <t-tag
+                  class="printer-management-connection-indicator"
                   size="small"
-                  maxlength="100"
-                  autofocus
-                  placeholder="设备名称"
-                  :disabled="nameSavingId === scope.row.id"
-                  @enter="savePrinterName(scope.row)"
-                  @blur="savePrinterName(scope.row)"
-                />
-              </div>
-              <button
-                v-else-if="isAdmin"
-                type="button"
-                class="printer-inline-value printer-inline-value--primary"
-                title="点击编辑设备名称"
-                @click.stop="startNameEdit(scope.row)"
-              >
-                <span class="printer-management-status-dot" :class="`printer-management-status-dot--${getStatusClass(scope.row.effectiveStatus)}`" />
-                <span class="printer-management-ellipsis" :title="scope.row.name">{{ scope.row.name }}</span>
-                <edit class="printer-inline-value__edit" />
-              </button>
-              <div v-else class="printer-management-name">
-                <span class="printer-management-status-dot" :class="`printer-management-status-dot--${getStatusClass(scope.row.effectiveStatus)}`" />
-                <span class="printer-management-ellipsis" :title="scope.row.name">{{ scope.row.name }}</span>
+                  :theme="getConnectionTheme(scope.row.connectionStatus)"
+                  variant="light"
+                >
+                  {{ getConnectionLabel(scope.row.connectionStatus) }}
+                </t-tag>
               </div>
 
               <div v-if="isAdmin && editingMachineNumberId === scope.row.id" class="printer-inline-editor printer-inline-editor--secondary" @click.stop>
@@ -191,16 +199,15 @@
                 title="点击编辑机器编号"
                 @click.stop="startMachineNumberEdit(scope.row)"
               >
-                <span>编号</span>
                 <span class="printer-management-ellipsis font-mono">{{ scope.row.machineNumber || '未设置' }}</span>
                 <edit class="printer-inline-value__edit" />
               </button>
-              <span v-else class="printer-management-muted">编号 {{ scope.row.machineNumber || '未设置' }}</span>
+              <span v-else class="printer-management-muted font-mono">{{ scope.row.machineNumber || '未设置' }}</span>
             </div>
           </template>
         </TdTableColumn>
 
-        <TdTableColumn prop="ipAddress" label="连接" width="158">
+        <TdTableColumn prop="ipAddress" label="网络信息" width="158" align="left">
           <template #default="scope">
             <div class="printer-management-connection-meta">
               <t-tag size="small" variant="light-outline" theme="default">{{ scope.row.ipAddress }}</t-tag>
@@ -209,25 +216,15 @@
           </template>
         </TdTableColumn>
 
-        <TdTableColumn prop="status" label="状态" width="178" align="center">
+        <TdTableColumn prop="status" label="打印状态" width="132" align="center">
           <template #default="scope">
-            <div class="printer-management-state">
-              <div class="printer-management-state__tags">
-                <StatusTag domain="printer" :status="scope.row.effectiveStatus" />
-                <t-tag size="small" :theme="getConnectionTheme(scope.row.connectionStatus)" variant="light">
-                  {{ getConnectionLabel(scope.row.connectionStatus) }}
-                </t-tag>
-              </div>
-              <span v-if="showLastKnownStatus(scope.row)" class="printer-management-muted">最后：{{ getStatusLabel(scope.row.lastKnownStatus) }}</span>
-              <span v-if="scope.row.connectionStatus === 'OFFLINE' && scope.row.lastCommunicationError"
-                class="printer-management-ellipsis printer-management-muted" :title="scope.row.lastCommunicationError">
-                {{ scope.row.lastCommunicationError }}
-              </span>
+            <div class="printer-management-print-status">
+              <StatusTag domain="printer" :status="scope.row.printStatus" />
             </div>
           </template>
         </TdTableColumn>
 
-        <TdTableColumn label="监控" width="180" align="center">
+        <TdTableColumn label="监控" width="132" align="center">
           <template #default="scope">
             <div class="printer-management-monitor-cell">
               <div class="printer-management-monitor-cell__control">
@@ -235,15 +232,11 @@
                 <t-switch class="printer-management-monitor" :value="scope.row.monitorEnabled === true" :disabled="!isAdmin || monitorUpdatingIds.includes(scope.row.id)"
                   :loading="monitorUpdatingIds.includes(scope.row.id)" @click.stop @change="value => handleMonitorChange(scope.row, value)" />
               </div>
-              <span class="printer-management-muted">{{ formatDateTime(scope.row.lastSeenAt) }}</span>
-              <span v-if="Number(scope.row.consecutiveFailureCount) > 0" class="printer-management-recent__failure">
-                连续失败 {{ scope.row.consecutiveFailureCount }} 次
-              </span>
             </div>
           </template>
         </TdTableColumn>
 
-        <TdTableColumn label="当前任务" min-width="220" align="center">
+        <TdTableColumn label="当前任务" min-width="260" align="left">
           <template #default="scope">
             <div class="printer-management-task">
               <span class="printer-management-task__icon" :class="{ 'printer-management-task__icon--active': hasObservedTask(scope.row) }">
@@ -271,32 +264,30 @@
           </template>
         </TdTableColumn>
 
-        <TdTableColumn label="操作" width="178" align="center" fixed="right">
+        <TdTableColumn label="操作" width="216" align="center" fixed="right">
           <template #default="scope">
             <div class="printer-management-actions">
               <!-- 确认热床已清理按钮 -->
               <t-button
                 v-if="shouldShowSafeButton(scope.row)"
-                size="small" theme="warning"
+                size="small" theme="warning" variant="base" :icon="renderIcon(Check)"
                 @click.stop="handleConfirmSafe(scope.row)"
                 :loading="confirmingSafeIds.includes(scope.row.id)"
               >
-                <span><check /></span>
                 确认清理
               </t-button>
               <!-- 启动打印按钮 -->
               <t-button
                 v-if="shouldShowStartButton(scope.row)"
-                size="small" theme="success"
+                size="small" theme="success" variant="base" :icon="renderIcon(Printer)"
                 @click.stop="handleStartJob(scope.row)"
                 :loading="startingJobIds.includes(scope.row.id)"
               >
-                <span><printer /></span>
                 启动打印
               </t-button>
               <t-tooltip v-if="isAdmin" content="编辑设备">
-                <t-button size="small" theme="primary" variant="text" shape="square" aria-label="编辑设备" @click.stop="handleEdit(scope.row)">
-                  <edit />
+                <t-button size="small" theme="primary" variant="base" :icon="renderIcon(Edit)" aria-label="编辑设备" @click.stop="handleEdit(scope.row)">
+                  编辑
                 </t-button>
               </t-tooltip>
               <!-- 删除按钮 -->
@@ -306,8 +297,8 @@
                 @confirm="handleDelete(scope.row.id)"
               >
                 <template #default>
-                  <t-button size="small" theme="danger" variant="text" shape="square" aria-label="删除打印机" :loading="deletingIds.includes(scope.row.id)" @click.stop>
-                    <delete />
+                  <t-button size="small" theme="danger" variant="base" :icon="renderIcon(Delete)" aria-label="删除打印机" :loading="deletingIds.includes(scope.row.id)" @click.stop>
+                    删除
                   </t-button>
                 </template>
               </t-popconfirm>
@@ -618,7 +609,6 @@ import {
   resolveEffectivePrinterStatus,
   resolveLastKnownPrinterStatus
 } from '@/utils/dataAdapters'
-import { formatDateTime } from '@/utils/formatters'
 import { createLatestRequestGuard } from '@/utils/latestRequestGuard'
 import {
   applyBatchUpsertResult,
@@ -797,6 +787,10 @@ const displayTableData = computed(() => tableData.value.map(printer => {
   }
   merged.effectiveStatus = resolveEffectivePrinterStatus(merged)
   merged.lastKnownStatus = resolveLastKnownPrinterStatus(merged) || merged.lastKnownStatus
+  merged.printStatus = merged.monitorEnabled === false
+    || ['OFFLINE', 'UNKNOWN'].includes(String(merged.connectionStatus || '').toUpperCase())
+    ? PRINTER_STATUS.UNKNOWN
+    : normalizePrinterStatus(merged.businessStatus || merged.effectiveStatus || merged.status)
   return merged
 }))
 
@@ -857,12 +851,6 @@ const scanStatsText = computed(() => {
 const getStatusLabel = (status) => {
   return PRINTER_STATUS_MAP[String(status || '').toUpperCase()]?.label || '未知'
 }
-
-const getStatusClass = status => String(status || 'UNKNOWN').toLowerCase()
-const showLastKnownStatus = printer => (
-  [PRINTER_STATUS.OFFLINE, PRINTER_STATUS.UNKNOWN].includes(printer?.effectiveStatus)
-  && !!resolveLastKnownPrinterStatus(printer)
-)
 
 const getProgress = printer => {
   const progress = Number(printer.progress)
@@ -1703,10 +1691,11 @@ const handleBatchAdd = async () => {
 }
 
 .printer-management-device-cell,
+.printer-management-device-name-row,
 .printer-inline-editor,
 .printer-inline-value,
 .printer-management-connection-meta,
-.printer-management-state__tags,
+.printer-management-print-status,
 .printer-management-monitor-cell,
 .printer-management-monitor-cell__control,
 .printer-management-actions {
@@ -1724,6 +1713,20 @@ const handleBatchAdd = async () => {
 .printer-management-device-cell {
   align-items: flex-start;
   gap: 2px;
+}
+
+.printer-management-device-name-row {
+  width: 100%;
+  gap: var(--app-spacing-1);
+}
+
+.printer-management-device-name-row .printer-inline-editor {
+  width: auto;
+  flex: 1 1 auto;
+}
+
+.printer-management-connection-indicator {
+  flex: 0 0 auto;
 }
 
 .printer-inline-editor {
@@ -1788,12 +1791,21 @@ const handleBatchAdd = async () => {
 
 .printer-management-connection-meta,
 .printer-management-monitor-cell {
-  justify-content: center;
   gap: 2px;
+}
+
+.printer-management-connection-meta {
+  align-items: flex-start;
+  justify-content: center;
+  text-align: left;
+}
+
+.printer-management-monitor-cell {
+  justify-content: center;
   text-align: center;
 }
 
-.printer-management-state__tags,
+.printer-management-print-status,
 .printer-management-monitor-cell__control,
 .printer-management-actions {
   justify-content: center;
@@ -1875,19 +1887,6 @@ const handleBatchAdd = async () => {
   min-width: 0;
 }
 
-.printer-management-state {
-  align-items: center;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.printer-management-state {
-  display: flex;
-  min-width: 0;
-  justify-content: center;
-  line-height: 1.2;
-}
-
 .printer-management-name {
   align-items: center;
   max-width: 100%;
@@ -1908,29 +1907,14 @@ const handleBatchAdd = async () => {
   font-size: var(--td-font-size-body-small);
 }
 
-.printer-management-status-dot {
-  flex: 0 0 auto;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-}
-
-.printer-management-status-dot--printing { background: var(--app-primary); }
-.printer-management-status-dot--idle { background: var(--app-success); }
-.printer-management-status-dot--preparing,
-.printer-management-status-dot--paused { background: var(--app-warning); }
-.printer-management-status-dot--error { background: var(--app-danger); }
-.printer-management-status-dot--offline,
-.printer-management-status-dot--unknown { background: var(--app-text-placeholder); }
-
-.printer-management-recent__failure {
-  color: var(--app-warning);
-  font-size: var(--td-font-size-body-small);
+.printer-management-print-status :deep(.app-status-tag__icon) {
+  width: 12px;
+  height: 12px;
 }
 
 .printer-management-task {
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: var(--app-spacing-2);
   text-align: left;
 }
@@ -1975,6 +1959,10 @@ const handleBatchAdd = async () => {
 
 .printer-management-task__content :deep(.t-progress) {
   width: 96px;
+}
+
+.printer-management-actions :deep(.t-button) {
+  min-width: 58px;
 }
 
 .printer-management-table-footer {
