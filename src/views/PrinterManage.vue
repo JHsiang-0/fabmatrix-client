@@ -22,6 +22,11 @@
       :monitor-error="monitorError"
       :monitor-updating="monitorUpdatingIds.includes(selectedDevice?.id)"
       :can-manage-monitor="isAdmin"
+      :action-loading="detailActionLoading"
+      :show-analytics="true"
+      @analytics-open="handleAnalyticsOpen"
+      @action="handlePrinterAction"
+      @emergency-stop="handleEmergencyStop"
       @history-query="handleHistoryQuery"
       @history-page-change="handleHistoryPageChange"
       @monitor-change="handleDetailMonitorChange"
@@ -548,7 +553,11 @@ import {
   getPrinterStatistics,
   getPrinterMonitor,
   updatePrinterMonitor,
-  updatePrinterMonitorBatch
+  updatePrinterMonitorBatch,
+  pausePrinter,
+  resumePrinter,
+  cancelPrinter,
+  emergencyStopPrinter
 } from '@/api/printer'
 import { startJob } from '@/api/job'
 import { message, confirmMessage } from '@/utils/message'
@@ -638,6 +647,7 @@ const monitorError = ref('')
 const monitorUpdatingIds = ref([])
 const monitorBatchLoading = ref(false)
 const selectedPrinterIds = ref([])
+const detailActionLoading = ref(false)
 
 // ===== 表单与弹窗状态 =====
 const dialogVisible = ref(false)
@@ -911,7 +921,6 @@ const handleRowClick = (row) => {
   detailDrawerVisible.value = true
   loadPrinterDetail(row.id)
   loadPrinterMonitor(row.id)
-  loadPrinterAnalytics(row.id)
 }
 
 const loadPrinterDetail = async deviceId => {
@@ -1011,6 +1020,68 @@ const handleDetailMonitorChange = enabled => {
   if (printer) return updateMonitorForIds([printer.id], enabled, printer)
 }
 
+const refreshSelectedPrinter = async printerId => {
+  await Promise.all([
+    fetchData(),
+    loadPrinterDetail(printerId)
+  ])
+}
+
+const handlePrinterAction = async (action, printer) => {
+  if (!printer?.id || detailActionLoading.value) return
+
+  const actionConfig = {
+    pause: { label: '暂停打印', request: pausePrinter, type: 'warning' },
+    resume: { label: '恢复打印', request: resumePrinter, type: 'warning' },
+    cancel: { label: '取消任务', request: cancelPrinter, type: 'danger' }
+  }[action]
+  if (!actionConfig) return
+
+  try {
+    await confirmMessage(
+      `确定要对 ${printer.machineNumber || printer.name} 执行“${actionConfig.label}”吗？`,
+      '操作确认',
+      {
+        confirmButtonText: actionConfig.label,
+        cancelButtonText: '返回',
+        type: actionConfig.type
+      }
+    )
+    detailActionLoading.value = true
+    await actionConfig.request(printer.id)
+    await refreshSelectedPrinter(printer.id)
+    message.success(`${actionConfig.label}成功`)
+  } catch (error) {
+    if (error !== 'cancel' && !error?.toastShown) {
+      message.error(error?.message || `${actionConfig.label}失败`)
+    }
+  } finally {
+    detailActionLoading.value = false
+  }
+}
+
+const handleEmergencyStop = async printer => {
+  if (!printer?.id || detailActionLoading.value) return
+
+  try {
+    await confirmMessage(
+      `紧急停机会立即停止 ${printer.machineNumber || printer.name}，确定继续吗？`,
+      '紧急停机确认',
+      { confirmButtonText: '确认急停', cancelButtonText: '返回', type: 'danger' }
+    )
+    detailActionLoading.value = true
+    await emergencyStopPrinter(printer.id)
+    await refreshSelectedPrinter(printer.id)
+    message.success('紧急停机成功')
+  } catch (error) {
+    if (error !== 'cancel' && !error?.toastShown) {
+      message.error(error?.message || '紧急停机失败')
+    }
+  } finally {
+    detailActionLoading.value = false
+  }
+}
+
 const loadPrinterAnalytics = async deviceId => {
   historyLoading.value = true
   statisticsLoading.value = true
@@ -1053,6 +1124,10 @@ const loadPrinterAnalytics = async deviceId => {
   }
 }
 
+const handleAnalyticsOpen = () => {
+  if (selectedDevice.value?.id) loadPrinterAnalytics(selectedDevice.value.id)
+}
+
 const handleHistoryQuery = range => {
   historyRange.value = Array.isArray(range) ? range : []
   historyPageNum.value = 1
@@ -1082,6 +1157,7 @@ const clearPrinterDetailContext = () => {
   monitorConfig.value = null
   monitorLoading.value = false
   monitorError.value = ''
+  detailActionLoading.value = false
 }
 
 const restorePrinterDetailContext = () => {

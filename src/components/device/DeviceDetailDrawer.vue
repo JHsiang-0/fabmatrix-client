@@ -44,407 +44,247 @@
             </template>
         </t-empty>
 
-        <div v-else-if="device" class="printer-detail-drawer__content p-fluid-md flex flex-col gap-fluid-lg">
-            <!-- 实时状态概览卡片 -->
-            <div class="printer-detail-drawer__status-card p-fluid-md rounded-lg bg-gray-100 border" :class="[
-                currentStateClass === 'error' ? 'bg-red-50 border-red-300' : '',
-                currentStateClass === 'preparing' || currentStateClass === 'paused' ? 'bg-yellow-50 border-yellow-300' : '',
-                currentStateClass === 'printing' ? 'bg-gray-100 border-gray-500' : ''
-            ]">
-                <!-- 状态标签和进度 -->
-                <div class="flex items-center justify-between gap-3">
-                    <StatusTag domain="printer" :status="currentState" variant="dark" size="large" />
-                    <span v-if="realTimeData?.progress !== undefined && isPrintingState"
-                        class="text-fluid-2xl font-bold text-gray-700">
-                        {{ realTimeData.progress }}%
-                    </span>
-                </div>
-
-                <div v-if="isDeviceTaskActive" class="printer-detail-drawer__task-observation">
-                    <t-tag size="small" :theme="deviceTaskSourceMeta.theme" variant="light">
-                        {{ deviceTaskSourceMeta.label }}
-                    </t-tag>
-                    <span class="printer-detail-drawer__task-filename" :title="observedTaskFilename">
-                        {{ observedTaskFilename || '设备未返回文件名' }}
-                    </span>
-                </div>
-
-                <!-- 系统错误信息 -->
-                <div v-if="realTimeData?.systemMessage && isErrorState"
-                    class="mt-3 p-fluid-sm bg-red-50 border border-red-300 rounded text-fluid-xs text-red-700 leading-tight flex items-start gap-2">
-                    <span class="shrink-0 mt-0.5">
-                        <Warning />
-                    </span>
-                    <span class="line-clamp-3" :title="realTimeData.systemMessage">{{ realTimeData.systemMessage }}</span>
-                </div>
-            </div>
-
-            <t-alert v-if="externalTaskNotice" theme="warning" :close-btn="false"
-                :title="externalTaskNotice" />
-
-            <section class="printer-detail-drawer__monitor-section" aria-labelledby="printer-monitor-title">
-                <div class="flex items-center justify-between gap-2 text-fluid-sm font-semibold text-gray-900">
-                    <span id="printer-monitor-title">监控与通信</span>
-                    <t-switch :value="monitorEnabled" :disabled="!canManageMonitor || monitorLoading || monitorUpdating"
-                        :loading="monitorUpdating" @change="handleMonitorChange" />
-                </div>
-                <t-alert v-if="monitorError" theme="error" :title="monitorError" :close-btn="false" />
-                <t-skeleton v-else-if="monitorLoading" :loading="true" theme="paragraph" />
-                <t-descriptions v-else :column="descriptionColumn" size="small" bordered>
-                    <t-descriptions-item label="后台监控">
-                        {{ monitorEnabled ? '已启用' : '已停用' }}
-                    </t-descriptions-item>
-                    <t-descriptions-item label="通信状态">
-                        <t-tag size="small" :theme="connectionTheme" variant="light">{{ connectionLabel }}</t-tag>
-                    </t-descriptions-item>
-                    <t-descriptions-item label="最近通信">
-                        {{ formatDateTime(monitorValue.lastSeenAt) }}
-                    </t-descriptions-item>
-                    <t-descriptions-item label="连续失败">
-                        {{ monitorValue.consecutiveFailureCount ?? 0 }} 次
-                    </t-descriptions-item>
-                    <t-descriptions-item label="最近已知状态">
-                        <StatusTag domain="printer" :status="monitorValue.lastKnownStatus || currentState" />
-                    </t-descriptions-item>
-                    <t-descriptions-item label="协议原始状态">
-                        {{ monitorValue.lastProtocolState || '-' }}
-                    </t-descriptions-item>
-                    <t-descriptions-item label="设备运行时间">
-                        {{ monitorValue.lastDeviceUptime ?? '-' }}
-                    </t-descriptions-item>
-                    <t-descriptions-item v-if="monitorValue.lastCommunicationError" label="最近通信错误" :span="descriptionColumn">
-                        <span class="text-red-600">{{ monitorValue.lastCommunicationError }}</span>
-                    </t-descriptions-item>
-                </t-descriptions>
-            </section>
-
-            <t-alert v-if="currentJobStatus === 'RECONCILING'" theme="warning" :close-btn="false"
-                title="设备状态无法自动确认，请人工核对打印结果。" />
-
-            <!-- 温度监控 -->
-            <div class="flex flex-col gap-fluid-sm">
-                <div class="flex items-center gap-2 text-fluid-sm font-semibold text-gray-900">
-                    <IconNozzle class="w-4 h-4 text-red-600" />
-                    温度监控
-                </div>
-                <!-- 温度卡片网格 - 响应式：移动端堆叠，桌面端并排 -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-fluid-sm">
-                    <!-- 喷头温度 -->
-                    <div class="p-fluid-sm bg-gray-100 rounded-lg flex flex-col gap-1">
-                        <span class="flex items-center text-fluid-xs text-gray-600">
-                            <IconNozzle class="w-3.5 h-3.5 mr-1 text-red-600" />
-                            喷头温度
-                        </span>
-                        <span class="text-fluid-2xl font-bold text-gray-900" :class="{ 'text-red-600': nozzleTemp > 50 }">
-                            {{ formatTemp(nozzleTemp) }}
-                        </span>
-                    </div>
-                    <!-- 热床温度 -->
-                    <div class="p-fluid-sm bg-gray-100 rounded-lg flex flex-col gap-1">
-                        <span class="flex items-center text-fluid-xs text-gray-600">
-                            <IconBed class="w-3.5 h-3.5 mr-1 text-yellow-600" />
-                            热床温度
-                        </span>
-                        <span class="text-fluid-2xl font-bold text-gray-900" :class="{ 'text-yellow-600': bedTemp > 40 }">
-                            {{ formatTemp(bedTemp) }}
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ASSIGNED 状态：待安全确认的任务信息 -->
-            <div v-if="isAssignedState" class="flex flex-col gap-fluid-sm">
-                <div class="flex items-center gap-2 text-fluid-sm font-semibold text-gray-900">
-                    <span class="text-yellow-600">
-                        <Lock />
-                    </span>
-                    待打印任务
-                </div>
-                <div class="p-fluid-md bg-yellow-50 border border-yellow-300 rounded-lg flex flex-col gap-fluid-sm">
-                    <!-- 任务标题和图标 -->
-                    <div class="flex items-start gap-3">
-                        <div class="shrink-0 mt-0.5">
-                            <Lock :size="24" class="text-yellow-600" />
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <div class="font-semibold text-yellow-800 text-fluid-lg">
-                                {{ props.realTimeData?.currentJobFileName ||
-                                    props.device?.currentJobFileName ||
-                                    '任务 #' + (props.realTimeData?.currentJobId || props.device?.currentJobId) }}
+        <div v-else-if="device" class="printer-detail-drawer__content">
+            <t-tabs v-model:value="activeDetailTab" class="printer-detail-drawer__tabs"
+                :class="{ 'is-single-panel': !showAnalytics }"
+                @change="handleDetailTabChange">
+                <t-tab-panel value="overview" label="设备概览">
+                    <div class="printer-detail-drawer__panel printer-detail-drawer__overview app-scroll-region">
+                        <section class="printer-detail-drawer__status-card" :class="[
+                            currentStateClass === 'error' ? 'is-error' : '',
+                            currentStateClass === 'preparing' || currentStateClass === 'paused' ? 'is-warning' : '',
+                            currentStateClass === 'printing' ? 'is-printing' : ''
+                        ]">
+                            <div class="printer-detail-drawer__status-main">
+                                <div class="printer-detail-drawer__status-copy">
+                                    <StatusTag domain="printer" :status="currentState" variant="dark" size="large" />
+                                    <div v-if="isDeviceTaskActive" class="printer-detail-drawer__task-observation">
+                                        <t-tag size="small" :theme="deviceTaskSourceMeta.theme" variant="light">
+                                            {{ deviceTaskSourceMeta.label }}
+                                        </t-tag>
+                                        <span class="printer-detail-drawer__task-filename" :title="observedTaskFilename">
+                                            {{ observedTaskFilename || '设备未返回文件名' }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div v-if="realTimeData?.progress !== undefined && isPrintingState"
+                                    class="printer-detail-drawer__progress-summary">
+                                    <strong>{{ realTimeData.progress }}%</strong>
+                                    <span>打印进度</span>
+                                </div>
                             </div>
-                            <div class="text-fluid-xs text-yellow-700 mt-1">
-                                任务已分配，请确认现场安全后启动打印
+                            <t-progress v-if="isPrintingState" :percentage="realTimeData?.progress || 0"
+                                :status="progressStatus" :stroke-width="6" :label="false" />
+                            <div v-if="realTimeData?.systemMessage && isErrorState"
+                                class="printer-detail-drawer__inline-error">
+                                <Warning />
+                                <span class="line-clamp-2" :title="realTimeData.systemMessage">{{ realTimeData.systemMessage }}</span>
                             </div>
-                        </div>
-                    </div>
+                        </section>
 
-                    <!-- 任务详情网格 -->
-                    <t-divider class="my-2" />
-                    <div class="grid grid-cols-2 gap-2 text-fluid-sm">
-                        <div class="flex flex-col">
-                            <span class="text-fluid-xs text-yellow-600">任务编号</span>
-                            <span class="font-medium text-yellow-800">#{{ props.realTimeData?.currentJobId ||
-                                props.device?.currentJobId || '-' }}</span>
-                        </div>
-                        <div class="flex flex-col">
-                            <span class="text-fluid-xs text-yellow-600">文件名称</span>
-                            <span class="font-medium text-yellow-800 truncate">{{ props.realTimeData?.currentJobFileName
-                                || props.device?.currentJobFileName || '-' }}</span>
-                        </div>
-                    </div>
+                        <t-alert v-if="externalTaskNotice" theme="warning" :close-btn="false"
+                            :title="externalTaskNotice" />
+                        <t-alert v-if="currentJobStatus === 'RECONCILING'" theme="warning" :close-btn="false"
+                            title="设备状态无法自动确认，请人工核对打印结果。" />
 
-                    <!-- 操作按钮 -->
-                    <div class="mt-2">
-                        <t-button v-if="!isSafetyConfirmed" theme="warning" size="large"
-                            class="w-full" @click="handleConfirmSafe" :loading="isLoading">
-                            <span>
-                                <Lock />
-                            </span>
-                            确认现场安全
-                        </t-button>
-                        <div v-else class="flex gap-2">
-                            <t-button theme="primary" size="large" class="flex-1"
-                                @click="handleStartPrint('START_PRINT')" :loading="isLoading">
-                                <span>
-                                    <VideoPlay />
-                                </span>
-                                下发并开始打印
-                            </t-button>
-                            <t-button theme="default" size="large" class="flex-1"
-                                @click="handleStartPrint('UPLOAD_ONLY')" :loading="isLoading">
-                                <span>
-                                    <DocumentAdd />
-                                </span>
-                                仅下发文件
-                            </t-button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                        <section class="printer-detail-drawer__monitor-section" aria-labelledby="printer-monitor-title">
+                            <div class="printer-detail-drawer__section-heading">
+                                <span id="printer-monitor-title">监控与通信</span>
+                                <div class="printer-detail-drawer__monitor-toggle">
+                                    <span>{{ monitorEnabled ? '已启用' : '已停用' }}</span>
+                                    <t-switch :value="monitorEnabled"
+                                        :disabled="!canManageMonitor || monitorLoading || monitorUpdating"
+                                        :loading="monitorUpdating" @change="handleMonitorChange" />
+                                </div>
+                            </div>
+                            <t-alert v-if="monitorError" theme="error" :title="monitorError" :close-btn="false" />
+                            <t-skeleton v-else-if="monitorLoading" :loading="true" theme="paragraph" />
+                            <div v-else class="printer-detail-drawer__monitor-summary">
+                                <div class="printer-detail-drawer__summary-item">
+                                    <span>通信状态</span>
+                                    <t-tag size="small" :theme="connectionTheme" variant="light">{{ connectionLabel }}</t-tag>
+                                </div>
+                                <div class="printer-detail-drawer__summary-item">
+                                    <span>最近通信</span>
+                                    <strong>{{ formatDateTime(monitorValue.lastSeenAt) }}</strong>
+                                </div>
+                                <div class="printer-detail-drawer__summary-item">
+                                    <span>连续失败</span>
+                                    <strong>{{ monitorValue.consecutiveFailureCount ?? 0 }} 次</strong>
+                                </div>
+                            </div>
+                            <div v-if="monitorValue.lastCommunicationError" class="printer-detail-drawer__communication-error"
+                                :title="monitorValue.lastCommunicationError">
+                                {{ monitorValue.lastCommunicationError }}
+                            </div>
+                        </section>
 
-            <!-- 打印任务信息 -->
-            <div v-if="isPrintingOrRelated" class="flex flex-col gap-fluid-sm">
-                <div class="flex items-center gap-2 text-fluid-sm font-semibold text-gray-900">
-                    <span class="text-gray-600">
-                        <Printer />
-                    </span>
-                    打印任务
-                </div>
-                <div class="grid grid-cols-2 gap-fluid-sm">
-                    <div class="p-fluid-sm bg-gray-100 rounded-lg flex flex-col gap-1">
-                        <span class="text-fluid-xs text-gray-600">打印时长</span>
-                        <span class="text-fluid-base font-medium text-gray-900">{{ formatDuration(realTimeData?.printDuration)
-                            }}</span>
-                    </div>
-                    <div class="p-fluid-sm bg-gray-100 rounded-lg flex flex-col gap-1">
-                        <span class="flex items-center text-fluid-xs text-gray-600">
-                            <IconSpool class="w-3.5 h-3.5 mr-1 text-green-600" />
-                            已用耗材
-                        </span>
-                        <span class="text-fluid-base font-medium text-gray-900">{{ formatFilament(realTimeData?.filamentUsed)
-                            }}</span>
-                    </div>
-                    <div v-if="isPrintingState" class="p-fluid-sm bg-gray-100 rounded-lg flex flex-col gap-1 col-span-2">
-                        <span class="text-fluid-xs text-gray-600">打印进度</span>
-                        <t-progress :percentage="realTimeData?.progress || 0" :status="progressStatus"
-                            :stroke-width="10" class="mt-2" />
-                    </div>
-                </div>
-            </div>
+                        <section class="printer-detail-drawer__detail-section" aria-labelledby="printer-live-metrics-title">
+                            <div id="printer-live-metrics-title" class="printer-detail-drawer__section-heading">
+                                <span>实时指标</span>
+                            </div>
+                            <div class="printer-detail-drawer__metric-grid">
+                                <div class="printer-detail-drawer__metric">
+                                    <span><IconNozzle />喷头温度</span>
+                                    <strong :class="{ 'text-red-600': nozzleTemp > 50 }">{{ formatTemp(nozzleTemp) }}</strong>
+                                </div>
+                                <div class="printer-detail-drawer__metric">
+                                    <span><IconBed />热床温度</span>
+                                    <strong :class="{ 'text-yellow-600': bedTemp > 40 }">{{ formatTemp(bedTemp) }}</strong>
+                                </div>
+                                <div v-if="isPrintingOrRelated" class="printer-detail-drawer__metric">
+                                    <span><Printer />打印时长</span>
+                                    <strong>{{ formatDuration(realTimeData?.printDuration) }}</strong>
+                                </div>
+                                <div v-if="isPrintingOrRelated" class="printer-detail-drawer__metric">
+                                    <span><IconSpool />已用耗材</span>
+                                    <strong>{{ formatFilament(realTimeData?.filamentUsed) }}</strong>
+                                </div>
+                            </div>
+                        </section>
 
-            <!-- 设备信息 -->
-            <div class="flex flex-col gap-fluid-sm">
-                <div class="flex items-center gap-2 text-fluid-sm font-semibold text-gray-900">
-                    <span class="text-gray-600">
-                        <InfoFilled />
-                    </span>
-                    设备信息
-                </div>
-                <t-descriptions :column="descriptionColumn" size="small" bordered>
-                    <t-descriptions-item label="机器编号" :span="descriptionColumn">
-                        {{ device.machineNumber || '-' }}
-                    </t-descriptions-item>
-                    <t-descriptions-item label="设备名称" :span="descriptionColumn">
-                        {{ device.name || '-' }}
-                    </t-descriptions-item>
-                    <t-descriptions-item label="IP 地址" :span="descriptionColumn">
-                        {{ device.ipAddress || '-' }}
-                    </t-descriptions-item>
-                    <t-descriptions-item label="固件类型">
-                        {{ device.firmwareType || '-' }}
-                    </t-descriptions-item>
-                    <t-descriptions-item label="喷头尺寸">
-                        {{ device.nozzleSize ? device.nozzleSize + 'mm' : '-' }}
-                    </t-descriptions-item>
-                </t-descriptions>
-            </div>
+                        <section v-if="isAssignedState" class="printer-detail-drawer__assigned-section">
+                            <div class="printer-detail-drawer__section-heading">
+                                <span><Lock />待打印任务</span>
+                            </div>
+                            <div class="printer-detail-drawer__assigned-card">
+                                <div class="printer-detail-drawer__assigned-copy">
+                                    <strong :title="assignedFileName">{{ assignedFileName }}</strong>
+                                    <span>任务 #{{ linkedFarmJobId }} · 请确认现场安全后启动</span>
+                                </div>
+                                <t-button v-if="!isSafetyConfirmed" theme="warning" size="medium"
+                                    @click="handleConfirmSafe" :loading="isLoading">
+                                    <Lock />确认现场安全
+                                </t-button>
+                                <div v-else class="printer-detail-drawer__assigned-actions">
+                                    <t-button theme="primary" size="medium"
+                                        @click="handleStartPrint('START_PRINT')" :loading="isLoading">
+                                        <VideoPlay />下发并打印
+                                    </t-button>
+                                    <t-button theme="default" size="medium"
+                                        @click="handleStartPrint('UPLOAD_ONLY')" :loading="isLoading">
+                                        <DocumentAdd />仅下发文件
+                                    </t-button>
+                                </div>
+                            </div>
+                        </section>
 
-            <!-- 历史与统计 -->
-            <div class="flex flex-col gap-fluid-sm">
-                <div class="flex items-center justify-between gap-2 text-fluid-sm font-semibold text-gray-900">
-                    <span class="flex items-center gap-2">
-                        <span class="text-gray-600"><InfoFilled /></span>
-                        状态历史与统计
-                    </span>
-                    <t-tag v-if="historyIncrementNotice" theme="primary" variant="light" size="small">
-                        实时状态已更新
-                    </t-tag>
-                </div>
-
-                <t-card class="printer-detail-drawer__sub-card border-gray-200">
-                    <template #header>
-                        <div class="flex flex-wrap items-center justify-between gap-2">
-                            <span class="text-sm font-semibold text-gray-900">打印统计</span>
-                            <span class="text-xs text-gray-500">时长单位：秒</span>
-                        </div>
-                    </template>
-                    <t-alert v-if="statisticsError" theme="error" :title="statisticsError" :close-btn="false" />
-                    <t-skeleton v-else-if="statisticsLoading" :loading="true" theme="paragraph" />
-                    <div v-else-if="statistics" class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                        <div v-for="item in statisticCards" :key="item.key" class="rounded-lg bg-gray-100 p-3">
-                            <div class="text-xs text-gray-600">{{ item.label }}</div>
-                            <div class="mt-1 text-lg font-bold text-gray-900">{{ item.value }}</div>
-                        </div>
+                        <section class="printer-detail-drawer__detail-section" aria-labelledby="printer-device-info-title">
+                            <div id="printer-device-info-title" class="printer-detail-drawer__section-heading">
+                                <span>设备信息</span>
+                            </div>
+                            <t-descriptions :column="descriptionColumn" size="small" bordered
+                                class="printer-detail-drawer__device-descriptions">
+                                <t-descriptions-item label="机器编号">{{ device.machineNumber || '-' }}</t-descriptions-item>
+                                <t-descriptions-item label="IP 地址">{{ device.ipAddress || '-' }}</t-descriptions-item>
+                                <t-descriptions-item label="固件类型">{{ device.firmwareType || '-' }}</t-descriptions-item>
+                                <t-descriptions-item label="喷头尺寸">{{ device.nozzleSize ? device.nozzleSize + 'mm' : '-' }}</t-descriptions-item>
+                            </t-descriptions>
+                        </section>
                     </div>
-                    <t-empty v-else description="暂无统计数据" />
-                </t-card>
+                </t-tab-panel>
 
-                <t-card class="printer-detail-drawer__sub-card border-gray-200">
-                    <template #header>
-                        <div class="flex flex-wrap items-center justify-between gap-2">
-                            <span class="text-sm font-semibold text-gray-900">状态历史</span>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <t-date-range-picker
-                                    v-model="historyRangeModel"
-                                    separator="至"
+                <t-tab-panel v-if="showAnalytics" value="history" label="历史统计">
+                    <div class="printer-detail-drawer__panel printer-detail-drawer__history-panel app-scroll-region">
+                        <section class="printer-detail-drawer__statistics-section">
+                            <div class="printer-detail-drawer__section-heading">
+                                <span>打印统计</span>
+                                <t-tag v-if="historyIncrementNotice" theme="primary" variant="light" size="small">
+                                    实时状态已更新
+                                </t-tag>
+                            </div>
+                            <t-alert v-if="statisticsError" theme="error" :title="statisticsError" :close-btn="false" />
+                            <t-skeleton v-else-if="statisticsLoading" :loading="true" theme="paragraph" />
+                            <div v-else-if="statistics" class="printer-detail-drawer__statistics-grid">
+                                <div v-for="item in statisticCards" :key="item.key" class="printer-detail-drawer__statistic">
+                                    <span>{{ item.label }}</span>
+                                    <strong>{{ item.value }}</strong>
+                                </div>
+                            </div>
+                            <t-empty v-else description="暂无统计数据" />
+                        </section>
+
+                        <section class="printer-detail-drawer__history-section">
+                            <div class="printer-detail-drawer__history-toolbar">
+                                <t-date-range-picker v-model="historyRangeModel" separator="至"
                                     :placeholder="['开始日期', '结束日期']"
                                     value-type="YYYY-MM-DD HH:mm:ss"
-                                    style="width: 260px"
-                                    :default-time="['00:00:00', '23:59:59']"
-                                />
-                                <t-button size="small" theme="primary" :loading="historyLoading" @click="handleHistoryQuery">
-                                    查询
-                                </t-button>
-                                <t-button v-if="historyIncrementNotice" size="small" variant="outline" @click="handleHistoryQuery">
-                                    刷新历史
-                                </t-button>
+                                    :default-time="['00:00:00', '23:59:59']" />
+                                <t-button size="small" theme="primary" :loading="historyLoading"
+                                    @click="handleHistoryQuery">查询</t-button>
+                                <t-button v-if="historyIncrementNotice" size="small" variant="outline"
+                                    @click="handleHistoryQuery">刷新</t-button>
                             </div>
-                        </div>
-                    </template>
-                    <t-alert v-if="historyError" theme="error" :title="historyError" :close-btn="false" />
-                    <t-skeleton v-else-if="historyLoading" :loading="true" theme="paragraph" />
-                    <t-table
-                        v-else-if="statusHistory.length > 0"
-                        class="printer-history-table"
-                        :data="displayStatusHistory"
-                        :columns="historyColumns"
-                        row-key="historyRowKey"
-                        size="small"
-                        bordered
-                    >
-                        <template #status="slotProps">
-                            <div class="printer-history-status">
-                                <StatusTag domain="printer" :status="slotProps.row.status" />
-                                <span v-if="slotProps.row.sampleCount > 1" class="printer-history-samples">
-                                    {{ slotProps.row.sampleCount }} 次
-                                </span>
+                            <t-alert v-if="historyError" theme="error" :title="historyError" :close-btn="false" />
+                            <t-skeleton v-else-if="historyLoading" :loading="true" theme="paragraph" />
+                            <div v-else class="printer-detail-drawer__history-table-region">
+                                <t-table v-if="statusHistory.length > 0" class="printer-history-table"
+                                    :data="displayStatusHistory" :columns="historyColumns"
+                                    row-key="historyRowKey" size="small" bordered>
+                                    <template #status="slotProps">
+                                        <div class="printer-history-status">
+                                            <StatusTag domain="printer" :status="slotProps.row.status" />
+                                            <span v-if="slotProps.row.sampleCount > 1" class="printer-history-samples">
+                                                {{ slotProps.row.sampleCount }} 次
+                                            </span>
+                                        </div>
+                                    </template>
+                                    <template #taskSource="slotProps">
+                                        <t-tag size="small" :theme="getTaskSourceMeta(slotProps.row.taskSource).theme" variant="light">
+                                            {{ getTaskSourceMeta(slotProps.row.taskSource).label }}
+                                        </t-tag>
+                                    </template>
+                                    <template #progress="slotProps">{{ formatHistoryProgress(slotProps.row) }}</template>
+                                    <template #recordedAt="slotProps">{{ formatHistoryPeriod(slotProps.row) }}</template>
+                                </t-table>
+                                <t-empty v-else description="暂无状态历史" />
                             </div>
-                        </template>
-                        <template #taskSource="slotProps">
-                            <t-tag size="small" :theme="getTaskSourceMeta(slotProps.row.taskSource).theme" variant="light">
-                                {{ getTaskSourceMeta(slotProps.row.taskSource).label }}
-                            </t-tag>
-                        </template>
-                        <template #progress="slotProps">
-                            {{ formatHistoryProgress(slotProps.row) }}
-                        </template>
-                        <template #recordedAt="slotProps">
-                            {{ formatHistoryPeriod(slotProps.row) }}
-                        </template>
-                    </t-table>
-                    <t-empty v-else description="暂无状态历史" />
-                    <t-pagination
-                        v-if="historyTotal > historyPageSize"
-                        class="mt-3"
-                        :current="historyPageNum"
-                        :page-size="historyPageSize"
-                        :total="historyTotal"
-                        :show-page-size="false"
-                        @change="handleHistoryPageChange"
-                    />
-                </t-card>
-            </div>
-
-            <!-- 设备原生管理界面快捷操作 -->
-            <div class="flex flex-col gap-fluid-sm">
-                <div class="flex items-center gap-2 text-fluid-sm font-semibold text-gray-900">
-                    <span class="text-gray-600">
-                        <Monitor />
-                    </span>
-                    远程控制
-                </div>
-                <div class="flex flex-col gap-fluid-sm">
-                    <t-button v-if="device.ipAddress" theme="primary" size="large" tag="a" :href="deviceConsoleUrl"
-                        target="_blank" rel="noopener noreferrer" class="w-full justify-center h-11 text-fluid-sm">
-                        <span>
-                            <Monitor />
-                        </span>
-                        {{ isRrfDevice ? '打开 DWC 界面' : '打开 Mainsail 界面' }}
-                    </t-button>
-
-                    <!-- 操作按钮网格 - 移动端单列，桌面 3列 -->
-                    <div class="printer-detail-drawer__remote-actions">
-                        <t-button theme="warning" size="medium" :disabled="actionLoading || !canPause" :loading="actionLoading" @click="handleAction('pause')" class="printer-detail-drawer__remote-action">
-                            <span>
-                                <VideoPause />
-                            </span>
-                            暂停
-                        </t-button>
-                        <t-button theme="success" size="medium" :disabled="actionLoading || !canResume" :loading="actionLoading" @click="handleAction('resume')" class="printer-detail-drawer__remote-action">
-                            <span>
-                                <VideoPlay />
-                            </span>
-                            恢复
-                        </t-button>
-                        <t-button theme="danger" size="medium" :disabled="actionLoading || !canCancel" :loading="actionLoading" @click="handleAction('cancel')" class="printer-detail-drawer__remote-action">
-                            <span>
-                                <CircleClose />
-                            </span>
-                            取消
-                        </t-button>
+                            <t-pagination v-if="historyTotal > historyPageSize"
+                                :current="historyPageNum" :page-size="historyPageSize" :total="historyTotal"
+                                :show-page-size="false" @change="handleHistoryPageChange" />
+                        </section>
                     </div>
-
-                    <div v-if="isFatalError" class="mt-3">
-                        <t-divider>
-                            <t-tag theme="danger" variant="dark">紧急操作</t-tag>
-                        </t-divider>
-                        <t-button theme="danger" size="large" class="w-full"
-                            :disabled="actionLoading" :loading="actionLoading"
-                            @click="handleEmergencyStop">
-                            <span>
-                                <Warning />
-                            </span>
-                            紧急停机 (ESTOP)
-                        </t-button>
-                    </div>
-                </div>
-            </div>
+                </t-tab-panel>
+            </t-tabs>
         </div>
 
         <!-- 抽屉底部操作区 -->
         <template #footer>
-            <div class="flex justify-end p-fluid-md border-t border-gray-200">
+            <div v-if="device" class="printer-detail-drawer__footer">
+                <t-button v-if="device.ipAddress" theme="default" variant="outline" size="medium" tag="a"
+                    :href="deviceConsoleUrl" target="_blank" rel="noopener noreferrer"
+                    class="printer-detail-drawer__console-button">
+                    <Monitor />{{ isRrfDevice ? '打开 DWC' : '打开 Mainsail' }}
+                </t-button>
+                <t-button v-else theme="default" variant="outline" size="medium" disabled>
+                    <Monitor />设备地址不可用
+                </t-button>
+                <div class="printer-detail-drawer__footer-actions">
+                    <t-button v-if="canPause" theme="warning" size="medium" :disabled="actionLoading"
+                        :loading="actionLoading" @click="handleAction('pause')">
+                        <VideoPause />暂停
+                    </t-button>
+                    <t-button v-if="canResume" theme="success" size="medium" :disabled="actionLoading"
+                        :loading="actionLoading" @click="handleAction('resume')">
+                        <VideoPlay />恢复
+                    </t-button>
+                    <t-button v-if="canCancel" theme="danger" variant="outline" size="medium"
+                        :disabled="actionLoading" :loading="actionLoading" @click="handleAction('cancel')">
+                        <CircleClose />取消
+                    </t-button>
+                    <t-button v-if="isFatalError" theme="danger" size="medium"
+                        :disabled="actionLoading" :loading="actionLoading" @click="handleEmergencyStop">
+                        <Warning />紧急停机
+                    </t-button>
                 <t-popconfirm v-if="canManageDevice" content="确定要将此设备从该物理位置下架吗？" confirm-btn="确认下架" cancel-btn="取消"
                     theme="danger" @confirm="handleRemove">
                     <template>
-                        <t-button theme="danger" variant="outline">
-                            <span>
-                                <Delete />
-                            </span>
-                            从看板下架
-                        </t-button>
+                            <t-button theme="danger" variant="text" size="medium">
+                                <Delete />下架
+                            </t-button>
                     </template>
                 </t-popconfirm>
+                </div>
             </div>
         </template>
     </t-drawer>
@@ -456,7 +296,6 @@ import {
     CloseIcon as Close,
     DeleteIcon as Delete,
     PrintIcon as Printer,
-    InfoCircleFilledIcon as InfoFilled,
     DesktopIcon as Monitor,
     PauseIcon as VideoPause,
     PlayIcon as VideoPlay,
@@ -492,8 +331,8 @@ const isLargeScreen = computed(() => windowWidth.value >= 1920)
 const drawerSize = computed(() => {
     if (isMobile.value) return '100%'      // 移动端：全屏
     if (isTablet.value) return '70%'       // 平板：70% 宽度
-    if (isLargeScreen.value) return '560px' // 大屏：固定 560px (35rem)
-    return '520px'                          // 桌面：固定 520px (32.5rem)
+    if (isLargeScreen.value) return '680px' // 大屏：为历史表格保留完整列宽
+    return '640px'                          // 桌面：概览与历史共用稳定宽度
 })
 
 // 响应式描述列表列数
@@ -616,6 +455,11 @@ const props = defineProps({
     canManageMonitor: {
         type: Boolean,
         default: false
+    },
+    /** 是否提供历史与统计数据；看板复用时只展示设备概览 */
+    showAnalytics: {
+        type: Boolean,
+        default: false
     }
 })
 
@@ -631,12 +475,15 @@ const emit = defineEmits([
     'closed',
     'history-query',
     'history-page-change',
+    'analytics-open',
     'retry',
     'monitor-change'
 ])
 
 const historyRangeModel = ref([])
 const historyIncrementNotice = ref(false)
+const activeDetailTab = ref('overview')
+const analyticsRequested = ref(false)
 const drawerVisible = computed({
     get: () => props.modelValue,
     set: value => handleVisibleChange(value)
@@ -689,9 +536,8 @@ const statisticCards = computed(() => {
         { key: 'completedJobs', label: '已完成', value: stats.completedJobs ?? 0 },
         { key: 'failedJobs', label: '失败', value: stats.failedJobs ?? 0 },
         { key: 'successRate', label: '成功率', value: `${Number(stats.successRate || 0).toFixed(1)}%` },
-        { key: 'activeJobs', label: '活动任务', value: stats.activeJobs ?? 0 },
-        { key: 'totalPrintSeconds', label: '总打印时长', value: `${Number(stats.totalPrintSeconds || 0).toFixed(0)} 秒` },
-        { key: 'averagePrintSeconds', label: '平均时长', value: `${Number(stats.averagePrintSeconds || 0).toFixed(0)} 秒` }
+        { key: 'totalPrintSeconds', label: '总打印时长', value: formatDuration(stats.totalPrintSeconds) },
+        { key: 'averagePrintSeconds', label: '平均时长', value: formatDuration(stats.averagePrintSeconds) }
     ]
 })
 
@@ -704,7 +550,12 @@ watch(() => props.realTimeData?.updatedAt, (value, previousValue) => {
 })
 
 watch(() => props.modelValue, visible => {
-    if (!visible) historyIncrementNotice.value = false
+    if (visible) {
+        activeDetailTab.value = 'overview'
+        analyticsRequested.value = false
+    } else {
+        historyIncrementNotice.value = false
+    }
 })
 
 // ============================================
@@ -732,6 +583,12 @@ function handleHistoryQuery() {
 
 function handleHistoryPageChange(page) {
     emit('history-page-change', page)
+}
+
+function handleDetailTabChange(value) {
+    if (value !== 'history' || analyticsRequested.value) return
+    analyticsRequested.value = true
+    emit('analytics-open')
 }
 
 // 监听抽屉打开事件
@@ -819,6 +676,11 @@ const linkedFarmJobId = computed(() => (
     || props.device?.currentJob?.id
     || props.device?.currentJobId
     || null
+))
+const assignedFileName = computed(() => (
+    props.realTimeData?.currentJobFileName
+    || props.device?.currentJobFileName
+    || `任务 #${linkedFarmJobId.value || '-'}`
 ))
 const isDeviceTaskActive = computed(() => (
     isPrintingOrRelated.value && ['FARM', 'EXTERNAL', 'UNKNOWN'].includes(deviceTaskSource.value)
@@ -977,43 +839,225 @@ async function handleStartPrint(action) {
    抽屉整体样式 - 响应式优化
    ============================================ */
 .printer-detail-drawer :deep(.t-drawer__body) {
-    overflow-y: auto;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.printer-detail-drawer :deep(.t-drawer__footer) {
+    padding: 0;
+}
+
+.printer-detail-drawer__panel {
     scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
     scrollbar-width: thin;
 }
 
-.printer-detail-drawer :deep(.t-drawer__body::-webkit-scrollbar) { width: 8px; }
-.printer-detail-drawer :deep(.t-drawer__body::-webkit-scrollbar-track) { background: var(--app-scrollbar-track); }
-.printer-detail-drawer :deep(.t-drawer__body::-webkit-scrollbar-thumb) {
+.printer-detail-drawer__panel::-webkit-scrollbar { width: 8px; height: 8px; }
+.printer-detail-drawer__panel::-webkit-scrollbar-track { background: var(--app-scrollbar-track); }
+.printer-detail-drawer__panel::-webkit-scrollbar-thumb {
     background: var(--app-scrollbar-thumb);
     border: 2px solid transparent;
     border-radius: 999px;
     background-clip: padding-box;
 }
-.printer-detail-drawer :deep(.t-drawer__body::-webkit-scrollbar-thumb:hover) {
+.printer-detail-drawer__panel::-webkit-scrollbar-thumb:hover {
     background: var(--app-scrollbar-thumb-hover);
     background-clip: padding-box;
 }
 
 .printer-detail-drawer__content {
+    display: flex;
+    height: 100%;
+    min-height: 0;
     min-width: 0;
+    flex-direction: column;
+}
+
+.printer-detail-drawer__tabs {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+}
+
+.printer-detail-drawer__tabs :deep(.t-tabs__nav) {
+    flex: 0 0 auto;
+    padding: 0 var(--app-spacing-4);
+}
+
+.printer-detail-drawer__tabs.is-single-panel :deep(.t-tabs__nav) {
+    display: none;
+}
+
+.printer-detail-drawer__tabs :deep(.t-tabs__content) {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+}
+
+.printer-detail-drawer__tabs :deep(.t-tab-panel) {
+    height: 100%;
+    min-height: 0;
+}
+
+.printer-detail-drawer__panel {
+    height: 100%;
+    min-height: 0;
+    padding: var(--app-spacing-3) var(--app-spacing-4);
+}
+
+.printer-detail-drawer__overview {
+    display: grid;
+    align-content: start;
+    gap: var(--app-spacing-3);
+    overflow-y: auto;
 }
 
 .printer-detail-drawer__status-card {
+    display: grid;
+    gap: var(--app-spacing-2);
+    padding: var(--app-spacing-3) var(--app-spacing-4);
     background: var(--app-surface-muted);
-    border-color: var(--app-border);
-    box-shadow: var(--app-shadow);
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
 }
 
-.printer-detail-drawer__monitor-section {
-    padding: var(--app-spacing-4);
+.printer-detail-drawer__status-card.is-error {
+    background: var(--td-error-color-1);
+    border-color: var(--td-error-color-3);
+}
+
+.printer-detail-drawer__status-card.is-warning {
+    background: var(--td-warning-color-1);
+    border-color: var(--td-warning-color-3);
+}
+
+.printer-detail-drawer__status-card.is-printing {
+    border-color: var(--td-brand-color-3);
+}
+
+.printer-detail-drawer__status-main,
+.printer-detail-drawer__section-heading,
+.printer-detail-drawer__footer,
+.printer-detail-drawer__footer-actions,
+.printer-detail-drawer__monitor-toggle,
+.printer-detail-drawer__assigned-actions {
+    display: flex;
+    align-items: center;
+}
+
+.printer-detail-drawer__status-main,
+.printer-detail-drawer__section-heading,
+.printer-detail-drawer__footer {
+    justify-content: space-between;
+}
+
+.printer-detail-drawer__status-main {
+    min-width: 0;
+    gap: var(--app-spacing-3);
+}
+
+.printer-detail-drawer__status-copy {
+    min-width: 0;
+}
+
+.printer-detail-drawer__progress-summary {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: baseline;
+    gap: var(--app-spacing-2);
+}
+
+.printer-detail-drawer__progress-summary strong {
+    color: var(--app-text-primary);
+    font-size: var(--td-font-size-title-large);
+}
+
+.printer-detail-drawer__progress-summary span,
+.printer-detail-drawer__monitor-toggle,
+.printer-detail-drawer__summary-item > span,
+.printer-detail-drawer__metric > span,
+.printer-detail-drawer__assigned-copy > span,
+.printer-detail-drawer__statistic > span {
+    color: var(--app-text-secondary);
+    font-size: var(--td-font-size-body-small);
+}
+
+.printer-detail-drawer__inline-error {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    gap: var(--app-spacing-2);
+    color: var(--td-error-color-7);
+    font-size: var(--td-font-size-body-small);
+}
+
+.printer-detail-drawer__monitor-section,
+.printer-detail-drawer__detail-section,
+.printer-detail-drawer__statistics-section,
+.printer-detail-drawer__history-section {
+    padding: var(--app-spacing-3);
     background: var(--app-surface);
     border: 1px solid var(--app-border);
     border-radius: var(--app-radius);
 }
 
-.printer-detail-drawer__monitor-section :deep(.t-descriptions) {
-    margin-top: var(--app-spacing-3);
+.printer-detail-drawer__section-heading {
+    min-height: var(--td-comp-size-xs);
+    gap: var(--app-spacing-2);
+    color: var(--app-text-primary);
+    font-size: var(--td-font-size-body-medium);
+    font-weight: 600;
+}
+
+.printer-detail-drawer__section-heading > span {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--app-spacing-1);
+}
+
+.printer-detail-drawer__monitor-toggle,
+.printer-detail-drawer__footer-actions,
+.printer-detail-drawer__assigned-actions {
+    gap: var(--app-spacing-2);
+}
+
+.printer-detail-drawer__monitor-summary {
+    display: grid;
+    grid-template-columns: 0.8fr 1.5fr 0.8fr;
+    gap: var(--app-spacing-2);
+    margin-top: var(--app-spacing-2);
+}
+
+.printer-detail-drawer__summary-item {
+    display: flex;
+    min-width: 0;
+    min-height: 44px;
+    padding: var(--app-spacing-2) var(--app-spacing-3);
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    background: var(--app-surface-muted);
+    border-radius: var(--app-radius-small);
+}
+
+.printer-detail-drawer__summary-item strong {
+    overflow: hidden;
+    color: var(--app-text-primary);
+    font-size: var(--td-font-size-body-small);
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.printer-detail-drawer__communication-error {
+    margin-top: var(--app-spacing-2);
+    overflow: hidden;
+    color: var(--td-error-color-7);
+    font-size: var(--td-font-size-body-small);
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .printer-detail-drawer__task-observation {
@@ -1021,7 +1065,7 @@ async function handleStartPrint(action) {
     min-width: 0;
     align-items: center;
     gap: var(--app-spacing-2);
-    margin-top: var(--app-spacing-3);
+    margin-top: var(--app-spacing-2);
 }
 
 .printer-detail-drawer__task-filename {
@@ -1033,18 +1077,139 @@ async function handleStartPrint(action) {
     white-space: nowrap;
 }
 
-.printer-detail-drawer__sub-card {
+.printer-detail-drawer__metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: var(--app-spacing-2);
+    margin-top: var(--app-spacing-2);
+}
+
+.printer-detail-drawer__metric {
+    display: flex;
+    min-width: 0;
+    min-height: 58px;
+    padding: var(--app-spacing-2) var(--app-spacing-3);
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    background: var(--app-surface-muted);
+    border-radius: var(--app-radius-small);
+}
+
+.printer-detail-drawer__metric > span {
+    display: flex;
+    align-items: center;
+    gap: var(--app-spacing-1);
+}
+
+.printer-detail-drawer__metric svg {
+    width: 14px;
+    height: 14px;
+}
+
+.printer-detail-drawer__metric strong {
+    color: var(--app-text-primary);
+    font-size: var(--td-font-size-title-medium);
+}
+
+.printer-detail-drawer__assigned-section {
+    display: grid;
+    gap: var(--app-spacing-2);
+}
+
+.printer-detail-drawer__assigned-card {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--app-spacing-3);
+    padding: var(--app-spacing-3);
+    background: var(--td-warning-color-1);
+    border: 1px solid var(--td-warning-color-3);
+    border-radius: var(--app-radius);
+}
+
+.printer-detail-drawer__assigned-copy {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.printer-detail-drawer__assigned-copy strong {
+    overflow: hidden;
+    color: var(--app-text-primary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.printer-detail-drawer__device-descriptions {
+    margin-top: var(--app-spacing-2);
+}
+
+.printer-detail-drawer__history-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-spacing-3);
     overflow: hidden;
 }
 
-.printer-detail-drawer__sub-card :deep(.t-card__header) {
-    padding: var(--app-spacing-3) var(--app-spacing-4);
-    background: var(--app-surface-muted);
-    border-bottom: 1px solid var(--app-border);
+.printer-detail-drawer__statistics-section {
+    flex: 0 0 auto;
 }
 
-.printer-detail-drawer__sub-card :deep(.t-card__body) {
-    padding: var(--app-spacing-4);
+.printer-detail-drawer__statistics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--app-spacing-2);
+    margin-top: var(--app-spacing-2);
+}
+
+.printer-detail-drawer__statistic {
+    display: flex;
+    min-width: 0;
+    min-height: 48px;
+    padding: var(--app-spacing-2) var(--app-spacing-3);
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    background: var(--app-surface-muted);
+    border-radius: var(--app-radius-small);
+}
+
+.printer-detail-drawer__statistic strong {
+    overflow: hidden;
+    color: var(--app-text-primary);
+    font-size: var(--td-font-size-title-small);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.printer-detail-drawer__history-section {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--app-spacing-2);
+}
+
+.printer-detail-drawer__history-toolbar {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--app-spacing-2);
+}
+
+.printer-detail-drawer__history-toolbar :deep(.t-date-range-picker) {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.printer-detail-drawer__history-table-region {
+    min-height: 160px;
+    flex: 1 1 auto;
+    overflow: auto;
 }
 
 .printer-detail-drawer :deep(.printer-history-table) {
@@ -1055,7 +1220,7 @@ async function handleStartPrint(action) {
 .printer-detail-drawer :deep(.printer-history-table .t-table__content) {
     width: 100%;
     max-width: 100%;
-    overflow-x: auto;
+    overflow: visible;
 }
 
 .printer-detail-drawer :deep(.printer-history-table table) {
@@ -1083,18 +1248,6 @@ async function handleStartPrint(action) {
     white-space: nowrap;
 }
 
-.printer-detail-drawer__remote-actions {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--app-spacing-2);
-}
-
-.printer-detail-drawer__remote-action {
-    width: 100%;
-    min-height: 40px;
-    justify-content: center;
-}
-
 .printer-detail-drawer__header {
     display: flex;
     align-items: center;
@@ -1112,6 +1265,17 @@ async function handleStartPrint(action) {
     white-space: nowrap;
 }
 
+.printer-detail-drawer__footer {
+    min-height: 64px;
+    padding: var(--app-spacing-3) var(--app-spacing-4);
+    gap: var(--app-spacing-3);
+    border-top: 1px solid var(--app-border);
+}
+
+.printer-detail-drawer__console-button {
+    flex: 0 0 auto;
+}
+
 /* ============================================
    移动端适配
    ============================================ */
@@ -1120,10 +1284,38 @@ async function handleStartPrint(action) {
         width: 100% !important;
     }
 
-    .printer-detail-drawer__remote-actions {
-        grid-template-columns: 1fr;
+    .printer-detail-drawer__panel {
+        padding: var(--app-spacing-2) var(--app-spacing-3);
     }
 
+    .printer-detail-drawer__monitor-summary,
+    .printer-detail-drawer__statistics-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .printer-detail-drawer__assigned-card,
+    .printer-detail-drawer__footer {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .printer-detail-drawer__assigned-actions,
+    .printer-detail-drawer__footer-actions {
+        width: 100%;
+    }
+
+    .printer-detail-drawer__assigned-actions > *,
+    .printer-detail-drawer__footer-actions > * {
+        flex: 1 1 auto;
+    }
+
+    .printer-detail-drawer__history-panel {
+        overflow-y: auto;
+    }
+
+    .printer-detail-drawer__history-section {
+        min-height: 460px;
+    }
 }
 
 /* ============================================
