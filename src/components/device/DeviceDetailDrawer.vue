@@ -51,8 +51,8 @@
                 <t-tab-panel value="overview" label="设备概览">
                     <div class="printer-detail-drawer__panel printer-detail-drawer__overview app-scroll-region">
                         <section class="printer-detail-drawer__status-card" :class="`is-${currentStateClass}`">
-                            <div class="printer-detail-drawer__status-layout">
-                                <div class="printer-detail-drawer__status-context">
+                            <div class="printer-detail-drawer__status-main">
+                                <div class="printer-detail-drawer__status-copy">
                                     <div class="printer-detail-drawer__status-heading">
                                         <StatusTag domain="printer" :status="currentState" variant="dark" size="large" />
                                         <t-tag size="small" :theme="connectionTheme" variant="light">
@@ -76,18 +76,10 @@
                                     <span v-else class="printer-detail-drawer__status-description">
                                         {{ statusDescription }}
                                     </span>
-                                    <div v-if="isPrintingOrRelated" class="printer-detail-drawer__progress-summary">
-                                        <span>打印进度</span>
-                                        <strong>{{ currentProgress }}%</strong>
-                                    </div>
                                 </div>
-
-                                <div class="printer-detail-drawer__device-info-grid" aria-label="设备信息">
-                                    <div v-for="item in deviceInfoItems" :key="item.label"
-                                        class="printer-detail-drawer__device-info-item">
-                                        <span>{{ item.label }}</span>
-                                        <strong :title="item.value">{{ item.value }}</strong>
-                                    </div>
+                                <div v-if="isPrintingOrRelated" class="printer-detail-drawer__progress-summary">
+                                    <strong>{{ currentProgress }}%</strong>
+                                    <span>打印进度</span>
                                 </div>
                             </div>
                             <t-progress v-if="isPrintingOrRelated" :percentage="currentProgress"
@@ -156,6 +148,20 @@
                                 <div v-if="isPrintingOrRelated" class="printer-detail-drawer__metric">
                                     <span><IconSpool />已用耗材</span>
                                     <strong>{{ formatFilament(realTimeData?.filamentUsed) }}</strong>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="printer-detail-drawer__detail-section"
+                            aria-labelledby="printer-device-info-title">
+                            <div id="printer-device-info-title" class="printer-detail-drawer__section-heading">
+                                <span>设备信息</span>
+                            </div>
+                            <div class="printer-detail-drawer__device-info-grid">
+                                <div v-for="item in deviceInfoItems" :key="item.label"
+                                    class="printer-detail-drawer__device-info-item">
+                                    <span>{{ item.label }}</span>
+                                    <strong :title="item.value">{{ item.value }}</strong>
                                 </div>
                             </div>
                         </section>
@@ -1009,18 +1015,17 @@ async function handleStartPrint(action) {
     border-color: var(--app-border);
 }
 
-.printer-detail-drawer__status-layout {
-    display: grid;
-    grid-template-columns: minmax(180px, 0.85fr) minmax(0, 1.6fr);
+.printer-detail-drawer__status-main {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
     gap: var(--app-spacing-3);
 }
 
-.printer-detail-drawer__status-context {
-    display: flex;
+.printer-detail-drawer__status-copy {
     min-width: 0;
-    flex-direction: column;
-    justify-content: center;
-    gap: var(--app-spacing-2);
+    flex: 1 1 auto;
 }
 
 .printer-detail-drawer__status-heading,
@@ -1053,8 +1058,8 @@ async function handleStartPrint(action) {
 
 .printer-detail-drawer__progress-summary {
     display: flex;
+    flex: 0 0 auto;
     align-items: baseline;
-    justify-content: space-between;
     gap: var(--app-spacing-2);
 }
 
@@ -1066,8 +1071,9 @@ async function handleStartPrint(action) {
 .printer-detail-drawer__device-info-grid {
     display: grid;
     min-width: 0;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--app-spacing-2);
+    margin-top: var(--app-spacing-2);
 }
 
 .printer-detail-drawer__device-info-item {
@@ -1078,8 +1084,7 @@ async function handleStartPrint(action) {
     flex-direction: column;
     justify-content: center;
     gap: 2px;
-    background: var(--td-bg-color-container);
-    border: 1px solid var(--td-component-border);
+    background: var(--app-surface-muted);
     border-radius: var(--app-radius-small);
 }
 
@@ -1437,8 +1442,8 @@ async function handleStartPrint(action) {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .printer-detail-drawer__status-layout {
-        grid-template-columns: 1fr;
+    .printer-detail-drawer__status-main {
+        align-items: flex-start;
     }
 
     .printer-detail-drawer__assigned-card,

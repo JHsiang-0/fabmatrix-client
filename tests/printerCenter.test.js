@@ -246,12 +246,20 @@ test('打印机详情抽屉以概览和历史双标签压缩信息并固定底�
   assert.match(printerApiSource, /data: \{ jobId, printerId \}/)
 })
 
-test('打印机详情使用状态主题卡整合任务和设备信息并统一底部操作', () => {
+test('打印机详情使用紧凑状态主题卡和独立设备信息卡并统一底部操作', () => {
   assert.match(detailSource, /:class="`is-\$\{currentStateClass\}`"/)
+  assert.match(detailSource, /printer-detail-drawer__status-main/)
   assert.match(detailSource, /printer-detail-drawer__device-info-grid/)
+  assert.match(detailSource, /aria-labelledby="printer-device-info-title"/)
+  const statusCardStart = detailSource.indexOf('class="printer-detail-drawer__status-card"')
+  const statusCardEnd = detailSource.indexOf('</section>', statusCardStart)
+  const deviceInfoStart = detailSource.indexOf('aria-labelledby="printer-device-info-title"')
+  assert.equal(deviceInfoStart > statusCardEnd, true)
   assert.match(detailSource, /label: 'MAC 地址'/)
   assert.match(detailSource, /label: '当前耗材'/)
   assert.match(detailSource, /label: '看板位置'/)
+  assert.match(detailSource, /\.printer-detail-drawer__device-info-grid[\s\S]*repeat\(3, minmax\(0, 1fr\)\)/)
+  assert.match(detailSource, /\.printer-detail-drawer__device-info-item[\s\S]*background: var\(--app-surface-muted\)/)
   assert.match(detailSource, /\.printer-detail-drawer__status-card\.is-idle[\s\S]*--td-success-color-1/)
   assert.match(detailSource, /\.printer-detail-drawer__status-card\.is-printing[\s\S]*--td-brand-color-1/)
   assert.doesNotMatch(detailSource, /printer-detail-drawer__device-descriptions/)
