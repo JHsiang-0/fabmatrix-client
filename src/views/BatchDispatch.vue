@@ -115,6 +115,9 @@
           {{ conflict.message || conflict.reasonCode || conflict.code || '资源冲突' }}
         </div>
       </t-alert>
+      <t-alert v-if="previewData.items?.some(isCapabilityWarning)" class="mb-3" theme="warning" title="存在打印参数提醒" :close-btn="false">
+        耗材或喷嘴与打印机当前配置不一致，但仍可执行；请在打印前确认现场参数。
+      </t-alert>
       <div class="preview-list app-scroll-region" aria-label="派发预览明细">
         <div v-for="item in previewData.items || []" :key="item.itemId" class="preview-row">
           <t-tooltip
@@ -125,7 +128,7 @@
               {{ item.fileName || `文件 #${item.fileId}` }} → {{ item.printerName || (item.printerId ? `打印机 #${item.printerId}` : '未分配') }}
             </span>
           </t-tooltip>
-          <t-tag class="preview-row__status" :theme="item.canExecute ? 'success' : 'danger'" variant="light">
+          <t-tag class="preview-row__status" :theme="isCapabilityWarning(item) ? 'warning' : (item.canExecute ? 'success' : 'danger')" variant="light">
             {{ item.message || item.reasonCode || (item.canExecute ? '可执行' : '存在冲突') }}
           </t-tag>
         </div>
@@ -313,9 +316,14 @@ function collectFolderIds(nodes, result = []) {
 }
 
 function resultTheme(item) {
+  if (isCapabilityWarning(item)) return 'warning'
   if (isBatchConfirmItemSuccessful(item)) return 'success'
   if (item.status === 'RETRYABLE' || item.status === 'RECOVERY_REQUIRED') return 'warning'
   return 'danger'
+}
+
+function isCapabilityWarning(item) {
+  return item?.canExecute === true && String(item?.message || '').startsWith('警告：')
 }
 
 function stopPreviewExpiryTimer() {

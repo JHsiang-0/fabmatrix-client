@@ -19,6 +19,9 @@ test('任务创建只提交正式字段并提供幂等多份结果', () => {
   assert.match(queueSource, /fileId: createTaskForm\.value\.fileId/)
   assert.match(queueSource, /idempotencyKey: `\$\{createTaskBatchKey\.value\}-\$\{index\}`/)
   assert.doesNotMatch(queueSource, /materialType: createTaskForm|nozzleSize: createTaskForm/)
+  assert.match(queueSource, /createTaskWarnings/)
+  assert.match(queueSource, /confirmMessage\([\s\S]*仍然创建/)
+  assert.match(queueSource, /nozzleSize: node\.nozzleSize/)
   assert.match(queueSource, /retryFailedTaskCreations/)
 })
 

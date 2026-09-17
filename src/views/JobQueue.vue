@@ -316,6 +316,16 @@
 
             class="mt-3"
           />
+          <t-alert
+            v-else-if="assignWarnings.length"
+            theme="warning"
+            title="打印参数不一致提醒"
+            :close-btn="false"
+            class="mt-3"
+          >
+            <div v-for="warning in assignWarnings" :key="warning">{{ warning }}</div>
+            <div class="mt-1">仅作风险提醒，不会阻止任务分配；请确认现场已更换或接受当前喷嘴/耗材。</div>
+          </t-alert>
         </t-form-item>
       </t-form>
 
@@ -403,6 +413,16 @@
           />
         </t-form-item>
       </t-form>
+      <t-alert
+        v-if="createTaskWarnings.length"
+        theme="warning"
+        title="打印参数不一致提醒"
+        :close-btn="false"
+        class="mb-4"
+      >
+        <div v-for="warning in createTaskWarnings" :key="warning">{{ warning }}</div>
+        <div class="mt-1">仅作风险提醒，不会阻止任务创建或后续打印。</div>
+      </t-alert>
       <t-alert
         v-if="createTaskResults.length"
         :theme="createTaskResults.every(result => result.status === 'SUCCESS') ? 'success' : 'warning'"
@@ -546,6 +566,12 @@ const createTaskForm = ref({
   copies: 1
 })
 
+const selectedCreateTaskFile = computed(() => taskFiles.value.find(file => String(file.id) === String(createTaskForm.value.fileId)))
+const selectedCreateTaskPrinter = computed(() => taskPrinters.value.find(printer => String(printer.id) === String(createTaskForm.value.printerId)))
+const selectedAssignPrinter = computed(() => idlePrinters.value.find(printer => String(printer.id) === String(selectedPrinterId.value)))
+const createTaskWarnings = computed(() => getPrintParameterWarnings(selectedCreateTaskFile.value, selectedCreateTaskPrinter.value))
+const assignWarnings = computed(() => getPrintParameterWarnings(currentJob.value, selectedAssignPrinter.value))
+
 const createTaskRules = {
   fileId: [{ required: true, message: '请选择切片文件', trigger: 'change' }],
   priority: [{ required: true, message: '请输入优先级', trigger: 'change' }],
@@ -642,6 +668,27 @@ const hasValue = value => value !== undefined && value !== null && value !== ''
 
 const formatOptional = value => hasValue(value) ? value : '-'
 
+const normalizedParameter = value => value === undefined || value === null || String(value).trim() === ''
+  ? null
+  : String(value).trim()
+
+const getPrintParameterWarnings = (file, printer) => {
+  if (!file || !printer) return []
+  const warnings = []
+  const fileMaterial = normalizedParameter(file.materialType)
+  const printerMaterial = normalizedParameter(printer.currentMaterial)
+  if (fileMaterial && printerMaterial && fileMaterial.toUpperCase() !== printerMaterial.toUpperCase()) {
+    warnings.push(`耗材不一致：文件要求 ${fileMaterial}，打印机当前为 ${printerMaterial}`)
+  }
+
+  const fileNozzle = Number.parseFloat(file.nozzleSize)
+  const printerNozzle = Number.parseFloat(printer.nozzleSize)
+  if (Number.isFinite(fileNozzle) && Number.isFinite(printerNozzle) && Math.abs(fileNozzle - printerNozzle) > 0.0001) {
+    warnings.push(`喷嘴不一致：文件要求 ${fileNozzle.toFixed(2)} mm，打印机当前为 ${printerNozzle.toFixed(2)} mm`)
+  }
+  return warnings
+}
+
 const flattenTaskFiles = (nodes, result = []) => {
   nodes.forEach(node => {
     if (node.folder !== true) {
@@ -649,7 +696,8 @@ const flattenTaskFiles = (nodes, result = []) => {
         id: node.id,
         originalName: node.name,
         fileSize: node.fileSize,
-        materialType: node.materialType
+        materialType: node.materialType,
+        nozzleSize: node.nozzleSize
       })
     }
     if (Array.isArray(node.children)) flattenTaskFiles(node.children, result)
@@ -720,6 +768,18 @@ const submitCreateTask = async (retryOnly = false) => {
       .map(result => result.index)
     : Array.from({ length: createTaskForm.value.copies }, (_, index) => index)
   if (!indexes.length) return
+
+  if (!retryOnly && createTaskWarnings.value.length) {
+    try {
+      await confirmMessage(
+        `当前文件与所选打印机存在参数不一致：\n${createTaskWarnings.value.join('\n')}\n\n仍然创建任务吗？`,
+        '打印参数不一致提醒',
+        { type: 'warning', confirmButtonText: '仍然创建', cancelButtonText: '返回修改' }
+      )
+    } catch {
+      return
+    }
+  }
 
   actionLoadingKey.value = `create:${createTaskBatchKey.value}`
   createTaskSubmitting.value = true
@@ -948,6 +1008,13 @@ const submitAssign = async () => {
   if (!acquireJobActionLock({ actionLoadingKey, action: 'assign', jobId: job.id })) return
   assigning.value = true
   try {
+    if (assignWarnings.value.length) {
+      await confirmMessage(
+        `当前任务与所选打印机存在参数不一致：\n${assignWarnings.value.join('\n')}\n\n仍然分配任务吗？`,
+        '打印参数不一致提醒',
+        { type: 'warning', confirmButtonText: '仍然分配', cancelButtonText: '返回修改' }
+      )
+    }
     await assignJobToPrinter(job.id, selectedPrinterId.value)
     message.success('任务分配成功！请等待操作员确认安全后启动打印')
     assignDialogVisible.value = false
