@@ -144,6 +144,18 @@ test('任务中心视觉适配保留 TDesign 分区、表格反馈和详情核�
   assert.match(detailSource, /COMPLETED.*FAILED.*CANCELLED.*QUEUED/s)
 })
 
+test('任务队列表格保持两行信息密度并统一单行操作层级', () => {
+  assert.doesNotMatch(queueSource, /文件 ID \{\{/)
+  assert.doesNotMatch(queueSource, /打印机 ID \{\{/)
+  assert.match(queueSource, /const getFileMeta = job =>/)
+  assert.match(queueSource, /const getPrinterMeta = display =>/)
+  assert.match(queueSource, /class="task-action-button" size="small" variant="text"/)
+  assert.match(queueSource, /const getActivePrimaryAction = job =>/)
+  assert.match(queueSource, /\.task-action-group\s*\{[\s\S]*?flex-wrap: nowrap;[\s\S]*?white-space: nowrap;/)
+  assert.match(queueSource, /<TdTableColumn label="调度操作" width="236" align="center" fixed="right">/)
+  assert.match(queueSource, /<TdTableColumn label="操作" width="236" align="center" fixed="right">/)
+})
+
 test('任务核对仍有重复提交保护并刷新任务、队列和打印机状态', () => {
   for (const source of [queueSource, historySource]) {
     assert.match(source, /const refreshResults = await Promise\.allSettled\(/)

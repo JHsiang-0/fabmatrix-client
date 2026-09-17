@@ -40,7 +40,7 @@
         style="width: 100%"
         class="job-queue-table job-table"
       >
-        <TdTableColumn prop="id" label="任务 ID" width="130" align="center">
+        <TdTableColumn prop="id" label="任务 ID" width="96" align="center">
           <template #default="scope">
             <t-tooltip :content="`#${getQueueDisplay(scope.row).jobId}`" class="job-display-tooltip">
               <span class="job-display__secondary job-display__ellipsis font-mono">#{{ getQueueDisplay(scope.row).jobId }}</span>
@@ -54,30 +54,27 @@
               <t-tooltip :content="getQueueDisplay(scope.row).fileName" class="job-display-tooltip">
                 <span class="job-display__primary job-display__ellipsis">{{ getQueueDisplay(scope.row).fileName }}</span>
               </t-tooltip>
-              <span v-if="getQueueDisplay(scope.row).fileId" class="job-display__secondary job-display__ellipsis">
-                文件 ID {{ getQueueDisplay(scope.row).fileId }}
+              <span v-if="getFileMeta(scope.row)" class="job-display__secondary job-display__ellipsis">
+                {{ getFileMeta(scope.row) }}
               </span>
             </div>
           </template>
         </TdTableColumn>
 
-        <TdTableColumn label="打印设备" min-width="210">
+        <TdTableColumn label="打印设备" min-width="200">
           <template #default="scope">
             <div class="job-display-cell">
               <t-tooltip :content="getQueueDisplay(scope.row).printerName" class="job-display-tooltip">
                 <span class="job-display__primary job-display__ellipsis">{{ getQueueDisplay(scope.row).printerName }}</span>
               </t-tooltip>
-              <t-tooltip :content="getQueueDisplay(scope.row).machineNumber" class="job-display-tooltip">
-                <span class="job-display__secondary job-display__ellipsis">{{ getQueueDisplay(scope.row).machineNumber }}</span>
-              </t-tooltip>
-              <span v-if="getQueueDisplay(scope.row).printerId" class="job-display__secondary job-display__ellipsis">
-                打印机 ID {{ getQueueDisplay(scope.row).printerId }}
+              <span v-if="getPrinterMeta(getQueueDisplay(scope.row))" class="job-display__secondary job-display__ellipsis">
+                {{ getPrinterMeta(getQueueDisplay(scope.row)) }}
               </span>
             </div>
           </template>
         </TdTableColumn>
 
-        <TdTableColumn label="人员" min-width="190">
+        <TdTableColumn label="人员" min-width="180">
           <template #default="scope">
             <div class="job-display-cell">
               <t-tooltip :content="getQueueDisplay(scope.row).creatorUsername" class="job-display-tooltip">
@@ -128,13 +125,15 @@
           </template>
         </TdTableColumn>
 
-        <TdTableColumn label="调度操作" width="300" align="center" fixed="right">
+        <TdTableColumn label="调度操作" width="236" align="center" fixed="right">
           <template #default="scope">
             <t-space size="small" class="task-action-group" @mousedown.stop @click.stop>
-              <t-button size="small" variant="text" @click.stop="openTaskDetail(scope.row)">详情</t-button>
+              <t-button class="task-action-button" size="small" variant="text" @click.stop="openTaskDetail(scope.row)">详情</t-button>
               <t-button
+                class="task-action-button"
                 size="small"
                 theme="primary"
+                variant="text"
                 :loading="isActionLoading('assign', scope.row)"
                 :disabled="scope.row.status !== 'QUEUED' || actionLoadingKey !== ''"
                 @click.stop="openAssignDialog(scope.row)"
@@ -149,7 +148,7 @@
                 @mousedown.stop
                 @click="item => handleQueueAction(scope.row, item)"
               >
-                <t-button size="small" variant="text" :disabled="actionLoadingKey !== ''" @mousedown.stop @click.stop>更多</t-button>
+                <t-button class="task-action-button" size="small" variant="text" :disabled="actionLoadingKey !== ''" @mousedown.stop @click.stop>更多</t-button>
               </t-dropdown>
             </t-space>
           </template>
@@ -185,7 +184,7 @@
         style="width: 100%"
         class="job-queue-table job-table"
       >
-        <TdTableColumn prop="id" label="任务 ID" width="130" align="center">
+        <TdTableColumn prop="id" label="任务 ID" width="96" align="center">
           <template #default="scope">
             <t-tooltip :content="`#${getActiveDisplay(scope.row).jobId}`" class="job-display-tooltip">
               <span class="job-display__secondary job-display__ellipsis font-mono">#{{ getActiveDisplay(scope.row).jobId }}</span>
@@ -198,28 +197,25 @@
               <t-tooltip :content="getActiveDisplay(scope.row).fileName" class="job-display-tooltip">
                 <span class="job-display__primary job-display__ellipsis">{{ getActiveDisplay(scope.row).fileName }}</span>
               </t-tooltip>
-              <span v-if="getActiveDisplay(scope.row).fileId" class="job-display__secondary job-display__ellipsis">
-                文件 ID {{ getActiveDisplay(scope.row).fileId }}
+              <span v-if="getFileMeta(scope.row)" class="job-display__secondary job-display__ellipsis">
+                {{ getFileMeta(scope.row) }}
               </span>
             </div>
           </template>
         </TdTableColumn>
-        <TdTableColumn label="打印设备" min-width="210">
+        <TdTableColumn label="打印设备" min-width="200">
           <template #default="scope">
             <div class="job-display-cell">
               <t-tooltip :content="getActiveDisplay(scope.row).printerName" class="job-display-tooltip">
                 <span class="job-display__primary job-display__ellipsis">{{ getActiveDisplay(scope.row).printerName }}</span>
               </t-tooltip>
-              <t-tooltip :content="getActiveDisplay(scope.row).machineNumber" class="job-display-tooltip">
-                <span class="job-display__secondary job-display__ellipsis">{{ getActiveDisplay(scope.row).machineNumber }}</span>
-              </t-tooltip>
-              <span v-if="getActiveDisplay(scope.row).printerId" class="job-display__secondary job-display__ellipsis">
-                打印机 ID {{ getActiveDisplay(scope.row).printerId }}
+              <span v-if="getPrinterMeta(getActiveDisplay(scope.row))" class="job-display__secondary job-display__ellipsis">
+                {{ getPrinterMeta(getActiveDisplay(scope.row)) }}
               </span>
             </div>
           </template>
         </TdTableColumn>
-        <TdTableColumn label="人员" min-width="190">
+        <TdTableColumn label="人员" min-width="180">
           <template #default="scope">
             <div class="job-display-cell">
               <t-tooltip :content="getActiveDisplay(scope.row).creatorUsername" class="job-display-tooltip">
@@ -245,10 +241,22 @@
         <TdTableColumn prop="updatedAt" label="最近更新" min-width="160" align="center">
           <template #default="scope">{{ formatDateTime(scope.row.updatedAt) }}</template>
         </TdTableColumn>
-        <TdTableColumn label="操作" width="150" align="center" fixed="right">
+        <TdTableColumn label="操作" width="236" align="center" fixed="right">
           <template #default="scope">
             <t-space size="small" class="task-action-group" @mousedown.stop @click.stop>
-              <t-button size="small" variant="text" @click.stop="openTaskDetail(scope.row)">详情</t-button>
+              <t-button class="task-action-button" size="small" variant="text" @click.stop="openTaskDetail(scope.row)">详情</t-button>
+              <t-button
+                v-if="getActivePrimaryAction(scope.row)"
+                class="task-action-button"
+                size="small"
+                theme="primary"
+                variant="text"
+                :loading="isActionLoading(getActivePrimaryAction(scope.row).value, scope.row)"
+                :disabled="actionLoadingKey !== ''"
+                @click.stop="handleActiveAction(scope.row, getActivePrimaryAction(scope.row))"
+              >
+                {{ getActivePrimaryAction(scope.row).content }}
+              </t-button>
               <t-dropdown
                 trigger="click"
                 :options="getActiveActionOptions(scope.row)"
@@ -256,7 +264,7 @@
                 @mousedown.stop
                 @click="item => handleActiveAction(scope.row, item)"
               >
-                <t-button size="small" variant="text" :disabled="actionLoadingKey !== ''" @mousedown.stop @click.stop>更多</t-button>
+                <t-button class="task-action-button" size="small" variant="text" :disabled="actionLoadingKey !== ''" @mousedown.stop @click.stop>更多</t-button>
               </t-dropdown>
             </t-space>
           </template>
@@ -668,6 +676,20 @@ const hasValue = value => value !== undefined && value !== null && value !== ''
 
 const formatOptional = value => hasValue(value) ? value : '-'
 
+const getFileMeta = job => {
+  const metadata = []
+  if (hasValue(job?.materialType)) metadata.push(String(job.materialType))
+  if (hasValue(job?.nozzleSize)) metadata.push(`喷嘴 ${job.nozzleSize} mm`)
+  return metadata.join(' · ')
+}
+
+const getPrinterMeta = display => {
+  const machineNumber = String(display?.machineNumber || '').trim()
+  if (!machineNumber || machineNumber === '字段缺失机器编号') return ''
+  if (machineNumber === '未分配') return display?.printerName === '未分配' ? '等待分配打印机' : ''
+  return `机器编号：${machineNumber}`
+}
+
 const normalizedParameter = value => value === undefined || value === null || String(value).trim() === ''
   ? null
   : String(value).trim()
@@ -873,7 +895,18 @@ const getActiveActionOptions = job => {
   if (job.status === 'PRINTING' && job.printerId) options.push({ content: '暂停打印', value: 'pause', theme: 'warning' })
   if (job.status === 'PAUSED' && job.printerId) options.push({ content: '恢复打印', value: 'resume', theme: 'success' })
   if (canCancel(job.status)) options.push({ content: '取消任务', value: 'cancel', theme: 'error' })
-  return options.length ? options : [{ content: '暂无可用操作', value: 'none', disabled: true }]
+  const primaryValue = getActivePrimaryAction(job)?.value
+  const secondaryOptions = options.filter(option => option.value !== primaryValue)
+  return secondaryOptions.length ? secondaryOptions : [{ content: '暂无更多操作', value: 'none', disabled: true }]
+}
+
+const getActivePrimaryAction = job => {
+  if (job.status === 'RECONCILING') return { content: '人工核对', value: 'reconcile' }
+  if (job.status === 'ASSIGNED') return { content: '上传文件', value: 'upload' }
+  if (job.status === 'READY') return { content: '启动打印', value: 'start' }
+  if (job.status === 'PRINTING') return { content: '暂停打印', value: 'pause' }
+  if (job.status === 'PAUSED') return { content: '恢复打印', value: 'resume' }
+  return null
 }
 
 const handleQueueAction = async (job, item) => {
@@ -1128,7 +1161,7 @@ onMounted(() => {
 }
 
 .job-queue-table :deep(.t-table td) {
-  height: 58px;
+  height: 64px;
   padding: var(--app-spacing-2) var(--app-spacing-3);
   color: var(--app-text-primary);
   border-bottom-color: var(--app-border);
@@ -1152,15 +1185,25 @@ onMounted(() => {
 }
 
 .task-action-group {
-  flex-wrap: wrap;
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
   justify-content: center;
+  white-space: nowrap;
+}
+
+.task-action-button {
+  min-width: 48px;
+  white-space: nowrap;
 }
 
 .job-display-cell {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 2px;
+  justify-content: center;
+  gap: var(--app-spacing-1);
+  min-height: 40px;
 }
 
 .job-display-tooltip {
