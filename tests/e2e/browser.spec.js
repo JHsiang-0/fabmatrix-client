@@ -563,6 +563,8 @@ test('打印机和文件结果区拥有明确的滚动容器', async ({ browser 
         overflowX: style.overflowX,
         overflowY: style.overflowY,
         clientHeight: element.clientHeight,
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
       }
     })
     const pageScrollMetrics = await page.locator('.app-content__view').evaluate(element => ({
@@ -570,6 +572,7 @@ test('打印机和文件结果区拥有明确的滚动容器', async ({ browser 
       clientHeight: element.clientHeight
     }))
     expect(['auto', 'scroll']).toContain(printerScrollMetrics.overflowX)
+    expect(printerScrollMetrics.scrollWidth).toBeLessThanOrEqual(printerScrollMetrics.clientWidth + 1)
     expect(pageScrollMetrics.overflowY).toBe('hidden')
     expect(printerScrollMetrics.clientHeight).toBeGreaterThan(0)
     expect(pageScrollMetrics.clientHeight).toBeGreaterThan(0)
@@ -1102,6 +1105,22 @@ test('UI-006 打印机选择不跨筛选分页且两个抽屉在 800x560 可用'
     await openSidebarItem(page, 800, '打印机管理')
     await expect(page.getByRole('heading', { name: '打印机管理' })).toBeVisible()
 
+    const firstDeviceRow = page.locator('.printer-table tbody tr').first()
+    await firstDeviceRow.getByTitle('点击编辑设备名称').click()
+    await firstDeviceRow.getByPlaceholder('设备名称').fill('一号测试设备')
+    await firstDeviceRow.getByPlaceholder('设备名称').press('Enter')
+    await expect(firstDeviceRow.getByTitle('点击编辑设备名称')).toContainText('一号测试设备')
+
+    await firstDeviceRow.getByTitle('点击编辑机器编号').click()
+    await firstDeviceRow.getByPlaceholder('自定义编号').fill('LINE-A_01')
+    await page.getByRole('heading', { name: '打印机管理' }).click()
+    await expect(firstDeviceRow.getByTitle('点击编辑机器编号')).toContainText('LINE-A_01')
+    await page.waitForTimeout(350)
+    await page.getByRole('button', { name: '刷新', exact: true }).click()
+    await page.waitForTimeout(350)
+    await expect(firstDeviceRow.getByTitle('点击编辑设备名称')).toContainText('一号测试设备')
+    await expect(firstDeviceRow.getByTitle('点击编辑机器编号')).toContainText('LINE-A_01')
+
     const batchButton = page.getByRole('button', { name: /^(启用监控|停用监控) \(\d+\)$/ })
     const firstRowCheckbox = page.locator('.printer-table tbody tr').first().getByRole('checkbox')
     const selectFirstPrinter = async () => {
@@ -1112,9 +1131,10 @@ test('UI-006 打印机选择不跨筛选分页且两个抽屉在 800x560 可用'
     await selectFirstPrinter()
     await expect(batchButton).toHaveCount(1)
 
-    const idleFilter = page.getByRole('radio', { name: '待机', exact: true })
-    await idleFilter.locator('..').click()
-    await expect(idleFilter).toBeChecked()
+    const statusFilter = page.locator('.printer-management-status-filter')
+    await statusFilter.click()
+    await page.locator('.t-select-option').filter({ hasText: '待机' }).click()
+    await expect(statusFilter.getByRole('textbox')).toHaveValue('待机')
     await expect(batchButton).toHaveCount(0)
     await expect(firstRowCheckbox).not.toBeChecked()
     await page.waitForTimeout(350)
@@ -1148,21 +1168,21 @@ test('UI-006 打印机选择不跨筛选分页且两个抽屉在 800x560 可用'
     await page.getByText('点击绑定', { exact: true }).first().click()
     const bindDialog = page.locator('.t-dialog').filter({ hasText: /绑定设备至/ }).last()
     await expect(bindDialog).toBeVisible()
-    await expect(bindDialog.getByText('UI005_Printer_01', { exact: true })).toBeVisible()
+    await expect(bindDialog.getByText('一号测试设备', { exact: true })).toBeVisible()
     const bindRowMetrics = await bindDialog.locator('.t-table tbody tr').first().evaluate(element => ({
       height: element.getBoundingClientRect().height,
       cursor: getComputedStyle(element).cursor
     }))
     expect(bindRowMetrics.height).toBeLessThanOrEqual(44)
     expect(bindRowMetrics.cursor).toBe('pointer')
-    await bindDialog.getByText('UI005_Printer_01', { exact: true }).click()
+    await bindDialog.getByText('一号测试设备', { exact: true }).click()
     const confirmDialog = page.locator('.t-dialog').filter({ hasText: '确认绑定' }).last()
     await confirmDialog.getByRole('button', { name: '确定', exact: true }).click()
     await expect(bindDialog).toBeHidden()
 
     await page.getByText('点击绑定', { exact: true }).first().click()
     const reopenedBindDialog = page.locator('.t-dialog').filter({ hasText: /绑定设备至/ }).last()
-    await expect(reopenedBindDialog.getByText('UI005_Printer_01', { exact: true })).toHaveCount(0)
+    await expect(reopenedBindDialog.getByText('一号测试设备', { exact: true })).toHaveCount(0)
     await expect(reopenedBindDialog.getByText('暂无可绑定的设备', { exact: true })).toBeVisible()
     await reopenedBindDialog.locator('.t-dialog__close').click()
     await expect(reopenedBindDialog).toBeHidden()

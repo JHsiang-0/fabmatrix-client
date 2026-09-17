@@ -21,6 +21,7 @@ import {
  * @param {number} [params.pageNum=1] - 页码
  * @param {number} [params.pageSize=10] - 每页条数
  * @param {string} [params.status] - 设备状态（OFFLINE/IDLE/PREPARING/PRINTING/PAUSED/ERROR/UNKNOWN）
+ * @param {string} [params.firmwareType] - 设备协议（RRF/KLIPPER）
  * @returns {Promise<{code: number, message: string, data: {records: Array<Printer>, total: number, pageNum: number, pageSize: number}}>} 分页结果
  */
 export function getPrinterList(params = {}, options = {}) {

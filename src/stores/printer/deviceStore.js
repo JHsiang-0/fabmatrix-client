@@ -149,6 +149,24 @@ export const useDeviceStore = defineStore('device', () => {
   }
 
   /**
+   * 将已确认保存的少量设备字段同步到本地列表和详情缓存。
+   * 用于列表原位编辑，避免实时状态重新计算时重新显示保存前的旧值。
+   */
+  function patchDevice(deviceId, patch) {
+    const key = String(deviceId)
+    let changed = false
+    rawDeviceList.value = rawDeviceList.value.map(device => {
+      if (String(device.id) !== key) return device
+      changed = true
+      return { ...device, ...patch }
+    })
+
+    const cachedDetail = detailsById.value.get(key)
+    if (cachedDetail) cacheDeviceDetail({ ...cachedDetail, ...patch })
+    if (changed) version.value++
+  }
+
+  /**
    * 从看板移除设备（设置 gridRow/gridCol 为 null）
    */
   async function removeDeviceFromBoard(deviceId) {
@@ -190,6 +208,7 @@ export const useDeviceStore = defineStore('device', () => {
     fetchDeviceDetail,
     updatePositions,
     updateDevice,
+    patchDevice,
     removeDeviceFromBoard,
     getDeviceById
   }

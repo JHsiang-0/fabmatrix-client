@@ -652,6 +652,11 @@ const handlePrinterPage = config => {
       ? records.filter(item => ATTENTION_PRINTER_STATUSES.includes(String(item.status || '').toUpperCase()))
       : records.filter(item => item.status === params.status)
   }
+  if (params.firmwareType) {
+    records = records.filter(item => (
+      String(item.firmwareType || '').toUpperCase() === String(params.firmwareType).toUpperCase()
+    ))
+  }
   return createMockPage(records.map(printer => ({
     ...toPublicPrinter(printer),
     ...getMockMonitorData(printer)

@@ -10,11 +10,12 @@ const dashboardSource = fs.readFileSync(new URL('../src/components/FarmDashboard
 const unallocatedSource = fs.readFileSync(new URL('../src/components/UnallocatedPrinterDrawer.vue', import.meta.url), 'utf8')
 const detailSource = fs.readFileSync(new URL('../src/components/device/DeviceDetailDrawer.vue', import.meta.url), 'utf8')
 const tableAdapterSource = fs.readFileSync(new URL('../src/components/TdTable.vue', import.meta.url), 'utf8')
+const deviceStoreSource = fs.readFileSync(new URL('../src/stores/printer/deviceStore.js', import.meta.url), 'utf8')
 
 test('打印机中心使用正式名称和状态筛选契约', () => {
   assert.match(source, /v-model="keyword"/)
   assert.match(source, /name: keyword\.value\.trim\(\)/)
-  assert.match(source, /placeholder="搜索机器名称"/)
+  assert.match(source, /placeholder="搜索设备名称"/)
   assert.match(source, /@input="scheduleKeywordSearch"/)
   assert.match(source, /setTimeout\(\(\) => \{/)
   assert.match(source, /}, 300\)/)
@@ -22,6 +23,7 @@ test('打印机中心使用正式名称和状态筛选契约', () => {
   assert.match(source, /Object\.values\(PRINTER_STATUS\)/)
   assert.doesNotMatch(source, /statusFilterConfig = \{[\s\S]*ATTENTION/)
   assert.match(source, /status: activeStatusFilterKey\.value/)
+  assert.match(source, /firmwareType: activeFirmwareFilterKey\.value/)
 })
 
 test('UI-006 打印机中心移除重复未分配入口，未分配设备迁移到看板', () => {
@@ -64,8 +66,9 @@ test('打印机列表使用局部滚动和显式详情入口，不再以绝对�
 test('打印机中心视觉适配保留紧凑筛选、表格反馈和响应式分页', () => {
   assert.match(source, /class="[^"]*printer-manage-page[^"]*"/)
   assert.match(source, /class="printer-management-toolbar-card"/)
-  assert.match(source, /<t-radio-group[\s\S]*class="printer-management-tabs"/)
-  assert.match(source, /const printerStatusTabs = \[\{ value: '', label: '全部' \}/)
+  assert.match(source, /class="printer-management-firmware-filter"/)
+  assert.match(source, /class="printer-management-status-filter"/)
+  assert.match(source, /const firmwareOptions = \[/)
   assert.match(source, /class="printer-management-table printer-table"[\s\S]*hover/)
   assert.doesNotMatch(source, /printer-management-status-card/)
   assert.match(source, /<StatusTag domain="printer" :status="scope\.row\.effectiveStatus" \/>/)
@@ -81,10 +84,13 @@ test('UI-005 打印机管理压缩字段、固定首尾列并按条件显示批�
   assert.match(source, /<TdTableColumn v-if="isAdmin" type="selection"[^>]*fixed="left"/)
   assert.match(source, /<TdTableColumn label="操作"[^>]*fixed="right"/)
   assert.doesNotMatch(source, /<TdTableColumn prop="id" label="ID"/)
-  assert.match(source, /scope\.row\.machineNumber \|\| '-'/)
+  assert.match(source, /scope\.row\.machineNumber \|\| '未设置'/)
   assert.doesNotMatch(source, /printer-management-muted">#\{\{ scope\.row\.id \}\}/)
-  assert.match(source, /height: 46px/)
-  assert.match(source, /table-content-width="1180px"/)
+  assert.match(source, /height: 58px/)
+  assert.doesNotMatch(source, /table-content-width="1180px"/)
+  assert.match(source, /<TdTableColumn prop="name" label="设备" width="238">/)
+  assert.match(source, /<TdTableColumn prop="ipAddress" label="连接" width="158">/)
+  assert.doesNotMatch(source, /label="最近通信"|label="协议"/)
   assert.match(tableAdapterSource, /\{ selectedRowKeys: props\.selectedRowKeys \}/)
   assert.match(tableAdapterSource, /\{ tableContentWidth: props\.tableContentWidth \}/)
 })
@@ -92,12 +98,24 @@ test('UI-005 打印机管理压缩字段、固定首尾列并按条件显示批�
 test('打印机机器编号是独立自定义字段并支持管理员原位编辑', () => {
   assert.match(source, /v-if="isAdmin && editingMachineNumberId === scope\.row\.id"/)
   assert.match(source, /@click\.stop="startMachineNumberEdit\(scope\.row\)"/)
+  assert.match(source, /@blur="saveMachineNumber\(scope\.row\)"/)
+  assert.doesNotMatch(source, /aria-label="保存机器编号"|aria-label="取消编辑机器编号"/)
   assert.match(source, /const MACHINE_NUMBER_PATTERN = \/\^\[A-Za-z0-9_-\]\*\$\//)
   assert.match(source, /machineNumber: machineNumber \|\| null/)
+  assert.match(source, /patchPrinterRecord\(printer\.id, \{ machineNumber: machineNumber \|\| null \}\)/)
+  assert.match(deviceStoreSource, /function patchDevice\(deviceId, patch\)/)
   assert.match(source, /<t-form-item label="机器编号" name="machineNumber"/)
   assert.match(source, /仅支持字母、数字、下划线和短横线/)
   assert.doesNotMatch(dashboardSource, /machineNumber:\s*targetSlotLabel\.value/)
   assert.match(dashboardSource, /positionChanges/)
+})
+
+test('打印机名称支持回车或失焦快速保存并同步真实列表数据', () => {
+  assert.match(source, /@click\.stop="startNameEdit\(scope\.row\)"/)
+  assert.match(source, /@enter="savePrinterName\(scope\.row\)"/)
+  assert.match(source, /@blur="savePrinterName\(scope\.row\)"/)
+  assert.match(source, /patchPrinterRecord\(printer\.id, \{ name \}\)/)
+  assert.match(source, /void fetchData\(\)/)
 })
 
 test('UI-006 扫描使用右侧 Drawer、纵向列表和独立发现状态', () => {
@@ -206,10 +224,9 @@ test('UI-005 扫描 API 使用独立超时且不改变全局请求配置', () =>
   assert.match(printerApiSource, /devices\[\]\.suggestedName/)
 })
 
-test('UI-006 打印机搜索使用局部 TDesign borderless 填充输入框并保持实时防抖', () => {
-  assert.match(source, /class="printer-management-filter__search"[\s\S]*borderless/)
-  assert.match(source, /\.printer-management-filter__search :deep\(\.t-input\)/)
-  assert.match(source, /background: var\(--app-surface-muted\)/)
+test('UI-006 打印机搜索使用 TDesign 标准输入框并保持实时防抖', () => {
+  assert.match(source, /class="printer-management-filter__search"/)
+  assert.doesNotMatch(source, /class="printer-management-filter__search"[\s\S]{0,80}borderless/)
   assert.match(source, /@input="scheduleKeywordSearch"/)
   assert.doesNotMatch(source, /查询按钮|搜索按钮/)
 })
