@@ -5,6 +5,7 @@ import router from '@/router'
 import { REQUEST_TIMEOUT } from './constants'
 import { isMockEnabled, mockRequest } from '@/mock'
 import { getApiBaseUrl } from './serverConfig'
+import { readJsonDownloadBody } from './fileExport'
 import {
   getErrorContext,
   getErrorMessage,
@@ -296,11 +297,39 @@ const normalizeSuccess = (responseData, config, status = 200, headers) => {
   return envelope
 }
 
-const validateAxiosResponse = response => {
+const normalizeDownloadResponse = async response => {
+  const payload = await readJsonDownloadBody(response.data, response.headers)
+  if (payload !== null) {
+    normalizeSuccess(payload, { ...response.config, responseType: 'json' }, response.status, response.headers)
+    throw new RequestError({ message: '服务端未返回导出文件，请重试', code: 503, status: 503, config: response.config })
+  }
+  const contentType = String(response.headers?.['content-type'] || response.data?.type || '').split(';')[0].trim().toLowerCase()
+  if (!(response.data instanceof Blob) || !response.data.size
+    || !response.config.downloadContentTypes?.includes(contentType)) {
+    throw new RequestError({ message: '导出文件格式无效，请重试', code: 503, status: 503, config: response.config })
+  }
+  return {
+    blob: response.data,
+    contentType,
+    contentDisposition: String(response.headers?.['content-disposition'] || '').slice(0, 2048)
+  }
+}
+
+const handleAxiosFailure = async (error, config) => {
+  const requestConfig = config || error?.config || error?.response?.config
+  if (requestConfig?.downloadResponse && error?.response?.data instanceof Blob) {
+    const payload = await readJsonDownloadBody(error.response.data, error.response.headers, true)
+    if (payload !== null) error.response.data = payload
+  }
+  return handleRequestError(error, requestConfig)
+}
+
+const validateAxiosResponse = async response => {
   try {
+    if (response.config?.downloadResponse) return await normalizeDownloadResponse(response)
     return normalizeSuccess(response.data, response.config, response.status, response.headers)
   } catch (error) {
-    return handleRequestError(error)
+    return handleRequestError(error, response.config)
   }
 }
 
@@ -312,7 +341,7 @@ service.interceptors.request.use(
   error => Promise.reject(error)
 )
 
-service.interceptors.response.use(validateAxiosResponse, handleRequestError)
+service.interceptors.response.use(validateAxiosResponse, handleAxiosFailure)
 
 const executeRequest = (config, session) => {
   const requestConfig = withAuthSession(config, session)
@@ -320,8 +349,10 @@ const executeRequest = (config, session) => {
 
   const boundRequestConfig = bindRequestSession(requestConfig)
   return mockRequest(boundRequestConfig)
-    .then(response => normalizeSuccess(response, boundRequestConfig, 200))
-    .catch(error => handleRequestError(error, boundRequestConfig))
+    .then(response => boundRequestConfig.downloadResponse
+      ? validateAxiosResponse({ ...response, config: boundRequestConfig })
+      : normalizeSuccess(response, boundRequestConfig, 200))
+    .catch(error => handleAxiosFailure(error, boundRequestConfig))
 }
 
 const request = config => {

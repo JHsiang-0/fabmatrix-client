@@ -8,6 +8,45 @@ import { isFeatureEnabled } from '../../src/config/features.js'
 const E2E_DESKTOP_URL = 'http://127.0.0.1:5177'
 const batchDispatchEnabled = isFeatureEnabled('batchDispatch')
 
+test('Electron 打印历史通过 Blob 下载 Excel 和 PDF，并保留中文文件名', async () => {
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fabmatrix-electron-export-e2e-'))
+  const electronApp = await electron.launch({ args: [path.resolve('.')], env: {
+    ...process.env, FARM_ELECTRON_E2E: '1', FARM_ELECTRON_E2E_USER_DATA: userDataDir,
+    FARM_ELECTRON_DEV_SERVER_URL: E2E_DESKTOP_URL
+  } })
+  try {
+    await electronApp.evaluate(({ session }, directory) => {
+      globalThis.exportDownloads = []
+      session.defaultSession.on('will-download', (event, item) => {
+        const filename = item.getFilename()
+        item.setSavePath(`${directory}/${filename}`)
+        item.once('done', (doneEvent, state) => globalThis.exportDownloads.push({ filename, state }))
+      })
+    }, userDataDir)
+    const page = await electronApp.firstWindow()
+    await page.getByLabel('用户名', { exact: true }).fill('admin')
+    await page.getByLabel('密码', { exact: true }).fill('Admin123')
+    await page.getByRole('button', { name: '登录', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '概览仪表盘' })).toBeVisible()
+    await page.goto(`${E2E_DESKTOP_URL}/#/tasks/history`)
+    for (const [index, format] of ['xlsx', 'pdf'].entries()) {
+      await page.getByRole('button', { name: '导出历史', exact: true }).click()
+      const dialog = page.locator('.t-dialog').filter({ hasText: '导出打印历史' })
+      if (format === 'pdf') await dialog.getByText('PDF（.pdf）', { exact: true }).click()
+      await dialog.getByRole('button', { name: '下载文件', exact: true }).click()
+      await expect.poll(() => electronApp.evaluate(() => globalThis.exportDownloads.length)).toBe(index + 1)
+      const download = await electronApp.evaluate(() => globalThis.exportDownloads.at(-1))
+      expect(download).toEqual({ filename: `打印历史（Mock）.${format}`, state: 'completed' })
+      const bytes = fs.readFileSync(path.join(userDataDir, download.filename))
+      if (format === 'pdf') expect(bytes.toString()).toMatch(/^%PDF-1\.4/)
+      else expect(Array.from(bytes.subarray(0, 4))).toEqual([0x50, 0x4b, 3, 4])
+    }
+  } finally {
+    await electronApp.close()
+    fs.rmSync(userDataDir, { recursive: true, force: true })
+  }
+})
+
 const createTc008HistoryJobs = () => Array.from({ length: 12 }, (_, index) => {
   const failed = index === 5
   const minute = String(59 - index).padStart(2, '0')

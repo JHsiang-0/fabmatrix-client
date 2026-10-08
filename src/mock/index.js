@@ -17,6 +17,7 @@ import { toPublicFile, toPublicJob, toPublicPrinter, toPublicSemanticIds } from 
 import { transitionMockJob } from './stateMachine.js'
 import { publishMockWebSocketEvent } from './websocket.js'
 import { isValidPassword, PASSWORD_RULE_MESSAGE } from '../utils/password.js'
+import { createMockHistoryDownload } from './historyExport.js'
 
 const runtimeEnv = import.meta.env || {}
 const MOCK_DELAY = 120
@@ -1789,7 +1790,7 @@ const handleBatchMoveFiles = config => {
   }
 }
 
-const handleJobPage = config => {
+const queryJobRecords = config => {
   const session = requireSession(config, ['ADMIN', 'OPERATOR'])
   const params = getBody(config) || {}
   const hasStatus = params.status !== undefined && params.status !== null
@@ -1863,7 +1864,27 @@ const handleJobPage = config => {
     const timeDiff = String(right[timeKey] || '').localeCompare(String(left[timeKey] || ''))
     return timeDiff || compareMockIds(right.id, left.id)
   })
-  return createMockPage(records.map(toMockJobSummary), params)
+  return records.map(toMockJobSummary)
+}
+
+const handleJobPage = config => createMockPage(queryJobRecords(config), getBody(config))
+
+const handleHistoryExport = config => {
+  const session = requireSession(config, ['ADMIN', 'OPERATOR'])
+  const body = getBody(config)
+  mockState.lastHistoryExportPayload = cloneMockData(body)
+  if (!['XLSX', 'PDF'].includes(body.format)) fail(400, 400, '导出格式必须为 XLSX 或 PDF')
+  const statuses = body.statuses ?? ['COMPLETED', 'FAILED', 'CANCELLED']
+  if (!Array.isArray(statuses) || !statuses.length || statuses.some(status => !['COMPLETED', 'FAILED', 'CANCELLED', 'CANCELED'].includes(status))) {
+    fail(400, 400, '只能导出终态打印历史')
+  }
+  if (session.role !== 'ADMIN' && body.userId && String(body.userId) !== String(session.userId)) {
+    fail(403, 403, '无权导出其他用户的打印历史')
+  }
+  const records = queryJobRecords({ ...config, data: { ...body, status: undefined, statuses, timeField: 'COMPLETED_AT' } })
+  const maximum = body.format === 'PDF' ? 1000 : 10000
+  if (records.length > maximum) fail(422, 422, `导出最多支持 ${maximum} 条记录，请缩小时间范围`)
+  return createMockHistoryDownload(records, body.format)
 }
 
 const handleJobQueue = config => {
@@ -2545,6 +2566,7 @@ const route = async config => {
   if (key === 'PUT /api/v1/print-files/batch/move') return handleBatchMoveFiles(config)
   if (key === 'GET /api/v1/print-jobs/queue') return handleJobQueue(config)
   if (key === 'POST /api/v1/print-jobs/page') return handleJobPage(config)
+  if (key === 'POST /api/v1/print-jobs/history/export') return handleHistoryExport(config)
   if (key === 'POST /api/v1/print-jobs/batch/preview') return handleBatchPreview(config)
   if (key === 'POST /api/v1/print-jobs/batch/retry-preview') return handleBatchRetryPreview(config)
   if (key === 'POST /api/v1/print-jobs/batch/confirm') return handleBatchConfirm(config)
@@ -2578,6 +2600,7 @@ if ((runtimeEnv.DEV || runtimeEnv.MODE === 'mock' || String(runtimeEnv.MODE || '
   window.__FARM_RESET_MOCK_DEBUG__ = resetMockDebugState
   window.__FARM_GET_LAST_BATCH_ADD_PAYLOAD__ = () => cloneMockData(mockState.lastBatchAddPayload || [])
   window.__FARM_GET_LAST_SCAN_SUBNET__ = () => mockState.lastScanSubnet || null
+  window.__FARM_GET_LAST_HISTORY_EXPORT_PAYLOAD__ = () => cloneMockData(mockState.lastHistoryExportPayload || null)
   window.__FARM_SET_DASHBOARD_LAYOUT_ERROR__ = failure => {
     mockState.dashboardLayoutError = cloneMockData(failure)
   }
@@ -2599,5 +2622,6 @@ export async function mockRequest(config) {
   }
   recordMockRequest(`${String(config.method || 'get').toUpperCase()} ${getPath(config.url)}`)
   const data = await route(config)
+  if (getPath(config.url) === '/api/v1/print-jobs/history/export') return data
   return createMockSuccess(toPublicSemanticIds(data))
 }

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
 import { isFeatureEnabled } from '../../src/config/features.js'
 
 const batchDispatchEnabled = isFeatureEnabled('batchDispatch')
@@ -52,6 +53,90 @@ const loginAs = async (page, username, password) => {
   await expect(page).toHaveURL(/\/dashboard$/)
   await expect(page.getByRole('heading', { name: '概览仪表盘' })).toBeVisible()
 }
+
+test('打印历史导出 Excel 和 PDF 使用已查询筛选并包含全部分页，窄屏可下载', async ({ page }) => {
+  await page.goto('/login')
+  await page.evaluate(() => window.__FARM_RESET_MOCK__({ jobs: Array.from({ length: 25 }, (_, index) => ({
+    id: 10000 + index, fileId: index % 2 ? 21 : 20, userId: 1, status: 'COMPLETED', progress: 100,
+    completedAt: '2026-10-08T12:00:00', createdAt: '2026-10-08T10:00:00'
+  })) }))
+  await page.getByLabel('用户名', { exact: true }).fill('admin')
+  await page.getByLabel('密码', { exact: true }).fill('Admin123')
+  await page.getByRole('button', { name: '登录', exact: true }).click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await openSidebarItem(page, 1280, '打印历史')
+  await expect(page.getByRole('button', { name: '导出历史', exact: true })).toBeEnabled()
+  await page.getByPlaceholder('请输入文件名', { exact: true }).fill('gearbox')
+  await page.getByRole('button', { name: '查询', exact: true }).click()
+  await expect(page.locator('.history-pagination-footer__summary')).toContainText('13')
+  await page.getByPlaceholder('请输入文件名', { exact: true }).fill('尚未查询的条件')
+  await page.getByRole('button', { name: '导出历史', exact: true }).click()
+  const dialog = page.locator('.t-dialog').filter({ hasText: '导出打印历史' })
+  await expect(dialog).toContainText('gearbox')
+  await expect(dialog).toContainText('13 条')
+  const excelDownload = page.waitForEvent('download')
+  await dialog.getByRole('button', { name: '下载文件', exact: true }).click()
+  const excel = await excelDownload
+  expect(excel.suggestedFilename()).toBe('打印历史（Mock）.xlsx')
+  const excelBytes = await readFile(await excel.path())
+  expect([...excelBytes.subarray(0, 4)]).toEqual([0x50, 0x4b, 3, 4])
+  expect(excelBytes.toString()).toContain('10024')
+  expect(excelBytes.toString()).not.toContain('10023')
+  const payload = await page.evaluate(() => window.__FARM_GET_LAST_HISTORY_EXPORT_PAYLOAD__())
+  expect(payload).toEqual({ format: 'XLSX', statuses: ['COMPLETED', 'FAILED', 'CANCELLED'], fileName: 'gearbox' })
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.getByRole('button', { name: '导出历史', exact: true }).click()
+  await dialog.getByText('PDF（.pdf）', { exact: true }).click()
+  await assertNoViewportOverflow(page)
+  const pdfDownload = page.waitForEvent('download')
+  await dialog.getByRole('button', { name: '下载文件', exact: true }).click()
+  const pdf = await pdfDownload
+  expect(pdf.suggestedFilename()).toBe('打印历史（Mock）.pdf')
+  const pdfText = (await readFile(await pdf.path())).toString()
+  expect(pdfText).toMatch(/^%PDF-1\.4/)
+  expect(pdfText).toContain('13 records')
+  expect(pdfText).toContain('#10024')
+})
+
+test('打印历史 PDF 导出超限显示业务错误且不下载假文件，取消生成不会下载', async ({ page }) => {
+  await page.goto('/login')
+  await page.evaluate(() => window.__FARM_RESET_MOCK__({ jobs: Array.from({ length: 1001 }, (_, index) => ({
+    id: 20000 + index, fileId: 20, userId: 1, status: 'COMPLETED', completedAt: '2026-10-08T12:00:00'
+  })) }))
+  await page.getByLabel('用户名', { exact: true }).fill('admin')
+  await page.getByLabel('密码', { exact: true }).fill('Admin123')
+  await page.getByRole('button', { name: '登录', exact: true }).click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await openSidebarItem(page, 1280, '打印历史')
+  const downloads = []
+  page.on('download', download => downloads.push(download))
+  await page.getByRole('button', { name: '导出历史', exact: true }).click()
+  const dialog = page.locator('.t-dialog').filter({ hasText: '导出打印历史' })
+  await dialog.getByText('PDF（.pdf）', { exact: true }).click()
+  await dialog.getByRole('button', { name: '下载文件', exact: true }).click()
+  await expect(page.locator('.t-message').filter({ hasText: '导出最多支持 1000 条记录，请缩小时间范围' })).toBeVisible()
+  expect(downloads).toHaveLength(0)
+  await dialog.getByText('Excel（.xlsx）', { exact: true }).click()
+  await dialog.getByRole('button', { name: '下载文件', exact: true }).click()
+  await dialog.getByRole('button', { name: '取消导出', exact: true }).click()
+  await expect(dialog).toBeHidden()
+  await page.waitForTimeout(250)
+  expect(downloads).toHaveLength(0)
+})
+
+test('操作员打印历史导出可用且只下载本人记录，不显示创建人筛选', async ({ page }) => {
+  await loginAs(page, 'operator', 'Operator123')
+  await openSidebarItem(page, 1280, '打印历史')
+  await expect(page.getByText('创建人', { exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: '导出历史', exact: true }).click()
+  const dialog = page.locator('.t-dialog').filter({ hasText: '导出打印历史' })
+  const downloadEvent = page.waitForEvent('download')
+  await dialog.getByRole('button', { name: '下载文件', exact: true }).click()
+  const content = (await readFile(await (await downloadEvent).path())).toString()
+  expect(content).toContain('1004')
+  expect(content).not.toContain('1005')
+  expect(await page.evaluate(() => window.__FARM_GET_LAST_HISTORY_EXPORT_PAYLOAD__())).not.toHaveProperty('userId')
+})
 
 test('设备 IP 同步独立于普通刷新，展示地址变化并刷新列表，窄屏可关闭', async ({ page }) => {
   await login(page)

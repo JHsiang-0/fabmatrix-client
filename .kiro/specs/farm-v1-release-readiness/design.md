@@ -111,3 +111,9 @@ R100 是一个发布整改总任务，内部子任务必须按 `tasks.md` 顺序
 ## 11. R100-15 客户端设备地址同步
 
 打印机管理页单独提供 ADMIN“同步设备 IP”抽屉。调用 POST `/api/v1/printers/rediscover` 发起任务，GET 同一路径恢复/查询最近任务；抽屉展示服务端返回的网段、汇总和公开逐项结果。轮询工具串行发起 2 秒查询、防止重复启动、在完成后通知页面刷新，并在卸载或失去管理权限后忽略在途响应。关闭抽屉不取消后台任务；网络错误保留已有结果并提供重新查询，FAILED 可再次启动。地址与身份的判断、持久化和自动恢复调度只在后端实施。
+
+## 12. R100-16 打印历史导出
+
+JobHistory 使用 activeFilters 保存已提交查询、appliedFilters 保存成功结果范围。分页和终态实时刷新沿用 activeFilters，导出对话框展示 appliedFilters；查询中或加载失败时禁止导出，未查询表单改动不改变当前结果。`exportJobHistory` 仅发送格式和筛选白名单，通过统一 request 的 opt-in 下载分支取得 Blob/MIME/Content-Disposition；该分支解码 JSON Blob HTTP/业务错误并复用 RequestError/401 会话规则，其他接口响应不变。
+
+下载 guard 持有 AbortController、会话代次和身份/角色快照，取消或组件卸载中止请求，旧账号的成功响应不能落为新账号下载。公共 fileExport 工具处理格式白名单、UTF-8 文件名、basename 清理和延迟 Blob URL 回收，可用于后续操作日志等导出。Mock 实际生成未压缩 ZIP 的 OOXML 工作簿和分页 PDF；正式 alias 保持 disabled Mock，release 生成目录不参加源码 lint。

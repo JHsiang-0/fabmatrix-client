@@ -3,6 +3,9 @@
     <PageHeader title="打印历史记录">
       <template #actions>
       <div class="app-page-toolbar__actions">
+        <t-button theme="default" variant="outline" :icon="renderIcon(Download)"
+          :disabled="loading || !hasAppliedQuery || Boolean(loadError)" :loading="exportLoading"
+          @click="exportVisible = true">导出历史</t-button>
         <t-button :icon="renderIcon(Refresh)" :loading="loading" @click="handleQuery" size="medium">
           刷新
         </t-button>
@@ -75,6 +78,8 @@
           </div>
         </div>
       </QueryToolbar>
+
+      <p class="history-export-hint">导出全部已查询结果，包含所有分页。修改筛选条件后，请先点击查询。</p>
 
       <!-- 数据表格区 -->
       <div class="history-content">
@@ -186,6 +191,28 @@
         </div>
       </div>
     </section>
+    <t-dialog v-model:visible="exportVisible" header="导出打印历史" :footer="false"
+      :close-on-overlay-click="false" :width="'min(480px, calc(100vw - 32px))'" @close="cancelExport">
+      <div class="history-export-dialog">
+        <p>按最近一次成功查询的条件导出全部历史记录，当前共 {{ pagination.total }} 条。</p>
+        <t-descriptions :column="1" size="small" bordered>
+          <t-descriptions-item label="任务状态">{{ exportFilterSummary.status }}</t-descriptions-item>
+          <t-descriptions-item label="文件名">{{ appliedFilters.fileName || '不限' }}</t-descriptions-item>
+          <t-descriptions-item label="打印机 ID">{{ appliedFilters.printerId || '不限' }}</t-descriptions-item>
+          <t-descriptions-item v-if="userStore.isAdmin" label="创建人 ID">{{ appliedFilters.userId || '不限' }}</t-descriptions-item>
+          <t-descriptions-item label="结束时间">{{ exportFilterSummary.time }}</t-descriptions-item>
+        </t-descriptions>
+        <t-radio-group v-model="exportFormat" :disabled="exportLoading" aria-label="导出格式">
+          <t-radio value="XLSX">Excel（.xlsx）</t-radio>
+          <t-radio value="PDF">PDF（.pdf）</t-radio>
+        </t-radio-group>
+        <p class="history-export-hint">Excel 适合统计分析，PDF 适合打印存档。记录过多时，请缩小时间范围。</p>
+        <div class="history-export-actions">
+          <t-button theme="default" variant="outline" @click="cancelExport">{{ exportLoading ? '取消导出' : '取消' }}</t-button>
+          <t-button theme="primary" :loading="exportLoading" @click="handleExport">{{ exportLoading ? '正在生成' : '下载文件' }}</t-button>
+        </div>
+      </div>
+    </t-dialog>
     <TaskDetailDrawer
       v-model="detailDrawerVisible"
       :task="selectedJob"
@@ -206,12 +233,14 @@
 import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue'
 import {
   RefreshIcon as Refresh,
+  DownloadIcon as Download,
   SearchIcon as Search,
   TimeIcon as Clock,
   TaskTimeIcon as Timer
 } from 'tdesign-icons-vue-next'
 import { getAdminUsers } from '@/api/user'
-import { getJobPage, reconcilePrintJob, retryJob } from '@/api/job'
+import { exportJobHistory, getJobPage, reconcilePrintJob, retryJob } from '@/api/job'
+import { createExportRequestGuard, saveExportFile } from '@/utils/fileExport'
 import { message } from '@/utils/message'
 import { formatDateTime } from '@/utils/formatters'
 import { renderIcon } from '@/utils/tdesign'
@@ -237,6 +266,43 @@ const creatorOptions = ref([])
 const userStore = useUserStore()
 const jobStore = useJobStore()
 const realtimeStore = useRealtimeStore()
+const exportVisible = ref(false)
+const exportLoading = ref(false)
+const exportFormat = ref('XLSX')
+const appliedFilters = ref({})
+const hasAppliedQuery = ref(false)
+const exportIdentity = () => `${userStore.token}:${userStore.getSessionGeneration()}:${userStore.userInfo.id}:${userStore.userInfo.role}`
+const exportRequestGuard = createExportRequestGuard(exportIdentity)
+const exportFilterSummary = computed(() => ({
+  status: appliedFilters.value.status ? ({ COMPLETED: '已完成', FAILED: '失败', CANCELLED: '已取消' })[appliedFilters.value.status] : '已完成、失败、已取消',
+  time: appliedFilters.value.startTime || appliedFilters.value.endTime
+    ? `${appliedFilters.value.startTime || '不限'} 至 ${appliedFilters.value.endTime || '不限'}` : '不限'
+}))
+const cancelExport = () => {
+  exportRequestGuard.cancel()
+  exportLoading.value = false
+  exportVisible.value = false
+}
+const handleExport = async () => {
+  if (!hasAppliedQuery.value || loading.value || loadError.value) return
+  const ticket = exportRequestGuard.begin()
+  if (!ticket) return
+  exportLoading.value = true
+  const format = exportFormat.value
+  try {
+    const response = await exportJobHistory(appliedFilters.value, format, { signal: ticket.controller.signal })
+    if (!exportRequestGuard.isCurrent(ticket)) return
+    saveExportFile(response, format)
+    message.success('打印历史已生成，开始下载')
+    exportVisible.value = false
+  } catch (error) {
+    if (!exportRequestGuard.isCurrent(ticket) || error?.context === 'canceled') return
+    if (!error?.toastShown) message.error(error?.message || '打印历史导出失败，请重试')
+  } finally {
+    if (exportRequestGuard.isCurrent(ticket)) exportLoading.value = false
+    exportRequestGuard.finish(ticket)
+  }
+}
 const detailLoading = computed(() => jobStore.detailLoading)
 const detailErrorText = computed(() => jobStore.detailError?.message || '')
 const tableData = ref([])
@@ -419,12 +485,8 @@ const getProgressStatus = (status, progress) => {
 }
 
 // 构建请求参数
-const buildParams = () => {
-  const params = {
-    pageNum: pagination.pageNum,
-    pageSize: pagination.pageSize,
-    timeField: 'COMPLETED_AT'
-  }
+const buildFilters = () => {
+  const params = {}
 
   if (queryForm.status) {
     params.status = queryForm.status
@@ -441,7 +503,7 @@ const buildParams = () => {
     params.printerId = queryForm.printerId
   }
 
-  if (queryForm.userId) {
+  if (userStore.isAdmin && queryForm.userId) {
     params.userId = queryForm.userId
   }
 
@@ -451,6 +513,10 @@ const buildParams = () => {
 
   return params
 }
+
+// Pagination and realtime refresh always keep the filters that were submitted.
+const activeFilters = ref(buildFilters())
+const buildParams = () => ({ ...activeFilters.value, pageNum: pagination.pageNum, pageSize: pagination.pageSize, timeField: 'COMPLETED_AT' })
 
 const toIsoLocalTime = value => String(value || '').replace(' ', 'T')
 
@@ -470,6 +536,7 @@ const loadCreatorOptions = async () => {
 
 // 查询数据
 const handleQuery = async () => {
+  activeFilters.value = buildFilters()
   pagination.pageNum = 1
   await fetchData()
 }
@@ -481,6 +548,7 @@ const handleReset = () => {
   queryForm.fileName = ''
   queryForm.dateRange = []
   queryForm.printerId = ''
+  activeFilters.value = buildFilters()
   pagination.pageNum = 1
   fetchData()
 }
@@ -495,17 +563,21 @@ const handlePaginationChange = ({ current, pageSize }) => {
 // 获取数据
 const fetchData = async ({ rethrow = false } = {}) => {
   const requestId = historyRequestGuard.begin()
+  const identity = exportIdentity()
   if (requestId === null) return
   loading.value = true
   loadError.value = ''
   try {
+    const filters = { ...activeFilters.value }
     const params = buildParams()
     const res = await getJobPage(params)
-    if (!historyRequestGuard.isCurrent(requestId)) return
+    if (!historyRequestGuard.isCurrent(requestId) || identity !== exportIdentity()) return
     if (res.code === 200) {
       // 成功响应允许 data=null，按空结果处理，不提示接口异常。
       tableData.value = res.data?.records || []
       pagination.total = res.data?.total || 0
+      appliedFilters.value = filters
+      hasAppliedQuery.value = true
       restoreTaskDetailContext()
     } else {
       const responseError = new Error(res.message || '打印历史加载失败，请重试')
@@ -515,7 +587,7 @@ const fetchData = async ({ rethrow = false } = {}) => {
       if (rethrow) throw responseError
     }
   } catch (error) {
-    if (!historyRequestGuard.isCurrent(requestId)) return
+    if (!historyRequestGuard.isCurrent(requestId) || identity !== exportIdentity()) return
     console.error('获取打印历史记录失败:', error)
     loadError.value = error?.message || '打印历史加载失败，请重试'
     if (!error?.toastShown) message.error(error?.message || '获取打印历史记录失败')
@@ -535,7 +607,19 @@ watch(() => jobStore.historyInvalidationVersion, () => {
   })
 })
 
-onBeforeUnmount(() => historyRequestGuard.invalidate())
+watch(exportIdentity, () => {
+  cancelExport()
+  hasAppliedQuery.value = false
+  tableData.value = []
+  appliedFilters.value = {}
+  if (!userStore.isAdmin) queryForm.userId = ''
+  if (userStore.isAuthenticated) void handleQuery()
+})
+
+onBeforeUnmount(() => {
+  historyRequestGuard.invalidate()
+  exportRequestGuard.dispose()
+})
 
 // 初始化数据
 fetchData()
@@ -543,6 +627,24 @@ loadCreatorOptions()
 </script>
 
 <style scoped>
+.history-export-hint {
+  margin: 0 0 var(--app-spacing-3);
+  color: var(--app-text-secondary);
+  font-size: var(--td-font-size-body-small);
+}
+
+.history-export-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-spacing-3);
+}
+
+.history-export-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--app-spacing-2);
+}
+
 .history-workspace {
   display: flex;
   flex: 1 1 auto;

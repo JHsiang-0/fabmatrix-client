@@ -218,5 +218,6 @@ test('TC-006 历史失效合并刷新并拒绝旧分页响应覆盖', () => {
   assert.match(historySource, /historyRequestGuard\.isCurrent\(requestId\)/)
   assert.match(historySource, /historyRefreshScheduled/)
   assert.match(historySource, /queueMicrotask\(\(\) =>/)
-  assert.match(historySource, /onBeforeUnmount\(\(\) => historyRequestGuard\.invalidate\(\)\)/)
+  assert.match(historySource, /onBeforeUnmount\(\(\) => \{[\s\S]*historyRequestGuard\.invalidate\(\)/)
+  assert.match(historySource, /exportRequestGuard\.dispose\(\)/)
 })

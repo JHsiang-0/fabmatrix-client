@@ -604,6 +604,7 @@ const createSeedData = ({
     requestCounts: {}
   },
   lastBatchAddPayload: null,
+  lastHistoryExportPayload: null,
   batchAddFailures: clone(batchAddFailures),
   dashboardLayoutError: clone(dashboardLayoutError),
   printerRediscovery: {

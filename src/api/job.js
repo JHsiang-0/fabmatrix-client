@@ -9,6 +9,7 @@ import {
 import { toBatchPreviewPayload } from '@/utils/batchDispatch'
 import { validateJobPageParams } from '@/utils/jobQuery'
 import { REQUEST_TIMEOUT } from '@/utils/constants'
+import { HISTORY_EXPORT_TYPES, toHistoryExportPayload } from '@/utils/fileExport'
 
 export { validateJobPageParams }
 
@@ -205,6 +206,22 @@ export function getJobPage(params = {}) {
     response,
     data => normalizePageResponse(data, normalizePrintJob)
   ))
+}
+
+/** Download every matching terminal history row through the shared authenticated client. */
+export function exportJobHistory(filters, format = 'XLSX', options = {}) {
+  return request({
+    url: '/api/v1/print-jobs/history/export',
+    method: 'post',
+    data: toHistoryExportPayload(filters, format),
+    responseType: 'blob',
+    downloadResponse: true,
+    downloadContentTypes: [HISTORY_EXPORT_TYPES[format]],
+    timeout: REQUEST_TIMEOUT.UPLOAD,
+    // The page guard prevents duplicate clicks. A canceled export must not be reused by a fresh retry.
+    dedupe: false,
+    signal: options.signal
+  })
 }
 
 // ============================================

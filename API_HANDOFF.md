@@ -341,6 +341,7 @@ POST 无请求体，扫描范围使用服务端配置并由 `subnets` 返回。�
 |---|---|---|---|---|
 | GET | `/print-jobs/queue` | ADMIN/OPERATOR | 无 | `PrintJobSummaryVO[]`；TC-002 已实施，精确 QUEUED、权限下推、priority/createdAt/id 稳定排序 |
 | POST | `/print-jobs/page` | ADMIN/OPERATOR | 分页、status 或 statuses、printerId、userId、fileName、timeField、startTime/endTime；权限在 SQL 下推 | `PageResult<PrintJobSummaryVO>`；TC-003 已实施，固定 count+data 两条 SQL |
+| POST | `/print-jobs/history/export` | ADMIN/OPERATOR | `format: XLSX/PDF`、`statuses?`、`fileName?`、`printerId?`、`userId?`、`startTime?`、`endTime?` | 200 二进制文件，失败使用标准 JSON Result；ADMIN 全部/筛选，OPERATOR 仅本人 |
 | GET | `/print-jobs/{id}` | ADMIN/OPERATOR | Path ID | `PrintJobDetailVO`；TC-002 已实施，不存在或无权统一 404 |
 | POST | `/print-jobs` | ADMIN/OPERATOR | `fileId,priority,printerId?,idempotencyKey?` | 新任务 ID；同一用户同一幂等键重复请求返回原任务 |
 | POST | `/print-jobs/create` | ADMIN/OPERATOR | `fileId,priority,printerId?,idempotencyKey?` | 新任务 ID（兼容，deprecated） |
@@ -355,6 +356,12 @@ POST 无请求体，扫描范围使用服务端配置并由 `subnets` 返回。�
 | POST | `/print-jobs/batch/preview` | ADMIN/OPERATOR | `fileIds,printerIds,strategy,action` | `DispatchPlanPreviewVO`；预览无副作用 |
 | POST | `/print-jobs/batch/confirm` | ADMIN/OPERATOR | `planId,version,itemIds,confirmationToken` | `BatchDispatchConfirmVO`；仅计划创建者或 ADMIN 可确认，逐项创建任务并返回结果 |
 | POST | `/print-jobs/batch/retry-preview` | ADMIN/OPERATOR | `sourcePlanId,sourceItemIds,retryKey` | `DispatchPlanPreviewVO`；只恢复无任务 ID 且可重试的失败项 |
+
+### 4.3.1 打印历史导出（R100-16）
+
+打印历史导出（R100-16）固定查询终态 `COMPLETED/FAILED/CANCELLED`，省略 `statuses` 表示全部终态，兼容 `CANCELED`；按结束时间筛选、倒序排序，无 `pageNum/pageSize/timeField`。时间格式沿用农场 local datetime，非法条件 400；超过 XLSX 默认 10000 条、PDF 默认 1000 条或 20MiB 输出限额返回 422，前端提示缩小查询范围。OPERATOR 提交其他创建人 ID 返回 403。成功 MIME 为 `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` 或 `application/pdf`，`Content-Disposition` 包含 ASCII fallback 及 UTF-8 `filename*`，跨源后端须 expose 此响应头。
+
+客户端历史页导出对话框展示最近一次成功查询条件，导出全部匹配记录；尚未点击查询的表单改动不影响分页、实时刷新或导出。统一 Axios 下载分支读取 Blob 和响应头，HTTP/业务错误中的 JSON Blob 仍执行统一错误提示及当前会话 401 清理；其他旧 Blob API 行为保持兼容。下载在取消、卸载、退出/重登、身份或角色变化后作废，临时链接移除并延迟释放 Blob URL。报表使用名称快照，经过时长含暂停；实际耗材和净打印时长尚未完整保存，不作为导出字段。
 
 ### 4.4 设备控制
 
