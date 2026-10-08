@@ -68,6 +68,7 @@ npm run lint:check  # 只读运行 Oxlint 和 ESLint，发布门禁使用此命�
 npm run lint        # 运行带自动修复的 lint，仅在确认 diff 后使用
 npm run format      # 格式化 src/
 npm test             # Node.js 内置回归测试
+npm run test:auth    # 会话与真实 Store 异步回归
 npm run test:mock    # Mock HTTP 集成回归
 npm run build:mock   # Mock 构建
 npm run build:desktop # Electron 正式构建
@@ -75,6 +76,8 @@ npm run release:gate # 1.0.0 发布门禁
 ```
 
 `npm run test:electron:dist` 会先构建 desktop 产物，再验证 Electron 的 `dist-file` 入口；`npm run verify` 还会执行全量构建和 Playwright。新增测试时应同步补充 `package.json` 命令和本文件说明。正式构建不应启用 Mock 环境。
+
+`npm run test:auth` 复用会话单测和真实 Pinia/Axios Store 回归，覆盖快速重登的身份/权限隔离、旧恢复请求成功或失败、恢复请求去重、持久化存储、同 Token 重登的 401/变更请求隔离和当前会话 401 清理。
 
 ## 代码规范
 

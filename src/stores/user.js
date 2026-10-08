@@ -51,6 +51,14 @@ export const useUserStore = defineStore('user', () => {
   const isAuthenticated = computed(() => Boolean(token.value && restoreState.value === 'authenticated'))
   const isRestoring = computed(() => restoreState.value === 'restoring')
   let restorePromise = null
+  let sessionGeneration = 0
+
+  const invalidateSessionRequests = () => {
+    sessionGeneration += 1
+    restorePromise = null
+  }
+
+  const getSessionGeneration = () => sessionGeneration
 
   const persistSession = remember => {
     if (typeof window === 'undefined') return
@@ -71,6 +79,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   const clearSession = () => {
+    invalidateSessionRequests()
     token.value = ''
     userInfo.value = {}
     expiresIn.value = null
@@ -86,6 +95,7 @@ export const useUserStore = defineStore('user', () => {
       throw new Error('登录响应缺少有效的身份信息')
     }
 
+    invalidateSessionRequests()
     token.value = session.token
     userInfo.value = session.userInfo
     expiresIn.value = session.expiresIn
@@ -112,26 +122,37 @@ export const useUserStore = defineStore('user', () => {
   const restoreSession = () => {
     if (restorePromise) return restorePromise
 
-    restorePromise = (async () => {
-      if (!token.value) {
-        restoreState.value = 'anonymous'
-        return false
-      }
+    if (!token.value) {
+      restoreState.value = 'anonymous'
+      return Promise.resolve(false)
+    }
 
-      if (isSessionExpired(expiresAt.value)) {
-        clearSession()
-        return false
-      }
+    if (isSessionExpired(expiresAt.value)) {
+      clearSession()
+      return Promise.resolve(false)
+    }
 
-      restoreState.value = 'restoring'
+    const generation = sessionGeneration
+    const currentSession = {
+      token: token.value,
+      userInfo: userInfo.value,
+      expiresIn: expiresIn.value,
+      expiresAt: expiresAt.value
+    }
+    const isCurrentSession = () => (
+      generation === sessionGeneration && token.value === currentSession.token
+    )
+    // A route awaiting an obsolete restore must use the new session's result.
+    const resolveCurrentSession = () => (
+      restorePromise && restorePromise !== promise ? restorePromise : isAuthenticated.value
+    )
+
+    restoreState.value = 'restoring'
+    const promise = (async () => {
       try {
         const response = await getCurrentUser()
-        const session = refreshAuthSession({
-          token: token.value,
-          userInfo: userInfo.value,
-          expiresIn: expiresIn.value,
-          expiresAt: expiresAt.value
-        }, response?.data)
+        if (!isCurrentSession()) return resolveCurrentSession()
+        const session = refreshAuthSession(currentSession, response?.data)
 
         if (!session) throw new Error('当前用户身份无效')
 
@@ -143,14 +164,16 @@ export const useUserStore = defineStore('user', () => {
         persistSession(rememberSession.value)
         return true
       } catch {
+        if (!isCurrentSession()) return resolveCurrentSession()
         clearSession()
         return false
-      } finally {
-        restorePromise = null
       }
-    })()
+    })().finally(() => {
+      if (restorePromise === promise) restorePromise = null
+    })
 
-    return restorePromise
+    restorePromise = promise
+    return promise
   }
 
   const hasRole = roles => {
@@ -184,6 +207,7 @@ export const useUserStore = defineStore('user', () => {
     userLogin,
     userLoginWithResult,
     restoreSession,
+    getSessionGeneration,
     hasRole,
     logout
   }

@@ -42,6 +42,7 @@ const pendingRequests = new Map()
 // Axios config/error objects that may be logged or returned to callers.
 const requestAuthSessions = new WeakMap()
 let observedAuthToken
+let observedStoreGeneration
 let authSessionGeneration = 0
 
 const isCanceledError = error => (
@@ -49,9 +50,12 @@ const isCanceledError = error => (
 )
 
 const getCurrentAuthSession = () => {
-  const token = useUserStore().token || ''
-  if (observedAuthToken !== token) {
+  const userStore = useUserStore()
+  const token = userStore.token || ''
+  const storeGeneration = userStore.getSessionGeneration()
+  if (observedAuthToken !== token || observedStoreGeneration !== storeGeneration) {
     observedAuthToken = token
+    observedStoreGeneration = storeGeneration
     authSessionGeneration += 1
   }
   return { token, generation: authSessionGeneration }

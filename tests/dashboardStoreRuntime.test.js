@@ -998,6 +998,236 @@ const authenticate = (userStore, token) => {
   userStore.restoreState = 'authenticated'
 }
 
+const sessionResult = (id, role) => ({
+  token: `test-session-${id}`,
+  expiresIn: 60,
+  userId: id,
+  username: `user-${id}`,
+  role
+})
+
+const setupSessionRuntime = t => {
+  const previousWindow = globalThis.window
+  const previousConsoleError = console.error
+  globalThis.window = {
+    localStorage: memoryStorage(),
+    sessionStorage: memoryStorage()
+  }
+  console.error = () => {}
+  setActivePinia(createPinia())
+  t.after(() => {
+    globalThis.window = previousWindow
+    console.error = previousConsoleError
+  })
+  return useUserStore()
+}
+
+for (const [oldRole, newRole] of [['ADMIN', 'OPERATOR'], ['OPERATOR', 'ADMIN']]) {
+  for (const outcome of ['success', 'unauthorized', 'network']) {
+    test(`旧 ${oldRole} 会话恢复 ${outcome} 不污染新 ${newRole} 会话及存储`, async t => {
+      const user = setupSessionRuntime(t)
+      const pending = deferred()
+      let requestConfig
+      service.defaults.adapter = config => {
+        requestConfig = config
+        return pending.promise
+      }
+      user.userLoginWithResult(sessionResult('old', oldRole), { remember: true })
+      const restoring = user.restoreSession()
+      await waitFor(() => requestConfig)
+      user.logout()
+      user.userLoginWithResult(sessionResult('new', newRole))
+
+      if (outcome === 'success') {
+        pending.resolve(axiosResponse(requestConfig, { id: 'old', username: 'user-old', role: oldRole }))
+      } else {
+        pending.reject(outcome === 'unauthorized' ? unauthorized(requestConfig) : new Error('网络断开'))
+      }
+
+      assert.equal(await restoring, true)
+      assert.equal(user.token, 'test-session-new')
+      assert.equal(user.userInfo.userId, 'new')
+      assert.equal(user.userInfo.role, newRole)
+      assert.equal(user.isAuthenticated, true)
+      const saved = JSON.parse(window.sessionStorage.getItem('farm-ui-session'))
+      assert.equal(saved.token, user.token)
+      assert.equal(saved.userInfo.userId, 'new')
+      assert.equal(saved.userInfo.role, newRole)
+      assert.equal(window.localStorage.getItem('farm-ui-session'), null)
+    })
+  }
+}
+
+for (const state of ['anonymous', 'expired']) {
+  test(`${state} 恢复结束后再次登录能够重新校验身份`, async t => {
+    const user = setupSessionRuntime(t)
+    if (state === 'expired') {
+      user.userLoginWithResult(sessionResult('expired', 'ADMIN'), { remember: true })
+      user.expiresAt = Date.now() - 1
+    }
+    assert.equal(await user.restoreSession(), false)
+    let requests = 0
+    service.defaults.adapter = config => {
+      requests += 1
+      return Promise.resolve(axiosResponse(config, { id: 'new', username: 'trusted-name', role: 'OPERATOR' }))
+    }
+    user.userLoginWithResult(sessionResult('new', 'OPERATOR'))
+
+    assert.equal(await user.restoreSession(), true)
+    assert.equal(requests, 1)
+    assert.equal(user.userInfo.username, 'trusted-name')
+    assert.equal(user.isAuthenticated, true)
+  })
+}
+
+test('退出后的旧恢复成功响应不能重新建立登录态或存储', async t => {
+  const user = setupSessionRuntime(t)
+  const pending = deferred()
+  let requestConfig
+  service.defaults.adapter = config => {
+    requestConfig = config
+    return pending.promise
+  }
+  user.userLoginWithResult(sessionResult('old', 'ADMIN'), { remember: true })
+  const restoring = user.restoreSession()
+  await waitFor(() => requestConfig)
+  user.logout()
+  pending.resolve(axiosResponse(requestConfig, { id: 'old', username: 'user-old', role: 'ADMIN' }))
+
+  assert.equal(await restoring, false)
+  assert.equal(user.token, '')
+  assert.equal(user.isAuthenticated, false)
+  assert.equal(window.localStorage.getItem('farm-ui-session'), null)
+  assert.equal(window.sessionStorage.getItem('farm-ui-session'), null)
+})
+
+test('新会话恢复独立请求并去重，旧恢复的 finally 不释放新请求锁', async t => {
+  const user = setupSessionRuntime(t)
+  const pending = []
+  const operations = []
+  service.defaults.adapter = config => {
+    const operation = deferred()
+    pending.push({ ...operation, config })
+    return operation.promise
+  }
+  try {
+    user.userLoginWithResult(sessionResult('old', 'ADMIN'))
+    operations.push(user.restoreSession())
+    await waitFor(() => pending.length === 1)
+    user.userLoginWithResult(sessionResult('new', 'OPERATOR'), { remember: true })
+    operations.push(user.restoreSession(), user.restoreSession())
+    await waitFor(() => pending.length === 2)
+    pending[0].resolve(axiosResponse(pending[0].config, { id: 'old', username: 'user-old', role: 'ADMIN' }))
+    await new Promise(resolve => setImmediate(resolve))
+    operations.push(user.restoreSession())
+    await new Promise(resolve => setImmediate(resolve))
+
+    assert.equal(pending.length, 2)
+    assert.equal(user.restoreState, 'restoring')
+    pending[1].resolve(axiosResponse(pending[1].config, { id: 'new', username: 'trusted-new', role: 'OPERATOR' }))
+    assert.deepEqual(await Promise.all(operations), [true, true, true, true])
+    assert.equal(user.userInfo.username, 'trusted-new')
+    assert.equal(user.userInfo.role, 'OPERATOR')
+    assert.equal(JSON.parse(window.localStorage.getItem('farm-ui-session')).userInfo.username, 'trusted-new')
+
+    operations.push(user.restoreSession())
+    await waitFor(() => pending.length === 3)
+    pending[2].resolve(axiosResponse(pending[2].config, { id: 'new', username: 'refreshed-new', role: 'OPERATOR' }))
+    assert.equal(await operations.at(-1), true)
+    assert.equal(user.userInfo.username, 'refreshed-new')
+  } finally {
+    for (const operation of pending) {
+      operation.resolve(axiosResponse(operation.config, { id: 'new', username: 'cleanup', role: 'OPERATOR' }))
+    }
+    await Promise.allSettled(operations)
+  }
+})
+
+test('当前会话恢复的 401 仍清理两种存储并返回未登录', async t => {
+  const user = setupSessionRuntime(t)
+  const originalRouterPush = router.push
+  const navigations = []
+  router.push = target => {
+    navigations.push(target)
+    return Promise.resolve()
+  }
+  t.after(() => { router.push = originalRouterPush })
+  user.userLoginWithResult(sessionResult('current', 'ADMIN'), { remember: true })
+  service.defaults.adapter = config => Promise.reject(unauthorized(config))
+
+  assert.equal(await user.restoreSession(), false)
+  assert.equal(user.token, '')
+  assert.equal(user.isAuthenticated, false)
+  assert.equal(window.localStorage.getItem('farm-ui-session'), null)
+  assert.equal(window.sessionStorage.getItem('farm-ui-session'), null)
+  assert.deepEqual(navigations, [{ name: 'login' }])
+})
+
+for (const logoutFirst of [false, true]) {
+  test(`相同 Token 重登${logoutFirst ? '（先退出）' : '（直接登录）'}后旧恢复 401 不清除新会话`, async t => {
+    const user = setupSessionRuntime(t)
+    const originalRouterPush = router.push
+    const navigations = []
+    router.push = target => {
+      navigations.push(target)
+      return Promise.resolve()
+    }
+    t.after(() => { router.push = originalRouterPush })
+    const pending = deferred()
+    let requestConfig
+    service.defaults.adapter = config => {
+      requestConfig = config
+      return pending.promise
+    }
+    user.userLoginWithResult(sessionResult('same', 'OPERATOR'))
+    const restoring = user.restoreSession()
+    await waitFor(() => requestConfig)
+    if (logoutFirst) user.logout()
+    user.userLoginWithResult(sessionResult('same', 'OPERATOR'), { remember: true })
+    pending.reject(unauthorized(requestConfig))
+
+    assert.equal(await restoring, true)
+    assert.equal(user.token, 'test-session-same')
+    assert.equal(user.isAuthenticated, true)
+    assert.equal(JSON.parse(window.localStorage.getItem('farm-ui-session')).token, user.token)
+    assert.deepEqual(navigations, [])
+  })
+}
+
+test('相同 Token 重登后的 mutation 不复用旧请求，旧清理不释放新请求锁', async t => {
+  const user = setupSessionRuntime(t)
+  const pending = []
+  const operations = []
+  service.defaults.adapter = config => {
+    const operation = deferred()
+    pending.push({ ...operation, config })
+    return operation.promise
+  }
+  const requestConfig = { url: '/api/v1/session-race/same-token', method: 'post', data: { action: 'save' } }
+  try {
+    user.userLoginWithResult(sessionResult('same', 'OPERATOR'))
+    const oldRequest = request(requestConfig)
+    operations.push(oldRequest)
+    assert.equal(request(requestConfig), oldRequest)
+    await waitFor(() => pending.length === 1)
+    user.userLoginWithResult(sessionResult('same', 'OPERATOR'))
+    const newRequest = request(requestConfig)
+    operations.push(newRequest)
+    assert.notEqual(newRequest, oldRequest)
+    assert.equal(request(requestConfig), newRequest)
+    await waitFor(() => pending.length === 2)
+
+    pending[0].resolve(axiosResponse(pending[0].config, { session: 'old' }))
+    await oldRequest
+    assert.equal(request(requestConfig), newRequest)
+    pending[1].resolve(axiosResponse(pending[1].config, { session: 'new' }))
+    assert.deepEqual((await newRequest).data, { session: 'new' })
+  } finally {
+    for (const operation of pending) operation.resolve(axiosResponse(operation.config, null))
+    await Promise.allSettled(operations)
+  }
+})
+
 test('旧会话请求的 401 只 reject，不清除或跳转快速重登后的新会话', async () => {
   setActivePinia(createPinia())
   const userStore = useUserStore()
