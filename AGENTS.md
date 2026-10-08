@@ -69,6 +69,7 @@ npm run lint        # 运行带自动修复的 lint，仅在确认 diff 后使�
 npm run format      # 格式化 src/
 npm test             # Node.js 内置回归测试
 npm run test:auth    # 会话与真实 Store 异步回归
+npm run test:printer-ip # 打印机 IP 同步权限、轮询与生命周期回归
 npm run test:mock    # Mock HTTP 集成回归
 npm run build:mock   # Mock 构建
 npm run build:desktop # Electron 正式构建

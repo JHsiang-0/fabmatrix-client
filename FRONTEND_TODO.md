@@ -2,7 +2,7 @@
 
 版本：历史 v1/v2 功能基线；当前产品：`1.0.0` 准正式版
 依据：[`TODO.md`](./TODO.md)、[`API_HANDOFF.md`](./API_HANDOFF.md)、[`docs/VERSION_AND_ROADMAP.md`](./docs/VERSION_AND_ROADMAP.md)
-更新时间：2026-09-14
+更新时间：2026-10-08
 
 > 当前发布门禁是 `.kiro/specs/farm-v1-release-readiness/`。本清单用于保留历史拆解和待验收项，不将“v1/v2”解释为产品发布版本。
 
@@ -18,6 +18,8 @@
 `UPLOADING`、`QUEUED`、`ASSIGNED`、`READY`、`PRINTING`、`PAUSED`、`COMPLETED`、`FAILED`、`RECONCILING`、`CANCELLED`。
 
 ## 当前前端基线
+
+- [x] R100-15：ADMIN 独立同步设备 IP 入口、异步进度/范围/逐项结果、完成刷新及卸载清理；权限与轮询回归已实现，现场 DHCP 验收待前后端部署后执行。
 
 - [x] Vue 3、Vite、Vue Router、Pinia、Axios、TDesign Vue Next 已配置。
 - [x] 已有登录页、农场看板、打印机管理、文件库、任务队列和任务历史页面。

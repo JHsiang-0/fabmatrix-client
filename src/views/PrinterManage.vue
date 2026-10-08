@@ -34,6 +34,9 @@
       @retry="retryPrinterDetail"
     />
 
+    <PrinterIpSyncDrawer v-if="isAdmin" v-model:visible="ipSyncVisible" :is-admin="isAdmin"
+      @running="ipSyncRunning = $event" @completed="handleIpSyncCompleted" />
+
     <!-- 页面标题与操作栏 -->
     <PageHeader title="打印机管理">
       <template #actions>
@@ -45,6 +48,9 @@
         </t-button>
         <t-button size="medium" theme="default" variant="base" :icon="renderIcon(Refresh)" :loading="loading" @click="fetchData">
           刷新
+        </t-button>
+        <t-button v-if="isAdmin" size="medium" theme="default" variant="outline" :icon="renderIcon(Refresh)" @click="ipSyncVisible = true">
+          {{ ipSyncRunning ? '同步设备 IP（进行中）' : '同步设备 IP' }}
         </t-button>
         <t-button v-if="isAdmin" size="medium" theme="success" variant="base" :icon="renderIcon(Aim)" @click="openScanDialog">
           扫描局域网设备
@@ -614,6 +620,7 @@ import {
   getDiscoveryStatus
 } from '@/utils/printerDiscovery'
 import DeviceDetailDrawer from '@/components/device/DeviceDetailDrawer.vue'
+import PrinterIpSyncDrawer from '@/components/device/PrinterIpSyncDrawer.vue'
 import AsyncState from '@/components/AsyncState.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import StatusTag from '@/components/StatusTag.vue'
@@ -632,6 +639,8 @@ const deviceStore = useDeviceStore()
 const realtimeStore = useRealtimeStore()
 const { statusMap } = storeToRefs(realtimeStore)
 const isAdmin = computed(() => userStore.isAdmin)
+const ipSyncVisible = ref(false)
+const ipSyncRunning = ref(false)
 const tableData = ref([])
 const total = ref(0)
 const queryParams = reactive({
@@ -1365,6 +1374,12 @@ const fetchData = async () => {
   } finally {
     if (printerListRequestGuard.isCurrent(requestId)) loading.value = false
   }
+}
+
+const handleIpSyncCompleted = async result => {
+  if (result.unresolvedCount > 0) message.warning(`地址同步完成，${result.unresolvedCount} 台设备需要检查`)
+  else message.success(`地址同步完成，更新 ${result.updatedCount} 台设备`)
+  await fetchData()
 }
 
 const clearKeywordDebounce = () => {

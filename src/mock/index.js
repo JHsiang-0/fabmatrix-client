@@ -1003,6 +1003,57 @@ const handleScanPrinters = config => {
   })
 }
 
+const handlePrinterRediscovery = config => {
+  requireSession(config, ['ADMIN'])
+  let result = mockState.printerRediscovery
+  if (config.method?.toLowerCase() === 'post' && result.status !== 'RUNNING') {
+    mockState.printerRediscoverySequence += 1
+    mockState.printerRediscoveryStartedAt = Date.now()
+    result = {
+      ...result,
+      scanId: `mock-rediscovery-${mockState.printerRediscoverySequence}`,
+      status: 'RUNNING',
+      message: '正在查找已登记设备',
+      startedAt: now(),
+      finishedAt: null,
+      scannedAddressCount: 0,
+      updatedCount: 0,
+      unchangedCount: 0,
+      unresolvedCount: 0,
+      items: []
+    }
+    mockState.printerRediscovery = result
+  } else if (config.method?.toLowerCase() === 'get' && result.status === 'RUNNING'
+    && Date.now() - mockState.printerRediscoveryStartedAt >= 1200) {
+    const items = mockState.printers.map((printer, index) => {
+      const oldIpAddress = printer.ipAddress
+      const updated = index === 1 && Boolean(printer.macAddress)
+      if (updated) printer.ipAddress = oldIpAddress === '192.168.1.181' ? '192.168.1.81' : '192.168.1.181'
+      return {
+        printerId: String(printer.id),
+        printerName: printer.name,
+        oldIpAddress,
+        newIpAddress: printer.macAddress ? printer.ipAddress : null,
+        status: !printer.macAddress ? 'MISSING_MAC' : updated ? 'UPDATED' : 'UNCHANGED',
+        message: !printer.macAddress ? '请先补全设备标识，再重新同步' : updated ? '已确认设备身份并更新地址' : '设备地址未变化'
+      }
+    })
+    result = {
+      ...result,
+      status: 'COMPLETED',
+      message: '地址同步完成',
+      finishedAt: now(),
+      scannedAddressCount: 254,
+      updatedCount: items.filter(item => item.status === 'UPDATED').length,
+      unchangedCount: items.filter(item => item.status === 'UNCHANGED').length,
+      unresolvedCount: items.filter(item => item.status === 'MISSING_MAC').length,
+      items
+    }
+    mockState.printerRediscovery = result
+  }
+  return cloneMockData(result)
+}
+
 const findBatchAddFailure = (device, index) => {
   const failures = Array.isArray(mockState.batchAddFailures) ? mockState.batchAddFailures : []
   return failures.find(item => item?.index !== null && item?.index !== ''
@@ -2466,6 +2517,7 @@ const route = async config => {
   if (/^POST \/api\/v1\/auth\/[^/]+\/change-password$/.test(key)) return handleChangePassword(config)
   if (key === 'GET /api/v1/dashboard-layout' || key === 'PUT /api/v1/dashboard-layout') return handleDashboardLayout(config)
   if (key === 'GET /api/v1/printers/page') return handlePrinterPage(config)
+  if (key === 'GET /api/v1/printers/rediscover' || key === 'POST /api/v1/printers/rediscover') return handlePrinterRediscovery(config)
   if (key === 'GET /api/v1/printers/scan') return handleScanPrinters(config)
   if (key === 'GET /api/v1/printers/unallocated') return handleUnallocatedPrinters(config)
   if (key === 'PUT /api/v1/printers/monitor/batch') return handleBatchUpdatePrinterMonitor(config)

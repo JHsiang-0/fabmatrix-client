@@ -2,7 +2,7 @@
 
 版本：历史 v1 基线；当前产品：`1.0.0` 准正式版
 依据：[API_HANDOFF.md](./API_HANDOFF.md) 与 [`docs/VERSION_AND_ROADMAP.md`](./docs/VERSION_AND_ROADMAP.md)
-更新时间：2026-09-14
+更新时间：2026-10-08
 
 > 本清单保留早期开发任务，不能作为当前发布门禁。当前 1.0.0 的必做项、范围和验收状态以 `.kiro/specs/farm-v1-release-readiness/` 与 `npm run release:gate` 为准。
 
@@ -17,6 +17,8 @@
 当前仓库是 Vue 前端工程；后端位于 `D:\WorkSpace\Java\fabmatrix-server`。本文件中的部分 P0/P1 条目来自早期前后端交接阶段，若与当前代码、R100 门禁冲突，以当前实现和发布门禁为准。
 
 ## 当前基线
+
+- [x] R100-15：已登记打印机 DHCP 地址恢复的前端手动同步入口；不复用普通刷新、不自动导入未知设备。实现与验证见发布规格任务记录。
 
 - [x] 已完成源码接口盘点和前后端交接文档：`API_HANDOFF.md`
 - [x] 已确定角色：`ADMIN`、`OPERATOR`

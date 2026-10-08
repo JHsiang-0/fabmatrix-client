@@ -1,7 +1,7 @@
 # FabMatrix 前后端接口交接与契约文档
 
 版本：v2.2
-更新时间：2026-09-12
+更新时间：2026-10-08
 适用范围：FabMatrix 本地 3D 打印生产管理服务端与浏览器/客户端
 
 > 本文以当前 Java 源码、`SecurityConfig` 和当前 OpenAPI 注解为准。第 4 节列出的正式 Farm API 均已有对应 Controller；开发环境兼容用路由单独列在第 4.6 节。v2 不提供后台自动派单接口，相关能力延期到 v3。SYNC-002 收口：布局坐标按服务端当前动态布局校验，布局上限为 30×60 且物理槽位总数不超过 1800；Long 语义 ID 的 JSON 值为十进制字符串，非 ID 数值保持 number。
@@ -283,6 +283,8 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 | DELETE | `/printers/delete/{id}` | ADMIN | Path ID | `Result<null>` |
 | GET | `/printers/scan` | ADMIN | Query：`subnet`，三段 IPv4 网段前缀，例如 `192.168.1` | Klipper/RRF 协议识别扫描结果数组；格式错误返回 `400/400` |
 | POST | `/printers/batch-add` | ADMIN | 扫描结果数组 | 批量新增/更新统计及逐项结果 |
+| POST | `/printers/rediscover` | ADMIN | 无请求体 | 启动异步已有设备 IP 同步，重复调用复用进行中任务 |
+| GET | `/printers/rediscover` | ADMIN | 无 | 最近一次同步任务与逐项结果；查询不启动扫描 |
 | GET | `/printers/by-mac/{macAddress}` | ADMIN/OPERATOR | Path MAC | `PrinterVO` 或 null |
 | GET | `/printers/by-ip/{ipAddress}` | ADMIN/OPERATOR | Path IP | `PrinterVO` 或 null |
 | PUT | `/printers/positions` | ADMIN | 位置更新数组 | 已弃用；ADMIN 兼容调用并委托动态布局原子事务 |
@@ -300,6 +302,14 @@ Local Edition 全新数据目录没有预置管理员账号。前端首次打开
 现有 WebSocket `version=1` 已实现五类消息：`SNAPSHOT/PRINTER_STATUS/PRINTER_OFFLINE/JOB_STATUS/LAYOUT_UPDATED`。布局消息 `printerId=null`，布局字段仅位于 `data`（`stateSource="LAYOUT"`、正数 `layoutVersion`），不覆盖设备业务/通信状态。
 
 新增、重新录入或批量扫描入库的打印机，在下一次协议状态探测完成前返回 `status=UNKNOWN`；`ONLINE` 不属于打印机状态枚举，也不会作为业务状态写入。普通配置编辑不重置设备当前状态。
+
+### 4.1.2 已登记设备 IP 同步（R100-15）
+
+设备关机再开机导致 DHCP 地址变化时，地址发现与身份核对由后端完成。前端打印机管理页为 ADMIN 提供独立“同步设备 IP”入口，普通“刷新”继续只读取列表。同步只更新身份和协议确认一致的已有设备，不导入未知设备，不更改名称、编号、位置、任务关联或监控开关。
+
+两个 `/printers/rediscover` 接口均返回 `Result<PrinterRediscoveryResultVO>`：`scanId,status,message,startedAt,finishedAt,subnets,scannedAddressCount,updatedCount,unchangedCount,unresolvedCount,items`。任务状态为 `IDLE/RUNNING/COMPLETED/FAILED`；IDLE 表示尚无记录。`items` 的字段为 `printerId,printerName,oldIpAddress,newIpAddress,status,message`，状态为 `UPDATED/UNCHANGED/NOT_FOUND/MISSING_MAC/UNSUPPORTED_PROTOCOL/CONFLICT/SKIPPED`，ID 按字符串读取，地址允许 null。接口不返回 MAC 或设备凭据。
+
+POST 无请求体，扫描范围使用服务端配置并由 `subnets` 返回。前端每 2 秒串行 GET 查询进行中任务，完成后刷新列表；失败停止轮询并提供重试，查询网络失败保留已有结果并允许重新查询。重新进入管理员页面会查询最近记录并恢复 RUNNING 任务；组件卸载后停止轮询并忽略在途响应。关闭抽屉不取消服务端任务。
 
 ### 4.2 文件
 

@@ -1,5 +1,6 @@
 import request from '@/utils/request'
 import { REQUEST_TIMEOUT } from '@/utils/constants'
+import { normalizeRediscoveryResult } from '@/utils/printerRediscovery'
 import {
   mapResponseData,
   normalizePageParams,
@@ -75,6 +76,22 @@ export function updatePrinterMonitorBatch(printerIds, monitorEnabled) {
       monitorEnabled: monitorEnabled === true
     }
   })
+}
+
+/** 发起已有打印机的异步 IP 同步。仅 ADMIN 可调用，无请求体。 */
+export function startPrinterRediscovery() {
+  return request({
+    url: '/api/v1/printers/rediscover',
+    method: 'post'
+  }).then(response => mapResponseData(response, normalizeRediscoveryResult))
+}
+
+/** 查询最近一次 IP 同步任务及逐项结果。仅 ADMIN 可调用。 */
+export function getPrinterRediscovery() {
+  return request({
+    url: '/api/v1/printers/rediscover',
+    method: 'get'
+  }).then(response => mapResponseData(response, normalizeRediscoveryResult))
 }
 
 /**

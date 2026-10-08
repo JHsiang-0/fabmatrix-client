@@ -606,6 +606,21 @@ const createSeedData = ({
   lastBatchAddPayload: null,
   batchAddFailures: clone(batchAddFailures),
   dashboardLayoutError: clone(dashboardLayoutError),
+  printerRediscovery: {
+    scanId: null,
+    status: 'IDLE',
+    message: '尚无同步记录',
+    startedAt: null,
+    finishedAt: null,
+    subnets: ['192.168.1.0/24'],
+    scannedAddressCount: 0,
+    updatedCount: 0,
+    unchangedCount: 0,
+    unresolvedCount: 0,
+    items: []
+  },
+  printerRediscoveryStartedAt: null,
+  printerRediscoverySequence: 0,
   nextIds: {
     users: '3',
     file: '25',

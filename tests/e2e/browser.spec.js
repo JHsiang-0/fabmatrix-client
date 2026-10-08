@@ -53,6 +53,40 @@ const loginAs = async (page, username, password) => {
   await expect(page.getByRole('heading', { name: '概览仪表盘' })).toBeVisible()
 }
 
+test('设备 IP 同步独立于普通刷新，展示地址变化并刷新列表，窄屏可关闭', async ({ page }) => {
+  await login(page)
+  await openSidebarItem(page, 1280, '打印机管理')
+  await expect(page.getByRole('heading', { name: '打印机管理' })).toBeVisible()
+  await expect.poll(() => mockRequestCount(page, 'GET /api/v1/printers/page')).toBeGreaterThan(0)
+  await page.getByRole('button', { name: '刷新', exact: true }).click()
+  expect(await mockRequestCount(page, 'POST /api/v1/printers/rediscover')).toBe(0)
+  await page.getByRole('button', { name: '同步设备 IP', exact: true }).click()
+  const drawer = page.locator('.printer-ip-sync-drawer')
+  await expect(drawer).toBeVisible()
+  await expect(drawer).toContainText('192.168.1.0/24')
+  const before = await mockRequestCount(page, 'GET /api/v1/printers/page')
+  await drawer.getByRole('button', { name: '开始同步', exact: true }).click()
+  await expect(drawer.getByRole('button', { name: '正在同步', exact: true })).toBeDisabled()
+  await expect.poll(() => mockRequestCount(page, 'POST /api/v1/printers/rediscover')).toBe(1)
+  await expect(drawer).toContainText('地址同步完成')
+  await expect(drawer).toContainText('192.168.1.81 → 192.168.1.181')
+  await expect.poll(() => mockRequestCount(page, 'GET /api/v1/printers/page')).toBeGreaterThan(before)
+  await page.setViewportSize({ width: 375, height: 812 })
+  await expect(drawer.getByRole('button', { name: '关闭', exact: true })).toBeVisible()
+  await assertNoViewportOverflow(page)
+  await drawer.getByRole('button', { name: '关闭', exact: true }).click()
+  await expect(drawer).toBeHidden()
+})
+
+test('操作员看不到设备 IP 同步入口，也不发起后台同步查询', async ({ page }) => {
+  await loginAs(page, 'operator', 'Operator123')
+  await openSidebarItem(page, 1280, '打印机管理')
+  await expect(page.getByRole('heading', { name: '打印机管理' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /同步设备 IP/ })).toHaveCount(0)
+  await page.getByRole('button', { name: '刷新', exact: true }).click()
+  expect(await mockRequestCount(page, 'GET /api/v1/printers/rediscover')).toBe(0)
+})
+
 const openSidebarItem = async (page, width, label) => {
   const sidebar = page.locator('.app-sidebar')
   const targetPath = pages.find(item => item.label === label)?.path
