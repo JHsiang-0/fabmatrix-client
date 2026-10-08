@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
+import { readXlsx } from '../helpers/xlsxReadback.js'
 import { isFeatureEnabled } from '../../src/config/features.js'
 
 const batchDispatchEnabled = isFeatureEnabled('batchDispatch')
@@ -54,7 +55,7 @@ const loginAs = async (page, username, password) => {
   await expect(page.getByRole('heading', { name: '概览仪表盘' })).toBeVisible()
 }
 
-test('打印历史导出 Excel 和 PDF 使用已查询筛选并包含全部分页，窄屏可下载', async ({ page }) => {
+test('打印历史导出独立筛选 Excel 和 PDF 全部分页，保持列表条件并可窄屏下载', async ({ page }) => {
   await page.goto('/login')
   await page.evaluate(() => window.__FARM_RESET_MOCK__({ jobs: Array.from({ length: 25 }, (_, index) => ({
     id: 10000 + index, fileId: index % 2 ? 21 : 20, userId: 1, status: 'COMPLETED', progress: 100,
@@ -72,20 +73,38 @@ test('打印历史导出 Excel 和 PDF 使用已查询筛选并包含全部分�
   await page.getByPlaceholder('请输入文件名', { exact: true }).fill('尚未查询的条件')
   await page.getByRole('button', { name: '导出历史', exact: true }).click()
   const dialog = page.locator('.t-dialog').filter({ hasText: '导出打印历史' })
-  await expect(dialog).toContainText('gearbox')
-  await expect(dialog).toContainText('13 条')
+  await expect(dialog.getByPlaceholder('包含文件名，不限请留空')).toHaveValue('gearbox')
+  await expect(dialog).not.toContainText('13 条')
+  await dialog.getByPlaceholder('包含文件名，不限请留空').fill('enclosure')
+  await dialog.getByRole('button', { name: '恢复列表条件', exact: true }).click()
+  await expect(dialog.getByPlaceholder('包含文件名，不限请留空')).toHaveValue('gearbox')
+  await dialog.getByPlaceholder('包含文件名，不限请留空').fill('enclosure')
+  const pageRequests = await mockRequestCount(page, 'POST /api/v1/print-jobs/page')
   const excelDownload = page.waitForEvent('download')
   await dialog.getByRole('button', { name: '下载文件', exact: true }).click()
   const excel = await excelDownload
   expect(excel.suggestedFilename()).toBe('打印历史（Mock）.xlsx')
   const excelBytes = await readFile(await excel.path())
   expect([...excelBytes.subarray(0, 4)]).toEqual([0x50, 0x4b, 3, 4])
-  expect(excelBytes.toString()).toContain('10024')
-  expect(excelBytes.toString()).not.toContain('10023')
+  const book = readXlsx(excelBytes)
+  expect(book.activeTab).toBe(0)
+  expect(book.sheets.map(sheet => sheet.name)).toEqual(['明细', '汇总'])
+  expect(book.sheets[0].rows[0]).toHaveLength(13)
+  expect(book.sheets[0].rows).toHaveLength(13)
+  expect(book.sheets[0].rows.some(row => row[0] === '10023')).toBe(true)
+  expect(book.sheets[0].rows.some(row => row[0] === '10024')).toBe(false)
   const payload = await page.evaluate(() => window.__FARM_GET_LAST_HISTORY_EXPORT_PAYLOAD__())
-  expect(payload).toEqual({ format: 'XLSX', statuses: ['COMPLETED', 'FAILED', 'CANCELLED'], fileName: 'gearbox' })
+  expect(payload).toEqual({ format: 'XLSX', statuses: ['COMPLETED', 'FAILED', 'CANCELLED'], fileName: 'enclosure' })
+  expect(await mockRequestCount(page, 'POST /api/v1/print-jobs/page')).toBe(pageRequests)
+  await expect(page.locator('.history-pagination-footer__summary')).toContainText('13')
+  await expect(page.getByPlaceholder('请输入文件名', { exact: true })).toHaveValue('尚未查询的条件')
   await page.setViewportSize({ width: 375, height: 812 })
   await page.getByRole('button', { name: '导出历史', exact: true }).click()
+  await expect(dialog.getByPlaceholder('包含文件名，不限请留空')).toHaveValue('gearbox')
+  await dialog.getByRole('button', { name: '重置为全历史', exact: true }).click()
+  await expect(dialog.getByPlaceholder('包含文件名，不限请留空')).toHaveValue('')
+  await dialog.getByRole('button', { name: '恢复列表条件', exact: true }).click()
+  await dialog.getByPlaceholder('包含文件名，不限请留空').fill('enclosure')
   await dialog.getByText('PDF（.pdf）', { exact: true }).click()
   await assertNoViewportOverflow(page)
   const pdfDownload = page.waitForEvent('download')
@@ -94,8 +113,8 @@ test('打印历史导出 Excel 和 PDF 使用已查询筛选并包含全部分�
   expect(pdf.suggestedFilename()).toBe('打印历史（Mock）.pdf')
   const pdfText = (await readFile(await pdf.path())).toString()
   expect(pdfText).toMatch(/^%PDF-1\.4/)
-  expect(pdfText).toContain('13 records')
-  expect(pdfText).toContain('#10024')
+  expect(pdfText).toContain('12 records')
+  expect(pdfText).toContain('#10023')
 })
 
 test('打印历史 PDF 导出超限显示业务错误且不下载假文件，取消生成不会下载', async ({ page }) => {
@@ -130,12 +149,47 @@ test('操作员打印历史导出可用且只下载本人记录，不显示创�
   await expect(page.getByText('创建人', { exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: '导出历史', exact: true }).click()
   const dialog = page.locator('.t-dialog').filter({ hasText: '导出打印历史' })
+  await expect(dialog.getByText('创建人', { exact: true })).toHaveCount(0)
   const downloadEvent = page.waitForEvent('download')
   await dialog.getByRole('button', { name: '下载文件', exact: true }).click()
   const content = (await readFile(await (await downloadEvent).path())).toString()
   expect(content).toContain('1004')
   expect(content).not.toContain('1005')
   expect(await page.evaluate(() => window.__FARM_GET_LAST_HISTORY_EXPORT_PAYLOAD__())).not.toHaveProperty('userId')
+})
+
+test('管理员导出可独立筛选创建人，历史设备 ID 校验失败不会请求或下载', async ({ page }) => {
+  await login(page)
+  await openSidebarItem(page, 1280, '打印历史')
+  await page.getByRole('button', { name: '导出历史', exact: true }).click()
+  const dialog = page.locator('.t-dialog').filter({ hasText: '导出打印历史' })
+  await dialog.getByPlaceholder('搜索设备名称、机台号或输入 ID').fill('-1')
+  await dialog.getByRole('button', { name: '下载文件', exact: true }).click()
+  await expect(dialog).toContainText('打印机 ID 必须为有效正整数')
+  expect(await mockRequestCount(page, 'POST /api/v1/print-jobs/history/export')).toBe(0)
+  await dialog.getByRole('button', { name: '重置为全历史', exact: true }).click()
+  await dialog.getByPlaceholder('搜索设备名称、机台号或输入 ID').fill('Printer_C0DA')
+  await page.getByText(/Printer_C0DA · .*（403）/).last().click()
+  await expect(dialog.getByPlaceholder('搜索设备名称、机台号或输入 ID')).toHaveValue('403')
+  await dialog.getByRole('button', { name: '重置为全历史', exact: true }).click()
+  await dialog.getByPlaceholder('全部创建人', { exact: true }).click()
+  await page.getByText('operator（2）', { exact: true }).last().click()
+  await dialog.getByText('失败', { exact: true }).click()
+  await dialog.getByText('已取消', { exact: true }).click()
+  await dialog.getByPlaceholder('开始时间', { exact: true }).fill('2026-09-02 00:00:00')
+  await dialog.getByPlaceholder('结束时间', { exact: true }).fill('2026-09-03 23:59:58')
+  await dialog.getByPlaceholder('结束时间', { exact: true }).press('Tab')
+  await expect(dialog).toContainText('实际范围：2026-09-02 00:00:00 至 2026-09-03 23:59:58')
+  await dialog.getByPlaceholder('结束时间', { exact: true }).fill('2026-09-03 23:59:59')
+  await dialog.getByPlaceholder('结束时间', { exact: true }).press('Enter')
+  await expect(dialog).toContainText('实际范围：2026-09-02 00:00:00 至 2026-09-03 23:59:59')
+  const downloadEvent = page.waitForEvent('download')
+  await dialog.getByRole('button', { name: '下载文件', exact: true }).click()
+  const book = readXlsx(await readFile(await (await downloadEvent).path()))
+  expect(book.sheets[0].rows).toHaveLength(2)
+  expect(book.sheets[0].rows[1][0]).toBe('1004')
+  expect(await page.evaluate(() => window.__FARM_GET_LAST_HISTORY_EXPORT_PAYLOAD__())).toMatchObject({ userId: '2', statuses: ['COMPLETED'], startTime: '2026-09-02T00:00:00', endTime: '2026-09-03T23:59:59' })
+  await expect(page.locator('.history-pagination-footer__summary')).toContainText('3')
 })
 
 test('设备 IP 同步独立于普通刷新，展示地址变化并刷新列表，窄屏可关闭', async ({ page }) => {

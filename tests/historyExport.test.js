@@ -7,8 +7,9 @@ import { createServer } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import {
   createExportRequestGuard, exportFileName, HISTORY_EXPORT_TYPES,
-  readJsonDownloadBody, saveExportFile, toHistoryExportPayload
+  createHistoryExportForm, historyExportFiltersFromForm, readJsonDownloadBody, saveExportFile, toHistoryExportPayload
 } from '../src/utils/fileExport.js'
+import { readXlsx } from './helpers/xlsxReadback.js'
 import { mockRequest } from '../src/mock/index.js'
 import { mockState, resetMockState } from '../src/mock/data.js'
 
@@ -21,6 +22,31 @@ test('history export sends terminal filters and excludes page/timeField', () => 
   assert.throws(() => toHistoryExportPayload({}, 'CSV'))
   assert.throws(() => toHistoryExportPayload({ status: 'PRINTING' }))
   assert.throws(() => toHistoryExportPayload({ statuses: [] }))
+})
+
+test('export form is independent, initializes from list filters and strips OPERATOR creator filters', () => {
+  const original = { statuses: ['FAILED'], fileName: 'gearbox', printerId: '403', userId: '2',
+    startTime: '2026-10-08T00:00:00', endTime: '2026-10-08T23:59:59' }
+  const form = createHistoryExportForm(original, true)
+  form.statuses.push('CANCELLED')
+  form.fileName = 'other'
+  assert.deepEqual(original.statuses, ['FAILED'])
+  assert.equal(original.fileName, 'gearbox')
+  assert.equal(historyExportFiltersFromForm(form, true).userId, '2')
+  assert.equal('userId' in historyExportFiltersFromForm(form, false), false)
+  assert.equal(createHistoryExportForm(original, false).userId, '')
+  assert.deepEqual(historyExportFiltersFromForm(createHistoryExportForm()), { statuses: ['COMPLETED', 'FAILED', 'CANCELLED'] })
+})
+
+test('export form validates positive Long IDs, file limit and complete real calendar dates before download', () => {
+  for (const id of ['0', '-1', '1.5', 'device-name', '9223372036854775808']) {
+    assert.throws(() => toHistoryExportPayload({ printerId: id }), /ID/)
+  }
+  assert.throws(() => toHistoryExportPayload({ fileName: 'x'.repeat(256) }), /255/)
+  assert.throws(() => historyExportFiltersFromForm({ statuses: ['COMPLETED'], dateRange: ['2026-10-08 00:00:00'] }), /完整/)
+  assert.throws(() => toHistoryExportPayload({ startTime: '2026-02-30T00:00:00' }), /格式/)
+  assert.throws(() => toHistoryExportPayload({ startTime: '2026-10-09T00:00:00', endTime: '2026-10-08T23:59:59' }), /晚于/)
+  assert.equal(toHistoryExportPayload({ printerId: '9223372036854775807' }).printerId, '9223372036854775807')
 })
 
 test('safe names prefer UTF8, reject paths/control characters and enforce the format suffix', () => {
@@ -99,10 +125,33 @@ test('Mock emits valid XLSX/PDF binary signatures, headers and only selected ter
   assert.match(pdf.headers['content-disposition'], /filename\*=UTF-8''/)
 })
 
+test('downloaded workbook opens with full 13-column detail first and matching statistics second', async () => {
+  setupMock()
+  const source = mockState.jobs.find(job => job.id === 1005)
+  Object.assign(source, { machineNumberSnapshot: '历史机台', operatorUsernameSnapshot: '现场操作员',
+    startedAt: '2026-10-08T10:00:00', completedAt: '2026-10-08T10:17:15', attemptNumber: 3, errorReason: '=原样文本原因' })
+  const download = await mockExport('XLSX', { statuses: ['FAILED'] })
+  const book = readXlsx(await download.data.arrayBuffer())
+  assert.equal(book.activeTab, 0)
+  assert.deepEqual(book.sheets.map(sheet => sheet.name), ['明细', '汇总'])
+  assert.deepEqual(book.sheets[0].rows[0], ['任务编号', '文件名', '打印机', '机台号', '创建人', '操作员', '结果', '创建时间', '开始时间', '结束时间', '经过时长（分钟）', '尝试序号', '原因'])
+  assert.equal(book.sheets[0].rows.length, 2)
+  assert.equal(book.sheets[0].rows[1].length, 13)
+  assert.equal(book.sheets[0].rows[1][0], '1005')
+  assert.equal(book.sheets[0].rows[1][3], '历史机台')
+  assert.equal(book.sheets[0].rows[1][5], '现场操作员')
+  assert.equal(book.sheets[0].rows[1][10], 17.25)
+  assert.equal(book.sheets[0].rows[1][11], 3)
+  assert.equal(book.sheets[0].rows[1][12], '=原样文本原因')
+  assert.deepEqual(book.sheets[1].rows.find(row => row[0] === '历史记录条数'), ['历史记录条数', 1])
+})
+
 test('Mock export enforces role ownership, missing session, terminal status and row limit', async () => {
   setupMock()
   await assert.rejects(mockExport('PDF', {}, 'unknown'), error => error.response.status === 401)
-  await assert.rejects(mockExport('PDF', { userId: '1' }, 'export-operator'), error => error.response.status === 403)
+  const forcedOwn = await mockExport('PDF', { userId: '1' }, 'export-operator')
+  assert.match(await forcedOwn.data.text(), /#1004/)
+  assert.doesNotMatch(await forcedOwn.data.text(), /#1005/)
   await assert.rejects(mockExport('PDF', { statuses: ['PRINTING'] }), error => error.response.status === 400)
   mockState.jobs = Array.from({ length: 1001 }, (_, index) => ({ id: 10000 + index, userId: 1, status: 'COMPLETED', completedAt: '2026-10-08T12:00:00' }))
   await assert.rejects(mockExport('PDF'), error => error.response.status === 422 && /缩小时间范围/.test(error.message))

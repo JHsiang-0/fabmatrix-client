@@ -1870,16 +1870,13 @@ const queryJobRecords = config => {
 const handleJobPage = config => createMockPage(queryJobRecords(config), getBody(config))
 
 const handleHistoryExport = config => {
-  const session = requireSession(config, ['ADMIN', 'OPERATOR'])
+  requireSession(config, ['ADMIN', 'OPERATOR'])
   const body = getBody(config)
   mockState.lastHistoryExportPayload = cloneMockData(body)
   if (!['XLSX', 'PDF'].includes(body.format)) fail(400, 400, '导出格式必须为 XLSX 或 PDF')
   const statuses = body.statuses ?? ['COMPLETED', 'FAILED', 'CANCELLED']
   if (!Array.isArray(statuses) || !statuses.length || statuses.some(status => !['COMPLETED', 'FAILED', 'CANCELLED', 'CANCELED'].includes(status))) {
     fail(400, 400, '只能导出终态打印历史')
-  }
-  if (session.role !== 'ADMIN' && body.userId && String(body.userId) !== String(session.userId)) {
-    fail(403, 403, '无权导出其他用户的打印历史')
   }
   const records = queryJobRecords({ ...config, data: { ...body, status: undefined, statuses, timeField: 'COMPLETED_AT' } })
   const maximum = body.format === 'PDF' ? 1000 : 10000

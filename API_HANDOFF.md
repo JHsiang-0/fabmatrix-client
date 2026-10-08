@@ -359,9 +359,9 @@ POST 无请求体，扫描范围使用服务端配置并由 `subnets` 返回。�
 
 ### 4.3.1 打印历史导出（R100-16）
 
-打印历史导出（R100-16）固定查询终态 `COMPLETED/FAILED/CANCELLED`，省略 `statuses` 表示全部终态，兼容 `CANCELED`；按结束时间筛选、倒序排序，无 `pageNum/pageSize/timeField`。时间格式沿用农场 local datetime，非法条件 400；超过 XLSX 默认 10000 条、PDF 默认 1000 条或 20MiB 输出限额返回 422，前端提示缩小查询范围。OPERATOR 提交其他创建人 ID 返回 403。成功 MIME 为 `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` 或 `application/pdf`，`Content-Disposition` 包含 ASCII fallback 及 UTF-8 `filename*`，跨源后端须 expose 此响应头。
+打印历史导出（R100-16）固定查询终态 `COMPLETED/FAILED/CANCELLED`，省略 `statuses` 表示全部终态，兼容 `CANCELED`；按结束时间筛选、倒序排序，无 `pageNum/pageSize/timeField`。时间格式沿用农场 local datetime，非法条件 400；超过 XLSX 默认 10000 条、PDF 默认 1000 条或 20MiB 输出限额返回 422，前端提示缩小查询范围。OPERATOR 的创建人筛选固定为 JWT 本人，不受客户端 userId 影响；前端不展示该字段且不提交 userId。成功 MIME 为 `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` 或 `application/pdf`，`Content-Disposition` 包含 ASCII fallback 及 UTF-8 `filename*`，跨源后端须 expose 此响应头。
 
-客户端历史页导出对话框展示最近一次成功查询条件，导出全部匹配记录；尚未点击查询的表单改动不影响分页、实时刷新或导出。统一 Axios 下载分支读取 Blob 和响应头，HTTP/业务错误中的 JSON Blob 仍执行统一错误提示及当前会话 401 清理；其他旧 Blob API 行为保持兼容。下载在取消、卸载、退出/重登、身份或角色变化后作废，临时链接移除并延迟释放 Blob URL。报表使用名称快照，经过时长含暂停；实际耗材和净打印时长尚未完整保存，不作为导出字段。
+客户端历史页导出对话框打开时复制最近一次成功查询条件，随后可独立编辑任务状态、文件名、设备、ADMIN 创建人和结束时间范围，直接导出全部匹配记录；修改导出条件不影响历史列表，无需先查询列表。提供“重置为全历史”和“恢复列表条件”，不把旧列表 total 当成新导出范围条数。打印机复用已加载设备和当前历史记录作为名称/机台号搜索建议，无缓存时首次打开只查询现有设备 API 第一页（最多100条、不全量翻页），失败仍可直接输入 ID；名称搜索只针对已加载建议，不保证覆盖全部历史设备。前端预检正数 Long ID、文件名长度、完整日期范围及日历有效性，时间框显示并可编辑实际秒级起止值，手动输入在 Enter 或失焦后提交校验；恢复列表条件保留具体时间。Excel 默认打开“明细”第一张表，保留全部13字段；“汇总”作为第二张表。统一 Axios 下载分支读取 Blob 和响应头，HTTP/业务错误中的 JSON Blob 仍执行统一错误提示及当前会话 401 清理；其他旧 Blob API 行为保持兼容。下载在取消、卸载、退出/重登、身份或角色变化后作废，临时链接移除并延迟释放 Blob URL。报表使用名称快照，经过时长含暂停；实际耗材和净打印时长尚未完整保存，不作为导出字段。
 
 ### 4.4 设备控制
 

@@ -5,7 +5,7 @@ export const HISTORY_EXPORT_TYPES = Object.freeze({
 
 export const HISTORY_EXPORT_STATUSES = Object.freeze(['COMPLETED', 'FAILED', 'CANCELLED'])
 
-/** Only the applied history filters are sent; pagination is deliberately omitted. */
+/** Only history filters are sent; pagination is deliberately omitted. */
 export function toHistoryExportPayload(filters = {}, format = 'XLSX') {
   if (!HISTORY_EXPORT_TYPES[format]) throw new TypeError('请选择 Excel 或 PDF 格式')
   const statuses = filters.status ? [filters.status] : (filters.statuses || HISTORY_EXPORT_STATUSES)
@@ -18,7 +18,44 @@ export function toHistoryExportPayload(filters = {}, format = 'XLSX') {
     const value = filters[key]
     if (value !== null && value !== undefined && String(value).trim() !== '') body[key] = String(value).trim()
   }
+  if (body.fileName?.length > 255) throw new TypeError('文件名筛选最多255个字符')
+  for (const key of ['printerId', 'userId']) {
+    if (body[key] && (!/^\d+$/.test(body[key]) || BigInt(body[key]) <= 0n || BigInt(body[key]) > 9223372036854775807n)) {
+      throw new TypeError(`${key === 'printerId' ? '打印机' : '创建人'} ID 必须为有效正整数`)
+    }
+  }
+  for (const key of ['startTime', 'endTime']) {
+    if (!body[key]) continue
+    const date = new Date(`${body[key]}Z`)
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(body[key]) || Number.isNaN(date.getTime())
+      || date.toISOString().slice(0, 19) !== body[key]) throw new TypeError('结束时间格式无效')
+  }
+  if (body.startTime && body.endTime && body.startTime > body.endTime) throw new TypeError('开始日期不能晚于结束日期')
   return body
+}
+
+/** The dialog owns a detached form; editing it never mutates the list query. */
+export function createHistoryExportForm(filters = {}, isAdmin = false) {
+  return {
+    statuses: [...(filters.status ? [filters.status] : (filters.statuses || HISTORY_EXPORT_STATUSES))],
+    fileName: filters.fileName || '', printerId: filters.printerId == null ? '' : String(filters.printerId),
+    userId: isAdmin && filters.userId != null ? String(filters.userId) : '',
+    dateRange: filters.startTime || filters.endTime
+      ? [String(filters.startTime || '').replace('T', ' '), String(filters.endTime || '').replace('T', ' ')] : []
+  }
+}
+
+export function historyExportFiltersFromForm(form, isAdmin = false) {
+  const filters = { statuses: [...form.statuses], fileName: form.fileName, printerId: form.printerId }
+  if (isAdmin) filters.userId = form.userId
+  if (form.dateRange?.length) {
+    if (form.dateRange.length !== 2 || !form.dateRange.every(Boolean)) throw new TypeError('请选择完整的结束日期范围')
+    filters.startTime = String(form.dateRange[0]).replace(' ', 'T')
+    filters.endTime = String(form.dateRange[1]).replace(' ', 'T')
+  }
+  const payload = toHistoryExportPayload(filters)
+  delete payload.format
+  return payload
 }
 
 /** Prefer RFC 5987 UTF-8 names and reduce every name to a safe local basename. */

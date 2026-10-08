@@ -52,18 +52,37 @@ const zip = files => {
   return [...parts, ...central, end]
 }
 
+const statusLabel = status => ({ COMPLETED: '已完成', FAILED: '失败', CANCELLED: '已取消', CANCELED: '已取消' })[status] || status
+const elapsedMinutes = row => {
+  if (!row.startedAt || !row.completedAt) return null
+  const seconds = (Date.parse(`${row.completedAt}Z`) - Date.parse(`${row.startedAt}Z`)) / 1000
+  return Number.isFinite(seconds) && seconds >= 0 ? Math.round(seconds / 60 * 100) / 100 : null
+}
+const makeSheet = (rows, detail = false) => `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"${detail ? ' tabSelected="1"' : ''}><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="13" width="22" customWidth="1"/></cols><sheetData>${rows.map((row, index) => `<row r="${index + 1}">${row.map((value, column) => {
+  const cell = `${String.fromCharCode(65 + column)}${index + 1}`
+  if (typeof value === 'number' && Number.isFinite(value)) return `<c r="${cell}"><v>${value}</v></c>`
+  return `<c r="${cell}" t="inlineStr"><is><t>${xml(value)}</t></is></c>`
+}).join('')}</row>`).join('')}</sheetData>${detail ? `<autoFilter ref="A1:M${rows.length}"/>` : ''}</worksheet>`
+
 const makeExcel = records => {
-  const rows = [['任务编号', '文件名', '打印机', '创建人', '结果', '结束时间'], ...records.map(row => [
-    row.id, row.fileNameSnapshot || row.fileName, row.printerNameSnapshot || row.printerName,
-    row.creatorUsernameSnapshot || row.creatorUsername, row.status, row.completedAt
+  const rows = [['任务编号', '文件名', '打印机', '机台号', '创建人', '操作员', '结果', '创建时间', '开始时间', '结束时间', '经过时长（分钟）', '尝试序号', '原因'], ...records.map(row => [
+    String(row.id), row.fileNameSnapshot || row.fileName, row.printerNameSnapshot || row.printerName,
+    row.machineNumberSnapshot || row.machineNumber, row.creatorUsernameSnapshot || row.creatorUsername,
+    row.operatorUsernameSnapshot || row.operatorUsername, statusLabel(row.status), row.createdAt,
+    row.startedAt, row.completedAt, elapsedMinutes(row), row.attemptNumber, row.errorReason
   ])]
-  const sheet = `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rows.map((row, index) => `<row r="${index + 1}">${row.map((value, column) => `<c r="${String.fromCharCode(65 + column)}${index + 1}" t="inlineStr"><is><t>${xml(value)}</t></is></c>`).join('')}</row>`).join('')}</sheetData></worksheet>`
+  const summary = [['统计项', '值'], ['历史记录条数', records.length],
+    ['已完成', records.filter(row => row.status === 'COMPLETED').length], ['失败', records.filter(row => row.status === 'FAILED').length],
+    ['已取消', records.filter(row => ['CANCELLED', 'CANCELED'].includes(row.status)).length],
+    ['经过时长合计（分钟）', Math.round(records.reduce((sum, row) => sum + (elapsedMinutes(row) || 0), 0) * 100) / 100],
+    ['时长口径', '开始至结束的经过时长，包含暂停；缺失或异常时间留空']]
   return zip({
-    '[Content_Types].xml': '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
+    '[Content_Types].xml': '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
     '_rels/.rels': '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
-    'xl/workbook.xml': '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="打印历史（Mock）" sheetId="1" r:id="rId1"/></sheets></workbook>',
-    'xl/_rels/workbook.xml.rels': '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
-    'xl/worksheets/sheet1.xml': sheet
+    'xl/workbook.xml': '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="0"/></bookViews><sheets><sheet name="明细" sheetId="1" r:id="rId1"/><sheet name="汇总" sheetId="2" r:id="rId2"/></sheets></workbook>',
+    'xl/_rels/workbook.xml.rels': '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/></Relationships>',
+    'xl/worksheets/sheet1.xml': makeSheet(rows, true),
+    'xl/worksheets/sheet2.xml': makeSheet(summary)
   })
 }
 

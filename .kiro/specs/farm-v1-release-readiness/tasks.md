@@ -304,11 +304,15 @@
 规格归属：farm-v1-release-readiness
 完成日期：2026-10-08
 
-范围：历史页 TDesign 导出对话框、已提交/成功查询筛选快照、统一鉴权二进制下载、Mock 文档生成和客户端回归。
+范围：历史页 TDesign 独立导出筛选对话框、成功查询条件初始化/恢复、统一鉴权二进制下载、Mock 文档生成和客户端回归。
 
-实施记录：ADMIN/OPERATOR 均可从“导出历史”选择 XLSX/PDF；使用最近一次成功查询条件并展示范围，导出全部分页。表单尚未提交的修改不影响分页、实时刷新或导出；查询中/加载失败时禁止导出。新 API POST `/api/v1/print-jobs/history/export` 只提交格式和筛选白名单，通过现有 Axios 会话鉴权，opt-in 分支保留 Content-Disposition、检查 MIME 和非空文件、解码 JSON Blob HTTP/业务错误；原缩略图等 Blob API 保持兼容。重复点击由页面 guard 拦截；取消后立即重试不复用旧取消请求，卸载、会话代次、身份或角色变化中止旧下载。文件名优先 UTF-8 并清理目录/控制字符，链接及时移除并延迟释放 Blob URL。Mock 生成有效 OOXML ZIP 和分页 PDF；ESLint 精确排除此前安装验证产物所在的 gitignore release 目录，防止生成的 CJS 被误当源码检查。
+初版实施记录：ADMIN/OPERATOR 均可从“导出历史”选择 XLSX/PDF；使用最近一次成功查询条件并展示范围，导出全部分页。表单尚未提交的修改不影响分页、实时刷新或导出；查询中/加载失败时禁止导出。新 API POST `/api/v1/print-jobs/history/export` 只提交格式和筛选白名单，通过现有 Axios 会话鉴权，opt-in 分支保留 Content-Disposition、检查 MIME 和非空文件、解码 JSON Blob HTTP/业务错误；原缩略图等 Blob API 保持兼容。重复点击由页面 guard 拦截；取消后立即重试不复用旧取消请求，卸载、会话代次、身份或角色变化中止旧下载。文件名优先 UTF-8 并清理目录/控制字符，链接及时移除并延迟释放 Blob URL。Mock 生成有效 OOXML ZIP 和分页 PDF；ESLint 精确排除此前安装验证产物所在的 gitignore release 目录，防止生成的 CJS 被误当源码检查。
 
-验证记录：`npm run test:history-export`（16/16）、`npm test`（430/430）、`npm run lint:check` 和 `npm run release:gate` 全部通过；门禁包含 Web/Desktop 正式/Mock 构建、Electron dist（1/1）以及源码/正式产物安全扫描。浏览器导出专项（3/3）实测两格式中文文件名/文件签名、13 条跨分页结果、未查询表单改动、375px 无横向溢出、PDF 1001 条限额错误不下载假文件、取消及 OPERATOR 本人边界。Electron 导出专项（1/1）通过原生 will-download 实际写盘两格式文件，检查 completed、中文文件名和签名。初次门禁构建与取消重试精确补丁重叠读取文件导致 parse error，停止编辑后重新完整门禁通过；最终证据以第二次 PASS 为准。构建保留既有大 chunk 与动态/静态导入提示。
+初版验证记录：`npm run test:history-export`（16/16）、`npm test`（430/430）、`npm run lint:check` 和 `npm run release:gate` 全部通过；门禁包含 Web/Desktop 正式/Mock 构建、Electron dist（1/1）以及源码/正式产物安全扫描。浏览器导出专项（3/3）实测两格式中文文件名/文件签名、13 条跨分页结果、未查询表单改动、375px 无横向溢出、PDF 1001 条限额错误不下载假文件、取消及 OPERATOR 本人边界。Electron 导出专项（1/1）通过原生 will-download 实际写盘两格式文件，检查 completed、中文文件名和签名。初次门禁构建与取消重试精确补丁重叠读取文件导致 parse error，停止编辑后重新完整门禁通过；最终证据以第二次 PASS 为准。构建保留既有大 chunk 与动态/静态导入提示。
+
+需求调整与追加实施（2026-10-08）：导出弹窗现在独立编辑终态、文件名、设备、ADMIN 创建人和秒级结束时间范围，打开时复制最近成功查询条件，支持“重置为全历史”与“恢复列表条件”，直接导出全部匹配记录，不更改列表、不依赖列表加载成功、不显示旧 total。设备名称/机台号建议复用缓存与历史快照，无缓存时仅补充现有 API 第一页最多100条；请求失败保留 ID 输入，关闭、身份变化或卸载中止并拒绝旧结果。OPERATOR 表单和 payload 始终移除 userId，Mock 与正式后端一样按 JWT 本人固定归属。日期组件显式显示/编辑完整秒级时间，并在 Enter/失焦时提交手输值校验，保留恢复的具体端点。Excel 明细第一且默认激活，全部13列和真实行完整输出，汇总第二；正式 PDF 紧凑表格由配套后端实现。
+
+追加验证：`npm run test:history-export`（19/19）、`npm test`（433/433）、lint 与完整 `npm run release:gate` 全部通过，包含 Web/Desktop 正式与 Mock 构建、Electron dist（1/1）和源码/正式产物安全扫描。浏览器导出专项（4/4）实际修改弹窗文件、状态、设备名称/历史 ID、ADMIN 创建人及时间，验证列表条件/结果不变、重置/恢复、OPERATOR 归属、无分页 body、限额/取消和375px布局；真实下载 XLSX ZIP/OOXML 读回验证明细第一/active=0、13列、全部12条跨页匹配记录及具体任务 ID。手输 Tab 与 Enter 分别验证 23:59:58 和 23:59:59 的实际范围及最终秒级 payload。Electron 原生下载专项（1/1）重新通过两格式实际写盘、completed、中文文件名和签名。日志保存在 gitignore `test-results/history-export-revision-*.log`，正式新安装器使用独立 `release/history-export-table-20261008-<commit>` 目录，不覆盖初版证据；构建保留既有大 chunk 与动态/静态导入提示。
 
 现场状态：NOT RUN。未使用真实厂内数据、持久化数据库或打印机；新旧 Windows 安装/升级和真实数据报表需部署后验收，本任务不改变 R100 总体现场验收状态。
 

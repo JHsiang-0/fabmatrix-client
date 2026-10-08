@@ -4,8 +4,8 @@
       <template #actions>
       <div class="app-page-toolbar__actions">
         <t-button theme="default" variant="outline" :icon="renderIcon(Download)"
-          :disabled="loading || !hasAppliedQuery || Boolean(loadError)" :loading="exportLoading"
-          @click="exportVisible = true">导出历史</t-button>
+          :disabled="!userStore.isAuthenticated" :loading="exportLoading"
+          @click="openExport">导出历史</t-button>
         <t-button :icon="renderIcon(Refresh)" :loading="loading" @click="handleQuery" size="medium">
           刷新
         </t-button>
@@ -79,7 +79,7 @@
         </div>
       </QueryToolbar>
 
-      <p class="history-export-hint">导出全部已查询结果，包含所有分页。修改筛选条件后，请先点击查询。</p>
+      <p class="history-export-hint">导出可单独设置筛选条件，包含全部匹配记录和所有分页。</p>
 
       <!-- 数据表格区 -->
       <div class="history-content">
@@ -192,16 +192,44 @@
       </div>
     </section>
     <t-dialog v-model:visible="exportVisible" header="导出打印历史" :footer="false"
-      :close-on-overlay-click="false" :width="'min(480px, calc(100vw - 32px))'" @close="cancelExport">
+      :close-on-overlay-click="false" :width="'min(640px, calc(100vw - 32px))'" @close="cancelExport">
       <div class="history-export-dialog">
-        <p>按最近一次成功查询的条件导出全部历史记录，当前共 {{ pagination.total }} 条。</p>
-        <t-descriptions :column="1" size="small" bordered>
-          <t-descriptions-item label="任务状态">{{ exportFilterSummary.status }}</t-descriptions-item>
-          <t-descriptions-item label="文件名">{{ appliedFilters.fileName || '不限' }}</t-descriptions-item>
-          <t-descriptions-item label="打印机 ID">{{ appliedFilters.printerId || '不限' }}</t-descriptions-item>
-          <t-descriptions-item v-if="userStore.isAdmin" label="创建人 ID">{{ appliedFilters.userId || '不限' }}</t-descriptions-item>
-          <t-descriptions-item label="结束时间">{{ exportFilterSummary.time }}</t-descriptions-item>
-        </t-descriptions>
+        <p>导出下列条件匹配的全部历史记录，包含所有分页。这里的修改不会改变历史列表。</p>
+        <div class="history-export-filter-actions">
+          <t-button size="small" theme="default" variant="outline" :disabled="exportLoading" @click="resetExportFilters">重置为全历史</t-button>
+          <t-button size="small" theme="default" variant="outline" :disabled="exportLoading || !hasAppliedQuery" @click="restoreExportFilters">恢复列表条件</t-button>
+        </div>
+        <t-form :data="exportForm" layout="vertical" class="history-export-form">
+          <div class="history-export-filter-grid">
+            <t-form-item label="任务状态" name="statuses" class="history-export-field-wide">
+              <t-checkbox-group v-model="exportForm.statuses" :disabled="exportLoading">
+                <t-checkbox value="COMPLETED">已完成</t-checkbox>
+                <t-checkbox value="FAILED">失败</t-checkbox>
+                <t-checkbox value="CANCELLED">已取消</t-checkbox>
+              </t-checkbox-group>
+            </t-form-item>
+            <t-form-item label="文件名" name="fileName">
+              <t-input v-model="exportForm.fileName" placeholder="包含文件名，不限请留空" clearable :disabled="exportLoading" :maxlength="255" />
+            </t-form-item>
+            <t-form-item label="打印机" name="printerId">
+              <t-auto-complete v-model="exportForm.printerId" :options="exportPrinterOptions" :filter="filterExportPrinter"
+                :empty="exportPrinterLoading ? '设备建议加载中…' : '可直接填写历史设备 ID'"
+                filterable clearable :disabled="exportLoading" placeholder="搜索设备名称、机台号或输入 ID" />
+              <template #help>名称搜索使用已加载设备建议；其他或已删除设备可直接填写 ID。</template>
+            </t-form-item>
+            <t-form-item v-if="userStore.isAdmin" label="创建人" name="userId" class="history-export-field-wide">
+              <t-select v-model="exportForm.userId" :options="creatorOptions.map(user => ({ label: `${user.username}（${user.id}）`, value: String(user.id) }))"
+                placeholder="全部创建人" filterable clearable :loading="creatorLoading" :disabled="exportLoading" />
+            </t-form-item>
+            <t-form-item label="结束时间范围（Asia/Shanghai）" name="dateRange" class="history-export-field-wide">
+              <t-date-range-picker v-model="exportForm.dateRange" format="YYYY-MM-DD HH:mm:ss" value-type="YYYY-MM-DD HH:mm:ss"
+                separator="至" allow-input enable-time-picker @blur="commitExportDateInput"
+                :placeholder="['开始时间', '结束时间']" :default-time="['00:00:00', '23:59:59']" clearable :disabled="exportLoading" />
+              <template #help>{{ exportForm.dateRange.length === 2 ? `实际范围：${exportForm.dateRange[0]} 至 ${exportForm.dateRange[1]}` : '不选日期时，结束时间不限。' }}</template>
+            </t-form-item>
+          </div>
+        </t-form>
+        <t-alert v-if="exportError" theme="error" :close-btn="false">{{ exportError }}</t-alert>
         <t-radio-group v-model="exportFormat" :disabled="exportLoading" aria-label="导出格式">
           <t-radio value="XLSX">Excel（.xlsx）</t-radio>
           <t-radio value="PDF">PDF（.pdf）</t-radio>
@@ -239,8 +267,9 @@ import {
   TaskTimeIcon as Timer
 } from 'tdesign-icons-vue-next'
 import { getAdminUsers } from '@/api/user'
+import { getPrinterList } from '@/api/printer'
 import { exportJobHistory, getJobPage, reconcilePrintJob, retryJob } from '@/api/job'
-import { createExportRequestGuard, saveExportFile } from '@/utils/fileExport'
+import { createExportRequestGuard, createHistoryExportForm, historyExportFiltersFromForm, saveExportFile } from '@/utils/fileExport'
 import { message } from '@/utils/message'
 import { formatDateTime } from '@/utils/formatters'
 import { renderIcon } from '@/utils/tdesign'
@@ -256,6 +285,7 @@ import TaskDetailDrawer from '@/components/TaskDetailDrawer.vue'
 import { useJobStore } from '@/stores/jobStore'
 import { useRealtimeStore } from '@/stores/printer/realtimeStore'
 import { useUserStore } from '@/stores/user'
+import { useDeviceStore } from '@/stores/printer/deviceStore'
 
 defineOptions({ name: 'JobHistory' })
 
@@ -266,37 +296,103 @@ const creatorOptions = ref([])
 const userStore = useUserStore()
 const jobStore = useJobStore()
 const realtimeStore = useRealtimeStore()
+const deviceStore = useDeviceStore()
 const exportVisible = ref(false)
 const exportLoading = ref(false)
 const exportFormat = ref('XLSX')
 const appliedFilters = ref({})
 const hasAppliedQuery = ref(false)
+const exportForm = reactive(createHistoryExportForm())
+const exportError = ref('')
+const exportPrinterCandidates = ref([])
+const exportPrinterLoading = ref(false)
+let exportPrinterLookupController = null
+let exportPrinterLookupGeneration = 0
 const exportIdentity = () => `${userStore.token}:${userStore.getSessionGeneration()}:${userStore.userInfo.id}:${userStore.userInfo.role}`
 const exportRequestGuard = createExportRequestGuard(exportIdentity)
-const exportFilterSummary = computed(() => ({
-  status: appliedFilters.value.status ? ({ COMPLETED: '已完成', FAILED: '失败', CANCELLED: '已取消' })[appliedFilters.value.status] : '已完成、失败、已取消',
-  time: appliedFilters.value.startTime || appliedFilters.value.endTime
-    ? `${appliedFilters.value.startTime || '不限'} 至 ${appliedFilters.value.endTime || '不限'}` : '不限'
-}))
+const exportPrinterOptions = computed(() => {
+  const printers = new Map([...exportPrinterCandidates.value, ...deviceStore.rawDeviceList].map(printer => [String(printer.id), {
+    text: String(printer.id), label: `${printer.name || '打印机'} · ${printer.machineNumber || '未编号'}（${printer.id}）`
+  }]))
+  for (const job of tableData.value) {
+    if (!job.printerId || printers.has(String(job.printerId))) continue
+    printers.set(String(job.printerId), { text: String(job.printerId),
+      label: `${job.printerNameSnapshot || job.printerName || '历史设备'} · ${job.machineNumberSnapshot || job.machineNumber || '未编号'}（${job.printerId}）` })
+  }
+  return [...printers.values()]
+})
+const filterExportPrinter = (words, option) => String(option.label).toLowerCase().includes(String(words).toLowerCase())
+const cancelExportPrinterLookup = () => {
+  exportPrinterLookupGeneration += 1
+  exportPrinterLookupController?.abort()
+  exportPrinterLookupController = null
+  exportPrinterLoading.value = false
+}
+const loadExportPrinterCandidates = async () => {
+  if (deviceStore.rawDeviceList.length || exportPrinterCandidates.value.length || exportPrinterLoading.value) return
+  const identity = exportIdentity()
+  const generation = ++exportPrinterLookupGeneration
+  const controller = new AbortController()
+  exportPrinterLookupController = controller
+  exportPrinterLoading.value = true
+  const isCurrent = () => generation === exportPrinterLookupGeneration && identity === exportIdentity() && exportVisible.value && !controller.signal.aborted
+  try {
+    // A bounded first page supplements an empty Store; never fetch every device just to export history.
+    const response = await getPrinterList({ pageNum: 1, pageSize: 100 }, { signal: controller.signal })
+    if (isCurrent()) exportPrinterCandidates.value = response.data?.records || []
+  } catch {
+    // Suggestions are optional. The shared request layer reports real failures; historical ID input still works.
+  } finally {
+    if (generation === exportPrinterLookupGeneration) {
+      exportPrinterLoading.value = false
+      exportPrinterLookupController = null
+    }
+  }
+}
+const restoreExportFilters = () => {
+  Object.assign(exportForm, createHistoryExportForm(appliedFilters.value, userStore.isAdmin))
+  exportError.value = ''
+}
+const resetExportFilters = () => {
+  Object.assign(exportForm, createHistoryExportForm({}, userStore.isAdmin))
+  exportError.value = ''
+}
+const commitExportDateInput = ({ value }) => {
+  // TDesign only commits typed dates on Enter; blur also needs to retain the exact edited seconds for validation/export.
+  if (!exportLoading.value && Array.isArray(value)) exportForm.dateRange = [...value]
+}
+const openExport = () => {
+  restoreExportFilters()
+  exportVisible.value = true
+  void loadExportPrinterCandidates()
+}
 const cancelExport = () => {
+  cancelExportPrinterLookup()
   exportRequestGuard.cancel()
   exportLoading.value = false
   exportVisible.value = false
 }
 const handleExport = async () => {
-  if (!hasAppliedQuery.value || loading.value || loadError.value) return
+  if (!userStore.isAuthenticated || exportLoading.value) return
+  let filters
+  exportError.value = ''
+  try { filters = historyExportFiltersFromForm(exportForm, userStore.isAdmin) } catch (error) {
+    exportError.value = error.message
+    return
+  }
   const ticket = exportRequestGuard.begin()
   if (!ticket) return
   exportLoading.value = true
   const format = exportFormat.value
   try {
-    const response = await exportJobHistory(appliedFilters.value, format, { signal: ticket.controller.signal })
+    const response = await exportJobHistory(filters, format, { signal: ticket.controller.signal })
     if (!exportRequestGuard.isCurrent(ticket)) return
     saveExportFile(response, format)
     message.success('打印历史已生成，开始下载')
     exportVisible.value = false
   } catch (error) {
     if (!exportRequestGuard.isCurrent(ticket) || error?.context === 'canceled') return
+    exportError.value = error?.message || '打印历史导出失败，请重试'
     if (!error?.toastShown) message.error(error?.message || '打印历史导出失败，请重试')
   } finally {
     if (exportRequestGuard.isCurrent(ticket)) exportLoading.value = false
@@ -609,6 +705,8 @@ watch(() => jobStore.historyInvalidationVersion, () => {
 
 watch(exportIdentity, () => {
   cancelExport()
+  exportPrinterCandidates.value = []
+  resetExportFilters()
   hasAppliedQuery.value = false
   tableData.value = []
   appliedFilters.value = {}
@@ -618,6 +716,7 @@ watch(exportIdentity, () => {
 
 onBeforeUnmount(() => {
   historyRequestGuard.invalidate()
+  cancelExportPrinterLookup()
   exportRequestGuard.dispose()
 })
 
@@ -643,6 +742,32 @@ loadCreatorOptions()
   display: flex;
   justify-content: flex-end;
   gap: var(--app-spacing-2);
+}
+
+.history-export-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-spacing-2);
+}
+
+.history-export-form {
+  max-height: min(55vh, 480px);
+  overflow-y: auto;
+  padding-right: var(--app-spacing-2);
+}
+
+.history-export-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--app-spacing-3);
+}
+
+.history-export-field-wide {
+  grid-column: 1 / -1;
+}
+
+.history-export-form :deep(.t-date-range-picker) {
+  width: 100%;
 }
 
 .history-workspace {
@@ -891,6 +1016,9 @@ loadCreatorOptions()
 }
 
 @media (max-width: 640px) {
+  .history-export-filter-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .history-filter-toolbar :deep(.flex.items-center.gap-2) {
     width: 100%;
   }
