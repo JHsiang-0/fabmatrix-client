@@ -79,7 +79,7 @@
         </div>
       </QueryToolbar>
 
-      <p class="history-export-hint">导出可单独设置筛选条件，包含全部匹配记录和所有分页。</p>
+      <t-typography-text theme="secondary" class="mb-3">导出可单独设置筛选条件，包含全部匹配记录和所有分页。</t-typography-text>
 
       <!-- 数据表格区 -->
       <div class="history-content">
@@ -191,55 +191,72 @@
         </div>
       </div>
     </section>
-    <t-dialog v-model:visible="exportVisible" header="导出打印历史" :footer="false"
-      :close-on-overlay-click="false" :width="'min(640px, calc(100vw - 32px))'" @close="cancelExport">
-      <div class="history-export-dialog">
-        <p>导出下列条件匹配的全部历史记录，包含所有分页。这里的修改不会改变历史列表。</p>
-        <div class="history-export-filter-actions">
-          <t-button size="small" theme="default" variant="outline" :disabled="exportLoading" @click="resetExportFilters">重置为全历史</t-button>
-          <t-button size="small" theme="default" variant="outline" :disabled="exportLoading || !hasAppliedQuery" @click="restoreExportFilters">恢复列表条件</t-button>
-        </div>
-        <t-form :data="exportForm" layout="vertical" class="history-export-form">
-          <div class="history-export-filter-grid">
-            <t-form-item label="任务状态" name="statuses" class="history-export-field-wide">
-              <t-checkbox-group v-model="exportForm.statuses" :disabled="exportLoading">
-                <t-checkbox value="COMPLETED">已完成</t-checkbox>
-                <t-checkbox value="FAILED">失败</t-checkbox>
-                <t-checkbox value="CANCELLED">已取消</t-checkbox>
-              </t-checkbox-group>
-            </t-form-item>
-            <t-form-item label="文件名" name="fileName">
-              <t-input v-model="exportForm.fileName" placeholder="包含文件名，不限请留空" clearable :disabled="exportLoading" :maxlength="255" />
-            </t-form-item>
-            <t-form-item label="打印机" name="printerId">
-              <t-auto-complete v-model="exportForm.printerId" :options="exportPrinterOptions" :filter="filterExportPrinter"
-                :empty="exportPrinterLoading ? '设备建议加载中…' : '可直接填写历史设备 ID'"
-                filterable clearable :disabled="exportLoading" placeholder="搜索设备名称、机台号或输入 ID" />
-              <template #help>名称搜索使用已加载设备建议；其他或已删除设备可直接填写 ID。</template>
-            </t-form-item>
-            <t-form-item v-if="userStore.isAdmin" label="创建人" name="userId" class="history-export-field-wide">
-              <t-select v-model="exportForm.userId" :options="creatorOptions.map(user => ({ label: `${user.username}（${user.id}）`, value: String(user.id) }))"
-                placeholder="全部创建人" filterable clearable :loading="creatorLoading" :disabled="exportLoading" />
-            </t-form-item>
-            <t-form-item label="结束时间范围（Asia/Shanghai）" name="dateRange" class="history-export-field-wide">
-              <t-date-range-picker v-model="exportForm.dateRange" format="YYYY-MM-DD HH:mm:ss" value-type="YYYY-MM-DD HH:mm:ss"
-                separator="至" allow-input enable-time-picker @blur="commitExportDateInput"
-                :placeholder="['开始时间', '结束时间']" :default-time="['00:00:00', '23:59:59']" clearable :disabled="exportLoading" />
-              <template #help>{{ exportForm.dateRange.length === 2 ? `实际范围：${exportForm.dateRange[0]} 至 ${exportForm.dateRange[1]}` : '不选日期时，结束时间不限。' }}</template>
-            </t-form-item>
-          </div>
+    <t-dialog v-model:visible="exportVisible" header="导出打印历史" placement="center"
+      :close-on-overlay-click="false" :width="'min(640px, calc(100vw - 32px))'" :confirm-on-enter="false"
+      :confirm-btn="exportLoading ? '正在生成' : '下载文件'" :confirm-loading="exportLoading"
+      :cancel-btn="exportLoading ? '取消导出' : '取消'" @confirm="handleExport" @close="cancelExport">
+      <t-space direction="vertical" size="medium" class="w-full">
+        <t-typography-text theme="secondary">导出全部匹配记录，不受分页影响。筛选修改仅用于本次导出。</t-typography-text>
+        <t-space size="small" break-line>
+          <t-tooltip content="清空文件、设备、创建人和时间条件，并选中全部历史状态；操作员仍只导出本人记录。">
+            <t-button size="small" theme="default" variant="outline" :disabled="exportLoading" @click="resetExportFilters">清空筛选</t-button>
+          </t-tooltip>
+          <t-tooltip content="使用列表最近一次成功查询的条件，不包含尚未点击查询的修改。">
+            <t-button size="small" theme="primary" variant="text" :disabled="exportLoading || !hasAppliedQuery" @click="restoreExportFilters">使用列表筛选</t-button>
+          </t-tooltip>
+        </t-space>
+        <t-form :data="exportForm" label-align="top">
+          <t-row :gutter="16">
+            <t-col :span="12">
+              <t-form-item label="任务状态" name="statuses">
+                <t-checkbox-group v-model="exportForm.statuses" :disabled="exportLoading">
+                  <t-checkbox value="COMPLETED">已完成</t-checkbox>
+                  <t-checkbox value="FAILED">失败</t-checkbox>
+                  <t-checkbox value="CANCELLED">已取消</t-checkbox>
+                </t-checkbox-group>
+              </t-form-item>
+            </t-col>
+            <t-col :xs="12" :sm="6">
+              <t-form-item label="文件名" name="fileName">
+                <t-input v-model="exportForm.fileName" placeholder="包含文件名，不限请留空" clearable :disabled="exportLoading" :maxlength="255" />
+              </t-form-item>
+            </t-col>
+            <t-col :xs="12" :sm="6">
+              <t-form-item label="打印机" name="printerId">
+                <t-auto-complete v-model="exportForm.printerId" :options="exportPrinterOptions" :filter="filterExportPrinter"
+                  :empty="exportPrinterLoading ? '设备建议加载中…' : '可直接填写历史设备 ID'"
+                  filterable clearable :disabled="exportLoading" placeholder="搜索设备名称、机台号或输入 ID" />
+                <template #help>名称搜索仅限建议，其他设备可输入 ID。</template>
+              </t-form-item>
+            </t-col>
+            <t-col v-if="userStore.isAdmin" :xs="12" :sm="6">
+              <t-form-item label="创建人" name="userId">
+                <t-select v-model="exportForm.userId" :options="creatorOptions.map(user => ({ label: `${user.username}（${user.id}）`, value: String(user.id) }))"
+                  placeholder="全部创建人" filterable clearable :loading="creatorLoading" :disabled="exportLoading" />
+              </t-form-item>
+            </t-col>
+            <t-col :xs="12" :sm="6">
+              <t-form-item label="导出格式">
+                <t-radio-group v-model="exportFormat" :disabled="exportLoading" aria-label="导出格式">
+                  <t-radio value="XLSX">Excel（.xlsx）</t-radio>
+                  <t-radio value="PDF">PDF（.pdf）</t-radio>
+                </t-radio-group>
+                <template #help>Excel 用于统计，PDF 用于打印存档。</template>
+              </t-form-item>
+            </t-col>
+            <t-col :span="12">
+              <t-form-item label="结束时间范围" name="dateRange">
+                <t-date-range-picker v-model="exportForm.dateRange" format="YYYY-MM-DD HH:mm:ss" value-type="YYYY-MM-DD HH:mm:ss"
+                  separator="至" allow-input enable-time-picker class="w-full" @blur="commitExportDateInput"
+                  :popup-props="{ overlayClassName: 'max-w-full', overlayInnerClassName: 'overflow-x-auto' }"
+                  :placeholder="['开始时间', '结束时间']" :default-time="['00:00:00', '23:59:59']" clearable :disabled="exportLoading" />
+                <template #help>{{ exportForm.dateRange.length === 2 ? `实际范围：${exportForm.dateRange[0]} 至 ${exportForm.dateRange[1]}；时区 Asia/Shanghai。` : '不选时间则不限范围；时区 Asia/Shanghai。' }}</template>
+              </t-form-item>
+            </t-col>
+          </t-row>
         </t-form>
         <t-alert v-if="exportError" theme="error" :close-btn="false">{{ exportError }}</t-alert>
-        <t-radio-group v-model="exportFormat" :disabled="exportLoading" aria-label="导出格式">
-          <t-radio value="XLSX">Excel（.xlsx）</t-radio>
-          <t-radio value="PDF">PDF（.pdf）</t-radio>
-        </t-radio-group>
-        <p class="history-export-hint">Excel 适合统计分析，PDF 适合打印存档。记录过多时，请缩小时间范围。</p>
-        <div class="history-export-actions">
-          <t-button theme="default" variant="outline" @click="cancelExport">{{ exportLoading ? '取消导出' : '取消' }}</t-button>
-          <t-button theme="primary" :loading="exportLoading" @click="handleExport">{{ exportLoading ? '正在生成' : '下载文件' }}</t-button>
-        </div>
-      </div>
+      </t-space>
     </t-dialog>
     <TaskDetailDrawer
       v-model="detailDrawerVisible"
@@ -726,50 +743,6 @@ loadCreatorOptions()
 </script>
 
 <style scoped>
-.history-export-hint {
-  margin: 0 0 var(--app-spacing-3);
-  color: var(--app-text-secondary);
-  font-size: var(--td-font-size-body-small);
-}
-
-.history-export-dialog {
-  display: flex;
-  flex-direction: column;
-  gap: var(--app-spacing-3);
-}
-
-.history-export-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--app-spacing-2);
-}
-
-.history-export-filter-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--app-spacing-2);
-}
-
-.history-export-form {
-  max-height: min(55vh, 480px);
-  overflow-y: auto;
-  padding-right: var(--app-spacing-2);
-}
-
-.history-export-filter-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 var(--app-spacing-3);
-}
-
-.history-export-field-wide {
-  grid-column: 1 / -1;
-}
-
-.history-export-form :deep(.t-date-range-picker) {
-  width: 100%;
-}
-
 .history-workspace {
   display: flex;
   flex: 1 1 auto;
@@ -1016,9 +989,6 @@ loadCreatorOptions()
 }
 
 @media (max-width: 640px) {
-  .history-export-filter-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .history-filter-toolbar :deep(.flex.items-center.gap-2) {
     width: 100%;
   }

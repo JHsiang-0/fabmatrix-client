@@ -117,3 +117,7 @@ R100 是一个发布整改总任务，内部子任务必须按 `tasks.md` 顺序
 JobHistory 使用 activeFilters 保存已提交查询、appliedFilters 保存成功结果范围，分页和终态实时刷新沿用 activeFilters。导出对话框维护独立 exportForm，打开时复制 appliedFilters，没有成功查询则默认全历史；可直接编辑、重置全历史或恢复列表条件，不更改列表、不展示旧 total、不受列表请求成功/失败限制。设备建议复用已加载 DeviceStore 与历史记录，无缓存时首次打开只从现有 getPrinterList 读取第一页面最多100条，不全量翻页，查询失败仍接受 ID；建议的请求带 AbortController、会话与代次核对，关闭/卸载/身份变化拒绝旧响应。名称搜索限于已加载建议，历史或其他设备可直接输入 ID。ADMIN 复用已有 creatorOptions，OPERATOR 剥离 userId。时间选择器显示并编辑完整秒级值，日历/时间面板保留具体端点，手输在 Enter 或失焦后提交原值再验证，避免默认结束时间被静默改为零点。公共表单转换器校验终态、Long ID、文件名和完整有效日期范围。`exportJobHistory` 仅发送格式和筛选白名单，通过统一 request 的 opt-in 下载分支取得 Blob/MIME/Content-Disposition；该分支解码 JSON Blob HTTP/业务错误并复用 RequestError/401 会话规则，其他接口响应不变。
 
 下载 guard 持有 AbortController、会话代次和身份/角色快照，取消或组件卸载中止请求，旧账号的成功响应不能落为新账号下载。公共 fileExport 工具处理格式白名单、UTF-8 文件名、basename 清理和延迟 Blob URL 回收，可用于后续操作日志等导出。Mock 实际生成未压缩 ZIP 的 OOXML 工作簿和分页 PDF；Excel 明细第一且 activeTab=0，全部13列、冻结表头与筛选行，汇总第二；ZIP/OOXML 读回测试验证真实行和完整字段。正式 alias 保持 disabled Mock，release 生成目录不参加源码 lint。
+
+### R100-16-UI 默认组件布局
+
+导出弹窗采用原生 Dialog 页脚确认/取消事件，禁用确认键 Enter，日期编辑 Enter 继续仅提交时间。主内容由默认 Space、顶部标签 Form 与12列 Grid 组织：状态整行，文件/打印机一行，ADMIN 创建人/格式一行，时间范围整行；窄屏列自动换行。控件宽度由栅格分配，格式帮助和日期实际范围使用默认 Form help，说明使用 Typography。保留现有弹窗 width 属性与项目通用布局工具，删除全部 history-export 专用 CSS。日期面板通过官方 popup-props 的 overlayClassName/overlayInnerClassName 与通用 max-w-full/overflow-x-auto 限制最大宽度、在内层滚动，使窄屏时分秒可访问且保留默认背景和阴影。辅助按钮命名为“清空筛选”和“使用列表筛选”，分别用默认描边与文字按钮及 Tooltip 说明清空/复制的区别；资源归属、查询、导出格式及请求保护不变。
