@@ -172,7 +172,7 @@
                             </div>
                         </section>
 
-                        <section v-if="isAssignedState" class="printer-detail-drawer__assigned-section">
+                        <section v-if="userStore.canOperate && isAssignedState" class="printer-detail-drawer__assigned-section">
                             <div class="printer-detail-drawer__section-heading">
                                 <span><Lock />待打印任务</span>
                             </div>
@@ -269,12 +269,12 @@
         <template #footer>
             <div v-if="device" class="printer-detail-drawer__footer">
                 <div class="printer-detail-drawer__footer-primary">
-                    <t-button v-if="device.ipAddress" theme="primary" size="medium" tag="a"
+                    <t-button v-if="userStore.canOperate && device.ipAddress" theme="primary" size="medium" tag="a"
                         :href="deviceConsoleUrl" target="_blank" rel="noopener noreferrer"
                         class="printer-detail-drawer__console-button">
                         <Monitor />{{ isRrfDevice ? '打开 DWC' : '打开 Mainsail' }}
                     </t-button>
-                    <t-button v-else theme="default" size="medium" disabled>
+                    <t-button v-else-if="!device.ipAddress" theme="default" size="medium" disabled>
                         <Monitor />设备地址不可用
                     </t-button>
                     <t-button theme="default" variant="base" size="medium"
@@ -283,24 +283,24 @@
                     </t-button>
                 </div>
                 <div class="printer-detail-drawer__footer-actions">
-                    <t-button v-if="canPause" theme="warning" size="medium" :disabled="actionLoading"
+                    <t-button v-if="userStore.canOperate && canPause" theme="warning" size="medium" :disabled="actionLoading"
                         :loading="actionLoading" @click="handleAction('pause')">
                         <VideoPause />暂停
                     </t-button>
-                    <t-button v-if="canResume" theme="success" size="medium" :disabled="actionLoading"
+                    <t-button v-if="userStore.canOperate && canResume" theme="success" size="medium" :disabled="actionLoading"
                         :loading="actionLoading" @click="handleAction('resume')">
                         <VideoPlay />恢复
                     </t-button>
-                    <t-button v-if="canCancel" theme="danger" size="medium"
+                    <t-button v-if="userStore.canOperate && canCancel" theme="danger" size="medium"
                         :disabled="actionLoading" :loading="actionLoading" @click="handleAction('cancel')">
                         <CircleClose />取消
                     </t-button>
-                    <t-button v-if="canEmergencyStop" theme="danger" size="medium"
+                    <t-button v-if="userStore.canOperate && canEmergencyStop" theme="danger" size="medium"
                         :disabled="actionLoading" :loading="actionLoading" @click="handleEmergencyStop">
                         <Warning />紧急停机
                     </t-button>
                     <span v-if="!hasTaskControls" class="printer-detail-drawer__footer-hint">
-                        {{ connectionLabel === '在线' ? '当前状态无需任务控制' : '设备离线，控制操作不可用' }}
+                        {{ !userStore.canOperate ? '当前账号仅可查看' : connectionLabel === '在线' ? '当前状态无需任务控制' : '设备离线，控制操作不可用' }}
                     </span>
                     <t-popconfirm v-if="canManageDevice" content="确定要将此设备从该物理位置下架吗？"
                         confirm-btn="确认下架" cancel-btn="取消" theme="danger" @confirm="handleRemove">
@@ -317,6 +317,7 @@
 </template>
 
 <script setup>
+import { useUserStore } from '@/stores/user'
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import {
     CloseIcon as Close,
@@ -347,6 +348,7 @@ import { message } from '@/utils/message'
 import { compactStatusHistory } from '@/utils/statusHistory'
 
 defineOptions({ name: 'DeviceDetailDrawer' })
+const userStore = useUserStore()
 
 // ============================================
 // 响应式断点检测

@@ -28,7 +28,7 @@ test('用户管理使用紧凑筛选和可读信息列，并保留明确的账�
   assert.match(userSource, /<TdTableColumn prop="email" label="联系方式"/)
   assert.doesNotMatch(userSource, /<TdTableColumn prop="id" label="ID"/)
   assert.match(userSource, /getRoleLabel\(row\.role\)/)
-  assert.match(userSource, /label="操作" width="176" align="center" fixed="right"/)
+  assert.match(userSource, /label="操作" width="340" align="center" fixed="right"/)
   assert.match(userSource, /class="user-management-footer__summary"/)
   assert.match(userSource, /\.user-management-table :deep\(\.t-table__body tr:hover > td\)/)
 })

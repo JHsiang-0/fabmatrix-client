@@ -1,5 +1,7 @@
 # Farm 前端历史开发 TODO
 
+2026-10-28 AS-001：已接入管理员重置临时密码、首次强制改密、VIEWER 固定岗位、个人/管理员会话撤销和账号审计。与后端 T16.30 配套，契约及升级要求见 [账号安全说明](docs/ACCOUNT_SECURITY.md)。需同步升级两端，旧登录需重新认证。
+
 版本：历史 v1 基线；当前产品：`1.0.0` 准正式版
 依据：[API_HANDOFF.md](./API_HANDOFF.md) 与 [`docs/VERSION_AND_ROADMAP.md`](./docs/VERSION_AND_ROADMAP.md)
 更新时间：2026-10-08

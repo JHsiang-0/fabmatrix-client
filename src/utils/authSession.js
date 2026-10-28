@@ -1,4 +1,4 @@
-const AUTH_ROLES = ['ADMIN', 'OPERATOR']
+const AUTH_ROLES = ['ADMIN', 'OPERATOR', 'VIEWER']
 
 const normalizeId = value => {
   if (value === undefined || value === null || value === '') return null

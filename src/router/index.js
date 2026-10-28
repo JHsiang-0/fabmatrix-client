@@ -5,7 +5,7 @@ import { message } from '@/utils/message'
 import { resolveRouteAccess, ROUTE_ACCESS } from '@/utils/permissions'
 import Layout from '@/layout/index.vue' // 引入刚写的布局组件
 
-const APP_ROLES = ['ADMIN', 'OPERATOR']
+const APP_ROLES = ['ADMIN', 'OPERATOR', 'VIEWER']
 const isDesktop = import.meta.env.MODE.startsWith('desktop')
 const routerHistory = typeof window === 'undefined'
   ? createMemoryHistory(import.meta.env.BASE_URL)
@@ -45,6 +45,12 @@ const router = createRouter({
       name: 'fullscreen-dashboard',
       component: () => import('../views/FullscreenDashboard.vue'),
       meta: { title: '实时设备看板', requiresAuth: true, roles: APP_ROLES, fullscreen: true }
+    },
+    {
+      path: '/change-password',
+      name: 'change-password',
+      component: () => import('../views/RequiredPasswordChange.vue'),
+      meta: { requiresAuth: true, roles: APP_ROLES }
     },
     // 将 Layout 设置为根路由
     {
@@ -117,7 +123,7 @@ const router = createRouter({
           path: 'batch-dispatch',
           name: 'batch-dispatch',
           component: () => import('../views/BatchDispatch.vue'),
-          meta: { title: '批量手动派发', hideBreadcrumb: true, pageScroll: true, feature: 'batchDispatch' }
+          meta: { title: '批量手动派发', hideBreadcrumb: true, pageScroll: true, roles: ['ADMIN', 'OPERATOR'], feature: 'batchDispatch' }
         }
       ]
     },
@@ -176,6 +182,11 @@ router.beforeEach(async (to) => {
       role: userStore.userInfo.role
     })
   }
+
+  if (userStore.isAuthenticated && userStore.userInfo.mustChangePassword
+      && to.name !== 'change-password') return { name: 'change-password' }
+  if (userStore.isAuthenticated && !userStore.userInfo.mustChangePassword
+      && to.name === 'change-password') return { name: 'printers' }
 
   if (access === ROUTE_ACCESS.AUTHENTICATED_LOGIN) {
     return { name: 'printers' }

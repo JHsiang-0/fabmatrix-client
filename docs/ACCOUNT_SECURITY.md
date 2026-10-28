@@ -1,0 +1,23 @@
+# 单农场账号安全与固定岗位
+
+本次实现三个固定岗位：ADMIN 管理员、OPERATOR 操作员、VIEWER 查看员，不引入多租户、自定义角色和权限树。
+
+## 页面和交互
+
+- 用户管理可创建操作员/查看员，编辑时可调整三个固定角色；已有的本人停用/角色修改限制和最后管理员后端保护保留。
+- 新建员工使用临时密码，下次登录必须修改。管理员“重置密码”要求输入并确认临时密码，服务端保存 BCrypt、撤销旧会话；界面显示“待改密”。
+- 登录与 /auth/me 返回 mustChangePassword、permissions。强制改密进入独立 /change-password；业务布局、设备操作和实时连接不能通过该页面绕过。后端最终限制接口，HTTP 403 / 业务码 4031。
+- 查看员只读设备状态、公有文件和本人资源，不能创建/上传/删除/派发/启动/暂停/取消/急停。文件操作使用后端 capability，页面同时隐藏生产操作与管理入口。
+- 个人中心增加登录会话，可退出单个会话或其他全部会话。管理员通过用户列表查看和撤销员工会话。显示最多最近 100 个有效登录及登录/最近活动/到期时间，最近活动五分钟节流，不代表实时在线。
+- 主动注销调用 POST /auth/logout；401/过期等被动失效只清理本机认证。修改临时密码成功后重新登录。
+- 操作日志复用原页面筛选，新增密码重置/修改、角色调整和会话撤销动作名称。
+
+## 契约和升级
+
+认证前缀 `/api/v1/auth`。新增 /sessions、/sessions/{id}/revoke、/sessions/revoke-others、/logout，以及 /admin/users/{id}/reset-password、/admin/users/{id}/sessions 和撤销端点。完整请求与数据库升级见后端 docs/ACCOUNT_SECURITY.md。
+
+必须同步更新服务端；升级前备份。SQLite 服务启动自动补齐新结构，MySQL 必须手工执行后端 24 号升级。旧 Token 不含 sessionId，升级后需要重新登录。已有员工不自动强制改密。
+
+## 验证
+
+`npm run test:auth` 包含账号安全专项；`npm test`、`npm run lint:check` 和发布门禁覆盖原有行为。浏览器专项为 `npx playwright test --project=browser --grep 账号安全`，验证临时密码、查看员入口、管理员重置、审计和个人会话。Mock 场景只证明页面交互；真实 SQLite/JWT/API 链路由后端隔离冒烟验证，不代表现场安装或真实设备验收。

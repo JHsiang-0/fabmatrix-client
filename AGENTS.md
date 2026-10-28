@@ -158,3 +158,7 @@ Error
 用户操作反馈
 
 优先复用 TDesign，不要自行创造新的视觉体系。
+
+## 单农场账号安全
+
+固定岗位 ADMIN、OPERATOR、VIEWER。查看员保留设备/公有文件/本人任务读取，不展示生产写操作入口；最终权限由后端强制检查。mustChangePassword 为 true 时导航到独立 /change-password，禁止启动业务布局与实时连接。主动退出调用持久化会话撤销接口；401/过期等被动失效只清除本机状态。账号管理、会话及审计契约见后端 docs/ACCOUNT_SECURITY.md。专项用例为 tests/accountSecurity.test.js 和 browser.spec.js 中的“账号安全”场景。

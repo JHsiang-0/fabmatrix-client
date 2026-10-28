@@ -52,8 +52,8 @@ const handleCommand = item => {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
-    }).then(() => {
-      userStore.logout()
+    }).then(async () => {
+      try { await userStore.endSession() } catch { message.warning('服务端退出未确认，本机登录已清除') }
       router.push('/login')
       message.success('已退出登录')
     }).catch(() => {})

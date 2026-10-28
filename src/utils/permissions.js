@@ -28,7 +28,7 @@ export const resolveRouteAccess = ({
   if (path === '/login' && isAuthenticated({ token, restoreState })) {
     return ROUTE_ACCESS.AUTHENTICATED_LOGIN
   }
-  if (requiresAuth && !['ADMIN', 'OPERATOR'].includes(String(role || '').toUpperCase())) {
+  if (requiresAuth && !['ADMIN', 'OPERATOR', 'VIEWER'].includes(String(role || '').toUpperCase())) {
     return ROUTE_ACCESS.UNKNOWN_ROLE
   }
   if (roleRequirements.some(roles => !roles.includes(String(role || '').toUpperCase()))) {

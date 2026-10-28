@@ -14,7 +14,13 @@ const ACTION_LABELS = Object.freeze({
   USER_CREATE: '创建用户',
   USER_UPDATE: '更新用户',
   USER_ENABLE: '启用用户',
-  USER_DISABLE: '停用用户'
+  USER_DISABLE: '停用用户',
+  USER_PASSWORD_RESET: '管理员重置密码',
+  USER_PASSWORD_CHANGE: '修改密码',
+  USER_FIRST_PASSWORD_CHANGE: '首次修改临时密码',
+  USER_ROLE_CHANGE: '调整岗位角色',
+  SESSION_REVOKE: '退出登录会话',
+  SESSION_REVOKE_ALL: '批量退出登录会话'
 })
 
 const TARGET_LABELS = Object.freeze({

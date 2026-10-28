@@ -64,7 +64,7 @@ test('protects the current administrator and only creates operators', async () =
     username: 'new-operator',
     password: 'Password1',
     confirmPassword: 'Password1',
-    role: 'ADMIN'
+    role: 'OPERATOR'
   }, adminHeaders)
   const user = mockState.users.find(item => item.id === created.data)
   assert.equal(user.role, 'OPERATOR')

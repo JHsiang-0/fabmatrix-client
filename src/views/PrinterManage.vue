@@ -272,7 +272,7 @@
             <div class="printer-management-actions">
               <!-- 确认热床已清理按钮 -->
               <t-button
-                v-if="shouldShowSafeButton(scope.row)"
+                v-if="userStore.canOperate && shouldShowSafeButton(scope.row)"
                 size="small" theme="warning" variant="base" :icon="renderIcon(Check)"
                 @click.stop="handleConfirmSafe(scope.row)"
                 :loading="confirmingSafeIds.includes(scope.row.id)"
@@ -281,7 +281,7 @@
               </t-button>
               <!-- 启动打印按钮 -->
               <t-button
-                v-if="shouldShowStartButton(scope.row)"
+                v-if="userStore.canOperate && shouldShowStartButton(scope.row)"
                 size="small" theme="success" variant="base" :icon="renderIcon(Printer)"
                 @click.stop="handleStartJob(scope.row)"
                 :loading="startingJobIds.includes(scope.row.id)"

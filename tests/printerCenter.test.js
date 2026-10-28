@@ -293,7 +293,7 @@ test('打印机详情使用紧凑状态主题卡和独立设备信息卡并统�
   assert.match(detailSource, /\.printer-detail-drawer__status-card\.is-printing[\s\S]*--td-brand-color-1/)
   assert.doesNotMatch(detailSource, /printer-detail-drawer__device-descriptions/)
   assert.match(detailSource, /<Refresh \/>刷新状态/)
-  assert.match(detailSource, /v-if="canEmergencyStop"/)
+  assert.match(detailSource, /v-if="userStore.canOperate && canEmergencyStop"/)
   assert.match(detailSource, /\.printer-detail-drawer :deep\(\.t-drawer__footer\)[\s\S]*border-top:/)
   assert.match(detailSource, /\.printer-detail-drawer__footer[\s\S]*border-top: 0/)
 })

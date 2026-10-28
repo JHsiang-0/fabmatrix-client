@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { getCurrentUser, login } from '@/api/user'
+import { getCurrentUser, login, logoutSession } from '@/api/user'
 import {
   createAuthSession,
   isSessionExpired,
@@ -47,6 +47,8 @@ export const useUserStore = defineStore('user', () => {
   const rememberSession = ref(storedSession?.remember === true)
   const restoreState = ref(token.value ? 'restoring' : 'anonymous')
   const isAdmin = computed(() => userInfo.value.role === 'ADMIN')
+  const canOperate = computed(() => (Array.isArray(userInfo.value.permissions) ? userInfo.value.permissions.includes('job:operate') : ['ADMIN', 'OPERATOR'].includes(userInfo.value.role)) && !userInfo.value.mustChangePassword)
+  const isViewer = computed(() => userInfo.value.role === 'VIEWER')
   const isOperator = computed(() => userInfo.value.role === 'OPERATOR')
   const isAuthenticated = computed(() => Boolean(token.value && restoreState.value === 'authenticated'))
   const isRestoring = computed(() => restoreState.value === 'restoring')
@@ -194,7 +196,17 @@ export const useUserStore = defineStore('user', () => {
       .catch(() => {})
   }
 
+  const endSession = async () => {
+    const generation = sessionGeneration
+    try { await logoutSession() } finally {
+      if (generation === sessionGeneration) logout()
+    }
+  }
+
   return {
+    canOperate,
+    isViewer,
+    endSession,
     token,
     userInfo,
     expiresIn,

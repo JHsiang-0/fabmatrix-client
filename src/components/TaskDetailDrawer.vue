@@ -285,12 +285,14 @@
 </template>
 
 <script setup>
+import { useUserStore } from '@/stores/user'
 import { computed, ref, watch } from 'vue'
 import { CloseIcon as Close } from 'tdesign-icons-vue-next'
 import { formatDateTime } from '@/utils/formatters'
 import { getJobDetailDisplay, JOB_DISPLAY_SOURCE } from '@/utils/jobDisplay'
 import { getStatusView } from '@/utils/statusView'
 
+const userStore = useUserStore()
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   task: { type: Object, default: null },
@@ -312,8 +314,8 @@ const drawerVisible = computed({
 const isTerminal = computed(() => ['COMPLETED', 'FAILED', 'CANCELLED'].includes(props.task?.status))
 const detailDisplay = computed(() => getJobDetailDisplay(props.task || {}, isTerminal.value ? 'history' : 'current'))
 const statusView = computed(() => getStatusView('job', props.task?.status))
-const showReconcileFooter = computed(() => props.task?.status === 'RECONCILING')
-const showRetryFooter = computed(() => props.task?.status === 'FAILED')
+const showReconcileFooter = computed(() => userStore.canOperate && props.task?.status === 'RECONCILING')
+const showRetryFooter = computed(() => userStore.canOperate && props.task?.status === 'FAILED')
 const showActionFooter = computed(() => showReconcileFooter.value || showRetryFooter.value)
 
 const priorityLabel = computed(() => {

@@ -43,6 +43,7 @@
         </t-form>
       </t-card>
     </div>
+    <t-card title="登录会话" class="mt-4"><LoginSessionPanel /></t-card>
   </div>
 </template>
 
@@ -53,6 +54,7 @@ import { changePassword, getProfile, updateProfile } from '@/api/user'
 import { useUserStore } from '@/stores/user'
 import { confirmMessage, message } from '@/utils/message'
 import { isValidPassword, PASSWORD_RULE_MESSAGE } from '@/utils/password'
+import LoginSessionPanel from '@/components/LoginSessionPanel.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 
 defineOptions({ name: 'ProfileView' })

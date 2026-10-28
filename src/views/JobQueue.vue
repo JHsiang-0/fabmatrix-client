@@ -3,7 +3,7 @@
     <PageHeader title="生产调度队列">
       <template #actions>
       <div class="app-page-toolbar__actions">
-        <t-button theme="primary" variant="base" :icon="renderIcon(Plus)" @click="openCreateTaskDialog" size="medium">
+        <t-button v-if="userStore.canOperate" theme="primary" variant="base" :icon="renderIcon(Plus)" @click="openCreateTaskDialog" size="medium">
           新建任务
         </t-button>
         <t-button theme="default" variant="base" :icon="renderIcon(Refresh)" :loading="loading" @click="fetchQueue" size="medium">
@@ -132,12 +132,13 @@
                 variant="base"
                 :icon="renderIcon(Promotion)"
                 :loading="isActionLoading('assign', scope.row)"
+                v-if="userStore.canOperate"
                 :disabled="scope.row.status !== 'QUEUED' || actionLoadingKey !== ''"
                 @click.stop="openAssignDialog(scope.row)"
               >
                 分配设备
               </t-button>
-              <t-dropdown
+              <t-dropdown v-if="userStore.canOperate"
                 trigger="click"
                 :options="getQueueActionOptions(scope.row)"
                 :disabled="actionLoadingKey !== ''"
@@ -235,7 +236,7 @@
           <template #default="scope">
             <t-space size="small" class="task-action-group" @mousedown.stop @click.stop>
               <t-button
-                v-if="getActivePrimaryAction(scope.row)"
+                v-if="userStore.canOperate && getActivePrimaryAction(scope.row)"
                 class="task-action-button"
                 size="small"
                 :theme="getActivePrimaryAction(scope.row).theme"
@@ -246,7 +247,7 @@
               >
                 {{ getActivePrimaryAction(scope.row).content }}
               </t-button>
-              <t-dropdown
+              <t-dropdown v-if="userStore.canOperate"
                 trigger="click"
                 :options="getActiveActionOptions(scope.row)"
                 :disabled="actionLoadingKey !== ''"
@@ -489,6 +490,7 @@
 </template>
 
 <script setup>
+import { useUserStore } from '@/stores/user'
 import { computed, ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import {
@@ -517,6 +519,7 @@ import { useJobStore } from '@/stores/jobStore'
 import { useRealtimeStore } from '@/stores/printer/realtimeStore'
 
 defineOptions({ name: 'JobQueue' })
+const userStore = useUserStore()
 
 const jobStore = useJobStore()
 const realtimeStore = useRealtimeStore()
@@ -885,6 +888,7 @@ const canCancel = (status) => {
 }
 
 const getQueueActionOptions = job => {
+  if (!userStore.canOperate) return []
   const options = []
   if (['ASSIGNED', 'READY'].includes(job.status)) options.push({ content: '重新排队', value: 'requeue' })
   if (['ASSIGNED', 'READY'].includes(job.status) && job.printerId) {
@@ -896,6 +900,7 @@ const getQueueActionOptions = job => {
 }
 
 const getActiveActionOptions = job => {
+  if (!userStore.canOperate) return []
   const options = []
   if (job.status === 'RECONCILING') {
     options.push({ content: '人工核对', value: 'reconcile', theme: 'warning' })

@@ -256,6 +256,12 @@ export const handleRequestError = (error, config) => {
   if (isCanceledError(error)) return Promise.reject(createCanceledError(error, requestConfig))
 
   const requestError = createErrorFromFailure(error, requestConfig)
+  if (Number(requestError.businessCode) === 4031
+      && requestAuthSessions.get(requestConfig) === getCurrentAuthSession().generation) {
+    const userStore = useUserStore()
+    userStore.userInfo.mustChangePassword = true
+    void router.replace({ name: 'change-password' }).catch(() => {})
+  }
   const staleUnauthorized = handleUnauthorized(requestError, requestConfig)
 
   if (!staleUnauthorized && !requestError.toastShown) {

@@ -155,3 +155,16 @@ export function changePassword(userId, data) {
  * @property {string} createdAt - 创建时间
  * @property {string} updatedAt - 更新时间
  */
+
+export const resetUserPassword = (userId, data) => request({
+  url: `/api/v1/auth/admin/users/${userId}/reset-password`, method: 'post', data
+})
+export const logoutSession = () => request({ url: '/api/v1/auth/logout', method: 'post' })
+export const getLoginSessions = userId => request({
+  url: userId ? `/api/v1/auth/admin/users/${userId}/sessions` : '/api/v1/auth/sessions', method: 'get'
+})
+export const revokeLoginSession = (id, userId) => request({
+  url: userId ? `/api/v1/auth/admin/users/${userId}/sessions/${id}/revoke` : `/api/v1/auth/sessions/${id}/revoke`, method: 'post'
+})
+export const revokeOtherSessions = () => request({ url: '/api/v1/auth/sessions/revoke-others', method: 'post' })
+export const revokeUserSessions = userId => request({ url: `/api/v1/auth/admin/users/${userId}/sessions/revoke-all`, method: 'post' })

@@ -14,6 +14,7 @@
             <t-radio-button value="">全部</t-radio-button>
             <t-radio-button value="ADMIN">管理员</t-radio-button>
             <t-radio-button value="OPERATOR">操作员</t-radio-button>
+            <t-radio-button value="VIEWER">查看员</t-radio-button>
           </t-radio-group>
         </div>
         <div class="user-filter-field">
@@ -71,15 +72,17 @@
           </template>
         </TdTableColumn>
         <TdTableColumn prop="enabled" label="账号状态" width="120" align="center">
-          <template #default="{ row }"><t-tag :theme="row.enabled ? 'success' : 'default'" variant="light">{{ row.enabled ? '启用' : '停用' }}</t-tag></template>
+          <template #default="{ row }"><t-tag :theme="row.enabled ? 'success' : 'default'" variant="light">{{ row.enabled ? '启用' : '停用' }}</t-tag><t-tag v-if="row.mustChangePassword" variant="light" theme="warning">待改密</t-tag></template>
         </TdTableColumn>
         <TdTableColumn prop="createdAt" label="创建时间" min-width="180">
           <template #default="{ row }"><span class="user-table-time">{{ row.createdAt ? formatDateTime(row.createdAt) : '—' }}</span></template>
         </TdTableColumn>
-        <TdTableColumn label="操作" width="176" align="center" fixed="right">
+        <TdTableColumn label="操作" width="340" align="center" fixed="right">
           <template #default="{ row }">
             <t-space size="small" class="user-table-actions">
               <t-button size="small" theme="primary" @click="openEdit(row)">编辑</t-button>
+              <t-button size="small" variant="text" :disabled="isCurrentUser(row)" @click="passwordUser = row">重置密码</t-button>
+              <t-button size="small" variant="text" @click="sessionUser = row">登录会话</t-button>
               <t-tooltip :content="isCurrentUser(row) ? '当前登录管理员不能停用自己的账号' : ''" :disabled="!isCurrentUser(row)">
                 <span>
                   <t-button
@@ -109,6 +112,10 @@
       </div>
     </t-card>
 
+    <ResetUserPasswordDialog :user="passwordUser" @close="passwordUser = null" @success="fetchUsers" />
+    <t-drawer :visible="Boolean(sessionUser)" :header="`登录会话：${sessionUser?.username || ''}`" size="640px" :footer="false" @close="sessionUser = null">
+      <LoginSessionPanel v-if="sessionUser" :user-id="String(sessionUser.id)" />
+    </t-drawer>
     <t-dialog v-model:visible="dialogVisible" :header="dialogTitle" @confirm="submitUser" @cancel="closeDialog"
       :confirm-btn="{ loading: submitting }">
       <t-alert v-if="dialogError" class="mb-4" theme="error" :close-btn="false">{{ dialogError }}</t-alert>
@@ -122,9 +129,9 @@
         </template>
         <t-form-item name="email" label="邮箱"><t-input v-model="form.email" clearable /></t-form-item>
         <t-form-item name="phone" label="手机号"><t-input v-model="form.phone" clearable /></t-form-item>
-        <t-form-item v-if="isEditing" name="role" label="角色">
+        <t-form-item name="role" label="角色">
           <t-select v-model="form.role" :disabled="isCurrentUser(form)">
-            <t-option label="管理员" value="ADMIN" /><t-option label="操作员" value="OPERATOR" />
+            <t-option v-if="isEditing" label="管理员" value="ADMIN" /><t-option label="操作员" value="OPERATOR" /><t-option label="查看员" value="VIEWER" />
           </t-select>
           <template #help v-if="isCurrentUser(form)">当前管理员不能在此处修改自己的角色。</template>
         </t-form-item>
@@ -134,6 +141,8 @@
 </template>
 
 <script setup>
+import LoginSessionPanel from '@/components/LoginSessionPanel.vue'
+import ResetUserPasswordDialog from '@/components/ResetUserPasswordDialog.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { confirmMessage, message } from '@/utils/message'
 import { createAdminUser, getAdminUsers, setAdminUserEnabled, updateAdminUser } from '@/api/user'
@@ -148,6 +157,8 @@ import { formatDateTime } from '@/utils/formatters'
 
 defineOptions({ name: 'UserManagement' })
 const userStore = useUserStore()
+const passwordUser = ref(null)
+const sessionUser = ref(null)
 const currentUserId = computed(() => userStore.userInfo.id)
 const loading = ref(false)
 const loadError = ref('')
@@ -164,7 +175,7 @@ const pagination = reactive({ pageNum: 1, pageSize: 10, total: 0 })
 const form = reactive({ id: null, username: '', password: '', confirmPassword: '', email: '', phone: '', role: 'OPERATOR' })
 const editingUserId = ref(null)
 const isEditing = computed(() => editingUserId.value !== null)
-const dialogTitle = computed(() => isEditing.value ? '编辑用户' : '新增操作员')
+const dialogTitle = computed(() => isEditing.value ? '编辑用户' : '新增员工（首次登录需改密）')
 const formRules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
@@ -181,7 +192,7 @@ const formRules = {
   ],
   email: [{ validator: value => !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? true : { result: false, message: '邮箱格式不正确' }, trigger: 'blur' }],
   phone: [{ validator: value => !value || /^1[3-9]\d{9}$/.test(value) ? true : { result: false, message: '手机号格式不正确' }, trigger: 'blur' }],
-  role: [{ enum: ['ADMIN', 'OPERATOR'], message: '角色只能是管理员或操作员', trigger: 'change' }]
+  role: [{ enum: ['ADMIN', 'OPERATOR', 'VIEWER'], message: '请选择有效岗位角色', trigger: 'change' }]
 }
 
 const normalizeOptional = value => String(value || '').trim() || null
@@ -192,7 +203,7 @@ const getUserErrorMessage = (error, fallback) => {
   if (error?.status === 403) return '当前账号无权执行此操作。'
   return error?.message || fallback
 }
-const getRoleLabel = role => ({ ADMIN: '管理员', OPERATOR: '操作员' })[role] || '未知角色'
+const getRoleLabel = role => ({ ADMIN: '管理员', OPERATOR: '操作员', VIEWER: '查看员' })[role] || '未知角色'
 
 const fetchUsers = async () => {
   loading.value = true
@@ -253,7 +264,8 @@ const submitUser = async () => {
         password: form.password,
         confirmPassword: form.confirmPassword,
         email: normalizeOptional(form.email),
-        phone: normalizeOptional(form.phone)
+        phone: normalizeOptional(form.phone),
+        role: form.role
       })
       message.success('操作员创建成功')
     }

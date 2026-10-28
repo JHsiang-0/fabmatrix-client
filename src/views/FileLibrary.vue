@@ -1059,7 +1059,7 @@ const fileRows = computed(() => fileList.value)
 const currentFolder = computed(() => flattenFolders(folderTreeFolders.value)
   .find(folder => String(folder.id) === String(currentParentId.value)))
 const canUpload = computed(() => directoryReady.value && currentFolder.value?.canUpload === true)
-const canCreateFolder = computed(() => currentParentId.value === null || currentParentId.value === undefined
+const canCreateFolder = computed(() => !userStore.canOperate ? false : currentParentId.value === null || currentParentId.value === undefined
   ? directoryReady.value
   : currentFolder.value?.canCreate === true)
 const canBatchDelete = computed(() => selectedIds.value.length > 0

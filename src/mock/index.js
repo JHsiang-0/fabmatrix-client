@@ -62,6 +62,20 @@ const getSession = config => {
   return token ? mockState.sessions[token] : null
 }
 
+const mockPermissions = role => {
+  const read = ['printer:read', 'file:read', 'job:read']
+  if (role === 'VIEWER') return read
+  if (role === 'OPERATOR') return [...read, 'file:write', 'job:operate']
+  return [...read, 'file:write', 'job:operate', 'printer:manage', 'user:manage', 'audit:read', 'session:manage']
+}
+const readOnlyRequest = config => {
+  const path = getPath(config.url)
+  return !path.includes('/scan') && !path.includes('/rediscover') && (
+    String(config.method).toUpperCase() === 'GET'
+    || ['/api/v1/print-files/page', '/api/v1/print-jobs/page', '/api/v1/print-jobs/history/export'].includes(path)
+  )
+}
+
 const requireSession = (config, roles = []) => {
   const session = getSession(config)
   if (!session) {
@@ -74,7 +88,13 @@ const requireSession = (config, roles = []) => {
   if (session.role !== user.role || Number(session.tokenVersion || 0) !== Number(user.tokenVersion || 0)) {
     fail(401, 401, '登录状态已失效，请重新登录')
   }
-  if (roles.length > 0 && !roles.includes(user.role)) {
+  const path = getPath(config.url)
+  const selfService = path === '/api/v1/auth/logout' || path.startsWith('/api/v1/auth/sessions')
+    || path === `/api/v1/auth/${user.id}/change-password` || path === `/api/v1/auth/${user.id}/profile`
+  if (user.mustChangePassword && !['/api/v1/auth/me', '/api/v1/auth/logout', `/api/v1/auth/${user.id}/change-password`].includes(path)) fail(403, 4031, '请先修改临时密码')
+  const viewerAllowed = user.role === 'VIEWER' && roles.includes('OPERATOR') && (readOnlyRequest(config) || selfService)
+  if (user.role === 'VIEWER' && !readOnlyRequest(config) && !selfService) fail(403, 403, '查看员不能执行此操作')
+  if (roles.length > 0 && !roles.includes(user.role) && !viewerAllowed) {
     fail(403, 403, '没有权限执行此操作')
   }
   return session
@@ -276,12 +296,12 @@ const fileCapabilities = (session, file) => {
   const folder = Boolean(file?.folder)
   return {
     visibility: publicFile ? 'PUBLIC' : 'PRIVATE',
-    canManage: folder && !file.isDefault && ((!publicFile && owner) || (admin && publicFile)),
-    canCreate: folder && ((publicFile && admin) || (!publicFile && owner)),
-    canUpload: folder && (publicFile || owner),
-    canDelete: !folder && (admin || owner),
-    canMove: !folder && ((!publicFile && owner) || (admin && publicFile)),
-    canPrint: !folder && canReadFile(session, file),
+    canManage: session.role !== 'VIEWER' && folder && !file.isDefault && ((!publicFile && owner) || (admin && publicFile)),
+    canCreate: session.role !== 'VIEWER' && folder && ((publicFile && admin) || (!publicFile && owner)),
+    canUpload: session.role !== 'VIEWER' && folder && (publicFile || owner),
+    canDelete: session.role !== 'VIEWER' && !folder && (admin || owner),
+    canMove: session.role !== 'VIEWER' && !folder && ((!publicFile && owner) || (admin && publicFile)),
+    canPrint: session.role !== 'VIEWER' && !folder && canReadFile(session, file),
     canDownload: !folder && canReadFile(session, file),
     level: file.level || getFolderLevel(file)
   }
@@ -382,6 +402,8 @@ const resolveUploadParent = (session, parentId) => {
 
 const publicUser = user => {
   const data = cloneMockData(user)
+  data.mustChangePassword = Boolean(user.mustChangePassword)
+  data.permissions = mockPermissions(user.role)
   delete data.password
   delete data.tokenVersion
   if (data.id !== undefined && data.id !== null) data.id = String(data.id)
@@ -415,12 +437,13 @@ const handleLogin = config => {
     fail(403, 403, '用户已被禁用')
   }
 
-  const token = `mock-token-${user.id}`
+  const token = `mock-token-${user.id}-${crypto.randomUUID()}`
   mockState.sessions[token] = {
     userId: user.id,
     username: user.username,
     role: user.role,
-    tokenVersion: user.tokenVersion || 0
+    tokenVersion: user.tokenVersion || 0,
+    id: crypto.randomUUID(), createdAt: now(), lastSeenAt: now(), expiresAt: new Date(Date.now() + 604800000).toISOString()
   }
 
   return {
@@ -430,7 +453,9 @@ const handleLogin = config => {
     username: user.username,
     role: user.role,
     email: user.email,
-    phone: user.phone
+    phone: user.phone,
+    mustChangePassword: Boolean(user.mustChangePassword),
+    permissions: mockPermissions(user.role)
   }
 }
 
@@ -466,7 +491,7 @@ const handleFirstAdminSetup = config => {
   }
   mockState.users.push(user)
   mockState.files.push(createMockDefaultFolder(user.id))
-  const token = `mock-token-${user.id}`
+  const token = `mock-token-${user.id}-${crypto.randomUUID()}`
   mockState.sessions[token] = {
     userId: user.id,
     username: user.username,
@@ -480,7 +505,9 @@ const handleFirstAdminSetup = config => {
     username: user.username,
     role: user.role,
     email: user.email,
-    phone: user.phone
+    phone: user.phone,
+    mustChangePassword: Boolean(user.mustChangePassword),
+    permissions: mockPermissions(user.role)
   }
 }
 
@@ -497,11 +524,13 @@ const handleRegister = config => {
     fail(409, 409, '用户名已存在')
   }
 
+  if (body.role && !['OPERATOR', 'VIEWER'].includes(body.role)) fail(400, 400, '新建角色无效')
   const user = {
     id: nextMockId('users'),
     username: body.username,
     password: body.password,
-    role: 'OPERATOR',
+    role: body.role || 'OPERATOR',
+    mustChangePassword: true,
     email: body.email || null,
     phone: body.phone || null,
     enabled: true,
@@ -582,7 +611,7 @@ const handleAdminUserUpdate = config => {
   const body = getBody(config)
   if (body.email !== undefined) user.email = body.email || null
   if (body.phone !== undefined) user.phone = body.phone || null
-  const roleChanged = body.role && ['ADMIN', 'OPERATOR'].includes(body.role) && body.role !== user.role
+  const roleChanged = body.role && ['ADMIN', 'OPERATOR', 'VIEWER'].includes(body.role) && body.role !== user.role
   const passwordChanged = Boolean(body.password) && body.password !== user.password
   if (roleChanged && user.role === 'ADMIN' && body.role !== 'ADMIN') assertNotLastActiveAdmin(user)
   if (roleChanged) user.role = body.role
@@ -640,6 +669,8 @@ const handleChangePassword = config => {
   if (body.newPassword !== body.confirmPassword) fail(500, 500, '两次输入的新密码不一致')
   const user = mockState.users.find(item => sameMockId(item.id, session.userId))
   if (!user || user.password !== body.oldPassword) fail(422, 422, '鏃у瘑鐮侀敊璇?')
+  if (body.newPassword === user.password) fail(400, 400, '新密码不能与临时密码相同')
+  user.mustChangePassword = false
   user.password = body.newPassword
   user.tokenVersion = Number(user.tokenVersion || 0) + 1
   user.updatedAt = now()
@@ -2515,11 +2546,53 @@ const handlePrinterControl = config => {
   return null
 }
 
+
+const handleAccountSecurity = config => {
+  const path = getPath(config.url)
+  const admin = path.includes('/admin/')
+  const session = requireSession(config, admin ? ['ADMIN'] : ['ADMIN', 'OPERATOR', 'VIEWER'])
+  const targetId = admin ? path.split('/')[6] : session.userId
+  const user = mockState.users.find(item => String(item.id) === String(targetId))
+  if (!user) fail(404, 404, '用户不存在')
+  const entries = Object.entries(mockState.sessions).filter(([, value]) => String(value.userId) === String(user.id))
+  const audit = action => mockState.auditLogs.push({ id: String(Date.now()), actorId: session.userId,
+    actorUsername: session.username, actorRole: session.role, action, targetType: 'USER',
+    targetId: String(user.id), targetLabel: user.username, result: 'SUCCESS', occurredAt: now() })
+  if (path.endsWith('/reset-password')) {
+    if (String(user.id) === String(session.userId)) fail(409, 409, '请在个人中心修改自己的密码')
+    const body = getBody(config)
+    if (!isValidPassword(body.password) || body.password !== body.confirmPassword) fail(400, 400, '临时密码不符合要求')
+    user.password = body.password; user.mustChangePassword = true
+    user.tokenVersion = Number(user.tokenVersion || 0) + 1
+    audit('USER_PASSWORD_RESET')
+    return null
+  }
+  if (String(config.method).toUpperCase() === 'GET') {
+    return entries.filter(([, value]) => Number(value.tokenVersion || 0) === Number(user.tokenVersion || 0)).map(([, value]) => {
+      value.id ||= crypto.randomUUID()
+      return { id: value.id, username: user.username, userAgent: 'Mock Browser', ipAddress: '127.0.0.1',
+        createdAt: value.createdAt || now(), lastSeenAt: value.lastSeenAt || now(), expiresAt: value.expiresAt || now(), current: value === session }
+    })
+  }
+  const selected = path.split('/').at(-2)
+  const all = path.endsWith('/revoke-all')
+  const others = path.endsWith('/revoke-others')
+  const logout = path.endsWith('/logout')
+  let count = 0
+  for (const [token, value] of entries) {
+    if (all || (others && value !== session) || (logout && value === session) || value.id === selected) { delete mockState.sessions[token]; count += 1 }
+  }
+  if (!all && !others && !count) fail(404, 404, '会话不存在')
+  audit(all || others ? 'SESSION_REVOKE_ALL' : 'SESSION_REVOKE')
+  return null
+}
+
 const route = async config => {
   throwMockErrorScenario(config)
   const method = String(config.method || 'get').toUpperCase()
   const path = getPath(config.url)
   const key = `${method} ${path}`
+  if (/^\/api\/v1\/auth\/(?:logout|sessions(?:\/.*)?|admin\/users\/[^/]+\/(?:reset-password|sessions(?:\/.*)?))$/.test(path)) return handleAccountSecurity(config)
 
   if (key === 'POST /api/v1/auth/login') return handleLogin(config)
   if (key === 'GET /api/v1/auth/setup/status') return handleFirstAdminSetupStatus()
