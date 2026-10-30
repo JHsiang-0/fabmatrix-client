@@ -17,6 +17,12 @@ const router = createRouter({
   history: routerHistory,
   routes: [
     {
+      path: '/cloud',
+      name: 'cloud-dashboard',
+      component: () => import('../views/CloudDashboard.vue'),
+      meta: { requiresAuth: false, skipSessionRestore: true }
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('../views/Login.vue'),

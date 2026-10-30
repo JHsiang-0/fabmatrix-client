@@ -5,6 +5,79 @@ import { isFeatureEnabled } from '../../src/config/features.js'
 
 const batchDispatchEnabled = isFeatureEnabled('batchDispatch')
 
+test('云端看板独立登录、过期状态和退出，不发送局域网凭证', async ({ page }) => {
+  const calls = []
+  let gatewayOnline = false
+  await page.route('https://cloud.test/api/v1/**', async route => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'GET,POST,OPTIONS' }
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers })
+    calls.push({ path, authorization: request.headers().authorization })
+    let data
+    if (path === '/api/v1/auth/login') data = { accessToken: 'test-cloud-session', user: { username: 'cloud-owner' } }
+    else if (path === '/api/v1/organizations') data = [{ id: 'org-a', name: '云端组织' }]
+    else if (path.endsWith('/farms')) data = [{ id: 'farm-a', name: '云端农场' }]
+    else if (path.endsWith('/printers')) data = { total: 1, items: [{ id: 'printer-a', name: '云端设备 A', gatewayName: '现场网关 A', gatewayOnline, stale: true, printState: 'PRINTING', progress: 25.5, observedAt: Date.now() - 120000 }] }
+    else data = { success: true }
+    await route.fulfill({ status: 200, headers, contentType: 'application/json', body: JSON.stringify(data) })
+  })
+  await page.goto('/server-connection')
+  await page.getByRole('button', { name: '云端只读看板', exact: true }).click()
+  await expect(page).toHaveURL(/\/cloud$/)
+  await page.getByPlaceholder('https://cloud.example.com').fill('https://cloud.test')
+  await page.getByPlaceholder('云端用户名', { exact: true }).fill('cloud-owner')
+  await page.getByPlaceholder('云端密码', { exact: true }).fill('test-password-only')
+  await page.getByRole('button', { name: '登录云端', exact: true }).click()
+  const desktop = page.locator('.cloud-table')
+  await expect(desktop.getByText('云端设备 A', { exact: true })).toBeVisible()
+  await expect(desktop.getByText('数据过期', { exact: true })).toBeVisible()
+  await expect(desktop.getByText('网关离线', { exact: true })).toBeVisible()
+  expect(calls[0].authorization).toBeUndefined()
+  expect(calls.slice(1).every(call => call.authorization === 'Bearer test-cloud-session')).toBe(true)
+  await page.screenshot({ path: 'test-results/cloud-desktop.png', fullPage: true })
+  await page.setViewportSize({ width: 375, height: 812 })
+  const mobile = page.locator('.cloud-mobile-list')
+  await expect(mobile.getByText('云端设备 A', { exact: true })).toBeVisible()
+  await expect(mobile.getByText('现场网关 A · 网关离线', { exact: true })).toBeVisible()
+  await expect(mobile.getByText('数据过期', { exact: true })).toBeVisible()
+  await page.screenshot({ path: 'test-results/cloud-mobile.png', fullPage: true })
+  gatewayOnline = true
+  await page.getByRole('button', { name: '刷新状态', exact: true }).click()
+  await expect(mobile.getByText('现场网关 A · 网关在线', { exact: true })).toBeVisible()
+  await expect(mobile.getByText('数据过期', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '退出云端', exact: true }).click()
+  await expect(page.getByPlaceholder('云端用户名', { exact: true })).toBeVisible()
+})
+
+test('云端看板的 401 只清理云会话，保留本地已保存登录', async ({ page }) => {
+  await login(page)
+  const localSession = await page.evaluate(() => window.localStorage.getItem('farm-ui-session') || window.sessionStorage.getItem('farm-ui-session'))
+  let expired = false
+  await page.route('https://cloud.test/api/v1/**', async route => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'GET,POST,OPTIONS' }
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers })
+    if (expired) return route.fulfill({ status: 401, headers, contentType: 'application/json', body: '{"code":"UNAUTHORIZED"}' })
+    const data = path.endsWith('/login') ? { accessToken: 'independent-cloud', user: { username: 'cloud' } }
+      : path === '/api/v1/organizations' ? [{ id: 'o', name: '组织' }]
+        : path.endsWith('/farms') ? [{ id: 'f', name: '农场' }] : { items: [], total: 0 }
+    await route.fulfill({ status: 200, headers, contentType: 'application/json', body: JSON.stringify(data) })
+  })
+  await page.goto('/cloud')
+  await page.getByPlaceholder('https://cloud.example.com').fill('https://cloud.test')
+  await page.getByPlaceholder('云端用户名', { exact: true }).fill('cloud')
+  await page.getByPlaceholder('云端密码', { exact: true }).fill('test-password-only')
+  await page.getByRole('button', { name: '登录云端', exact: true }).click()
+  await expect(page.getByRole('button', { name: '刷新状态', exact: true })).toBeVisible()
+  expired = true
+  await page.getByRole('button', { name: '刷新状态', exact: true }).click()
+  await expect(page.getByText('云端登录已失效，请重新登录', { exact: true })).toBeVisible()
+  const after = await page.evaluate(() => window.localStorage.getItem('farm-ui-session') || window.sessionStorage.getItem('farm-ui-session'))
+  expect(after).toBe(localSession)
+})
+
 const viewports = [
   { width: 375, height: 812 },
   { width: 768, height: 1024 },

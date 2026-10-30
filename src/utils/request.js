@@ -37,6 +37,13 @@ export const service = axios.create({
   timeout: REQUEST_CONFIG.TIMEOUT
 })
 
+// Cloud identity is independent of the local JWT/Result interceptors and request lifecycle.
+export const createCloudTransport = () => axios.create({
+  timeout: REQUEST_TIMEOUT.DEFAULT,
+  withCredentials: false,
+  headers: { Authorization: null }
+})
+
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete'])
 const pendingRequests = new Map()
 // Session credentials stay private to this module and are never attached to
