@@ -322,6 +322,7 @@ test('管理员批量删除展示确认和逐台结果', async ({ page }) => {
   const confirmation = page.locator('.t-dialog:visible').filter({ hasText: '批量删除设备' })
   await expect(confirmation).toContainText('Printer_C0DA')
   await expect(confirmation).toContainText('Printer_A12F')
+  await expect(confirmation).toContainText('请先到现场确认设备没有独立打印')
   await confirmation.getByRole('button', { name: '确认删除' }).click()
   const result = page.locator('.t-dialog:visible').filter({ hasText: '批量删除结果' })
   await expect(result).toContainText('成功 1 台，失败 1 台')

@@ -1037,11 +1037,8 @@ const handleBatchDeletePrinters = config => {
   const items = ids.map(id => {
     const printer = findPrinter(id)
     if (!printer) return { id, success: false, message: '设备不存在或已删除' }
-    if (printer.monitorEnabled === false || printer.connectionStatus === 'OFFLINE' || printer.status === 'OFFLINE') {
-      return { id, name: printer.name, success: false, message: '设备状态无法确认，请先恢复监控并确认空闲' }
-    }
-    if (printer.status !== 'IDLE' || printer.currentJobId) {
-      return { id, name: printer.name, success: false, message: '设备未处于空闲状态或仍绑定任务' }
+    if (['PREPARING', 'PRINTING', 'PAUSED'].includes(printer.status) || printer.currentJobId) {
+      return { id, name: printer.name, success: false, message: '设备正在执行任务或仍绑定任务' }
     }
     mockState.printers.splice(mockState.printers.indexOf(printer), 1)
     return { id, name: printer.name, success: true, message: '删除成功' }

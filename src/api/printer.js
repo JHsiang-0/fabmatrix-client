@@ -217,7 +217,7 @@ export function deletePrinter(id) {
 
 /** 管理员批量删除；每台设备独立返回结果。 */
 export function batchDeletePrinters(ids) {
-  return request({ url: '/api/v1/printers/batch-delete', method: 'post', data: { ids } })
+  return request({ url: '/api/v1/printers/batch-delete', method: 'post', data: { ids }, timeout: 120000 })
 }
 
 /**

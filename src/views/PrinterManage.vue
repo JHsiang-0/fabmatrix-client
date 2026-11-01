@@ -1584,8 +1584,12 @@ const handleBatchDeletePrinters = async () => {
   }
   batchDeleteLoading.value = true
   try {
+    const uncertain = selectedPrinterRows.value.filter(row => row.monitorEnabled !== true ||
+      String(row.connectionStatus || '').toUpperCase() !== 'ONLINE' || !row.lastSeenAt ||
+      !Number.isFinite(Date.parse(row.lastSeenAt)) || Date.now() - Date.parse(row.lastSeenAt) > 90000 ||
+      Date.parse(row.lastSeenAt) > Date.now() || row.consecutiveFailureCount == null || Number(row.consecutiveFailureCount) > 0)
     await confirmMessage(
-      `确认删除 ${selected.length} 台设备：${selected.map(item => item.name).join('、')}？仅最近监控确认空闲且没有未结束任务的设备可删除；请确认设备没有在现场启动打印。历史任务与执行记录保留。`,
+      `确认删除 ${selected.length} 台设备：${selected.map(item => item.name).join('、')}？${uncertain.length ? `以下设备状态无法确认：${uncertain.map(row => row.name || row.id).join('、')}。` : ''}请先到现场确认设备没有独立打印；已知进行中的任务会阻止删除，历史任务与执行记录保留。`,
       '批量删除设备',
       { type: 'danger', confirmButtonText: '确认删除', cancelButtonText: '取消' }
     )
@@ -1641,7 +1645,7 @@ const getDeleteMessage = printer => {
   const currentState = getStatusLabel(printer.effectiveStatus || printer.status)
   return printer.currentJobId
     ? `该设备当前为“${currentState}”，并关联任务 #${printer.currentJobId}。删除可能被服务端拒绝，确定继续吗？`
-    : `确定删除设备“${printer.name || printer.ipAddress}”吗？`
+    : `确定删除设备“${printer.name || printer.ipAddress}”吗？离线或状态未知时，请先到现场确认设备没有独立打印。`
 }
 
 // ===== 局域网扫描逻辑 =====

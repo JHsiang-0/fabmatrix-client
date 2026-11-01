@@ -17,3 +17,13 @@ test('批量删除只允许管理员，并对空闲与打印中设备分别返�
   assert.equal(mockState.printers.some(item => item.id === 404), false)
   assert.equal(mockState.printers.some(item => item.id === 403), true)
 })
+
+test('允许删除离线或未监控设备，继续阻止已知暂停的设备', async () => {
+  resetMockState()
+  mockState.sessions['batch-admin'] = { userId: 1, username: 'admin', role: 'ADMIN' }
+  Object.assign(mockState.printers.find(item => item.id === 404), { monitorEnabled: false, connectionStatus: 'OFFLINE', status: 'UNKNOWN', currentJobId: null })
+  Object.assign(mockState.printers.find(item => item.id === 403), { status: 'PAUSED' })
+  const response = await mockRequest({ method: 'post', url: '/api/v1/printers/batch-delete',
+    headers: { Authorization: 'Bearer batch-admin' }, data: { ids: [404, 403] } })
+  assert.deepEqual(response.data.items.map(item => item.success), [true, false])
+})
