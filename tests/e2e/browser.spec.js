@@ -290,6 +290,26 @@ test('设备 IP 同步独立于普通刷新，展示地址变化并刷新列表�
   await expect(drawer).toBeHidden()
 })
 
+test('手动新增设备时自动检测协议并在更换地址后重新检测', async ({ page }) => {
+  await login(page)
+  await openSidebarItem(page, 1280, '打印机管理')
+  await page.getByRole('button', { name: '新增打印机', exact: true }).click()
+  const dialog = page.locator('.t-dialog:visible')
+  await expect(dialog.getByRole('button', { name: '确定', exact: true })).toBeDisabled()
+  await dialog.getByPlaceholder('例：Klipper-01').fill('检测测试设备')
+  const address = dialog.getByPlaceholder('例：192.168.1.10')
+  await address.fill('192.168.1.99')
+  await expect(dialog).toContainText('已识别：Klipper')
+  await expect(dialog.getByRole('button', { name: '确定', exact: true })).toBeEnabled()
+  await address.fill('192.168.1.')
+  await expect(dialog.getByRole('button', { name: '确定', exact: true })).toBeDisabled()
+  await address.fill('192.168.1.98')
+  await expect(dialog).toContainText('已识别：Klipper')
+  await dialog.getByRole('button', { name: '确定', exact: true }).click()
+  await expect(dialog).toBeHidden()
+  expect(await mockRequestCount(page, 'POST /api/v1/printers/add-detected')).toBe(1)
+})
+
 test('操作员看不到设备 IP 同步入口，也不发起后台同步查询', async ({ page }) => {
   await loginAs(page, 'operator', 'Operator123')
   await openSidebarItem(page, 1280, '打印机管理')

@@ -995,6 +995,17 @@ const handleAddPrinter = config => {
   return null
 }
 
+const mockDetectedProtocol = config => {
+  requireSession(config, ['ADMIN'])
+  const ip = getBody(config).ipAddress
+  return mockState.printers.find(item => item.ipAddress === ip)?.firmwareType || 'KLIPPER'
+}
+
+const handleDetectedAdd = config => {
+  const firmwareType = mockDetectedProtocol(config)
+  return handleAddPrinter({ ...config, data: { ...getBody(config), firmwareType } })
+}
+
 const handleUpdatePrinter = config => {
   requireSession(config, ['ADMIN'])
   const body = getBody(config)
@@ -2618,6 +2629,8 @@ const route = async config => {
   if (/^GET \/api\/v1\/printers\/[^/]+\/statistics$/.test(key)) return handlePrinterStatistics(config)
   if (/^GET \/api\/v1\/printers\/[^/]+$/.test(key)) return handlePrinterDetail(config)
   if (key === 'POST /api/v1/printers/add') return handleAddPrinter(config)
+  if (key === 'POST /api/v1/printers/detect-protocol') return { firmwareType: mockDetectedProtocol(config) }
+  if (key === 'POST /api/v1/printers/add-detected') return handleDetectedAdd(config)
   if (key === 'PUT /api/v1/printers/update') return handleUpdatePrinter(config)
   if (key === 'POST /api/v1/printers/batch-add') return handleBatchAddPrinters(config)
   if (key === 'PUT /api/v1/printers/positions') return handlePositions(config)

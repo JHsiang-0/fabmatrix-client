@@ -182,6 +182,14 @@ export function addPrinter(data) {
   }).then(normalizePrinterResponse)
 }
 
+export function detectPrinterProtocol(ipAddress) {
+  return request({ url: '/api/v1/printers/detect-protocol', method: 'post', data: { ipAddress } })
+}
+
+export function addDetectedPrinter(data) {
+  return request({ url: '/api/v1/printers/add-detected', method: 'post', data })
+}
+
 /**
  * 更新打印机信息
  * @param {Object} data - 打印机数据

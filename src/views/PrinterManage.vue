@@ -352,11 +352,20 @@
           </t-input>
         </t-form-item>
 
-        <t-form-item label="设备协议" name="firmwareType">
+        <t-form-item v-if="isEdit" label="设备协议" name="firmwareType">
           <t-radio-group v-model="form.firmwareType" variant="default-filled" size="medium" class="printer-firmware-options">
             <t-radio-button value="RRF">RRF</t-radio-button>
             <t-radio-button value="KLIPPER">Klipper</t-radio-button>
           </t-radio-group>
+        </t-form-item>
+        <t-form-item v-else label="设备协议">
+          <div role="status" aria-live="polite">
+            <span v-if="protocolDetection.state === 'pending'">正在检测设备协议…</span>
+            <span v-else-if="protocolDetection.state === 'success'">已识别：{{ getFirmwareLabel(protocolDetection.type) }}</span>
+            <span v-else-if="protocolDetection.state === 'failed'">无法识别设备，请检查 IP 和设备连接</span>
+            <span v-else>输入完整 IP 后自动检测</span>
+            <t-button v-if="protocolDetection.state === 'failed'" variant="text" size="small" @click="detectCurrentProtocol">重新检测</t-button>
+          </div>
         </t-form-item>
 
         <t-form-item label="当前耗材" name="currentMaterial">
@@ -386,7 +395,8 @@
       <template #footer>
         <div class="flex justify-end gap-3">
           <t-button @click="dialogVisible = false">取消</t-button>
-          <t-button theme="primary" @click="submitForm" :loading="submitLoading">
+          <t-button theme="primary" @click="submitForm" :loading="submitLoading"
+            :disabled="!isEdit && protocolDetection.state !== 'success'">
             <span><check /></span>
             确定
           </t-button>
@@ -584,7 +594,8 @@ import {
 } from 'tdesign-icons-vue-next'
 import {
   getPrinterList,
-  addPrinter,
+  addDetectedPrinter,
+  detectPrinterProtocol,
   updatePrinter,
   deletePrinter,
   scanPrinters,
@@ -724,6 +735,38 @@ const defaultForm = {
   nozzleSize: 1.2
 }
 const form = reactive({ ...defaultForm })
+const protocolDetection = reactive({ state: 'idle', type: null, ipAddress: '' })
+let protocolDetectionTimer = null
+let protocolDetectionRevision = 0
+const isValidPrinterIp = ip => {
+  const parts = String(ip || '').split('.')
+  return parts.length === 4 && parts.every(part => /^(0|[1-9]\d{0,2})$/.test(part) && Number(part) <= 255)
+}
+const resetProtocolDetection = () => {
+  clearTimeout(protocolDetectionTimer)
+  protocolDetectionRevision++
+  Object.assign(protocolDetection, { state: 'idle', type: null, ipAddress: '' })
+}
+const detectCurrentProtocol = async () => {
+  const ipAddress = form.ipAddress.trim()
+  if (!dialogVisible.value || isEdit.value || !isValidPrinterIp(ipAddress)) return
+  const revision = ++protocolDetectionRevision
+  Object.assign(protocolDetection, { state: 'pending', type: null, ipAddress })
+  try {
+    const response = await detectPrinterProtocol(ipAddress)
+    if (revision !== protocolDetectionRevision || !dialogVisible.value || isEdit.value || form.ipAddress.trim() !== ipAddress) return
+    const type = response?.data?.firmwareType
+    Object.assign(protocolDetection, { state: ['KLIPPER', 'RRF'].includes(type) ? 'success' : 'failed', type })
+  } catch {
+    if (revision === protocolDetectionRevision && dialogVisible.value && !isEdit.value) protocolDetection.state = 'failed'
+  }
+}
+watch(() => [dialogVisible.value, isEdit.value, form.ipAddress], ([visible, edit, address]) => {
+  resetProtocolDetection()
+  if (visible && !edit && isValidPrinterIp(String(address || '').trim())) {
+    protocolDetectionTimer = setTimeout(detectCurrentProtocol, 500)
+  }
+})
 
 const rules = {
   name: [{ required: true, message: '请输入机器名称', trigger: 'blur' }],
@@ -1439,6 +1482,7 @@ watch(() => [route.query.status, route.query.firmwareType], ([status, firmwareTy
 
 onUnmounted(() => {
   clearKeywordDebounce()
+  resetProtocolDetection()
   printerListRequestGuard.invalidate()
 })
 
@@ -1467,13 +1511,17 @@ const handleEdit = (row) => {
 // 提交表单
 const submitForm = async () => {
   await formRef.value.validate()
+  if (!isEdit.value && (protocolDetection.state !== 'success' || protocolDetection.ipAddress !== form.ipAddress.trim())) {
+    message.error('请先完成设备协议检测')
+    return
+  }
   submitLoading.value = true
   try {
     const payload = {
       id: form.id,
       name: form.name,
       machineNumber: form.machineNumber.trim() || null,
-      ipAddress: form.ipAddress,
+      ipAddress: form.ipAddress.trim(),
       firmwareType: form.firmwareType,
       currentMaterial: form.currentMaterial,
       nozzleSize: form.nozzleSize
@@ -1483,7 +1531,7 @@ const submitForm = async () => {
       await updatePrinter(payload)
       message.success('修改成功')
     } else {
-      await addPrinter(payload)
+      await addDetectedPrinter(payload)
       message.success('新增成功')
     }
     dialogVisible.value = false
