@@ -211,7 +211,8 @@ export function updatePrinter(data) {
 export function deletePrinter(id) {
   return request({
     url: `/api/v1/printers/delete/${id}`,
-    method: 'delete'
+    method: 'delete',
+    timeout: 120000
   })
 }
 

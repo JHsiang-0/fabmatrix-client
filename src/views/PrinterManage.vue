@@ -47,7 +47,7 @@
         </t-button>
         <t-button v-if="isAdmin && selectedPrinterRows.length > 0" theme="danger" variant="outline"
           :disabled="batchDeleteLoading || monitorActionLoading || deletingIds.length > 0" :loading="batchDeleteLoading" @click="handleBatchDeletePrinters">
-          批量删除 ({{ selectedPrinterRows.length }})
+          {{ batchDeleteInFlight ? '正在删除，繁忙设备会自动重试' : `批量删除 (${selectedPrinterRows.length})` }}
         </t-button>
         <t-button v-if="isAdmin && selectedPrinterRows.length > 0" :theme="batchMonitorTarget ? 'success' : 'warning'" variant="outline"
           :disabled="monitorActionLoading" :loading="monitorActionLoading"
@@ -309,7 +309,7 @@
               >
                 <template #default>
                   <t-button size="small" theme="danger" variant="base" :icon="renderIcon(Delete)" aria-label="删除打印机" :loading="deletingIds.includes(scope.row.id)" :disabled="batchDeleteLoading" @click.stop>
-                    删除
+                    {{ deletingIds.includes(scope.row.id) ? '正在等待设备' : '删除' }}
                   </t-button>
                 </template>
               </t-popconfirm>
@@ -825,6 +825,7 @@ const confirmingSafeIds = ref([])
 const startingJobIds = ref([])
 const deletingIds = ref([])
 const batchDeleteLoading = ref(false)
+const batchDeleteInFlight = ref(false)
 const batchDeleteResultVisible = ref(false)
 const batchDeleteResult = ref({ deletedCount: 0, failedCount: 0, items: [] })
 
@@ -1593,6 +1594,7 @@ const handleBatchDeletePrinters = async () => {
       '批量删除设备',
       { type: 'danger', confirmButtonText: '确认删除', cancelButtonText: '取消' }
     )
+    batchDeleteInFlight.value = true
     const response = await batchDeletePrinters(selected.map(item => item.id))
     const result = response?.data
     const selectedIds = new Set(selected.map(item => String(item.id)))
@@ -1617,6 +1619,7 @@ const handleBatchDeletePrinters = async () => {
   } catch (error) {
     if (error !== 'cancel') message.error(error?.message || '批量删除失败，请刷新后核对')
   } finally {
+    batchDeleteInFlight.value = false
     batchDeleteLoading.value = false
   }
 }
