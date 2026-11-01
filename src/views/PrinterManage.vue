@@ -41,6 +41,10 @@
     <PageHeader title="打印机管理">
       <template #actions>
       <div class="app-page-toolbar__actions printer-page-actions">
+        <t-button v-if="isAdmin && selectedPrinterRows.length > 0" theme="danger" variant="outline"
+          :disabled="batchDeleteLoading || monitorActionLoading || deletingIds.length > 0" :loading="batchDeleteLoading" @click="handleBatchDeletePrinters">
+          批量删除 ({{ selectedPrinterRows.length }})
+        </t-button>
         <t-button v-if="isAdmin && selectedPrinterRows.length > 0" :theme="batchMonitorTarget ? 'success' : 'warning'" variant="outline"
           :disabled="monitorActionLoading" :loading="monitorActionLoading"
           @click="handleBatchMonitorToggle">
@@ -300,7 +304,7 @@
                 @confirm="handleDelete(scope.row.id)"
               >
                 <template #default>
-                  <t-button size="small" theme="danger" variant="base" :icon="renderIcon(Delete)" aria-label="删除打印机" :loading="deletingIds.includes(scope.row.id)" @click.stop>
+                  <t-button size="small" theme="danger" variant="base" :icon="renderIcon(Delete)" aria-label="删除打印机" :loading="deletingIds.includes(scope.row.id)" :disabled="batchDeleteLoading" @click.stop>
                     删除
                   </t-button>
                 </template>
@@ -402,6 +406,15 @@
           </t-button>
         </div>
       </template>
+    </t-dialog>
+
+    <t-dialog v-model:visible="batchDeleteResultVisible" header="批量删除结果" :footer="false" width="520px">
+      <p>成功 {{ batchDeleteResult.deletedCount }} 台，失败 {{ batchDeleteResult.failedCount }} 台。</p>
+      <ul class="printer-batch-delete-results">
+        <li v-for="item in batchDeleteResult.items" :key="item.id">
+          {{ item.name || item.id }}：{{ item.message }}
+        </li>
+      </ul>
     </t-dialog>
 
     <!-- 局域网设备扫描抽屉 -->
@@ -598,6 +611,7 @@ import {
   detectPrinterProtocol,
   updatePrinter,
   deletePrinter,
+  batchDeletePrinters,
   scanPrinters,
   batchAddPrinters,
   confirmSafe,
@@ -805,6 +819,9 @@ const scanSubnetRangeLabel = computed(() => subnetIsValid.value
 const confirmingSafeIds = ref([])
 const startingJobIds = ref([])
 const deletingIds = ref([])
+const batchDeleteLoading = ref(false)
+const batchDeleteResultVisible = ref(false)
+const batchDeleteResult = ref({ deletedCount: 0, failedCount: 0, items: [] })
 
 const displayTableData = computed(() => tableData.value.map(printer => {
   const realtime = statusMap.value.get(String(printer.id))
@@ -1544,6 +1561,47 @@ const submitForm = async () => {
 }
 
 // 删除数据
+const handleBatchDeletePrinters = async () => {
+  if (batchDeleteLoading.value || !isAdmin.value) return
+  const selected = selectedPrinterRows.value.map(row => ({ id: row.id, name: row.name || String(row.id) }))
+  if (!selected.length || selected.length > 100) {
+    message.warning('请选择 1 至 100 台设备')
+    return
+  }
+  batchDeleteLoading.value = true
+  try {
+    await confirmMessage(
+      `确认删除 ${selected.length} 台设备：${selected.map(item => item.name).join('、')}？仅最近监控确认空闲且没有未结束任务的设备可删除；请确认设备没有在现场启动打印。历史任务与执行记录保留。`,
+      '批量删除设备',
+      { type: 'danger', confirmButtonText: '确认删除', cancelButtonText: '取消' }
+    )
+    const response = await batchDeletePrinters(selected.map(item => item.id))
+    const result = response?.data
+    const selectedIds = new Set(selected.map(item => String(item.id)))
+    const itemIds = Array.isArray(result?.items) ? result.items.map(item => String(item?.id)) : []
+    const valid = result && Array.isArray(result.items) && itemIds.length === selected.length &&
+      new Set(itemIds).size === selected.length && itemIds.every(id => selectedIds.has(id)) &&
+      result.items.every(item => typeof item.success === 'boolean' && typeof item.message === 'string') &&
+      result.deletedCount === result.items.filter(item => item.success).length &&
+      result.failedCount === result.items.filter(item => !item.success).length
+    if (!valid) {
+      message.warning('删除结果不完整，请刷新设备列表后核对')
+      await fetchData()
+      return
+    }
+    const names = new Map(selected.map(item => [String(item.id), item.name]))
+    batchDeleteResult.value = { ...result, items: result.items.map(item => ({ ...item, name: names.get(String(item.id)) || item.name })) }
+    const deleted = new Set(result.items.filter(item => item.success).map(item => String(item.id)))
+    selectedPrinterIds.value = selectedPrinterIds.value.filter(id => !deleted.has(String(id)))
+    batchDeleteResultVisible.value = true
+    await fetchData()
+  } catch (error) {
+    if (error !== 'cancel') message.error(error?.message || '批量删除失败，请刷新后核对')
+  } finally {
+    batchDeleteLoading.value = false
+  }
+}
+
 const handleDelete = async (id) => {
   if (deletingIds.value.includes(id)) return
   deletingIds.value.push(id)
@@ -1674,6 +1732,12 @@ const handleBatchAdd = async () => {
 </script>
 
 <style scoped>
+.printer-batch-delete-results {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-left: 1.4rem;
+}
+
 .printer-manage-page {
   gap: var(--app-spacing-3);
 }

@@ -310,11 +310,31 @@ test('手动新增设备时自动检测协议并在更换地址后重新检测',
   expect(await mockRequestCount(page, 'POST /api/v1/printers/add-detected')).toBe(1)
 })
 
+test('管理员批量删除展示确认和逐台结果', async ({ page }) => {
+  await login(page)
+  await openSidebarItem(page, 1280, '打印机管理')
+  for (const name of ['Printer_C0DA', 'Printer_A12F']) {
+    const row = page.locator('.printer-table tbody tr').filter({ hasText: name })
+    await row.getByRole('checkbox').locator('..').click({ force: true })
+    await expect(row.getByRole('checkbox')).toBeChecked()
+  }
+  await page.getByRole('button', { name: '批量删除 (2)' }).click()
+  const confirmation = page.locator('.t-dialog:visible').filter({ hasText: '批量删除设备' })
+  await expect(confirmation).toContainText('Printer_C0DA')
+  await expect(confirmation).toContainText('Printer_A12F')
+  await confirmation.getByRole('button', { name: '确认删除' }).click()
+  const result = page.locator('.t-dialog:visible').filter({ hasText: '批量删除结果' })
+  await expect(result).toContainText('成功 1 台，失败 1 台')
+  await expect(result).toContainText('Printer_C0DA')
+  await expect(result).toContainText('Printer_A12F')
+})
+
 test('操作员看不到设备 IP 同步入口，也不发起后台同步查询', async ({ page }) => {
   await loginAs(page, 'operator', 'Operator123')
   await openSidebarItem(page, 1280, '打印机管理')
   await expect(page.getByRole('heading', { name: '打印机管理' })).toBeVisible()
   await expect(page.getByRole('button', { name: /同步设备 IP/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /批量删除/ })).toHaveCount(0)
   await page.getByRole('button', { name: '刷新', exact: true }).click()
   expect(await mockRequestCount(page, 'GET /api/v1/printers/rediscover')).toBe(0)
 })

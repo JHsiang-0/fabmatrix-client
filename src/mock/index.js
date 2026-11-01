@@ -1028,6 +1028,28 @@ const handleDeletePrinter = config => {
   return null
 }
 
+const handleBatchDeletePrinters = config => {
+  requireSession(config, ['ADMIN'])
+  const { ids } = getBody(config)
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100 || new Set(ids.map(String)).size !== ids.length) {
+    fail(400, 400, '请选择 1 至 100 台不同的有效设备')
+  }
+  const items = ids.map(id => {
+    const printer = findPrinter(id)
+    if (!printer) return { id, success: false, message: '设备不存在或已删除' }
+    if (printer.monitorEnabled === false || printer.connectionStatus === 'OFFLINE' || printer.status === 'OFFLINE') {
+      return { id, name: printer.name, success: false, message: '设备状态无法确认，请先恢复监控并确认空闲' }
+    }
+    if (printer.status !== 'IDLE' || printer.currentJobId) {
+      return { id, name: printer.name, success: false, message: '设备未处于空闲状态或仍绑定任务' }
+    }
+    mockState.printers.splice(mockState.printers.indexOf(printer), 1)
+    return { id, name: printer.name, success: true, message: '删除成功' }
+  })
+  const deletedCount = items.filter(item => item.success).length
+  return { deletedCount, failedCount: items.length - deletedCount, items }
+}
+
 const handleScanPrinters = config => {
   requireSession(config, ['ADMIN'])
   const subnet = getParams(config).subnet || '192.168.1'
@@ -2631,6 +2653,7 @@ const route = async config => {
   if (key === 'POST /api/v1/printers/add') return handleAddPrinter(config)
   if (key === 'POST /api/v1/printers/detect-protocol') return { firmwareType: mockDetectedProtocol(config) }
   if (key === 'POST /api/v1/printers/add-detected') return handleDetectedAdd(config)
+  if (key === 'POST /api/v1/printers/batch-delete') return handleBatchDeletePrinters(config)
   if (key === 'PUT /api/v1/printers/update') return handleUpdatePrinter(config)
   if (key === 'POST /api/v1/printers/batch-add') return handleBatchAddPrinters(config)
   if (key === 'PUT /api/v1/printers/positions') return handlePositions(config)
