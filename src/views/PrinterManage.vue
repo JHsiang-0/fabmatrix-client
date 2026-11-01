@@ -41,6 +41,10 @@
     <PageHeader title="打印机管理">
       <template #actions>
       <div class="app-page-toolbar__actions printer-page-actions">
+        <t-button v-if="isAdmin && selectedPrinterRows.length > 0" variant="text"
+          :disabled="batchDeleteLoading || monitorActionLoading" @click="clearPrinterSelection">
+          清空选择 ({{ selectedPrinterRows.length }})
+        </t-button>
         <t-button v-if="isAdmin && selectedPrinterRows.length > 0" theme="danger" variant="outline"
           :disabled="batchDeleteLoading || monitorActionLoading || deletingIds.length > 0" :loading="batchDeleteLoading" @click="handleBatchDeletePrinters">
           批量删除 ({{ selectedPrinterRows.length }})
@@ -725,6 +729,7 @@ const monitorError = ref('')
 const monitorUpdatingIds = ref([])
 const monitorBatchLoading = ref(false)
 const selectedPrinterIds = ref([])
+const selectedPrinterRecords = ref(new Map())
 const detailActionLoading = ref(false)
 const editingNameId = ref(null)
 const nameDraft = ref('')
@@ -861,8 +866,8 @@ const displayTableData = computed(() => tableData.value.map(printer => {
 }))
 
 const selectedPrinterRows = computed(() => {
-  const selectedIds = new Set(selectedPrinterIds.value.map(id => String(id)))
-  return displayTableData.value.filter(printer => selectedIds.has(String(printer.id)))
+  const visible = new Map(displayTableData.value.map(printer => [String(printer.id), printer]))
+  return selectedPrinterIds.value.map(id => visible.get(String(id)) || selectedPrinterRecords.value.get(String(id))).filter(Boolean)
 })
 
 const selectedVisiblePrinterIds = computed(() => selectedPrinterRows.value.map(printer => printer.id))
@@ -1024,13 +1029,18 @@ const handleStartJob = async (printer) => {
 
 // 表格行点击事件
 const handlePrinterSelectionChange = rows => {
-  selectedPrinterIds.value = Array.isArray(rows)
-    ? rows.map(row => row?.id).filter(Boolean)
-    : []
+  const visibleIds = new Set(displayTableData.value.map(row => String(row.id)))
+  const selectedRows = Array.isArray(rows) ? rows.filter(row => row?.id && visibleIds.has(String(row.id))) : []
+  const records = new Map(selectedPrinterRecords.value)
+  visibleIds.forEach(id => records.delete(id))
+  selectedRows.forEach(row => records.set(String(row.id), row))
+  selectedPrinterRecords.value = records
+  selectedPrinterIds.value = [...records.values()].map(row => row.id)
 }
 
 const clearPrinterSelection = () => {
   selectedPrinterIds.value = []
+  selectedPrinterRecords.value = new Map()
 }
 
 const handleRowClick = (row) => {
@@ -1414,7 +1424,6 @@ const restorePrinterDetailContext = () => {
 const fetchData = async () => {
   const requestId = printerListRequestGuard.begin()
   if (requestId === null) return
-  clearPrinterSelection()
   loading.value = true
   loadError.value = ''
   try {
@@ -1426,6 +1435,11 @@ const fetchData = async () => {
     })
     if (!printerListRequestGuard.isCurrent(requestId)) return
     tableData.value = res.data?.records || []
+    const records = new Map(selectedPrinterRecords.value)
+    tableData.value.forEach(row => {
+      if (records.has(String(row.id))) records.set(String(row.id), row)
+    })
+    selectedPrinterRecords.value = records
     total.value = res.data?.total || 0
     restorePrinterDetailContext()
   } catch (error) {
@@ -1485,7 +1499,6 @@ const applyFirmwareFilter = value => {
 }
 
 const handlePaginationChange = () => {
-  clearPrinterSelection()
   fetchData()
 }
 
@@ -1493,6 +1506,7 @@ watch(() => [route.query.status, route.query.firmwareType], ([status, firmwareTy
   statusFilter.value = Array.isArray(status) ? status[0] || '' : status || ''
   const firmwareValue = Array.isArray(firmwareType) ? firmwareType[0] || '' : firmwareType || ''
   firmwareFilter.value = String(firmwareValue).toUpperCase()
+  clearPrinterSelection()
   queryParams.pageNum = 1
   fetchData()
 }, { immediate: true })
@@ -1593,6 +1607,7 @@ const handleBatchDeletePrinters = async () => {
     batchDeleteResult.value = { ...result, items: result.items.map(item => ({ ...item, name: names.get(String(item.id)) || item.name })) }
     const deleted = new Set(result.items.filter(item => item.success).map(item => String(item.id)))
     selectedPrinterIds.value = selectedPrinterIds.value.filter(id => !deleted.has(String(id)))
+    selectedPrinterRecords.value = new Map([...selectedPrinterRecords.value].filter(([id]) => !deleted.has(id)))
     batchDeleteResultVisible.value = true
     await fetchData()
   } catch (error) {
@@ -1607,6 +1622,8 @@ const handleDelete = async (id) => {
   deletingIds.value.push(id)
   try {
     await deletePrinter(id)
+    selectedPrinterIds.value = selectedPrinterIds.value.filter(selectedId => String(selectedId) !== String(id))
+    selectedPrinterRecords.value.delete(String(id))
     message.success('删除成功')
     if (tableData.value.length === 1 && queryParams.pageNum > 1) {
       queryParams.pageNum--

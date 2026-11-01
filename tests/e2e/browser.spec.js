@@ -1361,7 +1361,7 @@ test('UI-010 扫描抽屉配置区对齐、结果分隔和初始空态居中', a
   }
 })
 
-test('UI-006 打印机选择不跨筛选分页且两个抽屉在 800x560 可用', async ({ browser }) => {
+test('UI-006 打印机选择跨页保留、筛选清空且两个抽屉在 800x560 可用', async ({ browser }) => {
   test.setTimeout(120000)
   const context = await browser.newContext({ viewport: { width: 800, height: 560 } })
   const page = await context.newPage()
@@ -1433,8 +1433,21 @@ test('UI-006 打印机选择不跨筛选分页且两个抽屉在 800x560 可用'
     await expect(batchButton).toHaveCount(1)
     await page.locator('.printer-management-table-footer .t-pagination__btn-next').click()
     await expect(page.locator('.printer-management-table-footer .t-pagination__number.t-is-current')).toHaveText('2')
-    await expect(batchButton).toHaveCount(0)
+    await expect(batchButton).toContainText('(1)')
     await expect(page.locator('.printer-table tbody tr').first().getByRole('checkbox')).not.toBeChecked()
+    await page.locator('.printer-table tbody tr').first().getByRole('checkbox').locator('..').click({ force: true })
+    await expect(batchButton).toContainText('(2)')
+    await page.locator('.printer-management-table-footer .t-pagination__btn-prev').click()
+    await expect(firstRowCheckbox).toBeChecked()
+    await expect(page.getByRole('button', { name: '批量删除 (2)' })).toBeVisible()
+    await page.getByRole('button', { name: '批量删除 (2)' }).click()
+    const deleteConfirmation = page.locator('.t-dialog:visible').filter({ hasText: '批量删除设备' })
+    await expect(deleteConfirmation).toContainText('一号测试设备')
+    await expect(deleteConfirmation).toContainText('UI005_Printer_21')
+    await deleteConfirmation.getByRole('button', { name: '取消' }).click()
+    await page.getByRole('button', { name: '清空选择 (2)' }).click()
+    await expect(batchButton).toHaveCount(0)
+    await expect(firstRowCheckbox).not.toBeChecked()
 
     const mainTableMetrics = await page.locator('.printer-table .t-table__content').first().evaluate(element => ({
       clientWidth: element.clientWidth,
