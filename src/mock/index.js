@@ -738,6 +738,14 @@ const handleGetPrinterMonitor = config => {
   return getMockMonitorData(printer)
 }
 
+const handleGetPrinterModel = config => {
+  requireSession(config, ['ADMIN', 'OPERATOR'])
+  const printer = findPrinter(getPath(config.url).split('/').at(-2))
+  if (!printer) fail(404, 404, '打印机不存在')
+  // Canonical fixtures are supplied explicitly; legacy seed values are never promoted to measurements.
+  return { serverTime: new Date().toISOString(), stale: printer.modelStale !== false, model: printer.canonicalModel ?? null }
+}
+
 const handleUpdatePrinterMonitor = config => {
   requireSession(config, ['ADMIN'])
   const id = getPath(config.url).split('/').at(-2)
@@ -2643,6 +2651,7 @@ const route = async config => {
   if (key === 'GET /api/v1/printers/unallocated') return handleUnallocatedPrinters(config)
   if (key === 'PUT /api/v1/printers/monitor/batch') return handleBatchUpdatePrinterMonitor(config)
   if (/^GET \/api\/v1\/printers\/[^/]+\/monitor$/.test(key)) return handleGetPrinterMonitor(config)
+  if (/^GET \/api\/v1\/printers\/[^/]+\/model$/.test(key)) return handleGetPrinterModel(config)
   if (/^PUT \/api\/v1\/printers\/[^/]+\/monitor$/.test(key)) return handleUpdatePrinterMonitor(config)
   if (/^GET \/api\/v1\/printers\/[^/]+\/history$/.test(key)) return handlePrinterHistory(config)
   if (/^GET \/api\/v1\/printers\/[^/]+\/statistics$/.test(key)) return handlePrinterStatistics(config)

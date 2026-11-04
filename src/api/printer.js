@@ -1,6 +1,7 @@
 import request from '@/utils/request'
 import { REQUEST_TIMEOUT } from '@/utils/constants'
 import { normalizeRediscoveryResult } from '@/utils/printerRediscovery'
+import { readPrinterModel } from '@/utils/printerModel'
 import {
   mapResponseData,
   normalizePageParams,
@@ -42,6 +43,15 @@ export function getPrinterList(params = {}, options = {}) {
  * @param {number|string} id - 打印机 ID
  * @returns {Promise<{code: number, message: string, data: Printer}>} 打印机详情
  */
+export function getPrinterModel(id, options = {}) {
+  return request({
+    url: `/api/v1/printers/${id}/model`,
+    method: 'get',
+    notifyError: false,
+    ...options
+  }).then(response => readPrinterModel(response.data, id))
+}
+
 export function getPrinterDetail(id) {
   return request({
     url: `/api/v1/printers/${id}`,

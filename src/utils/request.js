@@ -271,7 +271,7 @@ export const handleRequestError = (error, config) => {
   }
   const staleUnauthorized = handleUnauthorized(requestError, requestConfig)
 
-  if (!staleUnauthorized && !requestError.toastShown) {
+  if (!staleUnauthorized && !requestError.toastShown && requestConfig?.notifyError !== false) {
     requestError.toastShown = true
     try {
       notifyRequestError(requestError)

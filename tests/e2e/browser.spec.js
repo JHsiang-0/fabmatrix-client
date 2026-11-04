@@ -2,8 +2,57 @@ import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import { readXlsx } from '../helpers/xlsxReadback.js'
 import { isFeatureEnabled } from '../../src/config/features.js'
+import { printerModelFixture } from '../fixtures/printerModel.js'
 
 const batchDispatchEnabled = isFeatureEnabled('batchDispatch')
+
+test('统一设备模型展示多通道、零值和历史结果，刷新失败与过期清理旧测量', async ({ page }) => {
+  await login(page)
+  const fixture = printerModelFixture('403')
+  await page.evaluate(async fixture => {
+    const { mockState } = await import('/src/mock/data.js')
+    Object.assign(mockState.printers.find(item => String(item.id) === '403'), { canonicalModel: fixture.model, modelStale: false })
+  }, fixture)
+  await openSidebarItem(page, 1280, '打印机管理')
+  await page.locator('.printer-table-row').filter({ hasText: 'Printer_C0DA' }).locator('td').nth(2).click()
+  const panel = page.getByRole('region', { name: '完整设备状态' })
+  await expect(panel.getByText('实时数据', { exact: true })).toBeVisible()
+  await expect(panel.getByText('0 °C', { exact: true }).first()).toBeVisible()
+  await panel.getByText('加热器 · 副喷头', { exact: true }).click()
+  await expect(panel.getByText('23.4 °C', { exact: true })).toBeVisible()
+  await panel.getByText('当前执行', { exact: true }).click()
+  await expect(panel.getByText('test-part.gcode', { exact: true })).toBeVisible()
+  await expect(panel.getByText('文件位置推算', { exact: true })).toBeVisible()
+  await panel.getByText('当前执行', { exact: true }).click()
+  await panel.getByText('上次执行结果（历史记录）', { exact: true }).click()
+  await expect(panel.getByText('已取消', { exact: true })).toBeVisible()
+  await panel.locator('.model-heading').scrollIntoViewIfNeeded()
+  await page.screenshot({ path: 'test-results/printer-model-desktop.png', fullPage: true })
+  await page.evaluate(async () => {
+    const { mockState } = await import('/src/mock/data.js')
+    const printer = mockState.printers.find(item => String(item.id) === '403')
+    printer.modelStale = true
+    printer.canonicalModel.observation.connection.status = 'OFFLINE'
+  })
+  await panel.getByRole('button', { name: '刷新状态', exact: true }).click()
+  await expect(panel.getByText('数据过期', { exact: true }).first()).toBeVisible()
+  await expect(panel.getByText('0 °C', { exact: true })).toHaveCount(0)
+  await expect(panel.getByText('已取消', { exact: true })).toBeVisible()
+  await expect(page.locator('.printer-detail-drawer__status-card')).toContainText('离线')
+  await expect(page.locator('.printer-detail-drawer__progress-summary')).toHaveCount(0)
+  await page.setViewportSize({ width: 800, height: 560 })
+  await panel.getByText('数据过期', { exact: true }).first().scrollIntoViewIfNeeded()
+  await page.screenshot({ path: 'test-results/printer-model-compact.png', fullPage: true })
+  await page.evaluate(async () => {
+    const { mockState } = await import('/src/mock/data.js')
+    mockState.printers.find(item => String(item.id) === '403').canonicalModel.modelVersion = 99
+  })
+  await panel.getByRole('button', { name: '刷新状态', exact: true }).click()
+  await expect(panel.getByText('设备模型加载失败', { exact: true })).toBeVisible()
+  await expect(panel.getByText('已取消', { exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: '关闭打印机详情', exact: true }).click()
+  await expect(panel).not.toBeVisible()
+})
 
 test('云端看板独立登录、过期状态和退出，不发送局域网凭证', async ({ page }) => {
   const calls = []

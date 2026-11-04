@@ -21,6 +21,7 @@
     "test:cloud": "node --test tests/cloudSession.test.js",
     "test:auth": "node --test tests/authSession.test.js tests/accountSecurity.test.js tests/dashboardStoreRuntime.test.js",
     "test:printer-ip": "node --test tests/printerRediscovery.test.js",
+    "test:printer-model": "node --test tests/printerModel.test.js",
     "test:history-export": "node --test tests/historyExport.test.js",
     "test:mock": "node --test tests/p1MockE2E.test.js",
     "test:e2e": "playwright test --project=browser",

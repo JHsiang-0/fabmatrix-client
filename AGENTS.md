@@ -70,6 +70,7 @@ npm run format      # 格式化 src/
 npm test             # Node.js 内置回归测试
 npm run test:auth    # 会话与真实 Store 异步回归
 npm run test:printer-ip # 打印机 IP 同步权限、轮询与生命周期回归
+npm run test:printer-model # 统一模型校验、测量质量、新鲜度和请求隔离回归
 npm run test:history-export # 历史导出筛选、下载、JSON Blob 错误及会话隔离回归
 npm run test:mock    # Mock HTTP 集成回归
 npm run build:mock   # Mock 构建

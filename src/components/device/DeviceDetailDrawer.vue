@@ -83,12 +83,12 @@
                                         {{ statusDescription }}
                                     </span>
                                 </div>
-                                <div v-if="isPrintingOrRelated" class="printer-detail-drawer__progress-summary">
+                                <div v-if="isPrintingOrRelated && currentProgress !== null" class="printer-detail-drawer__progress-summary">
                                     <strong>{{ currentProgress }}%</strong>
                                     <span>打印进度</span>
                                 </div>
                             </div>
-                            <t-progress v-if="isPrintingOrRelated" :percentage="currentProgress"
+                            <t-progress v-if="isPrintingOrRelated && currentProgress !== null" :percentage="currentProgress"
                                 :status="progressStatus" :stroke-width="6" :label="false" />
                             <div v-if="realTimeData?.systemMessage && isErrorState"
                                 class="printer-detail-drawer__inline-error">
@@ -134,29 +134,8 @@
                             </div>
                         </section>
 
-                        <section class="printer-detail-drawer__detail-section" aria-labelledby="printer-live-metrics-title">
-                            <div id="printer-live-metrics-title" class="printer-detail-drawer__section-heading">
-                                <span>实时指标</span>
-                            </div>
-                            <div class="printer-detail-drawer__metric-grid">
-                                <div class="printer-detail-drawer__metric">
-                                    <span><IconNozzle />喷头温度</span>
-                                    <strong :class="{ 'text-red-600': nozzleTemp > 50 }">{{ formatTemp(nozzleTemp) }}</strong>
-                                </div>
-                                <div class="printer-detail-drawer__metric">
-                                    <span><IconBed />热床温度</span>
-                                    <strong :class="{ 'text-yellow-600': bedTemp > 40 }">{{ formatTemp(bedTemp) }}</strong>
-                                </div>
-                                <div v-if="isPrintingOrRelated" class="printer-detail-drawer__metric">
-                                    <span><Printer />打印时长</span>
-                                    <strong>{{ formatDuration(realTimeData?.printDuration) }}</strong>
-                                </div>
-                                <div v-if="isPrintingOrRelated" class="printer-detail-drawer__metric">
-                                    <span><IconSpool />已用耗材</span>
-                                    <strong>{{ formatFilament(realTimeData?.filamentUsed) }}</strong>
-                                </div>
-                            </div>
-                        </section>
+                        <PrinterModelPanel :printer-id="device.id" :active="drawerVisible && activeDetailTab === 'overview'"
+                            @summary="canonicalSummary = $event" />
 
                         <section class="printer-detail-drawer__detail-section"
                             aria-labelledby="printer-device-info-title">
@@ -322,7 +301,6 @@ import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import {
     CloseIcon as Close,
     DeleteIcon as Delete,
-    PrintIcon as Printer,
     DesktopIcon as Monitor,
     PauseIcon as VideoPause,
     PlayIcon as VideoPlay,
@@ -332,16 +310,14 @@ import {
     FileAddIcon as DocumentAdd,
     RefreshIcon as Refresh
 } from 'tdesign-icons-vue-next'
-import IconNozzle from '../icons/IconNozzle.vue'
-import IconBed from '../icons/IconBed.vue'
-import IconSpool from '../icons/IconSpool.vue'
+import PrinterModelPanel from './PrinterModelPanel.vue'
 import { PRINTER_STATUS, PRINTER_STATUS_MAP, PROGRESS_STATUS_MAP } from '@/utils/constants'
 import StatusTag from '@/components/StatusTag.vue'
 import {
     resolveEffectivePrinterStatus,
     resolveLastKnownPrinterStatus
 } from '@/utils/dataAdapters'
-import { formatTemp, formatDuration, formatFilament, formatDateTime } from '@/utils/formatters'
+import { formatDuration, formatDateTime } from '@/utils/formatters'
 import { confirmSafe } from '@/api/printer'
 import { startJob } from '@/api/job'
 import { message } from '@/utils/message'
@@ -349,6 +325,7 @@ import { compactStatusHistory } from '@/utils/statusHistory'
 
 defineOptions({ name: 'DeviceDetailDrawer' })
 const userStore = useUserStore()
+const canonicalSummary = ref(null)
 
 // ============================================
 // 响应式断点检测
@@ -635,6 +612,7 @@ const drawerTitle = computed(() => {
 
 /** 当前状态 */
 const currentState = computed(() => {
+    if (canonicalSummary.value) return canonicalSummary.value.status
     return resolveEffectivePrinterStatus({
         ...props.device,
         ...props.device?.realtimeStatus,
@@ -648,6 +626,7 @@ const monitorValue = computed(() => ({
     ...props.monitorConfig,
     ...props.device?.realtimeStatus,
     ...props.realTimeData,
+    ...canonicalSummary.value,
     lastKnownStatus: props.realTimeData?.lastKnownStatus
         || props.realTimeData?.unifiedState
         || props.device?.realtimeStatus?.unifiedState
@@ -698,13 +677,14 @@ const getTaskSourceMeta = source => ({
 }[String(source || 'UNKNOWN').toUpperCase()] || { label: '来源待确认', theme: 'default' })
 
 const deviceTaskSource = computed(() => String(
-    props.realTimeData?.taskSource
+    canonicalSummary.value?.taskSource
+    || props.realTimeData?.taskSource
     || props.device?.realtimeStatus?.taskSource
     || 'NONE'
 ).toUpperCase())
 const deviceTaskSourceMeta = computed(() => getTaskSourceMeta(deviceTaskSource.value))
 const observedTaskFilename = computed(() => (
-    props.realTimeData?.observedFilename
+    canonicalSummary.value ? canonicalSummary.value.filename : props.realTimeData?.observedFilename
     || props.realTimeData?.filename
     || props.device?.realtimeStatus?.filename
     || ''
@@ -749,6 +729,7 @@ const isPrintingOrRelated = computed(() => {
 })
 
 const currentProgress = computed(() => {
+    if (canonicalSummary.value) return canonicalSummary.value.progress
     const value = Number(
         props.realTimeData?.progress
         ?? props.device?.realtimeStatus?.progress
@@ -793,16 +774,6 @@ const deviceInfoItems = computed(() => [
 /** 是否为错误状态 */
 const isErrorState = computed(() => {
     return currentState.value === PRINTER_STATUS.ERROR
-})
-
-/** 喷头温度 */
-const nozzleTemp = computed(() => {
-    return props.realTimeData?.toolTemperature ?? props.device?.realtimeStatus?.toolTemperature
-})
-
-/** 热床温度 */
-const bedTemp = computed(() => {
-    return props.realTimeData?.bedTemperature ?? props.device?.realtimeStatus?.bedTemperature
 })
 
 /** 设备原生管理界面地址（RRF=DWC，Klipper=Mainsail） */
