@@ -243,7 +243,7 @@ test('UI-006 打印机搜索使用 TDesign 标准输入框并保持实时防抖'
   assert.doesNotMatch(source, /查询按钮|搜索按钮/)
 })
 
-test('打印机详情抽屉以概览和历史双标签压缩信息并固定底部操作', () => {
+test('打印机详情按概览、设备信息和历史分层并固定底部操作', () => {
   assert.match(detailSource, /return deviceName \? `\$\{deviceName\} - 详细信息` : '打印机详情'/)
   assert.match(detailSource, /v-model:visible="drawerVisible"/)
   assert.match(detailSource, /aria-label="关闭打印机详情"/)
@@ -264,8 +264,8 @@ test('打印机详情抽屉以概览和历史双标签压缩信息并固定底�
   assert.match(source, /@emergency-stop="handleEmergencyStop"/)
   assert.match(source, /const handlePrinterAction = async \(action, printer\) =>/)
   assert.match(source, /const handleEmergencyStop = async printer =>/)
-  assert.match(detailSource, /'is-single-panel': !showAnalytics/)
-  assert.match(detailSource, /\.printer-detail-drawer__tabs\.is-single-panel/)
+  assert.match(detailSource, /<t-tab-panel value="device" label="设备信息">/)
+  assert.doesNotMatch(detailSource, /'is-single-panel': !showAnalytics/)
   assert.doesNotMatch(detailSource, /undefined - 详细信息/)
   assert.match(detailSource, /props\.device\?\.machineNumber \|\| '未设置'/)
   assert.doesNotMatch(detailSource, /device\.machineNumber \|\| `#\$\{device\.id\}`/)

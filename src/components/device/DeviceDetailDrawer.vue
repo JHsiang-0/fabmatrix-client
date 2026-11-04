@@ -46,7 +46,6 @@
 
         <div v-else-if="device" class="printer-detail-drawer__content">
             <t-tabs v-model:value="activeDetailTab" class="printer-detail-drawer__tabs"
-                :class="{ 'is-single-panel': !showAnalytics }"
                 @change="handleDetailTabChange">
                 <t-tab-panel value="overview" label="设备概览">
                     <div class="printer-detail-drawer__panel printer-detail-drawer__overview app-scroll-region">
@@ -102,6 +101,54 @@
                         <t-alert v-if="currentJobStatus === 'RECONCILING'" theme="warning" :close-btn="false"
                             title="设备状态无法自动确认，请人工核对打印结果。" />
 
+                        <PrinterModelPanel :printer-id="device.id" :active="drawerVisible && activeDetailTab === 'overview'"
+                            @summary="canonicalSummary = $event" />
+
+                        <section v-if="userStore.canOperate && isAssignedState" class="printer-detail-drawer__assigned-section">
+                            <div class="printer-detail-drawer__section-heading">
+                                <span><Lock />待打印任务</span>
+                            </div>
+                            <div class="printer-detail-drawer__assigned-card">
+                                <div class="printer-detail-drawer__assigned-copy">
+                                    <strong :title="assignedFileName">{{ assignedFileName }}</strong>
+                                    <span>任务 #{{ linkedFarmJobId }} · 请确认现场安全后启动</span>
+                                </div>
+                                <t-button v-if="!isSafetyConfirmed" theme="warning" size="medium"
+                                    @click="handleConfirmSafe" :loading="isLoading">
+                                    <Lock />确认现场安全
+                                </t-button>
+                                <div v-else class="printer-detail-drawer__assigned-actions">
+                                    <t-button theme="primary" size="medium"
+                                        @click="handleStartPrint('START_PRINT')" :loading="isLoading">
+                                        <VideoPlay />下发并打印
+                                    </t-button>
+                                    <t-button theme="default" size="medium"
+                                        @click="handleStartPrint('UPLOAD_ONLY')" :loading="isLoading">
+                                        <DocumentAdd />仅下发文件
+                                    </t-button>
+                                </div>
+                            </div>
+                        </section>
+
+                    </div>
+                </t-tab-panel>
+
+                <t-tab-panel value="device" label="设备信息">
+                    <div class="printer-detail-drawer__panel printer-detail-drawer__overview app-scroll-region">
+                        <section class="printer-detail-drawer__detail-section"
+                            aria-labelledby="printer-device-info-title">
+                            <div id="printer-device-info-title" class="printer-detail-drawer__section-heading">
+                                <span>设备配置</span>
+                            </div>
+                            <div class="printer-detail-drawer__device-info-grid">
+                                <div v-for="item in deviceInfoItems" :key="item.label"
+                                    class="printer-detail-drawer__device-info-item">
+                                    <span>{{ item.label }}</span>
+                                    <strong :title="item.value">{{ item.value }}</strong>
+                                </div>
+                            </div>
+                        </section>
+
                         <section class="printer-detail-drawer__monitor-section" aria-labelledby="printer-monitor-title">
                             <div class="printer-detail-drawer__section-heading">
                                 <span id="printer-monitor-title">监控与通信</span>
@@ -131,49 +178,6 @@
                             <div v-if="monitorValue.lastCommunicationError" class="printer-detail-drawer__communication-error"
                                 :title="monitorValue.lastCommunicationError">
                                 {{ monitorValue.lastCommunicationError }}
-                            </div>
-                        </section>
-
-                        <PrinterModelPanel :printer-id="device.id" :active="drawerVisible && activeDetailTab === 'overview'"
-                            @summary="canonicalSummary = $event" />
-
-                        <section class="printer-detail-drawer__detail-section"
-                            aria-labelledby="printer-device-info-title">
-                            <div id="printer-device-info-title" class="printer-detail-drawer__section-heading">
-                                <span>设备信息</span>
-                            </div>
-                            <div class="printer-detail-drawer__device-info-grid">
-                                <div v-for="item in deviceInfoItems" :key="item.label"
-                                    class="printer-detail-drawer__device-info-item">
-                                    <span>{{ item.label }}</span>
-                                    <strong :title="item.value">{{ item.value }}</strong>
-                                </div>
-                            </div>
-                        </section>
-
-                        <section v-if="userStore.canOperate && isAssignedState" class="printer-detail-drawer__assigned-section">
-                            <div class="printer-detail-drawer__section-heading">
-                                <span><Lock />待打印任务</span>
-                            </div>
-                            <div class="printer-detail-drawer__assigned-card">
-                                <div class="printer-detail-drawer__assigned-copy">
-                                    <strong :title="assignedFileName">{{ assignedFileName }}</strong>
-                                    <span>任务 #{{ linkedFarmJobId }} · 请确认现场安全后启动</span>
-                                </div>
-                                <t-button v-if="!isSafetyConfirmed" theme="warning" size="medium"
-                                    @click="handleConfirmSafe" :loading="isLoading">
-                                    <Lock />确认现场安全
-                                </t-button>
-                                <div v-else class="printer-detail-drawer__assigned-actions">
-                                    <t-button theme="primary" size="medium"
-                                        @click="handleStartPrint('START_PRINT')" :loading="isLoading">
-                                        <VideoPlay />下发并打印
-                                    </t-button>
-                                    <t-button theme="default" size="medium"
-                                        @click="handleStartPrint('UPLOAD_ONLY')" :loading="isLoading">
-                                        <DocumentAdd />仅下发文件
-                                    </t-button>
-                                </div>
                             </div>
                         </section>
 
@@ -460,7 +464,7 @@ const props = defineProps({
         type: Boolean,
         default: false
     },
-    /** 是否提供历史与统计数据；看板复用时只展示设备概览 */
+    /** 是否提供历史与统计数据；看板复用时提供概览与设备信息 */
     showAnalytics: {
         type: Boolean,
         default: false
@@ -942,10 +946,6 @@ async function handleStartPrint(action) {
 .printer-detail-drawer__tabs :deep(.t-tabs__nav) {
     flex: 0 0 auto;
     padding: 0 var(--app-spacing-4);
-}
-
-.printer-detail-drawer__tabs.is-single-panel :deep(.t-tabs__nav) {
-    display: none;
 }
 
 .printer-detail-drawer__tabs :deep(.t-tabs__content) {

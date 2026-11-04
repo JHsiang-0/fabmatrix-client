@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readPrinterModel, isModelCurrent, modelMeasurement, printerModelGroups, printerModelSummary } from '../src/utils/printerModel.js'
+import { readPrinterModel, isModelCurrent, modelMeasurement, printerModelView, printerModelSummary } from '../src/utils/printerModel.js'
 import { createPrinterModelLoader } from '../src/utils/printerModelLoader.js'
 import { printerModelFixture } from './fixtures/printerModel.js'
 import { mockRequest } from '../src/mock/index.js'
@@ -40,18 +40,49 @@ test('测量保留零、false和不支持，并逐字段拒绝旧数据和不安
   assert.equal(modelMeasurement({ ...zero, value: Number.MAX_SAFE_INTEGER + 1 }, { ...options, integer: true }), '无效数据')
 })
 
-test('多通道、执行依据和历史结果完整展示；离线时不显示旧测量为当前状态', () => {
+test('界面按业务选择温度与打印数据，省略未提供的字段和内部元数据', () => {
   const data = printerModelFixture()
   const now = Date.parse(data.serverTime)
-  let groups = printerModelGroups(data, now)
-  assert.equal(groups.filter(group => group.label.startsWith('加热器')).length, 2)
-  assert.ok(JSON.stringify(groups).includes('文件位置推算'))
-  assert.ok(JSON.stringify(groups).includes('已取消'))
+  let view = printerModelView(data, now)
+  assert.equal(view.heaters.length, 2)
+  assert.equal(view.heaters[0].temperature.value, '0 °C')
+  assert.equal(view.heaters[1].target, null)
+  assert.equal(view.printMetrics.find(row => row.name === '已打印').value, '00:00:12')
+  assert.equal(view.printMetrics.find(row => row.name === '总层数'), undefined)
+  assert.equal(view.printMetrics.find(row => row.name === '已用耗材').value, '0.00m')
+  assert.equal(view.moreGroups.find(group => group.label === '模型风扇').rows.length, 1)
+  assert.equal(view.lastResult.outcome, '已取消')
+  assert.equal('identity' in view, false)
+  assert.equal(JSON.stringify(view).includes(data.model.identity.deviceUid), false)
   data.stale = true
-  groups = printerModelGroups(data, now)
-  assert.ok(JSON.stringify(groups).includes('数据过期'))
-  assert.ok(JSON.stringify(groups).includes('已取消'))
-  assert.equal(JSON.stringify(groups).includes('210 °C'), false)
+  view = printerModelView(data, now)
+  assert.equal(view.heaters[0].temperature.value, '数据过期')
+  assert.equal(view.execution.current, false)
+  assert.equal(view.lastResult.outcome, '已取消')
+  assert.equal(JSON.stringify(view).includes('210 °C'), false)
+})
+
+test('空闲设备、无能力信息与首次采样保持简洁，多喷头名称按实际角色区分', () => {
+  const data = printerModelFixture()
+  const o = data.model.observation
+  const d = data.model.descriptor
+  o.currentExecution = null
+  o.lastExecutionResult = null
+  d.heaters.forEach(heater => { heater.name = heater.id })
+  let view = printerModelView(data, Date.parse(data.serverTime))
+  assert.deepEqual(view.heaters.map(heater => heater.name), ['喷头 1', '喷头 2'])
+  assert.equal(view.execution, null)
+  assert.equal(view.lastResult, null)
+  assert.deepEqual(view.printMetrics, [])
+  d.heaters = []
+  d.fans = []
+  d.axes = []
+  d.sensors = []
+  o.motion.speedFactor.quality = 'UNSUPPORTED'
+  o.motion.flowFactor.quality = 'UNAVAILABLE'
+  view = printerModelView(data, Date.parse(data.serverTime))
+  assert.deepEqual(view.moreGroups, [])
+  assert.deepEqual(view.heaters, [])
 })
 
 test('详情摘要采用新模型状态和进度；未知进度不变成零，离线不保留打印中', () => {

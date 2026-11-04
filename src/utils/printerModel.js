@@ -1,3 +1,5 @@
+import { formatDuration, formatFilament } from './formatters.js'
+
 const FRESHNESS_MS = 30000
 const labels = {
   ONLINE: '在线', OFFLINE: '离线', UNKNOWN: '未知', READY: '就绪', STARTING: '启动中',
@@ -86,82 +88,84 @@ export function modelMeasurement(measurement, { current, now, unit = '', ratio =
   return modelNumber(ratio ? value * 100 : value, ratio ? '%' : unit)
 }
 
-export function printerModelGroups(data, now) {
+/** Curated operational view. Technical identity and schema metadata stay out of the user interface. */
+export function printerModelView(data, now) {
   const { descriptor: d, observation: o } = data.model
   const current = isModelCurrent(data, now)
+  const available = value => value?.quality === 'GOOD' || value?.quality === 'INVALID'
   const m = (value, unit = '', options = {}) => ({
-    text: modelMeasurement(value, { current, now, unit, ...options }),
+    value: modelMeasurement(value, { current, now, unit, ...options }),
     description: `${modelLabel(value?.quality || 'UNAVAILABLE')} · ${modelLabel(value?.source || 'NONE')} · ${modelTime(value?.observedAt)}`
   })
-  const list = (label, rows) => ({ label, rows: rows.map(([name, value]) => ({
-    name, value: value?.text ?? value, description: value?.description
-  })) })
-  const groups = [
-    list('设备与工具', [
-      ['固件', `${d.firmwareFamily} ${d.firmwareVersion || ''}`.trim()], ['连接方式', modelLabel(d.connectionMode)],
-      ['机器模式', modelLabel(d.machineMode)], ['仿真设备', d.emulated == null ? '未知' : d.emulated ? '是' : '否'],
-      ['当前位置', d.locationLabel || '未配置'], ['配置耗材', d.configuredMaterial || '未配置'],
-      ['配置喷嘴', modelNumber(d.configuredNozzleDiameterMm, ' mm')],
-      ['当前工具', current ? o.currentToolId || '未知' : '数据过期'],
-      ['主工具 / 热床', `${d.primaryToolId || '未知'} / ${d.primaryBedHeaterId || '未知'}`],
-      ...d.tools.map(tool => [`工具 ${tool.name || tool.id}`, `加热器 ${tool.heaterIds.join('、') || '无'} · 风扇 ${tool.fanIds.join('、') || '无'} · 挤出机 ${tool.extruderIds.join('、') || '无'}`])
-    ]),
+  const duration = value => {
+    const result = m(value)
+    if (current && value?.quality === 'GOOD' && Number.isFinite(value.value)
+        && value.value >= 0 && !['数据过期', '无效数据'].includes(result.value)) {
+      result.value = formatDuration(value.value)
+    }
+    return result
+  }
+  const row = (name, measurement, unit = '', options = {}) => available(measurement)
+    ? { name, ...m(measurement, unit, options) } : null
+  const heaters = d.heaters.map(heater => {
+    const state = o.heaters.find(item => item.id === heater.id)
+    const peers = d.heaters.filter(item => item.role === heater.role)
+    const roleName = ['TOOL', 'BED', 'CHAMBER'].includes(heater.role) ? modelLabel(heater.role) : '加热器'
+    const name = heater.name && heater.name !== heater.id ? heater.name
+      : `${roleName}${peers.length > 1 ? ` ${peers.findIndex(item => item.id === heater.id) + 1}` : ''}`
+    return {
+      id: heater.id, name, temperature: m(state?.currentC, ' °C'),
+      target: available(state?.effectiveTargetC) ? m(state.effectiveTargetC, ' °C') : null,
+      mode: current && ['STANDBY', 'FAULT'].includes(state?.mode) ? modelLabel(state.mode) : '',
+      fault: current && state?.mode === 'FAULT'
+    }
+  })
+  const e = o.currentExecution
+  const currentLayer = row('当前层', e?.layers?.current, '', { integer: true })
+  const totalLayers = row('总层数', e?.layers?.total, '', { integer: true })
+  const layer = currentLayer && totalLayers
+    ? { name: '层数', value: `${currentLayer.value} / ${totalLayers.value}`, description: currentLayer.description }
+    : currentLayer || totalLayers
+  const filament = row('已用耗材', e?.filamentLengthMm, ' mm')
+  if (filament?.value.endsWith(' mm') && e.filamentLengthMm.value >= 0) {
+    filament.value = formatFilament(e.filamentLengthMm.value)
+  }
+  const printMetrics = e ? [
+    available(e.timing?.printSeconds) ? { name: '已打印', ...duration(e.timing.printSeconds) } : null,
+    available(e.estimatedRemaining?.seconds) ? { name: '预计剩余', ...duration(e.estimatedRemaining.seconds) } : null,
+    layer, filament
+  ].filter(Boolean) : []
+  const moreGroups = [
     ...d.heaters.map(h => {
       const state = o.heaters.find(item => item.id === h.id)
-      return list(`加热器 · ${h.name || h.id}`, [
-        ['角色 / 依据', `${modelLabel(h.role)} / ${modelLabel(h.roleEvidence)}`],
-        ['温度', m(state?.currentC, ' °C')], ['有效目标', m(state?.effectiveTargetC, ' °C')],
-        ['工作目标', m(state?.activeTargetC, ' °C')], ['待机目标', m(state?.standbyTargetC, ' °C')],
-        ['功率', m(state?.pwmRatio, '', { ratio: true })], ['模式', current ? modelLabel(state?.mode) : '数据过期']
-      ])
+      return { label: heaters.find(item => item.id === h.id).name, rows: [
+        row('功率', state?.pwmRatio, '', { ratio: true }),
+        state?.mode === 'STANDBY' ? row('待机目标', state?.standbyTargetC, ' °C') : null
+      ].filter(Boolean) }
     }),
     ...d.fans.map(f => {
       const state = o.fans.find(item => item.id === f.id)
-      return list(`风扇 · ${f.name || f.id}`, [['角色', modelLabel(f.role)],
-        ['功率', m(state?.pwmRatio, '', { ratio: true })], ['转速', m(state?.rpm, ' rpm')]])
+      return { label: f.name || f.id, rows: [
+        row('风扇功率', state?.pwmRatio, '', { ratio: true }), row('转速', state?.rpm, ' rpm')
+      ].filter(Boolean) }
     }),
-    list('运动与坐标', [
-      ['坐标系', modelLabel(o.motion.coordinateSpace)],
-      ['速度倍率', m(o.motion.speedFactor, '', { ratio: true })], ['流量倍率', m(o.motion.flowFactor, '', { ratio: true })],
+    { label: '运动', rows: [row('速度倍率', o.motion.speedFactor, '', { ratio: true }),
+      row('流量倍率', o.motion.flowFactor, '', { ratio: true }),
       ...d.axes.flatMap(axis => {
         const state = o.motion.axes.find(item => item.id === axis.id)
-        return [[`${axis.name || axis.id} 位置`, m(state?.positionMm, ' mm')], [`${axis.name || axis.id} 已归零`, m(state?.homed)]]
-      })
-    ]),
+        return [row(`${axis.name || axis.id} 位置`, state?.positionMm, ' mm'), row(`${axis.name || axis.id} 已归零`, state?.homed)]
+      })].filter(Boolean) },
     ...d.sensors.map(s => {
       const state = o.sensors.find(item => item.id === s.id)
-      return list(`传感器 · ${s.name || s.id}`, [['类型', s.kind || '未知'], ['启用', m(state?.enabled)], ['读数', m(state?.reading, s.unit && s.unit !== 'BOOLEAN' ? ` ${s.unit}` : '')]])
+      return { label: s.name || s.id, rows: [row('启用', state?.enabled), row('检测值', state?.reading,
+        s.unit && s.unit !== 'BOOLEAN' ? ` ${s.unit}` : '')].filter(Boolean) }
     })
-  ]
-  const e = o.currentExecution
-  groups.push(list(current ? '当前执行' : '最近观测执行（历史快照）', e ? [
-    ['来源 / 类型', `${modelLabel(e.source)} / ${modelLabel(e.kind)}`], ['执行标识', e.id],
-    ['首次观测', modelTime(e.firstObservedAt)], ['开始时间', modelTime(e.startedAt)],
-    ['文件名', e.file?.name || '未知'], ['文件大小', Number.isSafeInteger(e.file?.sizeBytes) ? `${e.file.sizeBytes} B` : '未知'],
-    ['文件摘要', e.file?.sha256 || '未知'], ['进度', m(e.progressPercent, '%')], ['进度依据', modelLabel(e.progressMethod)],
-    ['文件位置', m(e.filePositionBytes, ' B', { integer: true })],
-    ['打印时长', m(e.timing?.printSeconds, ' s')], ['总时长', m(e.timing?.totalSeconds, ' s')],
-    ['有效打印', m(e.timing?.activeSeconds, ' s')], ['预热', m(e.timing?.warmupSeconds, ' s')],
-    ['暂停时长', m(e.timing?.pausedSeconds, ' s')], ['切片预计总时长', m(e.timing?.slicerEstimatedTotalSeconds, ' s')],
-    ['当前层', m(e.layers?.current, '', { integer: true })], ['总层数', m(e.layers?.total, '', { integer: true })],
-    ['耗材长度', m(e.filamentLengthMm, ' mm')], ['预计剩余', m(e.estimatedRemaining?.seconds, ' s')],
-    ['剩余时间依据', modelLabel(e.estimatedRemaining?.method)], ['估计置信度', modelNumber(e.estimatedRemaining?.confidence)]
-  ] : [['执行情况', current ? '当前无执行' : '无法确认当前执行']]))
+  ].filter(group => group.rows.length)
   const r = o.lastExecutionResult
-  groups.push(list('上次执行结果（历史记录）', r ? [
-    ['结果', modelLabel(r.outcome)], ['类型', modelLabel(r.kind)], ['确认依据', modelLabel(r.evidence)],
-    ['结束时间', modelTime(r.endedAt)], ['观测时间', modelTime(r.observedAt)], ['原因代码', r.reasonCode || '无'], ['执行标识', r.executionId]
-  ] : [['历史结果', '暂无记录']]))
-  groups.push(list('能力描述', d.capabilities.map(c => [c.code, `${modelLabel(c.support)} · ${modelLabel(c.evidence)} · ${modelTime(c.detectedAt)}`])))
-  groups.push(list('模型身份与采样', [
-    ['设备标识', data.model.identity.deviceUid], ['来源实例', data.model.identity.sourceInstanceId],
-    ['本地设备编号', data.model.identity.localPrinterId], ['启动标识', o.deviceBootId],
-    ['模型版本', String(data.model.modelVersion)], ['描述 / 观测版本', `${d.revision} / ${o.revision}`],
-    ['关联描述版本', String(o.descriptorRevision)], ['观测标识', o.id],
-    ['采集开始', modelTime(o.captureStartedAt)], ['采样时间', modelTime(o.observedAt)],
-    ['完整性', modelLabel(o.completeness)], ['最近成功通信', modelTime(o.connection.lastSuccessfulAt)],
-    ['连续失败', String(o.connection.consecutiveFailures)],
-    ...o.issues.map((issue, i) => [`问题 ${i + 1}`, `${modelLabel(issue.severity)} · ${issue.code}`])
-  ]))
-  return groups
+  return {
+    heaters, printMetrics, moreGroups, execution: e ? { current, simulation: e.kind === 'SIMULATION' } : null,
+    lastResult: r ? { label: r.kind === 'SIMULATION' ? '上次模拟' : '上次打印',
+      outcome: modelLabel(r.outcome), theme: { COMPLETED: 'success', CANCELLED: 'default', FAILED: 'danger' }[r.outcome] || 'warning',
+      at: modelTime(r.endedAt || r.observedAt), evidence: modelLabel(r.evidence) } : null
+  }
 }
