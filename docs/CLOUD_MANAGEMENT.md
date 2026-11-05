@@ -1,5 +1,11 @@
 # 组织与农场管理
 
+## 当前产品边界
+
+2026-11-05 按用户确认的 [ADR 0011](../../../Java/fabmatrix-cloud/docs/decisions/0011-local-production-and-cloud-reporting.md)，Client 作为独立本地生产客户端，原云端组织、农场、成员、网关和审计页面已移除。远程管理由 Flutter 手机 App 和 Cloud 承担。下文为原 Client 云端功能的历史实现及验收记录。
+
+## 历史记录
+
 云端看板登录后点击“组织与农场管理”，进入 `/cloud/manage`。使用独立云会话和 Cloud API，云路由跳过局域网登录恢复。需要配套 Cloud V17。
 
 ## 主界面入口

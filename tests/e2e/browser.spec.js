@@ -3,98 +3,8 @@ import { readFile } from 'node:fs/promises'
 import { readXlsx } from '../helpers/xlsxReadback.js'
 import { isFeatureEnabled } from '../../src/config/features.js'
 import { printerModelFixture } from '../fixtures/printerModel.js'
-import { mockCloudManagement } from '../fixtures/cloudManagement.js'
-
-test('云端组织农场展示统计并编辑资料，删除限制可见', async ({ page }) => {
-  const calls = await mockCloudManagement(page)
-  await expect(page.getByRole('heading', { name: '测试农场', exact: true })).toBeVisible()
-  await expect(page.getByText('125', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '编辑资料', exact: true }).click()
-  await page.getByLabel('资料名称', { exact: true }).getByRole('textbox').fill('更新后的农场')
-  await page.getByLabel('资料说明', { exact: true }).getByRole('textbox').fill('更新后的说明')
-  await page.getByLabel('农场地点', { exact: true }).getByRole('textbox').fill('二号车间')
-  await page.getByRole('button', { name: '保存', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '更新后的农场', exact: true })).toBeVisible()
-  await expect(page.getByText('地点 / 车间 二号车间', { exact: true })).toBeVisible()
-  expect(calls.some(c => c.path.endsWith('/farm/profile') && c.body.description === '更新后的说明')).toBe(true)
-  await expect(page.locator('.t-dialog:visible')).toHaveCount(0)
-  await page.screenshot({ path: 'test-results/cloud-farm-management.png', fullPage: true, animations: 'disabled' })
-  await page.getByRole('button', { name: '删除农场', exact: true }).click()
-  await page.getByRole('button', { name: '确认', exact: true }).click()
-  await expect(page.getByText('农场仍有网关或成员授权，请先处理下级资源', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '组织概览', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '测试组织', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: '查看农场', exact: true })).toBeVisible()
-  await page.getByText('操作记录', { exact: true }).click()
-  await expect(page.getByText('FARM_PROFILE_UPDATED', { exact: true })).toBeVisible()
-})
-
-test('云端网关一次性绑定码随退出清除，成员授权支持确认', async ({ page }) => {
-  const calls = await mockCloudManagement(page)
-  await page.getByText('成员授权', { exact: true }).click()
-  await expect(page.getByText('synthetic-viewer', { exact: true })).toBeVisible()
-  await page.locator('.t-switch:not(.t-is-disabled)').click()
-  await page.getByRole('button', { name: '确认', exact: true }).click()
-  await expect.poll(() => calls.some(c => c.path.endsWith('/farm/members/viewer') && c.method === 'DELETE')).toBe(true)
-  await page.getByText('网关管理', { exact: true }).click()
-  await page.getByRole('button', { name: '新增网关', exact: true }).click()
-  await page.getByLabel('资料名称', { exact: true }).getByRole('textbox').fill('新增现场网关')
-  await page.getByRole('button', { name: '保存', exact: true }).click()
-  await expect(page.getByLabel('一次性绑定码', { exact: true }).getByRole('textbox')).toHaveValue('synthetic-once-binding-ticket')
-  await page.getByRole('button', { name: '我已记录', exact: true }).click()
-  await page.getByRole('button', { name: '退出云端', exact: true }).click()
-  await expect(page.getByLabel('一次性绑定码', { exact: true })).toHaveCount(0)
-  await expect(page.getByText('请先前往云端看板登录', { exact: true })).toBeVisible()
-})
-
-test('查看员仅显示已授权概览，隐藏组织农场管理写操作', async ({ page }) => {
-  await mockCloudManagement(page, 'VIEWER')
-  await expect(page.getByRole('heading', { name: '测试农场', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: '编辑资料', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '新建农场', exact: true })).toHaveCount(0)
-  await expect(page.getByText('成员授权', { exact: true })).toHaveCount(0)
-  await page.setViewportSize({ width: 390, height: 844 })
-  await page.screenshot({ path: 'test-results/cloud-management-viewer-mobile.png', fullPage: true })
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-})
-
-test('云端管理确认期间会话失效关闭确认框并清除旧操作', async ({ page }) => {
-  const calls = await mockCloudManagement(page)
-  await page.getByRole('button', { name: '删除农场', exact: true }).click()
-  await expect(page.getByRole('button', { name: '确认', exact: true })).toBeVisible()
-  await page.evaluate(async () => {
-    const { useCloudStore } = await import('/src/stores/cloud.js')
-    await useCloudStore().logout()
-  })
-  await expect(page.getByRole('button', { name: '确认', exact: true })).toHaveCount(0)
-  await expect(page.getByText('请先前往云端看板登录', { exact: true })).toBeVisible()
-  expect(calls.filter(c => c.method === 'DELETE')).toEqual([])
-})
 
 const batchDispatchEnabled = isFeatureEnabled('batchDispatch')
-
-test('云端临时密码账号先改密，再返回登录页', async ({ page }) => {
-  const requests = []
-  await page.route('https://cloud.test/api/v1/**', async route => {
-    const req = route.request(), path = new URL(req.url()).pathname
-    if (req.method() === 'OPTIONS') { await route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } }); return }
-    requests.push(path)
-    const data = path.endsWith('/login') ? { accessToken: 'synthetic-temporary', user: { id: 'new-member', mustChangePassword: true } } : { success: true }
-    await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(data) })
-  })
-  await page.goto('/cloud')
-  await page.getByPlaceholder('https://cloud.example.com').fill('https://cloud.test')
-  await page.getByPlaceholder('云端用户名', { exact: true }).fill('new-member')
-  await page.getByPlaceholder('云端密码', { exact: true }).fill('synthetic-temporary')
-  await page.getByRole('button', { name: '登录云端', exact: true }).click()
-  await expect(page.getByText('首次登录请修改临时密码', { exact: true })).toBeVisible()
-  await page.getByLabel('云端临时密码', { exact: true }).locator('input').fill('synthetic-temporary')
-  await page.getByLabel('云端新密码', { exact: true }).locator('input').fill('synthetic-replacement')
-  await page.getByLabel('确认云端新密码', { exact: true }).locator('input').fill('synthetic-replacement')
-  await page.getByRole('button', { name: '修改密码并重新登录', exact: true }).click()
-  await expect(page.getByPlaceholder('云端用户名', { exact: true })).toBeVisible()
-  expect(requests).toEqual(['/api/v1/auth/login', '/api/v1/auth/password'])
-})
 
 test('设备概览按场景展示温度与打印，次要数据分层且离线清理旧值', async ({ page }) => {
   await login(page)
@@ -166,79 +76,6 @@ test('设备概览按场景展示温度与打印，次要数据分层且离线�
   await expect(panel).not.toBeVisible()
 })
 
-test('云端看板独立登录、过期状态和退出，不发送局域网凭证', async ({ page }) => {
-  const calls = []
-  let gatewayOnline = false
-  await page.route('https://cloud.test/api/v1/**', async route => {
-    const request = route.request()
-    const path = new URL(request.url()).pathname
-    const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'GET,POST,OPTIONS' }
-    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers })
-    calls.push({ path, authorization: request.headers().authorization })
-    let data
-    if (path === '/api/v1/auth/login') data = { accessToken: 'test-cloud-session', user: { username: 'cloud-owner' } }
-    else if (path === '/api/v1/organizations') data = [{ id: 'org-a', name: '云端组织' }]
-    else if (path.endsWith('/farms')) data = [{ id: 'farm-a', name: '云端农场' }]
-    else if (path.endsWith('/printers')) data = { total: 1, items: [{ id: 'printer-a', name: '云端设备 A', gatewayName: '现场网关 A', gatewayOnline, stale: true, printState: 'PRINTING', progress: 25.5, observedAt: Date.now() - 120000 }] }
-    else data = { success: true }
-    await route.fulfill({ status: 200, headers, contentType: 'application/json', body: JSON.stringify(data) })
-  })
-  await page.goto('/server-connection')
-  await page.getByRole('button', { name: '云端只读看板', exact: true }).click()
-  await expect(page).toHaveURL(/\/cloud$/)
-  await page.getByPlaceholder('https://cloud.example.com').fill('https://cloud.test')
-  await page.getByPlaceholder('云端用户名', { exact: true }).fill('cloud-owner')
-  await page.getByPlaceholder('云端密码', { exact: true }).fill('test-password-only')
-  await page.getByRole('button', { name: '登录云端', exact: true }).click()
-  const desktop = page.locator('.cloud-table')
-  await expect(desktop.getByText('云端设备 A', { exact: true })).toBeVisible()
-  await expect(desktop.getByText('数据过期', { exact: true })).toBeVisible()
-  await expect(desktop.getByText('网关离线', { exact: true })).toBeVisible()
-  expect(calls[0].authorization).toBeUndefined()
-  expect(calls.slice(1).every(call => call.authorization === 'Bearer test-cloud-session')).toBe(true)
-  await page.screenshot({ path: 'test-results/cloud-desktop.png', fullPage: true })
-  await page.setViewportSize({ width: 375, height: 812 })
-  const mobile = page.locator('.cloud-mobile-list')
-  await expect(mobile.getByText('云端设备 A', { exact: true })).toBeVisible()
-  await expect(mobile.getByText('现场网关 A · 网关离线', { exact: true })).toBeVisible()
-  await expect(mobile.getByText('数据过期', { exact: true })).toBeVisible()
-  await page.screenshot({ path: 'test-results/cloud-mobile.png', fullPage: true })
-  gatewayOnline = true
-  await page.getByRole('button', { name: '刷新状态', exact: true }).click()
-  await expect(mobile.getByText('现场网关 A · 网关在线', { exact: true })).toBeVisible()
-  await expect(mobile.getByText('数据过期', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '退出云端', exact: true }).click()
-  await expect(page.getByPlaceholder('云端用户名', { exact: true })).toBeVisible()
-})
-
-test('云端看板的 401 只清理云会话，保留本地已保存登录', async ({ page }) => {
-  await login(page)
-  const localSession = await page.evaluate(() => window.localStorage.getItem('farm-ui-session') || window.sessionStorage.getItem('farm-ui-session'))
-  let expired = false
-  await page.route('https://cloud.test/api/v1/**', async route => {
-    const request = route.request()
-    const path = new URL(request.url()).pathname
-    const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'GET,POST,OPTIONS' }
-    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers })
-    if (expired) return route.fulfill({ status: 401, headers, contentType: 'application/json', body: '{"code":"UNAUTHORIZED"}' })
-    const data = path.endsWith('/login') ? { accessToken: 'independent-cloud', user: { username: 'cloud' } }
-      : path === '/api/v1/organizations' ? [{ id: 'o', name: '组织' }]
-        : path.endsWith('/farms') ? [{ id: 'f', name: '农场' }] : { items: [], total: 0 }
-    await route.fulfill({ status: 200, headers, contentType: 'application/json', body: JSON.stringify(data) })
-  })
-  await page.goto('/cloud')
-  await page.getByPlaceholder('https://cloud.example.com').fill('https://cloud.test')
-  await page.getByPlaceholder('云端用户名', { exact: true }).fill('cloud')
-  await page.getByPlaceholder('云端密码', { exact: true }).fill('test-password-only')
-  await page.getByRole('button', { name: '登录云端', exact: true }).click()
-  await expect(page.getByRole('button', { name: '刷新状态', exact: true })).toBeVisible()
-  expired = true
-  await page.getByRole('button', { name: '刷新状态', exact: true }).click()
-  await expect(page.getByText('云端登录已失效，请重新登录', { exact: true })).toBeVisible()
-  const after = await page.evaluate(() => window.localStorage.getItem('farm-ui-session') || window.sessionStorage.getItem('farm-ui-session'))
-  expect(after).toBe(localSession)
-})
-
 const viewports = [
   { width: 375, height: 812 },
   { width: 768, height: 1024 },
@@ -267,9 +104,7 @@ const parentLabels = {
   批量派发: '批量派发',
   用户管理: '管理中心',
   操作日志: '管理中心',
-  个人中心: '个人中心',
-  云端设备看板: '云端平台',
-  组织与农场管理: '云端平台'
+  个人中心: '个人中心'
 }
 
 const login = async page => {
@@ -291,47 +126,41 @@ const loginAs = async (page, username, password) => {
   await expect(page.getByRole('heading', { name: '概览仪表盘' })).toBeVisible()
 }
 
-test('主界面顶部云端入口支持独立登录、自动进入管理并返回局域网', async ({ page }) => {
-  const calls = await mockCloudManagement(page, 'OWNER', { login: false })
-  await login(page)
-  const localSession = await page.evaluate(() => window.localStorage.getItem('farm-ui-session') || window.sessionStorage.getItem('farm-ui-session'))
-  await page.getByRole('button', { name: '云端管理', exact: true }).click()
-  await expect(page).toHaveURL(/\/cloud\?next=management$/)
-  await expect(page.getByText('登录后进入组织与农场管理。', { exact: true })).toBeVisible()
-  await page.getByPlaceholder('https://cloud.example.com').fill('https://cloud.test')
-  await page.getByPlaceholder('云端用户名', { exact: true }).fill('synthetic-owner')
-  await page.getByPlaceholder('云端密码', { exact: true }).fill('synthetic-password')
-  await page.getByRole('button', { name: '登录云端', exact: true }).click()
-  await expect(page).toHaveURL(/\/cloud\/manage$/)
-  await expect(page.getByRole('heading', { name: '测试农场', exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '返回局域网', exact: true }).click()
-  await expect(page).toHaveURL(/\/dashboard$/)
-  await expect(page.getByRole('heading', { name: '概览仪表盘', exact: true })).toBeVisible()
-  expect(await page.evaluate(() => window.localStorage.getItem('farm-ui-session') || window.sessionStorage.getItem('farm-ui-session'))).toBe(localSession)
-  await page.screenshot({ path: 'test-results/cloud-entry-main.png', fullPage: true, animations: 'disabled' })
-  await openSidebarItem(page, 1280, '组织与农场管理')
-  await expect(page).toHaveURL(/\/cloud\/manage$/)
-  expect(calls.filter(c => c.path.endsWith('/auth/login'))).toHaveLength(1)
-})
+for (const width of [375, 1280]) {
+  test(`本地产品边界：${width}px 在云服务不可达时登录与设备页面可用`, async ({ page }) => {
+    const remoteRequests = []
+    await page.route('**/*', async route => {
+      const url = new URL(route.request().url())
+      if (['http:', 'https:'].includes(url.protocol) && !['127.0.0.1', 'localhost'].includes(url.hostname)) {
+        remoteRequests.push(url.origin)
+        await route.abort()
+      } else await route.continue()
+    })
+    await page.setViewportSize({ width, height: 812 })
+    await login(page)
+    await expect(page.getByRole('button', { name: '云端管理', exact: true })).toHaveCount(0)
+    await expect(page.getByText('云端平台', { exact: true })).toHaveCount(0)
+    await openSidebarItem(page, width, '打印机管理')
+    await expect(page.getByRole('heading', { name: '打印机管理', exact: true })).toBeVisible()
+    await expect(page.locator('.printer-table tbody tr').first()).toBeVisible()
+    expect(remoteRequests).toEqual([])
+  })
+}
 
-test('窄屏侧栏为局域网查看员提供云端平台入口，使用独立云权限', async ({ page }) => {
-  await mockCloudManagement(page, 'OWNER', { login: false })
-  await page.setViewportSize({ width: 375, height: 812 })
-  await page.goto('/login')
-  await page.evaluate(async () => { const { mockState } = await import('/src/mock/data.js'); Object.assign(mockState.users[1], { username: 'viewer', password: 'Viewer123', role: 'VIEWER' }) })
-  await page.getByLabel('用户名', { exact: true }).fill('viewer')
-  await page.getByLabel('密码', { exact: true }).fill('Viewer123')
-  await page.getByRole('button', { name: '登录', exact: true }).click()
-  await expect(page).toHaveURL(/\/dashboard$/)
-  await expect(page.getByRole('button', { name: '云端管理', exact: true })).not.toBeVisible()
-  await openSidebarItem(page, 375, '组织与农场管理')
-  await expect(page).toHaveURL(/\/cloud\?next=management$/)
-  await expect(page.getByRole('button', { name: '登录云端', exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '返回局域网', exact: true }).click()
-  await expect(page).toHaveURL(/\/dashboard$/)
-  await openSidebarItem(page, 375, '云端设备看板')
-  await expect(page).toHaveURL(/\/cloud$/)
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+test('本地产品边界：旧云路由进入404并保留现场会话，连接页展示本地配置', async ({ page }) => {
+  await login(page)
+  const session = await page.evaluate(() => window.localStorage.getItem('farm-ui-session') || window.sessionStorage.getItem('farm-ui-session'))
+  for (const path of ['/cloud', '/cloud/manage']) {
+    await page.evaluate(async path => (await import('/src/router/index.js')).default.push(path), path)
+    await expect(page).toHaveURL(/\/404$/)
+    await expect(page.getByText('页面不存在', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '返回工作台', exact: true }).click()
+    await expect(page).toHaveURL(/\/dashboard$/)
+  }
+  expect(await page.evaluate(() => window.localStorage.getItem('farm-ui-session') || window.sessionStorage.getItem('farm-ui-session'))).toBe(session)
+  await page.evaluate(async () => (await import('/src/router/index.js')).default.push('/server-connection'))
+  await expect(page.getByRole('button', { name: '云端只读看板', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '保存并连接', exact: true })).toBeVisible()
 })
 
 test('打印历史导出独立筛选 Excel 和 PDF 全部分页，保持列表条件并可窄屏下载', async ({ page }) => {

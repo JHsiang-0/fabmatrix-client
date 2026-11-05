@@ -6,6 +6,7 @@
 - 当前发布门禁：[`farm-v1-release-readiness`](../.kiro/specs/farm-v1-release-readiness/)。
 - 当前部署形态：Windows Local Edition，一个本地服务端、多个 Electron 客户端，默认端口 `28081`。
 - 当前接口路径仍为 `/api/v1`；这是兼容性路径，不代表产品版本是 v1。
+- 当前产品分工为 Server + Client 本地生产、Cloud + 手机 App 远程业务，详见 [ADR 0011](../../../Java/fabmatrix-cloud/docs/decisions/0011-local-production-and-cloud-reporting.md)。
 
 完整的版本、路线和文档状态说明见：[VERSION_AND_ROADMAP.md](./VERSION_AND_ROADMAP.md)。
 
@@ -15,7 +16,7 @@
 | --- | --- | --- |
 | [`../AGENTS.md`](../AGENTS.md) | 前端协作、验证和安全约束 | 工作规则 |
 | [`VERSION_AND_ROADMAP.md`](./VERSION_AND_ROADMAP.md) | 产品版本、历史规格和发布范围的唯一映射 | 当前权威索引 |
-| [`CLOUD_MANAGEMENT.md`](./CLOUD_MANAGEMENT.md) | 云端组织、农场、成员、网关和审计管理 | 云端首期界面 |
+| [`CLOUD_MANAGEMENT.md`](./CLOUD_MANAGEMENT.md) | 原 Client 云端页面的阶段记录 | 历史参考，远程界面归手机 App |
 | [`../API_HANDOFF.md`](../API_HANDOFF.md) | 前后端 HTTP/WebSocket 契约 | 当前接口依据 |
 | [`../FRONTEND_UI_SPECIFICATION.md`](../FRONTEND_UI_SPECIFICATION.md) | UI 设计和交互基线 | 当前设计参考 |
 | [`../design-qa.md`](../design-qa.md) | UI 视觉验收记录 | 验收证据 |

@@ -56,16 +56,6 @@
         <template #icon><DesktopIcon size="18" /></template>
         设备看板
       </t-button>
-      <t-button
-        variant="outline"
-        shape="round"
-        class="app-header__cloud-action"
-        aria-label="云端管理"
-        @click="router.push({ name: 'cloud-management' })"
-      >
-        <template #icon><CloudIcon size="18" /></template>
-        云端管理
-      </t-button>
       <t-tooltip content="通知中心暂未开放">
         <span class="app-header__tooltip-trigger" tabindex="0">
           <t-button variant="text" class="header-icon-button" aria-label="消息通知" disabled>
@@ -97,7 +87,6 @@ import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import {
-  CloudIcon,
   DesktopIcon,
   HelpCircleIcon,
   MailIcon,
@@ -247,12 +236,6 @@ const openFullscreenDashboard = async () => {
 .header-icon-button:hover {
   color: var(--app-text-primary);
   background: var(--app-surface-muted);
-}
-
-@media (max-width: 1024px) {
-  .app-header__cloud-action {
-    display: none;
-  }
 }
 
 @media (max-width: 768px) {

@@ -82,7 +82,6 @@
             返回登录
           </t-button>
           <div class="connection-actions__right">
-            <t-button variant="outline" theme="default" @click="router.push({ name: 'cloud-dashboard' })">云端只读看板</t-button>
             <t-button variant="outline" theme="default" :disabled="testing || saving" @click="resetToEnvironment">
               使用启动配置
             </t-button>

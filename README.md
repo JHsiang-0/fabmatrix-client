@@ -2,6 +2,8 @@
 
 嘉东三维联动 3D 打印机实时控制系统的 Vue 3 / Electron 客户端。当前产品版本为 `1.0.0` 准正式版，默认连接本地服务端 `28081`。
 
+Client 与 Server 构成独立的厂内生产系统，账号、岗位、文件和任务由所选 Server 管理。Cloud 与 Flutter 手机 App 提供独立远程业务，Server 通过可选模块上报设备数据。当前分工见 [架构决定](../../Java/fabmatrix-cloud/docs/decisions/0011-local-production-and-cloud-reporting.md)。
+
 版本、路线和文档入口见 [`docs/README.md`](./docs/README.md)；本文件下方保留了 Vite/Electron 的基础运行说明。
 
 ## Recommended IDE Setup

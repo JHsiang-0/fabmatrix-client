@@ -6,6 +6,8 @@
 
 本仓库是面向 3D 打印生产管理场景的 FabMatrix Vue 单页应用，提供登录、打印机管理、文件库、任务队列/历史和实时设备看板等页面。
 
+2026-11-05 已确认本仓库是 Server 的独立本地生产客户端，只连接所选 Server 的认证、业务 API 与 WebSocket。Cloud + Flutter 手机 App 负责远程业务，两端账号、权限与数据库分别维护。架构边界见 [ADR 0011](../../Java/fabmatrix-cloud/docs/decisions/0011-local-production-and-cloud-reporting.md)。
+
 ## 技术栈
 
 - Vue 3、JavaScript（ES Modules），Vite 7
@@ -68,7 +70,7 @@ npm run lint:check  # 只读运行 Oxlint 和 ESLint，发布门禁使用此命�
 npm run lint        # 运行带自动修复的 lint，仅在确认 diff 后使用
 npm run format      # 格式化 src/
 npm test             # Node.js 内置回归测试
-npm run test:cloud    # 独立云会话、组织农场概览与管理请求生命周期
+npm run test:local    # 本地产品边界、现场会话与完整设备模型
 npm run test:auth    # 会话与真实 Store 异步回归
 npm run test:printer-ip # 打印机 IP 同步权限、轮询与生命周期回归
 npm run test:printer-model # 统一模型校验、测量质量、新鲜度和请求隔离回归
@@ -163,6 +165,6 @@ Error
 
 ## 单农场账号安全
 
-云只读入口及配置见 `docs/CLOUD_READONLY.md`，专项命令为 `npm run test:cloud`。云与局域网会话必须独立；云 API 使用 request.js 内独立 Axios 工厂，禁止挂接局域网 Token/401 拦截器。云路由跳过局域网会话恢复和实时连接。
+Client 的业务请求统一使用本地 request.js。远程账号、组织、农场与网关管理界面由手机 App 提供，历史 Client 云界面说明保存在 `docs/CLOUD_READONLY.md` 和 `docs/CLOUD_MANAGEMENT.md`；现行本地边界专项命令为 `npm run test:local`。
 
 固定岗位 ADMIN、OPERATOR、VIEWER。查看员保留设备/公有文件/本人任务读取，不展示生产写操作入口；最终权限由后端强制检查。mustChangePassword 为 true 时导航到独立 /change-password，禁止启动业务布局与实时连接。主动退出调用持久化会话撤销接口；401/过期等被动失效只清除本机状态。账号管理、会话及审计契约见后端 docs/ACCOUNT_SECURITY.md。专项用例为 tests/accountSecurity.test.js 和 browser.spec.js 中的“账号安全”场景。
