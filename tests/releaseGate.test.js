@@ -70,7 +70,7 @@ test('发布门禁脚本串联既有测试、检查、构建和 dist Electron E2
   assert.match(packageJson.scripts['release:gate'], /node scripts\/release-gate\.mjs/)
   assert.match(gateSource, /shell:\s*process\.platform === 'win32'/)
   assert.match(gateSource, /cwd:\s*projectRoot/)
-  assert.match(gateSource, /env:\s*process\.env/)
+  assert.match(gateSource, /(?:env:\s*process\.env|\.\.\.process\.env)/)
   assert.match(gateSource, /stdio:\s*'inherit'/)
   assert.match(viteSource, /const mockAliases = isExplicitMockMode \? \{\} : \{[\s\S]*disabled-websocket\.js[\s\S]*disabled\.js/)
   assert.match(viteSource, /farm-formal-mock-diagnostic-isolation/)

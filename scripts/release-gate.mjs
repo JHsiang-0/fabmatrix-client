@@ -11,7 +11,9 @@ const run = (command, args) => new Promise((resolve, reject) => {
   console.log(`\n[RELEASE GATE] ${command} ${args.join(' ')}`)
   const child = spawn(command, args, {
     cwd: projectRoot,
-    env: process.env,
+    env: hasFlag('--serial-tests') && args.includes('test')
+      ? { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --max-old-space-size=512` }
+      : process.env,
     shell: process.platform === 'win32',
     stdio: 'inherit'
   })
@@ -26,7 +28,7 @@ try {
     console.log('[RELEASE GATE] Workspace cleanliness is enforced by the backend gate; use --allow-dirty only for local diagnostics.')
   }
   const commands = [
-    ['run', ['test']],
+    ['run', ['test', ...(hasFlag('--serial-tests') ? ['--', '--test-concurrency=1'] : [])]],
     ['run', ['lint:check']],
     ['run', ['build']],
     ['run', ['build:mock']],

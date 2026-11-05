@@ -2633,6 +2633,24 @@ const handleCloudConnection = config => {
   const body = getBody(config)
   if (!(method === 'GET' && path.endsWith('/connection'))) {
     if (body.revision !== state.revision) fail(409, 409, '配置已被其他管理员更新，请刷新后重试')
+    if (path.includes('/pairing/')) {
+      if (path.endsWith('/start')) {
+        if (state.bound) fail(409, 409, '当前已绑定网关')
+        const id = '12345678-1234-1234-1234-123456789012'
+        mockState.cloudPairing = { pairingId: id, state: 'WAITING', expiresAt: Date.now() + 600000,
+          qrContent: JSON.stringify({ type: 'fabmatrix.gateway-pairing', version: 1, pairingId: id,
+            approvalToken: 'fmc_pa_' + 'a'.repeat(43), cloudUrl: body.apiUrl }) }
+        Object.assign(state, { apiUrl: body.apiUrl, mqttUrl: body.mqttUrl })
+      } else if (!mockState.cloudPairing || body.pairingId !== mockState.cloudPairing.pairingId) fail(409, 409, '配对会话已变化')
+      if (path.endsWith('/cancel')) { mockState.cloudPairing = null; return null }
+      if (mockState.cloudPairing.expiresAt <= Date.now()) mockState.cloudPairing.state = 'EXPIRED'
+      if (mockState.cloudPairing.state === 'COMPLETED') {
+        Object.assign(state, { bound: true, enabled: false, organizationName: '扫码组织', farmName: '扫码农场', gatewayName: '扫码网关' })
+        state.revision++
+        mockState.cloudPairing.qrContent = ''
+      }
+      return { ...mockState.cloudPairing }
+    }
     let action
     if (method === 'POST' && path.endsWith('/bind')) {
       if (!/^fmc_b_[A-Za-z0-9_-]{43}$/.test(body.bindingToken || '')) fail(400, 400, '绑定码无效')

@@ -22,6 +22,7 @@ const ACTION_LABELS = Object.freeze({
   SESSION_REVOKE: '退出登录会话',
   SESSION_REVOKE_ALL: '批量退出登录会话',
   CLOUD_BIND: '绑定云网关',
+  CLOUD_PAIR: '扫码配对云网关',
   CLOUD_ENABLE: '开启云端上报',
   CLOUD_DISABLE: '关闭云端上报',
   CLOUD_UNBIND: '解除云网关绑定',

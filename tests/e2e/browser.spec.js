@@ -175,6 +175,35 @@ for (const width of [375, 1280]) {
   })
 }
 
+test('云端连接：二维码等待手机确认、取消、完成后仍由本地管理员开启上报', async ({ page }) => {
+  await login(page)
+  await openSidebarItem(page, 1280, '云端连接')
+  await page.getByRole('button', { name: '手机扫码配对', exact: true }).click()
+  const dialog = page.locator('.t-dialog:visible')
+  await dialog.getByPlaceholder('https://cloud.example.com').fill('https://cloud.example.test')
+  await dialog.getByPlaceholder('ssl://mqtt.example.com:8883').fill('ssl://mqtt.example.test:8883')
+  await dialog.getByRole('button', { name: '生成配对二维码' }).click()
+  await expect(dialog.getByText('核对编号：56789012')).toBeVisible()
+  await expect(dialog.locator('canvas, svg').first()).toBeVisible()
+  await page.screenshot({ path: 'test-results/cloud-pairing-qr.png', fullPage: true, animations: 'disabled' })
+  await page.setViewportSize({ width: 375, height: 812 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await expect(dialog.getByText('核对编号：56789012')).toBeVisible()
+  await page.setViewportSize({ width: 1280, height: 812 })
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain('fmc_pa_')
+  await dialog.getByRole('button', { name: '取消配对', exact: true }).click()
+  await expect(dialog.getByRole('button', { name: '生成配对二维码' })).toBeVisible()
+  await dialog.getByRole('button', { name: '生成配对二维码' }).click()
+  await expect(dialog.getByText('核对编号：56789012')).toBeVisible()
+  await page.evaluate(async () => {
+    const { mockState } = await import('/src/mock/data.js')
+    mockState.cloudPairing.state = 'COMPLETED'
+  })
+  await expect(dialog).toHaveCount(0, { timeout: 10000 })
+  await expect(page.getByText('扫码农场', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('启用云端数据上报', { exact: true })).toHaveAttribute('aria-checked', 'false')
+})
+
 test('云端连接：管理员绑定后核对归属、开启关闭和解绑，绑定码不落客户端存储', async ({ page }) => {
   await login(page)
   await openSidebarItem(page, 1280, '云端连接')

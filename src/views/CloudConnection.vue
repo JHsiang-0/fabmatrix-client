@@ -43,15 +43,20 @@
             <div><dt>MQTT 地址</dt><dd>{{ connection.mqttUrl }}</dd></div>
             <div><dt>凭据到期时间</dt><dd>{{ date(connection.credentialExpiresAt) }}</dd></div>
           </dl>
-          <t-empty v-else description="使用手机 App 创建云网关，并在此输入一次性绑定码" />
+          <t-empty v-else title="本地独立运行" description="可用手机扫码连接云端，也可继续仅在厂内使用" />
           <t-space break-line>
-            <t-button theme="primary" :disabled="busy" @click="openBinding">{{ connection.bound ? '重新绑定' : '绑定云网关' }}</t-button>
-            <t-button v-if="connection.bound" variant="outline" :disabled="busy" @click="refreshBinding">刷新绑定信息</t-button>
-            <t-button v-if="connection.bound" theme="danger" variant="outline" :disabled="busy" @click="unbind">解除绑定</t-button>
+            <t-button v-if="!connection.bound" key="pair" theme="primary" :disabled="busy" @click="pairingVisible = true">手机扫码配对</t-button>
+            <t-button key="manual" variant="outline" :disabled="busy" @click="openBinding">{{ connection.bound ? '重新绑定' : '绑定云网关' }}</t-button>
+            <t-button v-if="connection.bound" key="refresh" variant="outline" :disabled="busy" @click="refreshBinding">刷新绑定信息</t-button>
+            <t-button v-if="connection.bound" key="unbind" theme="danger" variant="outline" :disabled="busy" @click="unbind">解除绑定</t-button>
           </t-space>
         </t-card>
       </template>
     </t-loading>
+
+    <t-dialog v-model:visible="pairingVisible" header="手机扫码连接云端" placement="center" :footer="false" destroy-on-close width="560px" :close-on-overlay-click="false">
+      <CloudPairingPanel v-if="pairingVisible && connection" :connection="connection" @bound="paired" />
+    </t-dialog>
 
     <t-dialog v-model:visible="bindingVisible" header="绑定当前 Server" :footer="false" :close-on-overlay-click="false" :close-btn="!busy" destroy-on-close width="560px" @closed="clearBindingSecret">
       <t-alert theme="info" :close-btn="false">在手机 App 中选择组织和农场，创建网关或签发新的绑定码。绑定完成后，上报开关保持关闭，供你核对归属。</t-alert>
@@ -79,6 +84,7 @@ import { useUserStore } from '@/stores/user'
 import { getCloudConnection, bindCloudGateway, setCloudReporting, refreshCloudBinding, unbindCloudGateway } from '@/api/cloudConnection'
 import { confirmMessage, message } from '@/utils/message'
 import { formatDateTime } from '@/utils/formatters'
+import CloudPairingPanel from '@/components/CloudPairingPanel.vue'
 
 const user = useUserStore()
 const generation = user.getSessionGeneration()
@@ -88,6 +94,13 @@ const busy = ref(false)
 const error = ref('')
 const bindingError = ref('')
 const bindingVisible = ref(false)
+const pairingVisible = ref(false)
+async function paired() {
+  if (!current()) return
+  pairingVisible.value = false
+  await load()
+  if (current()) message.success('配对完成，请核对组织和农场后开启数据上报')
+}
 const form = reactive({ apiUrl: '', mqttUrl: '', bindingToken: '', useSystemTrust: true, caCertificatePem: '' })
 let active = true
 let timer
@@ -180,7 +193,7 @@ async function unbind() {
 
 onMounted(() => {
   void load()
-  timer = setInterval(() => { if (!document.hidden && !bindingVisible.value) void load() }, 10000)
+  timer = setInterval(() => { if (!document.hidden && !bindingVisible.value && !pairingVisible.value) void load() }, 10000)
 })
 onUnmounted(() => { active = false; clearInterval(timer); clearBindingSecret() })
 </script>
