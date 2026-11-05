@@ -1451,6 +1451,16 @@ test('统一摘要在真实 Store 中覆盖旧消息、停监清空、无消息�
     assert.equal(realtime.statusMap.get('42').currentJobId, 'local-job')
     assert.equal(realtime.statusMap.get('42')._stateSummaryReceivedAt, 100000)
 
+    service.defaults.adapter = async config => axiosResponse(config,
+      config.url.endsWith('/printers/page') ? page([{ id: '42', stateSummary: {
+        ...summary, serverTime: '2026-11-05T07:59:59Z', status: 'PAUSED', progress: 95
+      } }]) : config.url.endsWith('/queue') ? [] : page([]))
+    await realtime.refreshPrinterSnapshot()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(realtime.statusMap.get('42').progress, 0)
+    assert.equal(realtime.statusMap.get('42').businessStatus, 'PRINTING')
+    assert.equal(realtime.statusMap.get('42')._stateSummaryReceivedAt, 100000)
+
     devices.rawDeviceList = [{ id: '42', _stateSummaryReceivedAt: localNow, stateSummary: summary }]
     assert.equal(devices.rawDeviceList[0].progress, 0)
     localNow += 30001

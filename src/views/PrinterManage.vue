@@ -636,7 +636,7 @@ import { useUserStore } from '@/stores/user'
 import { useDeviceStore } from '@/stores/printer/deviceStore'
 import { useRealtimeStore } from '@/stores/printer/realtimeStore'
 import { usePrinterStateClock } from '@/stores/printer/stateClock'
-import { applyPrinterStateSummary } from '@/utils/printerStateSummary'
+import { applyPrinterStateSummary, mergePrinterStateRecords } from '@/utils/printerStateSummary'
 import { PRINTER_STATUS, PRINTER_STATUS_MAP } from '@/utils/constants'
 import {
   normalizePrinterStatus,
@@ -862,7 +862,7 @@ const displayTableData = computed(() => tableData.value.map(printer => {
     const realtimeState = realtime.businessStatus || realtime.unifiedState || realtime.state
     if (realtimeState) merged.businessStatus = normalizePrinterStatus(realtimeState)
   }
-  merged = applyPrinterStateSummary(merged, printer.id, Math.max(stateClock.now, Date.now()))
+  merged = applyPrinterStateSummary(mergePrinterStateRecords(printer, merged), printer.id, Math.max(stateClock.now, Date.now()))
   merged.effectiveStatus = resolveEffectivePrinterStatus(merged)
   merged.lastKnownStatus = resolveLastKnownPrinterStatus(merged) || merged.lastKnownStatus
   merged.printStatus = merged.monitorEnabled === false

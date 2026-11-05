@@ -4,6 +4,7 @@ import { useDeviceStore } from './deviceStore'
 import { useRealtimeStore } from './realtimeStore'
 import { PRINTER_STATE, PRINTER_STATUS } from '@/utils/constants'
 import { resolveEffectivePrinterStatus } from '@/utils/dataAdapters'
+import { mergePrinterStateRecords } from '@/utils/printerStateSummary'
 import { getDashboardLayout, saveDashboardLayout } from '@/api/dashboardLayout'
 import {
   analyzeDevicePositions,
@@ -82,7 +83,7 @@ export const useGridStore = defineStore('grid', () => {
     if (deviceStore.rawDeviceList.length) {
       deviceStore.rawDeviceList.forEach(device => {
         const realtimeStatus = statusMap.get(String(device.id))
-        addStatus(resolveEffectivePrinterStatus({ ...device, ...realtimeStatus }))
+        addStatus(resolveEffectivePrinterStatus(mergePrinterStateRecords(device, realtimeStatus)))
       })
     } else {
       statusMap.forEach(status => addStatus(resolveEffectivePrinterStatus(status)))

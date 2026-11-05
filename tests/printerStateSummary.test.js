@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { applyPrinterStateSummary, capturePrinterStateSummary } from '../src/utils/printerStateSummary.js'
+import { applyPrinterStateSummary, capturePrinterStateSummary, mergePrinterStateRecords } from '../src/utils/printerStateSummary.js'
 import { normalizePrinter, normalizePrinterDetail, resolveEffectivePrinterStatus } from '../src/utils/dataAdapters.js'
 
 const serverTime = '2026-11-05T08:00:00Z'
@@ -56,4 +56,17 @@ test('列表与聚合详情使用同一摘要，缺摘要的旧服务端仍可�
   assert.equal(detail.realtimeStatus.progress, 0)
   assert.equal(detail.currentJob.id, '7')
   assert.equal(resolveEffectivePrinterStatus(normalizePrinter({ id: 42, status: 'IDLE' })), 'IDLE')
+})
+
+test('REST 与 WebSocket 交错时优先较新的摘要，合并旧字段不会延长接收时间', () => {
+  const recent = capturePrinterStateSummary({ id: '42', stateSummary: summary() }, 1000)
+  const older = capturePrinterStateSummary({ id: '42', stateSummary: summary({
+    serverTime: '2026-11-05T07:59:59Z', progress: 95, status: 'PAUSED'
+  }) }, 2000)
+  for (const row of [mergePrinterStateRecords(recent, older), mergePrinterStateRecords(older, recent),
+    mergePrinterStateRecords(recent, { progress: 95 })]) {
+    assert.equal(applyPrinterStateSummary(row, '42', 2000).progress, 0)
+    assert.equal(row._stateSummaryReceivedAt, 1000)
+  }
+  assert.equal(mergePrinterStateRecords(recent, { stateSummary: null }).stateSummary, null)
 })

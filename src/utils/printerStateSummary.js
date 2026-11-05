@@ -11,6 +11,20 @@ export function capturePrinterStateSummary(record, now = Date.now()) {
     : record
 }
 
+/** A slow REST response must not replace a newer WebSocket summary (or vice versa). */
+export function mergePrinterStateRecords(previous, incoming) {
+  const merged = { ...previous, ...incoming }
+  if (!hasPrinterStateSummary(previous)) return merged
+  const before = previous.stateSummary
+  const after = incoming?.stateSummary
+  const comparable = before?.modelVersion === 2 && after?.modelVersion === 2
+    && before.localPrinterId === after.localPrinterId
+  const keepPrevious = !hasPrinterStateSummary(incoming) || (comparable
+    && Date.parse(before.serverTime) > Date.parse(after.serverTime))
+  return keepPrevious ? { ...merged, stateSummary: before,
+    _stateSummaryReceivedAt: previous._stateSummaryReceivedAt } : merged
+}
+
 /** Read-side projection only. Local job bindings and safety fields remain separate. */
 export function applyPrinterStateSummary(record, printerId = record?.id, now = Date.now()) {
   if (!hasPrinterStateSummary(record)) return record

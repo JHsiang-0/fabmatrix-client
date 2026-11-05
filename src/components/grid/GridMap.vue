@@ -44,7 +44,7 @@
 <script setup>
 import { computed, ref, onBeforeUnmount, onMounted, nextTick, watch } from 'vue'
 import GridCell from './GridCell.vue'
-import { applyPrinterStateSummary } from '@/utils/printerStateSummary'
+import { applyPrinterStateSummary, mergePrinterStateRecords } from '@/utils/printerStateSummary'
 import {
   calculateGridFit,
   formatGridRowLabel as formatRowLabel,
@@ -139,7 +139,7 @@ function getRealTimeData(row, column) {
   if (!device) return null
   const realtime = props.realTimeStatus[String(device.id)]
   return device.stateSummary !== undefined || realtime?.stateSummary !== undefined
-    ? applyPrinterStateSummary({ ...device, ...realtime }, device.id) : realtime
+    ? applyPrinterStateSummary(mergePrinterStateRecords(device, realtime), device.id) : realtime
 }
 
 function getSlotLabel(row, column) {

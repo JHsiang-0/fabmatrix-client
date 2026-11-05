@@ -262,7 +262,7 @@ import StatusTag from '@/components/StatusTag.vue'
 import { useJobStore } from '@/stores/jobStore'
 import { useRealtimeStore } from '@/stores/printer/realtimeStore'
 import { usePrinterStateClock } from '@/stores/printer/stateClock'
-import { applyPrinterStateSummary } from '@/utils/printerStateSummary'
+import { applyPrinterStateSummary, mergePrinterStateRecords } from '@/utils/printerStateSummary'
 import { PRINTER_STATUS, PRINTER_STATUS_MAP } from '@/utils/constants'
 import { resolveEffectivePrinterStatus } from '@/utils/dataAdapters'
 import { buildFarmDateRange, buildSevenDayJobTrend } from '@/utils/dashboardMetrics'
@@ -302,7 +302,7 @@ const statusSegmentsConfig = [
 
 const effectivePrinters = computed(() => printers.value.map(printer => {
   const realtime = statusMap.value.get(String(printer.id))
-  const merged = applyPrinterStateSummary({ ...printer, ...realtime }, printer.id,
+  const merged = applyPrinterStateSummary(mergePrinterStateRecords(printer, realtime), printer.id,
     Math.max(stateClock.now, Date.now()))
   const status = resolveEffectivePrinterStatus(merged)
   return { ...printer, status, realtime }

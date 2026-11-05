@@ -22,7 +22,7 @@ import {
   toRealtimeSnapshotEntries
 } from '@/utils/realtimeAlerts'
 import { getWebSocketBaseUrl } from '@/utils/serverConfig'
-import { applyPrinterStateSummary, capturePrinterStateSummary } from '@/utils/printerStateSummary'
+import { applyPrinterStateSummary, capturePrinterStateSummary, mergePrinterStateRecords } from '@/utils/printerStateSummary'
 import { usePrinterStateClock } from './stateClock'
 
 const MAX_SEEN_EVENT_IDS = 1000
@@ -295,7 +295,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
     const idKey = String(printerId)
     const previous = pendingUpdates.get(idKey) || { data: statusMap.value.get(idKey) || {} }
     pendingUpdates.set(idKey, {
-      data: { ...previous?.data, ...capturePrinterStateSummary(data) },
+      data: mergePrinterStateRecords(previous?.data, capturePrinterStateSummary(data)),
       timestamp: timestamp || Date.now()
     })
     scheduleBatchUpdate()
