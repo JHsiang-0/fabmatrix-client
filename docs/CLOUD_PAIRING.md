@@ -8,6 +8,8 @@
 
 验证：Node 全量测试、lint、正式构建与 Playwright「云端连接」用例。二维码浏览器截图为模拟服务验收，不代表手机真机扫码。
 
-2026-11-05 发布门禁通过：457 项单元测试、lint、正式/Mock/桌面构建、2 项 Electron 制品用例及发布扫描。未替换已安装的桌面客户端，也未重打 Windows 安装包。
+2026-11-05 发布门禁通过：457 项单元测试、lint、正式/Mock/桌面构建、2 项 Electron 制品用例及发布扫描。
+
+同日随后基于 `af2469a` 重新构建正式 Windows 安装包 `release/FabMatrix-Client-Setup-1.0.0.exe`，大小 128309180 字节，SHA-256 为 `BE039BE8B54E4CA87D3211E6A5DE9A0355F856E53A384C807C0B4401EBD7798E`。ASAR 内 59 个 dist/electron 文件与新构建一致，包含扫码入口及配对 start/poll 接口，产物扫描通过。打包使用现有匹配 ICO；未替换已安装的 Client。配套 Server、Cloud V18 和 App 均已重新打包，安装与真实扫码另行验收。
 
 本机同时运行开发工具和现场服务、内存紧张时，可用 `npm run release:gate -- --allow-dirty --serial-tests` 串行执行同一套单元测试，并将测试进程的 Node 堆上限设为 512 MiB。默认并发及构建堆配置不变，lint、全部构建、Electron 验证和制品扫描均不跳过。
