@@ -635,6 +635,8 @@ import { renderIcon } from '@/utils/tdesign'
 import { useUserStore } from '@/stores/user'
 import { useDeviceStore } from '@/stores/printer/deviceStore'
 import { useRealtimeStore } from '@/stores/printer/realtimeStore'
+import { usePrinterStateClock } from '@/stores/printer/stateClock'
+import { applyPrinterStateSummary } from '@/utils/printerStateSummary'
 import { PRINTER_STATUS, PRINTER_STATUS_MAP } from '@/utils/constants'
 import {
   normalizePrinterStatus,
@@ -666,6 +668,7 @@ const router = useRouter()
 const userStore = useUserStore()
 const deviceStore = useDeviceStore()
 const realtimeStore = useRealtimeStore()
+const stateClock = usePrinterStateClock()
 const { statusMap } = storeToRefs(realtimeStore)
 const isAdmin = computed(() => userStore.isAdmin)
 const ipSyncVisible = ref(false)
@@ -831,7 +834,7 @@ const batchDeleteResult = ref({ deletedCount: 0, failedCount: 0, items: [] })
 
 const displayTableData = computed(() => tableData.value.map(printer => {
   const realtime = statusMap.value.get(String(printer.id))
-  const merged = { ...printer }
+  let merged = { ...printer }
   const healthFields = [
     'connectionStatus',
     'lastSeenAt',
@@ -848,7 +851,9 @@ const displayTableData = computed(() => tableData.value.map(printer => {
     'observedFilename',
     'taskSource',
     'taskMatchReason',
-    'progress'
+    'progress',
+    'stateSummary',
+    '_stateSummaryReceivedAt'
   ]
   if (realtime) {
     healthFields.forEach(field => {
@@ -857,6 +862,7 @@ const displayTableData = computed(() => tableData.value.map(printer => {
     const realtimeState = realtime.businessStatus || realtime.unifiedState || realtime.state
     if (realtimeState) merged.businessStatus = normalizePrinterStatus(realtimeState)
   }
+  merged = applyPrinterStateSummary(merged, printer.id, Math.max(stateClock.now, Date.now()))
   merged.effectiveStatus = resolveEffectivePrinterStatus(merged)
   merged.lastKnownStatus = resolveLastKnownPrinterStatus(merged) || merged.lastKnownStatus
   merged.printStatus = merged.monitorEnabled === false

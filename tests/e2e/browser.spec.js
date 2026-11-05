@@ -6,6 +6,32 @@ import { printerModelFixture } from '../fixtures/printerModel.js'
 
 const batchDispatchEnabled = isFeatureEnabled('batchDispatch')
 
+test('打印机列表优先统一摘要，停监后清理运行状态并保留设备行', async ({ page }) => {
+  await login(page)
+  await page.evaluate(async () => {
+    const { mockState } = await import('/src/mock/data.js')
+    const printer = mockState.printers.find(item => String(item.id) === '403')
+    printer.status = 'IDLE'
+    printer.stateSummary = {
+      modelVersion: 2, localPrinterId: '403', serverTime: new Date().toISOString(),
+      observedAt: new Date().toISOString(), stale: false, monitorEnabled: true,
+      connectionStatus: 'ONLINE', status: 'PAUSED', progress: 0, toolTemperature: 0
+    }
+  })
+  await openSidebarItem(page, 1280, '打印机管理')
+  const row = page.locator('.printer-table-row').filter({ hasText: 'Printer_C0DA' })
+  await expect(row.locator('.printer-management-print-status')).toHaveText('已暂停')
+  await expect(row.locator('.printer-management-connection-indicator')).toHaveText('在线')
+  await page.evaluate(async () => {
+    const { mockState } = await import('/src/mock/data.js')
+    mockState.printers.find(item => String(item.id) === '403').stateSummary.monitorEnabled = false
+  })
+  await page.getByRole('button', { name: '刷新', exact: true }).click()
+  await expect(row.locator('.printer-management-print-status')).toHaveText('未知')
+  await expect(row.locator('.printer-management-connection-indicator')).toHaveText('未知')
+  await expect(row).toContainText('未启用')
+})
+
 test('设备概览按场景展示温度与打印，次要数据分层且离线清理旧值', async ({ page }) => {
   await login(page)
   const fixture = printerModelFixture('403')

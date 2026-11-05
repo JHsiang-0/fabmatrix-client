@@ -2,6 +2,8 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { getPrinterDetail, getPrinterList, batchUpdatePositions, updatePrinter } from '@/api/printer'
 import { collectAllPages } from '@/utils/pagination'
+import { applyPrinterStateSummary } from '@/utils/printerStateSummary'
+import { usePrinterStateClock } from './stateClock'
 
 const MAX_DETAIL_CACHE_SIZE = 100
 
@@ -15,7 +17,12 @@ export const useDeviceStore = defineStore('device', () => {
   // ============================================
 
   /** 原始设备数据列表 */
-  const rawDeviceList = ref([])
+  const deviceRows = ref([])
+  const clock = usePrinterStateClock()
+  const rawDeviceList = computed({
+    get: () => deviceRows.value.map(device => applyPrinterStateSummary(device, device.id, Math.max(clock.now, Date.now()))),
+    set: value => { deviceRows.value = value }
+  })
 
   /** 加载状态 */
   const loading = ref(false)

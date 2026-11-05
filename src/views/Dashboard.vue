@@ -261,6 +261,8 @@ import AsyncState from '@/components/AsyncState.vue'
 import StatusTag from '@/components/StatusTag.vue'
 import { useJobStore } from '@/stores/jobStore'
 import { useRealtimeStore } from '@/stores/printer/realtimeStore'
+import { usePrinterStateClock } from '@/stores/printer/stateClock'
+import { applyPrinterStateSummary } from '@/utils/printerStateSummary'
 import { PRINTER_STATUS, PRINTER_STATUS_MAP } from '@/utils/constants'
 import { resolveEffectivePrinterStatus } from '@/utils/dataAdapters'
 import { buildFarmDateRange, buildSevenDayJobTrend } from '@/utils/dashboardMetrics'
@@ -273,6 +275,7 @@ defineOptions({ name: 'DashboardView' })
 const router = useRouter()
 const jobStore = useJobStore()
 const realtimeStore = useRealtimeStore()
+const stateClock = usePrinterStateClock()
 const { queueJobs, activeJobs } = storeToRefs(jobStore)
 const { statusMap, wsConnectionState, isWsConnected, isRealtimeStale, isRecovering } = storeToRefs(realtimeStore)
 
@@ -299,7 +302,9 @@ const statusSegmentsConfig = [
 
 const effectivePrinters = computed(() => printers.value.map(printer => {
   const realtime = statusMap.value.get(String(printer.id))
-  const status = resolveEffectivePrinterStatus({ ...printer, ...realtime })
+  const merged = applyPrinterStateSummary({ ...printer, ...realtime }, printer.id,
+    Math.max(stateClock.now, Date.now()))
+  const status = resolveEffectivePrinterStatus(merged)
   return { ...printer, status, realtime }
 }))
 

@@ -112,7 +112,7 @@
             <!-- 打印中显示大百分比 -->
             <div v-if="isPrinting" class="text-lg sm:text-2xl font-bold text-gray-600 leading-none"
             >
-                {{ progressPercent }}%
+                {{ progressPercent === null ? '进度未知' : `${progressPercent}%` }}
             </div>
             <!-- 其他状态显示状态文本 -->
             <div v-else class="text-[10px] sm:text-xs font-bold text-gray-900 uppercase tracking-wider"
@@ -206,10 +206,12 @@ const emit = defineEmits([
 // Computed - 状态相关
 // ============================================
 
-/** 当前业务状态，不使用通信健康消息覆盖业务状态 */
+/** 兼容看板状态词汇；统一摘要的当前状态由上游处理新鲜度。 */
 const status = computed(() => {
     if (!props.realTimeData) return PRINTER_STATE.UNKNOWN
-    return props.realTimeData.businessStatus || props.realTimeData.unifiedState || PRINTER_STATE.UNKNOWN
+    const value = props.realTimeData.businessStatus || props.realTimeData.unifiedState || PRINTER_STATE.UNKNOWN
+    return { IDLE: PRINTER_STATE.STANDBY, PREPARING: PRINTER_STATE.STARTING,
+        ERROR: PRINTER_STATE.FAULT, OFFLINE: PRINTER_STATE.UNKNOWN }[value] || value
 })
 
 /** 状态文本 - 使用 PRINTER_STATE_MAP */
@@ -254,25 +256,25 @@ const hasPrintError = computed(() => {
 
 /** 喷头温度 */
 const nozzleTemp = computed(() => {
-    if (!props.realTimeData?.extruder?.temperature) return '--'
+    if (!Number.isFinite(props.realTimeData?.extruder?.temperature)) return '--'
     return Math.round(props.realTimeData.extruder.temperature)
 })
 
 /** 喷头目标温度 */
 const nozzleTarget = computed(() => {
-    if (!props.realTimeData?.extruder?.target) return '--'
+    if (!Number.isFinite(props.realTimeData?.extruder?.target)) return '--'
     return Math.round(props.realTimeData.extruder.target)
 })
 
 /** 热床温度 */
 const bedTemp = computed(() => {
-    if (!props.realTimeData?.heaterBed?.temperature) return '--'
+    if (!Number.isFinite(props.realTimeData?.heaterBed?.temperature)) return '--'
     return Math.round(props.realTimeData.heaterBed.temperature)
 })
 
 /** 热床目标温度 */
 const bedTarget = computed(() => {
-    if (!props.realTimeData?.heaterBed?.target) return '--'
+    if (!Number.isFinite(props.realTimeData?.heaterBed?.target)) return '--'
     return Math.round(props.realTimeData.heaterBed.target)
 })
 
@@ -282,7 +284,7 @@ const bedTarget = computed(() => {
 
 /** 打印进度百分比 */
 const progressPercent = computed(() => {
-    if (!props.realTimeData?.progress) return 0
+    if (!Number.isFinite(props.realTimeData?.progress)) return null
     return Math.round(props.realTimeData.progress)
 })
 

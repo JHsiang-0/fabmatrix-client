@@ -130,6 +130,7 @@ let originalAdapter
 let useGridStore
 let useDeviceStore
 let useRealtimeStore
+let usePrinterStateClock
 let useJobStore
 let useUserStore
 let request
@@ -151,6 +152,7 @@ test.before(async () => {
   ;({ useGridStore } = await viteServer.ssrLoadModule('/src/stores/printer/gridStore.js'))
   ;({ useDeviceStore } = await viteServer.ssrLoadModule('/src/stores/printer/deviceStore.js'))
   ;({ useRealtimeStore } = await viteServer.ssrLoadModule('/src/stores/printer/realtimeStore.js'))
+  ;({ usePrinterStateClock } = await viteServer.ssrLoadModule('/src/stores/printer/stateClock.js'))
   ;({ useJobStore } = await viteServer.ssrLoadModule('/src/stores/jobStore.js'))
   originalAdapter = service.defaults.adapter
 })
@@ -1401,4 +1403,78 @@ test('mutation 去重仅复用同一认证 generation，重登后相同请求独
   }, 42)
   assert.match(lockKey, /^42:/)
   assert.equal(lockKey.includes('key-must-not-contain-this-secret'), false)
+})
+
+
+test('统一摘要在真实 Store 中覆盖旧消息、停监清空、无消息过期且设备身份隔离', async t => {
+  setActivePinia(createPinia())
+  let localNow = 100000
+  t.mock.method(Date, 'now', () => localNow)
+  const previousWindow = globalThis.window
+  const previousRaf = globalThis.requestAnimationFrame
+  const previousCancelRaf = globalThis.cancelAnimationFrame
+  globalThis.window = {
+    location: { protocol: 'http:', host: 'farm.test' },
+    localStorage: memoryStorage(), sessionStorage: memoryStorage()
+  }
+  globalThis.requestAnimationFrame = callback => setImmediate(callback)
+  globalThis.cancelAnimationFrame = handle => clearImmediate(handle)
+  service.defaults.adapter = async config => axiosResponse(config,
+    config.url.endsWith('/queue') ? [] : page([]))
+  const realtime = useRealtimeStore()
+  const devices = useDeviceStore()
+  const clock = usePrinterStateClock()
+  const user = useUserStore()
+  user.token = 'summary-token'
+  user.userInfo = { id: '1', role: 'ADMIN' }
+  const summary = {
+    modelVersion: 2, localPrinterId: '42', serverTime: '2026-11-05T08:00:00Z',
+    observedAt: '2026-11-05T08:00:00Z', stale: false, monitorEnabled: true,
+    connectionStatus: 'ONLINE', status: 'PRINTING', progress: 0, toolTemperature: 0,
+    filename: 'production.gcode', taskSource: 'EXTERNAL'
+  }
+  try {
+    realtime.connectWs({ webSocketFactory: url => new RuntimeFakeWebSocket(url) })
+    await waitFor(() => realtime.wsConnectionState === 'OPEN')
+    const socket = RuntimeFakeWebSocket.instances.at(-1)
+    socket.message({ version: '1', type: 'PRINTER_STATUS', printerId: '42', data: {
+      status: 'IDLE', progress: 90, toolTemperature: 180, currentJobId: 'local-job', stateSummary: summary
+    } })
+    await waitFor(() => realtime.statusMap.get('42')?.progress === 0)
+    assert.equal(realtime.statusMap.get('42').businessStatus, 'PRINTING')
+    assert.equal(realtime.statusMap.get('42').extruder.temperature, 0)
+    socket.message({ version: '1', type: 'JOB_STATUS', printerId: '42', data: {
+      jobId: 'local-job', status: 'PAUSED', progress: 95
+    } })
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(realtime.statusMap.get('42').progress, 0)
+    assert.equal(realtime.statusMap.get('42').currentJobId, 'local-job')
+    assert.equal(realtime.statusMap.get('42')._stateSummaryReceivedAt, 100000)
+
+    devices.rawDeviceList = [{ id: '42', _stateSummaryReceivedAt: localNow, stateSummary: summary }]
+    assert.equal(devices.rawDeviceList[0].progress, 0)
+    localNow += 30001
+    clock.now = localNow
+    await nextTick()
+    assert.equal(realtime.statusMap.get('42').progress, null)
+    assert.equal(realtime.statusMap.get('42').businessStatus, 'UNKNOWN')
+    assert.equal(devices.rawDeviceList[0].filename, null)
+
+    socket.message({ version: '1', type: 'COMMUNICATION_HEALTH', printerId: '42', data: {
+      connectionStatus: 'ONLINE', stateSummary: { ...summary, monitorEnabled: false }
+    } })
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(realtime.statusMap.get('42').monitorEnabled, false)
+    assert.equal(realtime.statusMap.get('42').extruder.temperature, null)
+    socket.message({ version: '1', type: 'PRINTER_STATUS', printerId: '43', data: { stateSummary: summary, progress: 90 } })
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(realtime.statusMap.get('43').progress, null)
+    assert.equal(realtime.statusMap.get('43').businessStatus, 'UNKNOWN')
+  } finally {
+    realtime.disconnectWs()
+    clock.$dispose()
+    globalThis.window = previousWindow
+    globalThis.requestAnimationFrame = previousRaf
+    globalThis.cancelAnimationFrame = previousCancelRaf
+  }
 })

@@ -22,6 +22,8 @@ import {
   toRealtimeSnapshotEntries
 } from '@/utils/realtimeAlerts'
 import { getWebSocketBaseUrl } from '@/utils/serverConfig'
+import { applyPrinterStateSummary, capturePrinterStateSummary } from '@/utils/printerStateSummary'
+import { usePrinterStateClock } from './stateClock'
 
 const MAX_SEEN_EVENT_IDS = 1000
 
@@ -40,7 +42,13 @@ export const useRealtimeStore = defineStore('realtime', () => {
    * 实时状态数据 - 使用 shallowRef 避免深层响应式开销
    * @type {ShallowRef<Map<string, Object>>}
    */
-  const statusMap = shallowRef(new Map())
+  const storedStatuses = shallowRef(new Map())
+  const clock = usePrinterStateClock()
+  const statusMap = computed({
+    get: () => new Map(Array.from(storedStatuses.value, ([id, record]) => [id,
+      applyPrinterStateSummary(record, id, Math.max(clock.now, Date.now()))])),
+    set: value => { storedStatuses.value = value }
+  })
   const alerts = ref([])
 
   /** WebSocket 客户端实例 - 使用 markRaw 避免响应式代理 */
@@ -188,6 +196,10 @@ export const useRealtimeStore = defineStore('realtime', () => {
       const isCommunicationHealth = stateSource === 'COMMUNICATION_HEALTH'
       const hasBusinessState = data.status !== undefined || data.unifiedState !== undefined || data.state !== undefined
       const next = { ...previous }
+      if (Object.prototype.hasOwnProperty.call(data, 'stateSummary')) {
+        next.stateSummary = data.stateSummary
+        next._stateSummaryReceivedAt = data._stateSummaryReceivedAt
+      }
 
       // COMMUNICATION_HEALTH 只更新通信字段，不能用不完整的消息清空或覆盖业务状态。
       if (!isCommunicationHealth && hasBusinessState) {
@@ -241,7 +253,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
         }
       }
       next.lastUpdate = timestamp
-      newMap.set(idKey, next)
+      newMap.set(idKey, applyPrinterStateSummary(next, idKey))
     })
 
     // 替换整个 Map，触发响应式更新
@@ -283,7 +295,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
     const idKey = String(printerId)
     const previous = pendingUpdates.get(idKey) || { data: statusMap.value.get(idKey) || {} }
     pendingUpdates.set(idKey, {
-      data: { ...previous?.data, ...data },
+      data: { ...previous?.data, ...capturePrinterStateSummary(data) },
       timestamp: timestamp || Date.now()
     })
     scheduleBatchUpdate()
@@ -335,6 +347,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
 
     if (type === 'PRINTER_OFFLINE') {
       queueRealtimeUpdate(printerId, {
+        ...data,
         connectionStatus: 'OFFLINE',
         lastCommunicationError: data?.reason || data?.message || data?.systemMessage || '设备已离线'
       }, timestamp)

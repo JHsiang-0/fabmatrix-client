@@ -57,7 +57,8 @@ test('SYNC-001.1 保留核心业务源码与既有回归测试入口', () => {
     assert.equal(fs.existsSync(new URL(`../${relativePath}`, import.meta.url)), true, relativePath)
   })
 
-  assert.match(read('package.json'), /"test":\s*"node --test tests\/\*\.test\.js"/)
+  assert.match(JSON.parse(read('package.json')).scripts.test,
+    /^node --test(?: --test-concurrency=\d+)? tests\/\*\.test\.js$/)
 })
 
 test('文件树按归属暴露 capability，目录操作保持完整且不越权', async () => {

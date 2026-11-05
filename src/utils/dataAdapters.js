@@ -6,6 +6,7 @@ import {
   PRINTER_STATUS,
   PRINTER_STATUS_VALUES
 } from './constants.js'
+import { applyPrinterStateSummary, capturePrinterStateSummary, hasPrinterStateSummary } from './printerStateSummary.js'
 
 const identity = value => value
 
@@ -143,6 +144,7 @@ export function normalizePrinterStatus(value) {
  */
 export function resolveEffectivePrinterStatus(record = {}) {
   if (!record || typeof record !== 'object') return PRINTER_STATUS.UNKNOWN
+  if (hasPrinterStateSummary(record)) return applyPrinterStateSummary(record).effectiveStatus
 
   const connectionStatus = String(record.connectionStatus || '').trim().toUpperCase()
   if (record.monitorEnabled === false) return PRINTER_STATUS.UNKNOWN
@@ -194,7 +196,7 @@ export function normalizeJobStatus(value) {
 }
 
 export function normalizePrinter(record) {
-  const normalized = normalizeIdFields(record, ['id', 'currentJobId'])
+  const normalized = capturePrinterStateSummary(normalizeIdFields(record, ['id', 'currentJobId']))
   if (!normalized || typeof normalized !== 'object') return normalized
 
   if (Object.prototype.hasOwnProperty.call(normalized, 'status')) {
@@ -211,7 +213,7 @@ export function normalizePrinter(record) {
     normalized.firmwareType = normalizeFirmwareType(normalized.firmwareType)
   }
 
-  return normalized
+  return applyPrinterStateSummary(normalized)
 }
 
 /**
@@ -224,7 +226,7 @@ export function normalizePrinterDetail(data) {
   if (!data.printer || typeof data.printer !== 'object') return normalizePrinter(data)
 
   const realtimeStatus = data.realtimeStatus && typeof data.realtimeStatus === 'object'
-    ? normalizeIdFields(data.realtimeStatus, ['farmJobId'])
+    ? applyPrinterStateSummary(capturePrinterStateSummary(normalizeIdFields(data.realtimeStatus, ['farmJobId'])), data.printer.id)
     : null
   const currentJob = data.currentJob && typeof data.currentJob === 'object'
     ? normalizeIdFields(data.currentJob, ['id', 'printerId', 'fileId', 'userId', 'operatorId'])

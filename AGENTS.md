@@ -69,11 +69,11 @@ npm run preview     # 预览构建产物
 npm run lint:check  # 只读运行 Oxlint 和 ESLint，发布门禁使用此命令
 npm run lint        # 运行带自动修复的 lint，仅在确认 diff 后使用
 npm run format      # 格式化 src/
-npm test             # Node.js 内置回归测试
+npm test             # Node.js 内置回归测试，最多 4 个文件并行，限制联调期间内存占用
 npm run test:local    # 本地产品边界、现场会话与完整设备模型
 npm run test:auth    # 会话与真实 Store 异步回归
 npm run test:printer-ip # 打印机 IP 同步权限、轮询与生命周期回归
-npm run test:printer-model # 统一模型校验、测量质量、新鲜度和请求隔离回归
+npm run test:printer-model # 完整模型与轻量摘要的身份、质量、新鲜度和请求隔离回归
 npm run test:history-export # 历史导出筛选、下载、JSON Blob 错误及会话隔离回归
 npm run test:mock    # Mock HTTP 集成回归
 npm run build:mock   # Mock 构建
