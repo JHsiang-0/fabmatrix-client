@@ -160,6 +160,26 @@ test.after(async () => {
   await viteServer.close()
 })
 
+test('待改密账号直接调用实时 Store 时不创建连接和业务请求', async () => {
+  setActivePinia(createPinia())
+  const user = useUserStore()
+  user.token = 'synthetic-temporary-session'
+  user.userInfo = { id: '2', role: 'OPERATOR', mustChangePassword: true }
+  let socketAttempts = 0
+  let businessRequests = 0
+  service.defaults.adapter = async () => {
+    businessRequests += 1
+    throw new Error('待改密账号不应发起业务请求')
+  }
+  const realtime = useRealtimeStore()
+  realtime.connectWs({ webSocketFactory: () => { socketAttempts += 1 } })
+  await nextTick()
+  assert.equal(socketAttempts, 0)
+  assert.equal(businessRequests, 0)
+  assert.equal(realtime.wsConnectionState, 'CLOSED')
+  assert.equal(user.token, 'synthetic-temporary-session')
+})
+
 test('真实 grid Pinia Store 取消过期草稿后重载布局和设备并清空全部草稿', async () => {
   setActivePinia(createPinia())
   let serverLayout = layout(1)

@@ -4,6 +4,80 @@ import path from 'node:path'
 import { _electron as electron } from 'playwright'
 import { expect, test } from '@playwright/test'
 
+test('Electron 正式构建的待改密账号保持改密页且不启动实时业务连接', async () => {
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fabmatrix-electron-password-e2e-'))
+  const electronApp = await electron.launch({
+    args: [path.resolve('.')],
+    env: {
+      ...process.env,
+      FARM_ELECTRON_E2E: '1',
+      FARM_ELECTRON_E2E_DIST: '1',
+      FARM_ELECTRON_E2E_USER_DATA: userDataDir
+    }
+  })
+  try {
+    const page = await electronApp.firstWindow()
+    const businessRequests = []
+    let socketAttempts = 0
+    let changedPassword = false
+    const identity = {
+      userId: '2', username: 'worker', role: 'OPERATOR', mustChangePassword: true
+    }
+    await page.route('http://**/*', async route => {
+      const request = route.request()
+      const pathname = new URL(request.url()).pathname
+      let data
+      if (pathname === '/api/v1/auth/setup/status') data = { initialized: true, setupEnabled: false }
+      else if (pathname === '/api/v1/auth/login') {
+        data = { ...identity, token: 'synthetic-temporary-session', expiresIn: 3600 }
+      } else if (pathname === '/api/v1/auth/me') data = identity
+      else if (pathname === '/api/v1/auth/2/change-password') {
+        expect(request.postDataJSON()).toEqual({
+          oldPassword: 'Temporary1', newPassword: 'Employee1', confirmPassword: 'Employee1'
+        })
+        changedPassword = true
+        data = null
+      } else {
+        businessRequests.push(pathname)
+        await route.fulfill({ status: 403, json: { code: 4031, message: '请先修改临时密码' } })
+        return
+      }
+      await route.fulfill({ json: { code: 200, message: '操作成功', data } })
+    })
+    await page.routeWebSocket('ws://**/*', socket => {
+      socketAttempts += 1
+      socket.close({ code: 1008, reason: 'Password change required' })
+    })
+    await page.reload()
+    await page.getByLabel('用户名', { exact: true }).fill('worker')
+    await page.getByLabel('密码', { exact: true }).fill('Temporary1')
+    await page.getByRole('button', { name: '登录', exact: true }).click()
+    await expect(page).toHaveURL(/#\/change-password$/)
+    await expect(page.getByText('请修改临时密码', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '修改并重新登录' })).toBeEnabled()
+    expect(socketAttempts).toBe(0)
+    expect(businessRequests).toEqual([])
+
+    await page.reload()
+    await expect(page.getByText('请修改临时密码', { exact: true })).toBeVisible()
+    expect(socketAttempts).toBe(0)
+    expect(businessRequests).toEqual([])
+    const fields = page.locator('input[type=password]')
+    await fields.nth(0).fill('Temporary1')
+    await fields.nth(1).fill('Employee1')
+    await fields.nth(2).fill('Employee1')
+    await page.getByRole('button', { name: '修改并重新登录' }).click()
+    await expect(page).toHaveURL(/#\/login$/)
+    expect(changedPassword).toBe(true)
+    expect(socketAttempts).toBe(0)
+    expect(businessRequests).toEqual([])
+    await expect.poll(() => page.evaluate(() => sessionStorage.getItem('farm-ui-session'))).toBeNull()
+  } finally {
+    await electronApp.close()
+    fs.rmSync(userDataDir, { recursive: true, force: true })
+  }
+})
+
 test('Electron desktop 构建产物加载 dist-file 并保留运行诊断', async () => {
   const distIndexPath = path.resolve('dist/index.html')
   expect(fs.existsSync(distIndexPath)).toBe(true)

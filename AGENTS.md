@@ -83,6 +83,8 @@ npm run release:gate # 1.0.0 发布门禁
 
 `npm run test:electron:dist` 会先构建 desktop 产物，再验证 Electron 的 `dist-file` 入口；`npm run verify` 还会执行全量构建和 Playwright。新增测试时应同步补充 `package.json` 命令和本文件说明。正式构建不应启用 Mock 环境。
 
+`npm run test:electron:dist` 同时覆盖正式桌面构建中的强制改密流程，验证后端拒绝业务 WebSocket 的情况下，待改密账号保持独立改密页并可刷新、提交密码和重新登录。
+
 `npm run test:auth` 复用会话单测和真实 Pinia/Axios Store 回归，覆盖快速重登的身份/权限隔离、旧恢复请求成功或失败、恢复请求去重、持久化存储、同 Token 重登的 401/变更请求隔离和当前会话 401 清理。
 
 ## 代码规范

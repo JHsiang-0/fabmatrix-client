@@ -122,8 +122,10 @@ test('全屏加载、错误和无设备覆盖层使用 TDesign，并保留详情
 })
 
 test('实时连接由应用根部按认证路由统一维护', () => {
-  assert.match(appSource, /isProtectedRoute/)
-  assert.match(appSource, /watch\(\s*\[isProtectedRoute, \(\) => userStore\.token\]/)
+  assert.match(appSource, /canConnectRealtime/)
+  assert.match(appSource, /&& userStore\.isAuthenticated/)
+  assert.match(appSource, /&& !userStore\.userInfo\.mustChangePassword/)
+  assert.match(appSource, /watch\(\s*\[canConnectRealtime, \(\) => userStore\.token\]/)
   assert.match(appSource, /realtimeStore\.connectWs\(\)/)
   assert.match(appSource, /realtimeStore\.disconnectWs\(\)/)
 })

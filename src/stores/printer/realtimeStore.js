@@ -449,6 +449,10 @@ export const useRealtimeStore = defineStore('realtime', () => {
    * 连接 WebSocket
    */
   function connectWs(options = {}) {
+    if (userStore.userInfo.mustChangePassword) {
+      disconnectWs()
+      return
+    }
     if (isMockEnabled && mockStream) return
     if (!isMockEnabled && wsClient) disconnectWs()
     const generation = ++lifecycleGeneration

@@ -21,10 +21,14 @@ const isDesktopApp = Boolean(window.farmDesktop?.isDesktop)
 const showDesktopTitleBar = computed(() => isDesktopApp && !route.matched.some(record => record.meta?.fullscreen))
 const userStore = useUserStore()
 const realtimeStore = useRealtimeStore()
-const isProtectedRoute = computed(() => route.matched.some(record => record.meta?.requiresAuth))
+const canConnectRealtime = computed(() => (
+  route.matched.some(record => record.meta?.requiresAuth)
+  && userStore.isAuthenticated
+  && !userStore.userInfo.mustChangePassword
+))
 
 watch(
-  [isProtectedRoute, () => userStore.token],
+  [canConnectRealtime, () => userStore.token],
   ([shouldConnect, token]) => {
     if (shouldConnect && token) realtimeStore.connectWs()
     else realtimeStore.disconnectWs()
