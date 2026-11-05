@@ -3,8 +3,98 @@ import { readFile } from 'node:fs/promises'
 import { readXlsx } from '../helpers/xlsxReadback.js'
 import { isFeatureEnabled } from '../../src/config/features.js'
 import { printerModelFixture } from '../fixtures/printerModel.js'
+import { mockCloudManagement } from '../fixtures/cloudManagement.js'
+
+test('云端组织农场展示统计并编辑资料，删除限制可见', async ({ page }) => {
+  const calls = await mockCloudManagement(page)
+  await expect(page.getByRole('heading', { name: '测试农场', exact: true })).toBeVisible()
+  await expect(page.getByText('125', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '编辑资料', exact: true }).click()
+  await page.getByLabel('资料名称', { exact: true }).getByRole('textbox').fill('更新后的农场')
+  await page.getByLabel('资料说明', { exact: true }).getByRole('textbox').fill('更新后的说明')
+  await page.getByLabel('农场地点', { exact: true }).getByRole('textbox').fill('二号车间')
+  await page.getByRole('button', { name: '保存', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '更新后的农场', exact: true })).toBeVisible()
+  await expect(page.getByText('地点 / 车间 二号车间', { exact: true })).toBeVisible()
+  expect(calls.some(c => c.path.endsWith('/farm/profile') && c.body.description === '更新后的说明')).toBe(true)
+  await expect(page.locator('.t-dialog:visible')).toHaveCount(0)
+  await page.screenshot({ path: 'test-results/cloud-farm-management.png', fullPage: true, animations: 'disabled' })
+  await page.getByRole('button', { name: '删除农场', exact: true }).click()
+  await page.getByRole('button', { name: '确认', exact: true }).click()
+  await expect(page.getByText('农场仍有网关或成员授权，请先处理下级资源', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '组织概览', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '测试组织', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '查看农场', exact: true })).toBeVisible()
+  await page.getByText('操作记录', { exact: true }).click()
+  await expect(page.getByText('FARM_PROFILE_UPDATED', { exact: true })).toBeVisible()
+})
+
+test('云端网关一次性绑定码随退出清除，成员授权支持确认', async ({ page }) => {
+  const calls = await mockCloudManagement(page)
+  await page.getByText('成员授权', { exact: true }).click()
+  await expect(page.getByText('synthetic-viewer', { exact: true })).toBeVisible()
+  await page.locator('.t-switch:not(.t-is-disabled)').click()
+  await page.getByRole('button', { name: '确认', exact: true }).click()
+  await expect.poll(() => calls.some(c => c.path.endsWith('/farm/members/viewer') && c.method === 'DELETE')).toBe(true)
+  await page.getByText('网关管理', { exact: true }).click()
+  await page.getByRole('button', { name: '新增网关', exact: true }).click()
+  await page.getByLabel('资料名称', { exact: true }).getByRole('textbox').fill('新增现场网关')
+  await page.getByRole('button', { name: '保存', exact: true }).click()
+  await expect(page.getByLabel('一次性绑定码', { exact: true }).getByRole('textbox')).toHaveValue('synthetic-once-binding-ticket')
+  await page.getByRole('button', { name: '我已记录', exact: true }).click()
+  await page.getByRole('button', { name: '退出云端', exact: true }).click()
+  await expect(page.getByLabel('一次性绑定码', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('请先前往云端看板登录', { exact: true })).toBeVisible()
+})
+
+test('查看员仅显示已授权概览，隐藏组织农场管理写操作', async ({ page }) => {
+  await mockCloudManagement(page, 'VIEWER')
+  await expect(page.getByRole('heading', { name: '测试农场', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '编辑资料', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '新建农场', exact: true })).toHaveCount(0)
+  await expect(page.getByText('成员授权', { exact: true })).toHaveCount(0)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.screenshot({ path: 'test-results/cloud-management-viewer-mobile.png', fullPage: true })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
+
+test('云端管理确认期间会话失效关闭确认框并清除旧操作', async ({ page }) => {
+  const calls = await mockCloudManagement(page)
+  await page.getByRole('button', { name: '删除农场', exact: true }).click()
+  await expect(page.getByRole('button', { name: '确认', exact: true })).toBeVisible()
+  await page.evaluate(async () => {
+    const { useCloudStore } = await import('/src/stores/cloud.js')
+    await useCloudStore().logout()
+  })
+  await expect(page.getByRole('button', { name: '确认', exact: true })).toHaveCount(0)
+  await expect(page.getByText('请先前往云端看板登录', { exact: true })).toBeVisible()
+  expect(calls.filter(c => c.method === 'DELETE')).toEqual([])
+})
 
 const batchDispatchEnabled = isFeatureEnabled('batchDispatch')
+
+test('云端临时密码账号先改密，再返回登录页', async ({ page }) => {
+  const requests = []
+  await page.route('https://cloud.test/api/v1/**', async route => {
+    const req = route.request(), path = new URL(req.url()).pathname
+    if (req.method() === 'OPTIONS') { await route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } }); return }
+    requests.push(path)
+    const data = path.endsWith('/login') ? { accessToken: 'synthetic-temporary', user: { id: 'new-member', mustChangePassword: true } } : { success: true }
+    await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(data) })
+  })
+  await page.goto('/cloud')
+  await page.getByPlaceholder('https://cloud.example.com').fill('https://cloud.test')
+  await page.getByPlaceholder('云端用户名', { exact: true }).fill('new-member')
+  await page.getByPlaceholder('云端密码', { exact: true }).fill('synthetic-temporary')
+  await page.getByRole('button', { name: '登录云端', exact: true }).click()
+  await expect(page.getByText('首次登录请修改临时密码', { exact: true })).toBeVisible()
+  await page.getByLabel('云端临时密码', { exact: true }).locator('input').fill('synthetic-temporary')
+  await page.getByLabel('云端新密码', { exact: true }).locator('input').fill('synthetic-replacement')
+  await page.getByLabel('确认云端新密码', { exact: true }).locator('input').fill('synthetic-replacement')
+  await page.getByRole('button', { name: '修改密码并重新登录', exact: true }).click()
+  await expect(page.getByPlaceholder('云端用户名', { exact: true })).toBeVisible()
+  expect(requests).toEqual(['/api/v1/auth/login', '/api/v1/auth/password'])
+})
 
 test('设备概览按场景展示温度与打印，次要数据分层且离线清理旧值', async ({ page }) => {
   await login(page)

@@ -90,6 +90,27 @@ export const createCloudSession = (api, state = createCloudState()) => {
     finally { if (current === generation) state.loading = false }
   }
 
+  const refreshScopes = async () => {
+    if (!state.token) return false
+    const orgId = state.organizationId, farmId = state.farmId
+    const current = cancel()
+    state.loading = true
+    state.printers = []; state.total = 0; state.lastRefreshAt = null
+    try {
+      const organizations = await request('get', '/api/v1/organizations')
+      if (current !== generation) return false
+      state.organizations = organizations
+      const selected = organizations.find(o => o.id === orgId)?.id || organizations[0]?.id || ''
+      const farms = selected ? await request('get', `/api/v1/organizations/${encodeURIComponent(selected)}/farms`) : []
+      if (current !== generation) return false
+      state.organizationId = selected
+      state.farms = farms
+      state.farmId = farms.some(f => f.id === farmId) ? farmId : ''
+      return true
+    } catch (error) { failure(error, current); return false }
+    finally { if (current === generation) state.loading = false }
+  }
+
   const login = async (url, username, password) => {
     const normalized = normalizeCloudUrl(url)
     if (!normalized) { state.error = '请输入 HTTPS 云端地址，本机调试可使用 HTTP 地址'; return false }
@@ -100,6 +121,11 @@ export const createCloudSession = (api, state = createCloudState()) => {
     try {
       const result = await api.login(normalized, username, password, controller.signal)
       if (current !== generation) return false
+      if (result.user?.mustChangePassword) {
+        state.token = result.accessToken
+        state.user = result.user
+        return true
+      }
       const organizations = await api.request(normalized, result.accessToken, 'get', '/api/v1/organizations', undefined, controller.signal)
       if (current !== generation) return false
       state.token = result.accessToken
@@ -120,5 +146,21 @@ export const createCloudSession = (api, state = createCloudState()) => {
       catch { /* The local cloud session is already cleared; never touch the LAN session. */ }
     }
   }
-  return { state, login, logout, refresh, selectOrganization, selectFarm, cancel }
+  const changeRequiredPassword = async (currentPassword, newPassword) => {
+    if (!state.token || !state.user?.mustChangePassword || state.authenticating) return false
+    const current = generation
+    state.authenticating = true
+    try {
+      await request('post', '/api/v1/auth/password', { currentPassword, newPassword })
+      if (current !== generation) return false
+      clear()
+      state.error = '密码已修改，请使用新密码重新登录'
+      return true
+    } catch (error) {
+      if (current === generation) state.error = error?.status === 400 ? '密码不符合要求，或原密码不正确' : '修改密码失败，请重试'
+      if (error?.status === 401) failure(error, current)
+      return false
+    } finally { if (current === generation) state.authenticating = false }
+  }
+  return { state, login, logout, refresh, selectOrganization, selectFarm, refreshScopes, changeRequiredPassword, cancel }
 }

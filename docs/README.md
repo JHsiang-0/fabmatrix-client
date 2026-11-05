@@ -15,6 +15,7 @@
 | --- | --- | --- |
 | [`../AGENTS.md`](../AGENTS.md) | 前端协作、验证和安全约束 | 工作规则 |
 | [`VERSION_AND_ROADMAP.md`](./VERSION_AND_ROADMAP.md) | 产品版本、历史规格和发布范围的唯一映射 | 当前权威索引 |
+| [`CLOUD_MANAGEMENT.md`](./CLOUD_MANAGEMENT.md) | 云端组织、农场、成员、网关和审计管理 | 云端首期界面 |
 | [`../API_HANDOFF.md`](../API_HANDOFF.md) | 前后端 HTTP/WebSocket 契约 | 当前接口依据 |
 | [`../FRONTEND_UI_SPECIFICATION.md`](../FRONTEND_UI_SPECIFICATION.md) | UI 设计和交互基线 | 当前设计参考 |
 | [`../design-qa.md`](../design-qa.md) | UI 视觉验收记录 | 验收证据 |

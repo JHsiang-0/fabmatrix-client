@@ -59,10 +59,12 @@ export const message = messageFacade
  */
 export function confirmMessage(content, title = '提示', options = {}) {
   return new Promise((resolve, reject) => {
+    if (options.signal?.aborted) { reject('cancel'); return }
     let settled = false
     const settle = (callback) => {
       if (settled) return
       settled = true
+      options.signal?.removeEventListener('abort', abortDialog)
       callback()
     }
 
@@ -71,6 +73,10 @@ export function confirmMessage(content, title = '提示', options = {}) {
       // 传入自定义 onClose 后，TDesign 不再执行默认的隐藏逻辑。
       dialog?.hide?.()
       settle(callback)
+    }
+    const abortDialog = () => {
+      dialog?.destroy?.()
+      settle(() => reject('cancel'))
     }
 
     dialog = DialogPlugin.confirm({
@@ -84,6 +90,7 @@ export function confirmMessage(content, title = '提示', options = {}) {
       onCancel: () => closeDialog(() => reject('cancel')),
       onClose: () => closeDialog(() => reject('cancel'))
     })
+    options.signal?.addEventListener('abort', abortDialog, { once: true })
   })
 }
 

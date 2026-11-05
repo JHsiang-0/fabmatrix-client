@@ -4,6 +4,7 @@
       <div><h1>云端只读看板</h1><p>远程查看已授权农场的设备状态</p></div>
       <div class="cloud-actions">
         <t-tag theme="primary" variant="light">只读</t-tag>
+        <t-button v-if="state.token && !state.user?.mustChangePassword" variant="outline" @click="router.push({ name: 'cloud-management' })">组织与农场管理</t-button>
         <t-button variant="outline" @click="router.push({ name: 'server-connection' })">局域网连接</t-button>
         <t-button v-if="state.token" variant="outline" @click="store.logout">退出云端</t-button>
       </div>
@@ -21,6 +22,14 @@
       <p class="cloud-note">使用云端账号登录。云端会话仅保存在本次应用运行期间，局域网账号保持独立。</p>
     </t-card>
 
+    <t-card v-else-if="state.user?.mustChangePassword" title="首次登录请修改临时密码" class="cloud-login">
+      <form @submit.prevent="changePassword">
+        <t-form-item label="临时密码"><t-input v-model="passwordForm.current" type="password" aria-label="云端临时密码" /></t-form-item>
+        <t-form-item label="新密码"><t-input v-model="passwordForm.next" type="password" aria-label="云端新密码" :maxlength="64" /></t-form-item>
+        <t-form-item label="确认新密码"><t-input v-model="passwordForm.confirm" type="password" aria-label="确认云端新密码" :maxlength="64" /></t-form-item>
+        <t-button type="submit" :loading="state.authenticating" :disabled="!passwordValid">修改密码并重新登录</t-button>
+      </form>
+    </t-card>
     <template v-else>
       <t-card class="cloud-toolbar">
         <div class="cloud-filters">
@@ -74,6 +83,14 @@ const endpointKey = 'fabmatrix.cloud.endpoint'
 let storedEndpoint = ''
 try { storedEndpoint = window.localStorage.getItem(endpointKey) || '' } catch { /* Storage is optional. */ }
 const form = reactive({ url: state.apiUrl || storedEndpoint, username: '', password: '' })
+const passwordForm = reactive({ current: '', next: '', confirm: '' })
+const passwordValid = computed(() => passwordForm.current && passwordForm.next.length >= 6
+  && passwordForm.next === passwordForm.confirm && new TextEncoder().encode(passwordForm.next).length <= 72)
+const changePassword = async () => {
+  if (!passwordValid.value) return
+  try { await store.changeRequiredPassword(passwordForm.current, passwordForm.next) }
+  finally { Object.assign(passwordForm, { current: '', next: '', confirm: '' }) }
+}
 const organizationOptions = computed(() => state.organizations.map(item => ({ label: item.name, value: item.id })))
 const farmOptions = computed(() => state.farms.map(item => ({ label: item.name, value: item.id })))
 const columns = [
@@ -107,7 +124,7 @@ onMounted(() => {
   timer = window.setInterval(() => { clock.value = Date.now(); if (!document.hidden) store.refresh() }, 5000)
   if (state.token) store.refresh()
 })
-onUnmounted(() => { window.clearInterval(timer); store.cancel() })
+onUnmounted(() => { window.clearInterval(timer); store.cancel(); Object.assign(passwordForm, { current: '', next: '', confirm: '' }) })
 </script>
 
 <style scoped>

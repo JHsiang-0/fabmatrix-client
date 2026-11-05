@@ -16,6 +16,8 @@ const execute = async (baseURL, token, method, url, data, signal) => {
     // Do not propagate Axios config objects containing cloud tokens or login passwords.
     const sanitized = new Error('Cloud request failed')
     sanitized.status = Number(error?.response?.status || 0)
+    const code = error?.response?.data?.code
+    if (typeof code === 'string' && /^[A-Z_]{1,64}$/.test(code)) sanitized.code = code
     throw sanitized
   }
 }

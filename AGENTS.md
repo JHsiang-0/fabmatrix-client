@@ -68,6 +68,7 @@ npm run lint:check  # 只读运行 Oxlint 和 ESLint，发布门禁使用此命�
 npm run lint        # 运行带自动修复的 lint，仅在确认 diff 后使用
 npm run format      # 格式化 src/
 npm test             # Node.js 内置回归测试
+npm run test:cloud    # 独立云会话、组织农场概览与管理请求生命周期
 npm run test:auth    # 会话与真实 Store 异步回归
 npm run test:printer-ip # 打印机 IP 同步权限、轮询与生命周期回归
 npm run test:printer-model # 统一模型校验、测量质量、新鲜度和请求隔离回归

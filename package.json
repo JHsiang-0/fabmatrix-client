@@ -18,7 +18,7 @@
     "desktop:build:mock": "npm run build:desktop:mock && node --require ./scripts/electron-builder-rename-retry.cjs ./node_modules/electron-builder/out/cli/cli.js --config electron-builder.mock.yml --win nsis",
     "desktop:build:dir": "npm run build:desktop && node --require ./scripts/electron-builder-rename-retry.cjs ./node_modules/electron-builder/out/cli/cli.js --win dir",
     "test": "node --test tests/*.test.js",
-    "test:cloud": "node --test tests/cloudSession.test.js",
+    "test:cloud": "node --test tests/cloudSession.test.js tests/cloudManagement.test.js",
     "test:auth": "node --test tests/authSession.test.js tests/accountSecurity.test.js tests/dashboardStoreRuntime.test.js",
     "test:printer-ip": "node --test tests/printerRediscovery.test.js",
     "test:printer-model": "node --test tests/printerModel.test.js",
