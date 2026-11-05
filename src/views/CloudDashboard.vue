@@ -3,6 +3,7 @@
     <header class="cloud-header">
       <div><h1>云端只读看板</h1><p>远程查看已授权农场的设备状态</p></div>
       <div class="cloud-actions">
+        <t-button variant="outline" @click="router.push({ name: 'dashboard-overview' })">返回局域网</t-button>
         <t-tag theme="primary" variant="light">只读</t-tag>
         <t-button v-if="state.token && !state.user?.mustChangePassword" variant="outline" @click="router.push({ name: 'cloud-management' })">组织与农场管理</t-button>
         <t-button variant="outline" @click="router.push({ name: 'server-connection' })">局域网连接</t-button>
@@ -20,6 +21,7 @@
         <t-button type="submit" block :loading="state.authenticating" :disabled="!form.username || !form.password">登录云端</t-button>
       </form>
       <p class="cloud-note">使用云端账号登录。云端会话仅保存在本次应用运行期间，局域网账号保持独立。</p>
+      <p v-if="route.query.next === 'management'" class="cloud-note">登录后进入组织与农场管理。</p>
     </t-card>
 
     <t-card v-else-if="state.user?.mustChangePassword" title="首次登录请修改临时密码" class="cloud-login">
@@ -68,13 +70,14 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useCloudStore } from '@/stores/cloud'
 
 defineOptions({ name: 'CloudDashboard' })
 const store = useCloudStore()
 const state = store.state
 const router = useRouter()
+const route = useRoute()
 const clock = ref(Date.now())
 const connectionUncertain = () => Boolean(state.error) || clock.value - (state.lastRefreshAt || 0) > 15000
 const isStale = row => row.stale || connectionUncertain()
@@ -107,9 +110,12 @@ const temperature = value => value == null ? '—' : `${value.toFixed(1)}℃`
 const stateLabel = value => ({ IDLE: '空闲', PRINTING: '打印中', PAUSED: '暂停', PREPARING: '准备中', ERROR: '故障', OFFLINE: '离线', UNKNOWN: '未知' })[value] || '未知'
 const login = async () => {
   try {
-    await store.login(form.url, form.username.trim(), form.password)
+    const loggedIn = await store.login(form.url, form.username.trim(), form.password)
     if (state.token) {
       try { window.localStorage.setItem(endpointKey, state.apiUrl) } catch { /* Storage is optional. */ }
+    }
+    if (loggedIn && state.token && !state.user?.mustChangePassword && route.query.next === 'management') {
+      await router.replace({ name: 'cloud-management' })
     }
   } finally { form.password = '' }
 }

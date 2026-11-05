@@ -267,7 +267,9 @@ const parentLabels = {
   批量派发: '批量派发',
   用户管理: '管理中心',
   操作日志: '管理中心',
-  个人中心: '个人中心'
+  个人中心: '个人中心',
+  云端设备看板: '云端平台',
+  组织与农场管理: '云端平台'
 }
 
 const login = async page => {
@@ -288,6 +290,49 @@ const loginAs = async (page, username, password) => {
   await expect(page).toHaveURL(/\/dashboard$/)
   await expect(page.getByRole('heading', { name: '概览仪表盘' })).toBeVisible()
 }
+
+test('主界面顶部云端入口支持独立登录、自动进入管理并返回局域网', async ({ page }) => {
+  const calls = await mockCloudManagement(page, 'OWNER', { login: false })
+  await login(page)
+  const localSession = await page.evaluate(() => window.localStorage.getItem('farm-ui-session') || window.sessionStorage.getItem('farm-ui-session'))
+  await page.getByRole('button', { name: '云端管理', exact: true }).click()
+  await expect(page).toHaveURL(/\/cloud\?next=management$/)
+  await expect(page.getByText('登录后进入组织与农场管理。', { exact: true })).toBeVisible()
+  await page.getByPlaceholder('https://cloud.example.com').fill('https://cloud.test')
+  await page.getByPlaceholder('云端用户名', { exact: true }).fill('synthetic-owner')
+  await page.getByPlaceholder('云端密码', { exact: true }).fill('synthetic-password')
+  await page.getByRole('button', { name: '登录云端', exact: true }).click()
+  await expect(page).toHaveURL(/\/cloud\/manage$/)
+  await expect(page.getByRole('heading', { name: '测试农场', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '返回局域网', exact: true }).click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.getByRole('heading', { name: '概览仪表盘', exact: true })).toBeVisible()
+  expect(await page.evaluate(() => window.localStorage.getItem('farm-ui-session') || window.sessionStorage.getItem('farm-ui-session'))).toBe(localSession)
+  await page.screenshot({ path: 'test-results/cloud-entry-main.png', fullPage: true, animations: 'disabled' })
+  await openSidebarItem(page, 1280, '组织与农场管理')
+  await expect(page).toHaveURL(/\/cloud\/manage$/)
+  expect(calls.filter(c => c.path.endsWith('/auth/login'))).toHaveLength(1)
+})
+
+test('窄屏侧栏为局域网查看员提供云端平台入口，使用独立云权限', async ({ page }) => {
+  await mockCloudManagement(page, 'OWNER', { login: false })
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.goto('/login')
+  await page.evaluate(async () => { const { mockState } = await import('/src/mock/data.js'); Object.assign(mockState.users[1], { username: 'viewer', password: 'Viewer123', role: 'VIEWER' }) })
+  await page.getByLabel('用户名', { exact: true }).fill('viewer')
+  await page.getByLabel('密码', { exact: true }).fill('Viewer123')
+  await page.getByRole('button', { name: '登录', exact: true }).click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.getByRole('button', { name: '云端管理', exact: true })).not.toBeVisible()
+  await openSidebarItem(page, 375, '组织与农场管理')
+  await expect(page).toHaveURL(/\/cloud\?next=management$/)
+  await expect(page.getByRole('button', { name: '登录云端', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '返回局域网', exact: true }).click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await openSidebarItem(page, 375, '云端设备看板')
+  await expect(page).toHaveURL(/\/cloud$/)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
 
 test('打印历史导出独立筛选 Excel 和 PDF 全部分页，保持列表条件并可窄屏下载', async ({ page }) => {
   await page.goto('/login')

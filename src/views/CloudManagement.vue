@@ -6,6 +6,7 @@
         <p>云端账号 {{ session.user?.username }} · {{ roleLabel(role) }}</p>
       </div>
       <div class="actions">
+        <t-button variant="outline" @click="router.push({ name: 'dashboard-overview' })">返回局域网</t-button>
         <t-button variant="outline" @click="router.push('/cloud')">返回设备看板</t-button>
         <t-button variant="outline" @click="store.logout">退出云端</t-button>
       </div>

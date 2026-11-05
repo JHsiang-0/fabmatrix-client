@@ -11,7 +11,7 @@ export const resourceSummary = () => ({
   lastReceivedAt: null,
 })
 
-export async function mockCloudManagement(page, role = 'OWNER') {
+export async function mockCloudManagement(page, role = 'OWNER', { login = true } = {}) {
   const calls = []
   let organization = {
     id: 'org',
@@ -112,6 +112,7 @@ export async function mockCloudManagement(page, role = 'OWNER') {
       body: JSON.stringify(data),
     })
   })
+  if (!login) return calls
   await page.goto('/cloud')
   await page.getByPlaceholder('https://cloud.example.com').fill('https://cloud.test')
   await page.getByPlaceholder('云端用户名', { exact: true }).fill('synthetic-owner')

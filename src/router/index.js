@@ -20,6 +20,14 @@ const router = createRouter({
       path: '/cloud/manage',
       name: 'cloud-management',
       component: () => import('../views/CloudManagement.vue'),
+      beforeEnter: async () => {
+        // Load lazily to keep the router/request/cloud transport dependency cycle deferred.
+        const { useCloudStore } = await import('@/stores/cloud')
+        const cloud = useCloudStore().state
+        if (!cloud.token || cloud.user?.mustChangePassword) {
+          return { name: 'cloud-dashboard', query: { next: 'management' } }
+        }
+      },
       meta: { requiresAuth: false, skipSessionRestore: true }
     },
     {

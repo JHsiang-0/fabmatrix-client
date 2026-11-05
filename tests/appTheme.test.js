@@ -36,7 +36,7 @@ test('semantic scroll regions share Chromium and Firefox scrollbar tokens', () =
 })
 
 test('navigation follows the T208-1 information architecture', () => {
-  for (const label of ['工作台', '打印机', '文件', '任务', '批量派发', '管理中心', '个人中心']) {
+  for (const label of ['工作台', '打印机', '文件', '任务', '批量派发', '云端平台', '管理中心', '个人中心']) {
     assert.match(navigationSource, new RegExp(`label: '${label}'`))
   }
   assert.match(navigationSource, /to: '\/profile'/)

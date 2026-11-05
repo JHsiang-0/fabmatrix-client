@@ -1,4 +1,5 @@
 import {
+  CloudIcon,
   DashboardIcon,
   FolderOpenIcon,
   PrintIcon,
@@ -42,6 +43,15 @@ export const navigationGroups = [
     label: '批量派发',
     icon: SendIcon,
     items: [{ key: 'tasks-batch', title: '批量派发', to: '/batch-dispatch', feature: 'batchDispatch' }]
+  },
+  {
+    key: 'cloud',
+    label: '云端平台',
+    icon: CloudIcon,
+    items: [
+      { key: 'cloud-dashboard', title: '云端设备看板', to: '/cloud' },
+      { key: 'cloud-management', title: '组织与农场管理', to: '/cloud/manage' }
+    ]
   },
   {
     key: 'management',
