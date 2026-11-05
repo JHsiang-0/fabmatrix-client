@@ -70,9 +70,9 @@
           </t-button>
         </span>
       </t-tooltip>
-      <t-tooltip content="系统设置暂未开放">
+      <t-tooltip :content="userStore.isAdmin ? '服务器设置' : '仅管理员可配置服务器'">
         <span class="app-header__tooltip-trigger app-header__optional-action" tabindex="0">
-          <t-button variant="text" class="header-icon-button" aria-label="系统设置" disabled>
+          <t-button variant="text" class="header-icon-button" aria-label="系统设置" :disabled="!userStore.isAdmin" @click="router.push({ name: 'cloud-connection' })">
             <SettingIcon size="19" />
           </t-button>
         </span>
@@ -96,6 +96,7 @@ import {
 } from 'tdesign-icons-vue-next'
 import { enterAppFullscreen } from '@/utils/fullscreen'
 import { useRealtimeStore } from '@/stores/printer/realtimeStore'
+import { useUserStore } from '@/stores/user'
 import AppUserMenu from './AppUserMenu.vue'
 
 defineOptions({ name: 'AppHeader' })
@@ -110,6 +111,7 @@ defineProps({
 defineEmits(['toggle-sidebar'])
 
 const router = useRouter()
+const userStore = useUserStore()
 const realtimeStore = useRealtimeStore()
 const { wsConnectionState, isWsConnected, isRealtimeStale, isRecovering } = storeToRefs(realtimeStore)
 

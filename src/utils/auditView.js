@@ -20,14 +20,20 @@ const ACTION_LABELS = Object.freeze({
   USER_FIRST_PASSWORD_CHANGE: '首次修改临时密码',
   USER_ROLE_CHANGE: '调整岗位角色',
   SESSION_REVOKE: '退出登录会话',
-  SESSION_REVOKE_ALL: '批量退出登录会话'
+  SESSION_REVOKE_ALL: '批量退出登录会话',
+  CLOUD_BIND: '绑定云网关',
+  CLOUD_ENABLE: '开启云端上报',
+  CLOUD_DISABLE: '关闭云端上报',
+  CLOUD_UNBIND: '解除云网关绑定',
+  CLOUD_CONNECTION_CHANGE: '变更云端连接'
 })
 
 const TARGET_LABELS = Object.freeze({
   JOB: '打印任务',
   PRINTER: '打印机',
   FILE: '文件',
-  USER: '用户'
+  USER: '用户',
+  CLOUD_GATEWAY: '云网关'
 })
 
 export const AUDIT_ACTION_OPTIONS = Object.freeze(

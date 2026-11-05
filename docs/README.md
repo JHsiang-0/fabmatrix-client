@@ -18,6 +18,7 @@
 | [`VERSION_AND_ROADMAP.md`](./VERSION_AND_ROADMAP.md) | 产品版本、历史规格和发布范围的唯一映射 | 当前权威索引 |
 | [`CLOUD_MANAGEMENT.md`](./CLOUD_MANAGEMENT.md) | 原 Client 云端页面的阶段记录 | 历史参考，远程界面归手机 App |
 | [`../API_HANDOFF.md`](../API_HANDOFF.md) | 前后端 HTTP/WebSocket 契约 | 当前接口依据 |
+| [Server 云端连接](../../../Java/fabmatrix-server/docs/CLOUD_GATEWAY.md) | 本地管理员配置网关绑定、上报与解绑 | 当前设置页契约及升级顺序 |
 | [`../FRONTEND_UI_SPECIFICATION.md`](../FRONTEND_UI_SPECIFICATION.md) | UI 设计和交互基线 | 当前设计参考 |
 | [`../design-qa.md`](../design-qa.md) | UI 视觉验收记录 | 验收证据 |
 | [`../FRONTEND_TODO.md`](../FRONTEND_TODO.md) | 前端历史任务与遗留项 | 辅助清单，不替代发布门禁 |

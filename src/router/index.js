@@ -88,6 +88,12 @@ const router = createRouter({
           meta: { title: '操作日志', roles: ['ADMIN'], hideBreadcrumb: true }
         },
         {
+          path: 'settings/cloud-connection',
+          name: 'cloud-connection',
+          component: () => import('../views/CloudConnection.vue'),
+          meta: { title: '云端连接', roles: ['ADMIN'], hideBreadcrumb: true, pageScroll: true }
+        },
+        {
           path: 'profile',
           name: 'profile',
           component: () => import('../views/Profile.vue'),

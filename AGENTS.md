@@ -169,4 +169,6 @@ Error
 
 Client 的业务请求统一使用本地 request.js。远程账号、组织、农场与网关管理界面由手机 App 提供，历史 Client 云界面说明保存在 `docs/CLOUD_READONLY.md` 和 `docs/CLOUD_MANAGEMENT.md`；现行本地边界专项命令为 `npm run test:local`。
 
+本地管理员可通过“设置 → 云端连接”管理所选 Server 的绑定、上报开关和解绑。该页面只调用本地 `/api/v1/cloud/**`，绑定码仅保留在当前表单内存，凭据与持久化配置由 Server 管理。远程组织、农场和云账号界面继续归属手机 App。验证包含浏览器的“云端连接”用例、角色路由以及 Server 的配置生命周期与 Cloud 自身凭据权限测试。
+
 固定岗位 ADMIN、OPERATOR、VIEWER。查看员保留设备/公有文件/本人任务读取，不展示生产写操作入口；最终权限由后端强制检查。mustChangePassword 为 true 时导航到独立 /change-password，禁止启动业务布局与实时连接。主动退出调用持久化会话撤销接口；401/过期等被动失效只清除本机状态。账号管理、会话及审计契约见后端 docs/ACCOUNT_SECURITY.md。专项用例为 tests/accountSecurity.test.js 和 browser.spec.js 中的“账号安全”场景。

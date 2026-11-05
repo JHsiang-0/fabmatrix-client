@@ -2625,11 +2625,52 @@ const handleAccountSecurity = config => {
   return null
 }
 
+const handleCloudConnection = config => {
+  const session = requireSession(config, ['ADMIN'])
+  const state = mockState.cloudConnection
+  const path = getPath(config.url)
+  const method = String(config.method || 'get').toUpperCase()
+  const body = getBody(config)
+  if (!(method === 'GET' && path.endsWith('/connection'))) {
+    if (body.revision !== state.revision) fail(409, 409, '配置已被其他管理员更新，请刷新后重试')
+    let action
+    if (method === 'POST' && path.endsWith('/bind')) {
+      if (!/^fmc_b_[A-Za-z0-9_-]{43}$/.test(body.bindingToken || '')) fail(400, 400, '绑定码无效')
+      Object.assign(state, { bound: true, enabled: false, connected: false, state: 'DISABLED',
+        apiUrl: body.apiUrl, mqttUrl: body.mqttUrl, caCertificateConfigured: !body.useSystemTrust,
+        gatewayId: 'mock-gateway', gatewayName: '现场网关', organizationId: 'mock-org',
+        organizationName: '测试组织', farmId: 'mock-farm', farmName: '测试农场',
+        credentialExpiresAt: Date.now() + 2592000000, lastAckAt: null, errorCode: null })
+      action = 'CLOUD_BIND'
+    } else if (method === 'PUT' && path.endsWith('/reporting')) {
+      if (!state.bound) fail(400, 400, '请先绑定云网关')
+      Object.assign(state, { enabled: body.enabled, connected: body.enabled,
+        state: body.enabled ? 'CONNECTED' : 'DISABLED', lastAckAt: body.enabled ? Date.now() : state.lastAckAt })
+      action = body.enabled ? 'CLOUD_ENABLE' : 'CLOUD_DISABLE'
+    } else if (method === 'POST' && path.endsWith('/unbind')) {
+      Object.assign(state, { bound: false, enabled: false, connected: false, state: 'DISABLED',
+        gatewayId: null, gatewayName: null, organizationId: null, organizationName: null,
+        farmId: null, farmName: null, apiUrl: '', mqttUrl: '', credentialExpiresAt: null, lastAckAt: null })
+      action = 'CLOUD_UNBIND'
+    } else if (method === 'POST' && path.endsWith('/refresh-binding')) {
+      if (!state.bound) fail(400, 400, '当前 Server 尚未绑定云网关')
+    } else fail(404, 404, '未找到云端连接接口')
+    if (action) {
+      state.revision += 1
+      mockState.auditLogs.unshift({ id: Date.now(), actorId: session.userId, actorUsername: session.username,
+        actorRole: session.role, action, targetType: 'CLOUD_GATEWAY', targetLabel: '当前 Server 云端连接',
+        result: 'SUCCESS', occurredAt: now() })
+    }
+  }
+  return { ...state, printerCount: mockState.printers.length }
+}
+
 const route = async config => {
   throwMockErrorScenario(config)
   const method = String(config.method || 'get').toUpperCase()
   const path = getPath(config.url)
   const key = `${method} ${path}`
+  if (path.startsWith('/api/v1/cloud/')) return handleCloudConnection(config)
   if (/^\/api\/v1\/auth\/(?:logout|sessions(?:\/.*)?|admin\/users\/[^/]+\/(?:reset-password|sessions(?:\/.*)?))$/.test(path)) return handleAccountSecurity(config)
 
   if (key === 'POST /api/v1/auth/login') return handleLogin(config)

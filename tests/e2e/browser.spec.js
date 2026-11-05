@@ -92,6 +92,7 @@ const pages = [
   { label: '批量派发', path: '/batch-dispatch', text: '批量手动派发', feature: 'batchDispatch' },
   { label: '用户管理', path: '/users', text: '用户管理' },
   { label: '操作日志', path: '/audit-logs', text: '操作日志' },
+  { label: '云端连接', path: '/settings/cloud-connection', text: '管理当前生产服务器的云端数据上报' },
   { label: '个人中心', path: '/profile', text: '个人资料' }
 ].filter(item => !item.feature || isFeatureEnabled(item.feature))
 
@@ -104,6 +105,7 @@ const parentLabels = {
   批量派发: '批量派发',
   用户管理: '管理中心',
   操作日志: '管理中心',
+  云端连接: '设置',
   个人中心: '个人中心'
 }
 
@@ -146,6 +148,64 @@ for (const width of [375, 1280]) {
     expect(remoteRequests).toEqual([])
   })
 }
+
+test('云端连接：管理员绑定后核对归属、开启关闭和解绑，绑定码不落客户端存储', async ({ page }) => {
+  await login(page)
+  await openSidebarItem(page, 1280, '云端连接')
+  await expect(page.getByRole('heading', { name: '云端连接', exact: true })).toBeVisible()
+  const toggle = page.getByLabel('启用云端数据上报', { exact: true })
+  await expect(toggle).toBeDisabled()
+  await page.getByRole('button', { name: '绑定云网关', exact: true }).click()
+  const dialog = page.locator('.t-dialog:visible')
+  const ticket = 'fmc_b_' + 'b'.repeat(43)
+  await dialog.getByLabel('云服务地址', { exact: true }).locator('input').fill('https://cloud.example.test')
+  await dialog.getByLabel('MQTT TLS 地址', { exact: true }).locator('input').fill('ssl://mqtt.example.test:8883')
+  await dialog.getByLabel('一次性绑定码', { exact: true }).locator('input').fill(ticket)
+  await dialog.getByRole('button', { name: '确认绑定', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByText('测试组织', { exact: true })).toBeVisible()
+  await expect(page.getByText('测试农场', { exact: true })).toBeVisible()
+  await expect(toggle).toBeEnabled()
+  await expect(toggle).toHaveAttribute('aria-checked', 'false')
+  await toggle.click()
+  await page.getByRole('button', { name: '确定', exact: true }).click()
+  await expect(toggle).toHaveAttribute('aria-checked', 'true')
+  await expect(page.getByText('在线', { exact: true })).toBeVisible()
+  await toggle.click()
+  await page.getByRole('button', { name: '确定', exact: true }).click()
+  await expect(toggle).toHaveAttribute('aria-checked', 'false')
+  await expect(page.getByText('现场网关', { exact: true })).toBeVisible()
+  await page.screenshot({ path: 'test-results/cloud-connection-bound-1280.png', fullPage: true, animations: 'disabled' })
+  const persisted = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))
+  expect(persisted).not.toContain(ticket)
+  await page.getByRole('button', { name: '解除绑定', exact: true }).click()
+  await page.getByRole('button', { name: '确定', exact: true }).click()
+  await expect(page.getByRole('button', { name: '绑定云网关', exact: true })).toBeVisible()
+  await expect(toggle).toBeDisabled()
+  await page.evaluate(async () => {
+    const { mockState } = await import('/src/mock/data.js')
+    for (const action of ['CLOUD_BIND', 'CLOUD_ENABLE', 'CLOUD_DISABLE', 'CLOUD_UNBIND']) {
+      if (!mockState.auditLogs.some(item => item.action === action)) throw new Error('缺少审计 ' + action)
+    }
+  })
+})
+
+test('云端连接：操作员入口隐藏且直接路由拒绝，窄屏管理员配置可用', async ({ page }) => {
+  await loginAs(page, 'operator', 'Operator123')
+  await expect(page.getByText('云端连接', { exact: true })).toHaveCount(0)
+  await page.evaluate(async () => (await import('/src/router/index.js')).default.push('/settings/cloud-connection'))
+  await expect(page).toHaveURL(/\/403/)
+  await page.evaluate(async () => (await import('/src/stores/user.js')).useUserStore().logout())
+  await page.setViewportSize({ width: 375, height: 812 })
+  await login(page)
+  await openSidebarItem(page, 375, '云端连接')
+  await page.getByRole('button', { name: '绑定云网关', exact: true }).click()
+  await expect(page.getByLabel('一次性绑定码', { exact: true })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: 'test-results/cloud-connection-binding-375.png', fullPage: true, animations: 'disabled' })
+  await page.getByRole('button', { name: '取消', exact: true }).click()
+  await expect(page.getByLabel('一次性绑定码', { exact: true })).toHaveCount(0)
+})
 
 test('本地产品边界：旧云路由进入404并保留现场会话，连接页展示本地配置', async ({ page }) => {
   await login(page)

@@ -53,6 +53,12 @@ export const navigationGroups = [
     ]
   },
   {
+    key: 'settings',
+    label: '设置',
+    icon: SettingIcon,
+    items: [{ key: 'cloud-connection', title: '云端连接', to: '/settings/cloud-connection', roles: ['ADMIN'] }]
+  },
+  {
     key: 'profile',
     label: '个人中心',
     icon: UserCircleIcon,

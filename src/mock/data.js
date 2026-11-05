@@ -16,6 +16,13 @@ const createSeedData = ({
   jobs: jobsOverride = null,
   batchDispatchEnabled = isFeatureEnabled('batchDispatch')
 } = {}) => ({
+  cloudConnection: {
+    revision: 0, enabled: false, bound: false, state: 'DISABLED', connected: false,
+    apiUrl: '', mqttUrl: '', caCertificateConfigured: false,
+    gatewayId: null, gatewayName: null, organizationId: null, organizationName: null,
+    farmId: null, farmName: null, credentialExpiresAt: null, lastAckAt: null,
+    errorCode: null, pending: false, fullModelEnabled: true
+  },
   users: initialized ? [
     {
       id: 1,
