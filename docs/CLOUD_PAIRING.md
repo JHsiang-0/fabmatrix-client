@@ -1,12 +1,12 @@
 # 手机扫码连接云端
 
-## 统一远程控制（本期源码）
+## 统一远程控制（本机已部署，授权关闭）
 
 云端连接页只保留一个“允许远程控制”开关，与数据上报分开。暂停、恢复、取消、喷嘴/热床温度、手动料冷风扇、打印速度倍率、挤出倍率和关闭全部加热在同一范围说明中展示，不再逐项授权。
 
 界面只读取Server的`remoteEnabled`、`unifiedControlSupported`和`authorizationVersion:1`，写入`{remoteEnabled,authorizationVersion:1,revision}`。旧单项bool不会在Client用OR/AND合成新权限；旧Server保持只读并提示升级，旧配置需要明确重新确认。关闭不取消打印、不开关加热，也不关闭上报。请求冲突、丢失响应、账号/绑定变化不自动重发。
 
-源码验证：472项Node、lint、正式和桌面构建、2项Mock浏览器流程通过，包含单一开关、取消无写入、重确认、旧版只读及375px布局。实际安装版尚未升级至本次统一授权代码，未变更真实授权或发送设备命令。范围和后端边界见[生产控制能力矩阵](../../../Java/fabmatrix-cloud/docs/REMOTE_CONTROL_CAPABILITIES.md)。下文为此前双开关温控版本的历史交付。
+源码验证：472项Node、lint、正式和桌面构建、2项Mock浏览器流程及完整release:gate通过，包含单一开关、取消无写入、重确认、旧版只读及375px布局。2026-11-08原安装目录已覆盖升级，安装器退出0，安装ASAR摘要CF9842210D0D512DEFE2F7E21E641A5C25A57A622E11FB85887F2B8763CEE53C与最终制品一致。普通用户启动后已观察本地登录页，没有自动登录或清理数据；统一授权仍关闭、真实命令0。配套Cloud V27、Server与手机开发版28已升级，上报回执恢复但31台源观测仍陈旧。范围和后端边界见[生产控制能力矩阵](../../../Java/fabmatrix-cloud/docs/REMOTE_CONTROL_CAPABILITIES.md)与[四端实际部署](../../../Java/fabmatrix-cloud/docs/REMOTE_PRODUCTION_CONTROL_ROLLOUT_20261108.md)。下文为此前双开关温控版本的历史交付。
 
 ## 远程温度单独授权（本机已部署，授权关闭）
 
