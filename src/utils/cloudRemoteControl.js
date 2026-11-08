@@ -4,7 +4,14 @@ const policy = value => {
   if (typeof value?.enabled !== 'boolean' || !Number.isSafeInteger(value?.revision) || value.revision < 0) {
     throw new Error('INVALID_REMOTE_POLICY')
   }
-  return { enabled: value.enabled, revision: value.revision }
+  const result = { enabled: value.enabled, revision: value.revision }
+  if (value.temperatureSupported !== undefined || value.temperatureEnabled !== undefined) {
+    if (typeof value.temperatureSupported !== 'boolean' || typeof value.temperatureEnabled !== 'boolean'
+      || (!value.temperatureSupported && value.temperatureEnabled)) throw new Error('INVALID_TEMPERATURE_POLICY')
+    result.temperatureSupported = value.temperatureSupported
+    result.temperatureEnabled = value.temperatureEnabled
+  }
+  return result
 }
 const status = error => error?.status ?? error?.response?.status
 
@@ -34,20 +41,24 @@ export function createRemotePausePolicy({ state, read, write, current, scope, co
     }
   }
 
-  async function change(enabled) {
+  async function changeSetting(field, enabled) {
     if (typeof enabled !== 'boolean' || !current() || !canChange() || state.loading || state.busy || !state.policy || state.supported !== true) return
+    const temperature = field === 'temperatureEnabled'
+    if (temperature && state.policy.temperatureSupported !== true) return
     const expectedScope = scope()
     const revision = state.policy.revision
     state.busy = true
     onBusy(true)
     state.error = ''
     try {
-      if (enabled) await confirm('允许具有此农场操作权限的云账号暂停当前打印？此授权与数据上报分别管理。', '允许远程暂停')
+      if (enabled) await confirm(
+        temperature ? '允许具有此农场操作权限的云账号设置喷嘴和热床目标温度？设为 0°C 会关闭对应加热器。此授权与远程暂停分别管理。' : '允许具有此农场操作权限的云账号暂停当前打印？此授权与数据上报分别管理。',
+        temperature ? '允许远程温度设置' : '允许远程暂停')
       if (!current() || scope() !== expectedScope) return
-      const result = policy(await write({ enabled, revision }))
+      const result = policy(await write({ [field]: enabled, revision }))
       if (current() && scope() === expectedScope) {
         state.policy = result
-        onSuccess(enabled ? '已允许远程暂停' : '远程暂停已关闭')
+        onSuccess(temperature ? (enabled ? '已允许远程温度设置' : '远程温度设置已关闭') : (enabled ? '已允许远程暂停' : '远程暂停已关闭'))
       }
     } catch (error) {
       if (!current() || scope() !== expectedScope) return
@@ -59,7 +70,7 @@ export function createRemotePausePolicy({ state, read, write, current, scope, co
       } else {
         state.error = status(error) === 404
           ? '当前 Server 尚不支持远程暂停，请先升级 Server。'
-          : '修改远程暂停授权失败，请刷新后重试。'
+          : '修改远程控制授权失败，请刷新后重试。'
         if (status(error) === 404) { state.policy = null; state.supported = false }
         else state.policy = null
       }
@@ -73,5 +84,5 @@ export function createRemotePausePolicy({ state, read, write, current, scope, co
     generation += 1
     Object.assign(state, initialRemotePausePolicy())
   }
-  return { load, change, clear }
+  return { load, change: enabled => changeSetting('enabled', enabled), changeTemperature: enabled => changeSetting('temperatureEnabled', enabled), clear }
 }

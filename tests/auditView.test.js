@@ -13,8 +13,8 @@ test('未知审计动作不把原始枚举直接当作界面文案', () => {
   assert.equal(getAuditActionLabel(), '未记录动作')
 })
 
-test('远程暂停和授权变更显示中文并可在已有动作筛选中选取', () => {
-  for (const [value, label] of Object.entries({ REMOTE_CONTROL_ENABLE: '允许远程暂停', REMOTE_CONTROL_DISABLE: '关闭远程暂停', REMOTE_PAUSE: '远程暂停打印' })) {
+test('远程操作和独立授权变更显示中文并可在已有动作筛选中选取', () => {
+  for (const [value, label] of Object.entries({ REMOTE_CONTROL_ENABLE: '允许远程暂停', REMOTE_CONTROL_DISABLE: '关闭远程暂停', REMOTE_PAUSE: '远程暂停打印', REMOTE_TEMPERATURE_ENABLE: '允许远程温度设置', REMOTE_TEMPERATURE_DISABLE: '关闭远程温度设置', REMOTE_SET_HEATER_TARGET: '设置加热器目标温度' })) {
     assert.equal(getAuditActionLabel(value), label)
     assert.ok(AUDIT_ACTION_OPTIONS.some(option => option.value === value && option.label === label))
   }

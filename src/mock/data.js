@@ -17,7 +17,7 @@ const createSeedData = ({
   batchDispatchEnabled = isFeatureEnabled('batchDispatch')
 } = {}) => ({
   cloudPairing: null,
-  cloudRemoteControl: { enabled: false, revision: 0 },
+  cloudRemoteControl: { enabled: false, temperatureEnabled: false, temperatureSupported: true, revision: 0 },
   cloudConnection: {
     revision: 0, enabled: false, bound: false, state: 'DISABLED', connected: false,
     apiUrl: '', mqttUrl: '', caCertificateConfigured: false,

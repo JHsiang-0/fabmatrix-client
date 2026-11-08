@@ -2634,10 +2634,12 @@ const handleCloudConnection = config => {
   if (path.endsWith('/remote-control')) {
     const policy = mockState.cloudRemoteControl
     if (method === 'GET') return { ...policy }
-    if (method !== 'PUT' || typeof body.enabled !== 'boolean') fail(400, 400, '授权参数无效')
+    const fields = ['enabled', 'temperatureEnabled'].filter(field => Object.hasOwn(body, field))
+    if (method !== 'PUT' || !fields.length || fields.some(field => typeof body[field] !== 'boolean')) fail(400, 400, '授权参数无效')
     if (body.revision !== policy.revision) fail(409, 409, '授权已更新，请刷新后重试')
-    if (body.enabled && !state.bound) fail(409, 409, '请先绑定云网关')
-    Object.assign(policy, { enabled: body.enabled, revision: policy.revision + 1 })
+    if (fields.some(field => body[field]) && !state.bound) fail(409, 409, '请先绑定云网关')
+    if (Object.hasOwn(body, 'temperatureEnabled') && !policy.temperatureSupported) fail(400, 400, '当前 Server 不支持温度设置')
+    Object.assign(policy, Object.fromEntries(fields.map(field => [field, body[field]])), { revision: policy.revision + 1 })
     return { ...policy }
   }
   if (!(method === 'GET' && path.endsWith('/connection'))) {
@@ -2654,7 +2656,7 @@ const handleCloudConnection = config => {
       if (path.endsWith('/cancel')) { mockState.cloudPairing = null; return null }
       if (mockState.cloudPairing.expiresAt <= Date.now()) mockState.cloudPairing.state = 'EXPIRED'
       if (mockState.cloudPairing.state === 'COMPLETED') {
-        Object.assign(mockState.cloudRemoteControl, { enabled: false, revision: mockState.cloudRemoteControl.revision + 1 })
+        Object.assign(mockState.cloudRemoteControl, { enabled: false, temperatureEnabled: false, revision: mockState.cloudRemoteControl.revision + 1 })
         Object.assign(state, { bound: true, enabled: false, organizationName: '扫码组织', farmName: '扫码农场', gatewayName: '扫码网关' })
         state.revision++
         mockState.cloudPairing.qrContent = ''
@@ -2670,7 +2672,7 @@ const handleCloudConnection = config => {
         organizationName: '测试组织', farmId: 'mock-farm', farmName: '测试农场',
         credentialExpiresAt: Date.now() + 2592000000, lastAckAt: null, errorCode: null })
       action = 'CLOUD_BIND'
-      Object.assign(mockState.cloudRemoteControl, { enabled: false, revision: mockState.cloudRemoteControl.revision + 1 })
+      Object.assign(mockState.cloudRemoteControl, { enabled: false, temperatureEnabled: false, revision: mockState.cloudRemoteControl.revision + 1 })
     } else if (method === 'PUT' && path.endsWith('/reporting')) {
       if (!state.bound) fail(400, 400, '请先绑定云网关')
       Object.assign(state, { enabled: body.enabled, connected: body.enabled,
@@ -2681,7 +2683,7 @@ const handleCloudConnection = config => {
         gatewayId: null, gatewayName: null, organizationId: null, organizationName: null,
         farmId: null, farmName: null, apiUrl: '', mqttUrl: '', credentialExpiresAt: null, lastAckAt: null })
       action = 'CLOUD_UNBIND'
-      Object.assign(mockState.cloudRemoteControl, { enabled: false, revision: mockState.cloudRemoteControl.revision + 1 })
+      Object.assign(mockState.cloudRemoteControl, { enabled: false, temperatureEnabled: false, revision: mockState.cloudRemoteControl.revision + 1 })
     } else if (method === 'POST' && path.endsWith('/refresh-binding')) {
       if (!state.bound) fail(400, 400, '当前 Server 尚未绑定云网关')
     } else fail(404, 404, '未找到云端连接接口')

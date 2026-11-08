@@ -34,6 +34,7 @@
           </dl>
           <t-typography-text theme="secondary">关闭后保留绑定和云端历史。云端会在心跳超时后显示离线或数据过期。</t-typography-text>
         </t-card>
+        <t-alert v-if="remoteState.error" :theme="remoteState.supported === false ? 'info' : 'warning'" :close-btn="false">{{ remoteState.error }}</t-alert>
         <t-card bordered title="远程暂停授权">
           <div class="cloud-reporting-row">
             <div>
@@ -47,8 +48,23 @@
               @keydown.enter.prevent="remotePolicy.change(remoteState.policy?.enabled !== true)"
               @keydown.space.prevent="remotePolicy.change(remoteState.policy?.enabled !== true)" />
           </div>
-          <t-alert v-if="remoteState.error" :theme="remoteState.supported === false ? 'info' : 'warning'" :close-btn="false">{{ remoteState.error }}</t-alert>
-          <t-typography-text theme="secondary">默认关闭。绑定网关或启用上报不会自动授权；关闭立即阻止新的远程暂停，不改变当前打印状态。当前阶段只支持暂停。</t-typography-text>
+          <t-typography-text theme="secondary">默认关闭。绑定网关或启用上报不会自动授权；关闭立即阻止新的远程暂停，不改变当前打印状态。此开关只授权暂停。</t-typography-text>
+        </t-card>
+        <t-card bordered title="远程温度授权">
+          <div class="cloud-reporting-row">
+            <div>
+              <t-typography-title level="h5">允许远程温度设置</t-typography-title>
+              <p>单独允许具有此农场操作权限的云账号设置喷嘴和热床目标温度。授权同步后，手机机器详情中的温度卡片可提交设置。</p>
+            </div>
+            <t-switch :value="remoteState.policy?.temperatureEnabled === true"
+              :disabled="temperatureDisabled" role="switch"
+              aria-label="允许远程温度设置" :aria-checked="remoteState.policy?.temperatureEnabled === true" :aria-disabled="temperatureDisabled"
+              :tabindex="temperatureDisabled ? -1 : 0" @change="remotePolicy.changeTemperature"
+              @keydown.enter.prevent="remotePolicy.changeTemperature(remoteState.policy?.temperatureEnabled !== true)"
+              @keydown.space.prevent="remotePolicy.changeTemperature(remoteState.policy?.temperatureEnabled !== true)" />
+          </div>
+          <t-alert v-if="remoteState.policy && remoteState.policy.temperatureSupported !== true" theme="info" :close-btn="false">当前 Server 尚不支持远程温度设置，请先升级。</t-alert>
+          <t-typography-text theme="secondary">默认关闭，与远程暂停独立。关闭授权不会关闭已开启的加热；需要关闭加热时，请将对应加热器目标设为 0°C。提交后以现场回执和实时目标值为准。</t-typography-text>
         </t-card>
         <t-card bordered title="网关绑定">
           <dl v-if="connection.bound" class="cloud-info-grid">
@@ -124,6 +140,7 @@ let timer
 const current = () => active && user.isAuthenticated && user.isAdmin && user.getSessionGeneration() === generation
 const remoteState = reactive(initialRemotePausePolicy())
 const remoteDisabled = computed(() => busy.value || remoteState.loading || !remoteState.policy || remoteState.supported !== true || !connection.value?.bound || !user.isAdmin)
+const temperatureDisabled = computed(() => remoteDisabled.value || remoteState.policy?.temperatureSupported !== true)
 const remotePolicy = createRemotePausePolicy({
   state: remoteState,
   read: async () => (await getCloudRemoteControl()).data,

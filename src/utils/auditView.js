@@ -29,6 +29,9 @@ const ACTION_LABELS = Object.freeze({
   CLOUD_CONNECTION_CHANGE: '变更云端连接',
   REMOTE_CONTROL_ENABLE: '允许远程暂停',
   REMOTE_CONTROL_DISABLE: '关闭远程暂停',
+  REMOTE_TEMPERATURE_ENABLE: '允许远程温度设置',
+  REMOTE_TEMPERATURE_DISABLE: '关闭远程温度设置',
+  REMOTE_SET_HEATER_TARGET: '设置加热器目标温度',
   REMOTE_PAUSE: '远程暂停打印'
 })
 
