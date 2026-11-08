@@ -34,6 +34,20 @@
           </dl>
           <t-typography-text theme="secondary">关闭后保留绑定和云端历史。云端会在心跳超时后显示离线或数据过期。</t-typography-text>
         </t-card>
+        <t-card bordered title="远程暂停授权">
+          <div class="cloud-reporting-row">
+            <div>
+              <t-typography-title level="h5">允许远程暂停</t-typography-title>
+              <p>由当前本地管理员单独授权。开启后，具有此农场操作权限的云账号可请求暂停当前打印，现场 Server 会再次核验设备、任务和有效期。</p>
+            </div>
+            <t-switch :value="remoteState.policy?.enabled === true"
+              :disabled="busy || remoteState.loading || remoteState.supported !== true || !connection.bound"
+              aria-label="允许远程暂停" :aria-checked="remoteState.policy?.enabled === true"
+              @change="remotePolicy.change" />
+          </div>
+          <t-alert v-if="remoteState.error" :theme="remoteState.supported === false ? 'info' : 'warning'" :close-btn="false">{{ remoteState.error }}</t-alert>
+          <t-typography-text theme="secondary">默认关闭。绑定网关或启用上报不会自动授权；关闭立即阻止新的远程暂停，不改变当前打印状态。当前阶段只支持暂停。</t-typography-text>
+        </t-card>
         <t-card bordered title="网关绑定">
           <dl v-if="connection.bound" class="cloud-info-grid">
             <div><dt>组织</dt><dd><span>{{ connection.organizationName || '待获取名称' }}</span><small>{{ connection.organizationId }}</small></dd></div>
@@ -81,10 +95,11 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useUserStore } from '@/stores/user'
-import { getCloudConnection, bindCloudGateway, setCloudReporting, refreshCloudBinding, unbindCloudGateway } from '@/api/cloudConnection'
+import { getCloudConnection, bindCloudGateway, setCloudReporting, refreshCloudBinding, unbindCloudGateway, getCloudRemoteControl, setCloudRemoteControl } from '@/api/cloudConnection'
 import { confirmMessage, message } from '@/utils/message'
 import { formatDateTime } from '@/utils/formatters'
 import CloudPairingPanel from '@/components/CloudPairingPanel.vue'
+import { initialRemotePausePolicy, createRemotePausePolicy } from '@/utils/cloudRemoteControl'
 
 const user = useUserStore()
 const generation = user.getSessionGeneration()
@@ -105,6 +120,18 @@ const form = reactive({ apiUrl: '', mqttUrl: '', bindingToken: '', useSystemTrus
 let active = true
 let timer
 const current = () => active && user.isAuthenticated && user.isAdmin && user.getSessionGeneration() === generation
+const remoteState = reactive(initialRemotePausePolicy())
+const remotePolicy = createRemotePausePolicy({
+  state: remoteState,
+  read: async () => (await getCloudRemoteControl()).data,
+  write: async data => (await setCloudRemoteControl(data)).data,
+  current,
+  scope: () => `${connection.value?.gatewayId || ''}:${connection.value?.revision ?? ''}`,
+  canChange: () => !busy.value && connection.value?.bound,
+  confirm: confirmMessage,
+  onBusy: value => { busy.value = value },
+  onSuccess: text => message.success(text)
+})
 const date = value => value ? formatDateTime(value) : '暂无记录'
 const statusLabel = computed(() => {
   if (!connection.value?.bound && connection.value?.state !== 'CONFIG_ERROR') return '未绑定'
@@ -117,7 +144,10 @@ async function load() {
   loading.value = true
   try {
     const response = await getCloudConnection()
-    if (current()) { connection.value = response.data; error.value = '' }
+    if (current()) {
+      connection.value = response.data; error.value = ''
+      await remotePolicy.load()
+    }
   } catch (cause) { if (current()) error.value = cause.message || '读取云端连接失败' }
   finally { if (current()) loading.value = false }
 }
@@ -195,7 +225,7 @@ onMounted(() => {
   void load()
   timer = setInterval(() => { if (!document.hidden && !bindingVisible.value && !pairingVisible.value) void load() }, 10000)
 })
-onUnmounted(() => { active = false; clearInterval(timer); clearBindingSecret() })
+onUnmounted(() => { active = false; clearInterval(timer); clearBindingSecret(); remotePolicy.clear() })
 </script>
 
 <style scoped>

@@ -9,3 +9,5 @@ export const unbindCloudGateway = revision => request({ url: '/api/v1/cloud/unbi
 export const startCloudPairing = data => request({ url: '/api/v1/cloud/pairing/start', method: 'post', data, notifyError: false })
 export const pollCloudPairing = data => request({ url: '/api/v1/cloud/pairing/poll', method: 'post', data, notifyError: false })
 export const cancelCloudPairing = data => request({ url: '/api/v1/cloud/pairing/cancel', method: 'post', data, notifyError: false })
+export const getCloudRemoteControl = () => request({ url: '/api/v1/cloud/remote-control', method: 'get', notifyError: false })
+export const setCloudRemoteControl = data => request({ url: '/api/v1/cloud/remote-control', method: 'put', data, notifyError: false })
