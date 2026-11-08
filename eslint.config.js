@@ -31,7 +31,7 @@ export default defineConfig([
     },
   },
 
-  globalIgnores(['**/dist/**', '**/dist-ssr/**', '**/coverage/**', 'release/**']),
+  globalIgnores(['**/dist/**', '**/dist-ssr/**', '**/coverage/**', 'release/**', 'test-results/**', 'playwright-report/**']),
 
   {
     languageOptions: {
