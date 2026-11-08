@@ -35,36 +35,24 @@
           <t-typography-text theme="secondary">关闭后保留绑定和云端历史。云端会在心跳超时后显示离线或数据过期。</t-typography-text>
         </t-card>
         <t-alert v-if="remoteState.error" :theme="remoteState.supported === false ? 'info' : 'warning'" :close-btn="false">{{ remoteState.error }}</t-alert>
-        <t-card bordered title="远程暂停授权">
+        <t-card bordered title="远程控制">
           <div class="cloud-reporting-row">
             <div>
-              <t-typography-title level="h5">允许远程暂停</t-typography-title>
-              <p>由当前本地管理员单独授权。开启后，具有此农场操作权限的云账号可请求暂停当前打印，现场 Server 会再次核验设备、任务和有效期。</p>
+              <t-typography-title level="h5">允许远程控制</t-typography-title>
+              <p>统一管理手机端的生产控制。开启后，具有此农场操作权限的云账号可按设备能力操作，现场 Server 仍会核验身份、任务、状态和有效期。</p>
             </div>
-            <t-switch :value="remoteState.policy?.enabled === true"
+            <t-switch :value="remoteState.policy?.remoteEnabled === true"
               :disabled="remoteDisabled" role="switch"
-              aria-label="允许远程暂停" :aria-checked="remoteState.policy?.enabled === true" :aria-disabled="remoteDisabled"
+              aria-label="允许远程控制" :aria-checked="remoteState.policy?.remoteEnabled === true" :aria-disabled="remoteDisabled"
               :tabindex="remoteDisabled ? -1 : 0" @change="remotePolicy.change"
-              @keydown.enter.prevent="remotePolicy.change(remoteState.policy?.enabled !== true)"
-              @keydown.space.prevent="remotePolicy.change(remoteState.policy?.enabled !== true)" />
+              @keydown.enter.prevent="remotePolicy.change(remoteState.policy?.remoteEnabled !== true)"
+              @keydown.space.prevent="remotePolicy.change(remoteState.policy?.remoteEnabled !== true)" />
           </div>
-          <t-typography-text theme="secondary">默认关闭。绑定网关或启用上报不会自动授权；关闭立即阻止新的远程暂停，不改变当前打印状态。此开关只授权暂停。</t-typography-text>
-        </t-card>
-        <t-card bordered title="远程温度授权">
-          <div class="cloud-reporting-row">
-            <div>
-              <t-typography-title level="h5">允许远程温度设置</t-typography-title>
-              <p>单独允许具有此农场操作权限的云账号设置喷嘴和热床目标温度。授权同步后，手机机器详情中的温度卡片可提交设置。</p>
-            </div>
-            <t-switch :value="remoteState.policy?.temperatureEnabled === true"
-              :disabled="temperatureDisabled" role="switch"
-              aria-label="允许远程温度设置" :aria-checked="remoteState.policy?.temperatureEnabled === true" :aria-disabled="temperatureDisabled"
-              :tabindex="temperatureDisabled ? -1 : 0" @change="remotePolicy.changeTemperature"
-              @keydown.enter.prevent="remotePolicy.changeTemperature(remoteState.policy?.temperatureEnabled !== true)"
-              @keydown.space.prevent="remotePolicy.changeTemperature(remoteState.policy?.temperatureEnabled !== true)" />
-          </div>
-          <t-alert v-if="remoteState.policy && remoteState.policy.temperatureSupported !== true" theme="info" :close-btn="false">当前 Server 尚不支持远程温度设置，请先升级。</t-alert>
-          <t-typography-text theme="secondary">默认关闭，与远程暂停独立。关闭授权不会关闭已开启的加热；需要关闭加热时，请将对应加热器目标设为 0°C。提交后以现场回执和实时目标值为准。</t-typography-text>
+          <t-alert v-if="remoteState.policy?.requiresReauthorization" theme="warning" :close-btn="false">原版本的单项授权不会自动扩大。请核对下方范围后，重新确认统一授权。</t-alert>
+          <t-space v-if="remoteState.policy?.supportedActions.length" class="remote-control-actions" break-line>
+            <t-tag v-for="action in remoteState.policy.supportedActions" :key="action" variant="light">{{ REMOTE_CONTROL_ACTION_LABELS[action] }}</t-tag>
+          </t-space>
+          <t-typography-text theme="secondary">默认关闭，绑定和上报不会自动开启。关闭会阻止新的远程操作，不会取消当前打印、关闭加热或停止上报。具体可用操作由手机上的设备状态决定。</t-typography-text>
         </t-card>
         <t-card bordered title="网关绑定">
           <dl v-if="connection.bound" class="cloud-info-grid">
@@ -117,7 +105,7 @@ import { getCloudConnection, bindCloudGateway, setCloudReporting, refreshCloudBi
 import { confirmMessage, message } from '@/utils/message'
 import { formatDateTime } from '@/utils/formatters'
 import CloudPairingPanel from '@/components/CloudPairingPanel.vue'
-import { initialRemotePausePolicy, createRemotePausePolicy } from '@/utils/cloudRemoteControl'
+import { initialRemoteControlPolicy, createRemoteControlPolicy, REMOTE_CONTROL_ACTION_LABELS } from '@/utils/cloudRemoteControl'
 
 const user = useUserStore()
 const generation = user.getSessionGeneration()
@@ -138,10 +126,9 @@ const form = reactive({ apiUrl: '', mqttUrl: '', bindingToken: '', useSystemTrus
 let active = true
 let timer
 const current = () => active && user.isAuthenticated && user.isAdmin && user.getSessionGeneration() === generation
-const remoteState = reactive(initialRemotePausePolicy())
+const remoteState = reactive(initialRemoteControlPolicy())
 const remoteDisabled = computed(() => busy.value || remoteState.loading || !remoteState.policy || remoteState.supported !== true || !connection.value?.bound || !user.isAdmin)
-const temperatureDisabled = computed(() => remoteDisabled.value || remoteState.policy?.temperatureSupported !== true)
-const remotePolicy = createRemotePausePolicy({
+const remotePolicy = createRemoteControlPolicy({
   state: remoteState,
   read: async () => (await getCloudRemoteControl()).data,
   write: async data => (await setCloudRemoteControl(data)).data,
@@ -254,6 +241,7 @@ onUnmounted(() => { active = false; clearInterval(timer); clearBindingSecret(); 
 .cloud-connection-header, .cloud-reporting-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .cloud-connection-header h1 { margin: 0 0 8px; font-size: 24px; }
 .cloud-reporting-row p { color: var(--td-text-color-secondary); }
+.remote-control-actions { display: flex; margin: 16px 0; }
 .cloud-info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 20px; margin: 24px 0; }
 .cloud-info-grid dt { color: var(--td-text-color-secondary); margin-bottom: 6px; }
 .cloud-info-grid dd { margin: 0; overflow-wrap: anywhere; }

@@ -20,3 +20,12 @@ test('远程操作和独立授权变更显示中文并可在已有动作筛选�
   }
   assert.equal(getAuditTargetLabel({ targetType: 'REMOTE_COMMAND', targetId: 'command-1' }), '远程操作 #command-1')
 })
+
+test('统一授权及新增生产控制使用独立审计文案，不改写历史暂停授权含义', () => {
+  for (const action of ['REMOTE_UNIFIED_CONTROL_ENABLE', 'REMOTE_UNIFIED_CONTROL_DISABLE', 'REMOTE_RESUME', 'REMOTE_CANCEL',
+    'REMOTE_SET_FAN_SPEED', 'REMOTE_SET_SPEED_FACTOR', 'REMOTE_SET_FLOW_FACTOR', 'REMOTE_HEATERS_OFF']) {
+    assert.notEqual(getAuditActionLabel(action), '其他操作')
+    assert.ok(AUDIT_ACTION_OPTIONS.some(option => option.value === action))
+  }
+  assert.equal(getAuditActionLabel('REMOTE_CONTROL_ENABLE'), '允许远程暂停')
+})

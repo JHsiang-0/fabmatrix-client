@@ -1,130 +1,125 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createRemotePausePolicy, initialRemotePausePolicy } from '../src/utils/cloudRemoteControl.js'
+import { createRemoteControlPolicy, initialRemoteControlPolicy, REMOTE_CONTROL_ACTION_LABELS } from '../src/utils/cloudRemoteControl.js'
 
+const actions = Object.keys(REMOTE_CONTROL_ACTION_LABELS)
+const initial = () => ({ remoteEnabled: false, unifiedControlSupported: true, authorizationVersion: 1,
+  requiresReauthorization: false, supportedActions: [...actions], revision: 1 })
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done }); return { promise, resolve } }
-function fixture({ initialPolicy = { enabled: false, revision: 1 }, ...overrides } = {}) {
-  const state = initialRemotePausePolicy()
+function fixture({ initialPolicy = initial(), ...overrides } = {}) {
+  const state = initialRemoteControlPolicy()
   const writes = []
   let saved = { ...initialPolicy }
-  const controller = createRemotePausePolicy({ state, read: async () => ({ ...saved }), write: async value => { writes.push(value); saved = { ...saved, ...value, revision: value.revision + 1 }; return { ...saved } }, current: () => true, scope: () => 'gateway:1', canChange: () => true, confirm: async () => {}, ...overrides })
+  const controller = createRemoteControlPolicy({ state, read: async () => ({ ...saved }),
+    write: async value => { writes.push(value); saved = { ...saved, ...value, requiresReauthorization: false, revision: value.revision + 1 }; return { ...saved } },
+    current: () => true, scope: () => 'gateway:1', canChange: () => true, confirm: async () => {}, ...overrides })
   return { state, writes, ...controller }
 }
 
-test('local authorization is loaded independently and enable sends the checked revision', async () => {
-  const f = fixture(); await f.load(); assert.equal(f.state.policy.enabled, false)
+test('one catalog authorization writes only the master, consent version and checked revision', async () => {
+  const f = fixture(); await f.load(); assert.equal(f.state.policy.remoteEnabled, false)
   await f.change(true)
-  assert.deepEqual(f.writes, [{ enabled: true, revision: 1 }])
-  assert.deepEqual(f.state.policy, { enabled: true, revision: 2 })
+  assert.deepEqual(f.writes, [{ remoteEnabled: true, authorizationVersion: 1, revision: 1 }])
+  assert.equal(f.state.policy.remoteEnabled, true); assert.equal(f.state.policy.revision, 2)
+  assert.deepEqual(f.state.policy.supportedActions, actions)
 })
+
 test('cancel and readonly authority never write', async () => {
   const f = fixture({ confirm: async () => { throw 'cancel' } }); await f.load(); await f.change(true)
   assert.equal(f.writes.length, 0)
   const viewer = fixture({ canChange: () => false }); await viewer.load(); await viewer.change(true)
   assert.equal(viewer.writes.length, 0)
 })
-test('disable is immediate without confirmation, double enable cannot submit twice', async () => {
-  let confirms = 0
-  const wait = deferred()
+
+test('disable is immediate; pending confirmation cannot submit twice or toggle another setting', async () => {
+  let confirms = 0; const wait = deferred()
   const f = fixture({ confirm: () => { confirms++; return wait.promise } }); await f.load()
   await f.change(false); assert.equal(confirms, 0)
-  const pending = f.change(true); await f.change(true); wait.resolve(); await pending
+  const pending = f.change(true); await f.change(true); await f.change(false); wait.resolve(); await pending
   assert.equal(confirms, 1); assert.equal(f.writes.length, 2)
+  assert.equal(f.state.policy.remoteEnabled, true)
 })
-test('CAS conflict refreshes authoritative state without automatically repeating the write', async () => {
+
+test('confirmation describes the exact catalog, cancellation and independence from reporting', async () => {
+  const f = fixture({ confirm: async (body, title) => {
+    assert.equal(title, '允许远程控制')
+    for (const label of Object.values(REMOTE_CONTROL_ACTION_LABELS)) assert.ok(body.includes(label))
+    assert.match(body, /取消打印不可恢复/); assert.match(body, /不影响数据上报/)
+  } }); await f.load(); await f.change(true)
+  assert.equal(f.writes.length, 1)
+})
+
+test('legacy pause and temperature flags never grant the new master', async () => {
+  for (const old of [{ enabled: true, revision: 1 }, { enabled: true, temperatureEnabled: true, temperatureSupported: true, revision: 1 }]) {
+    const f = fixture({ initialPolicy: old }); await f.load(); await f.change(true)
+    assert.equal(f.state.policy.remoteEnabled, false); assert.equal(f.state.supported, false)
+    assert.equal(f.writes.length, 0); assert.match(f.state.error, /升级/)
+  }
+  const f = fixture({ initialPolicy: { ...initial(), enabled: true, temperatureEnabled: true } }); await f.load()
+  assert.equal(f.state.policy.remoteEnabled, false)
+})
+
+test('legacy configuration requires explicit new consent before enabling all controls', async () => {
+  const f = fixture({ initialPolicy: { ...initial(), requiresReauthorization: true } }); await f.load()
+  assert.equal(f.state.policy.remoteEnabled, false); await f.change(true)
+  assert.equal(f.state.policy.remoteEnabled, true); assert.equal(f.state.policy.requiresReauthorization, false)
+})
+
+test('CAS conflict refreshes without repeating an authorization write', async () => {
   let reads = 0; let writes = 0
-  const f = fixture({ read: async () => ({ enabled: false, revision: ++reads }), write: async () => { writes++; throw { status: 409 } } })
+  const f = fixture({ read: async () => ({ ...initial(), revision: ++reads }), write: async () => { writes++; throw { status: 409 } } })
   await f.load(); await f.change(true)
   assert.equal(writes, 1); assert.equal(f.state.policy.revision, 2); assert.match(f.state.error, /重新确认/)
+  assert.equal(f.state.busy, false)
 })
-test('old server and malformed policy fail closed', async () => {
+
+test('old endpoint and malformed consent fail closed', async () => {
   const old = fixture({ read: async () => { throw { status: 404 } } }); await old.load(); await old.change(true)
   assert.equal(old.state.supported, false); assert.match(old.state.error, /升级/); assert.equal(old.writes.length, 0)
-  const bad = fixture({ read: async () => ({ enabled: 'false', revision: -1 }) }); await bad.load()
-  assert.equal(bad.state.policy, null)
+  for (const changes of [{ remoteEnabled: 'false' }, { authorizationVersion: 2 }, { revision: -1 }, { revision: 0 },
+    { supportedActions: ['GCODE'] }, { supportedActions: [] }, { supportedActions: ['PAUSE', 'PAUSE'] },
+    { requiresReauthorization: 'false' }, { remoteEnabled: true, requiresReauthorization: true }]) {
+    const bad = fixture({ initialPolicy: { ...initial(), ...changes } }); await bad.load(); await bad.change(true)
+    assert.equal(bad.state.policy, null); assert.equal(bad.writes.length, 0)
+  }
 })
-test('session or binding changes invalidate pending confirmation and late responses', async () => {
+
+test('session and binding changes invalidate pending confirmation and late responses', async () => {
   const wait = deferred(); let scope = 'first'
   const f = fixture({ scope: () => scope, confirm: () => wait.promise }); await f.load()
   const pending = f.change(true); scope = 'second'; wait.resolve(); await pending
   assert.equal(f.writes.length, 0)
   const response = deferred(); let active = true
   const late = fixture({ current: () => active, write: () => response.promise }); await late.load()
-  const changing = late.change(false); active = false; late.clear(); response.resolve({ enabled: true, revision: 3 }); await changing
+  const changing = late.change(false); active = false; late.clear(); response.resolve({ ...initial(), remoteEnabled: true, revision: 2 }); await changing
   assert.equal(late.state.policy, null)
 })
+
 test('lost write result never assumes success or silently retries', async () => {
   let attempts = 0
   const f = fixture({ write: async () => { attempts++; throw new Error('timeout') } }); await f.load(); await f.change(true)
   assert.equal(attempts, 1); assert.equal(f.state.policy, null); assert.match(f.state.error, /刷新/)
 })
 
-const temperaturePolicy = { enabled: false, temperatureEnabled: false, temperatureSupported: true, revision: 1 }
-test('temperature permission is separate and omitted fields preserve the other permission', async () => {
-  const f = fixture({ initialPolicy: temperaturePolicy }); await f.load()
-  await f.changeTemperature(true)
-  assert.deepEqual(f.writes[0], { temperatureEnabled: true, revision: 1 })
-  assert.equal(f.state.policy.enabled, false); assert.equal(f.state.policy.temperatureEnabled, true)
-  await f.change(true)
-  assert.deepEqual(f.writes[1], { enabled: true, revision: 2 })
-  assert.equal(f.state.policy.temperatureEnabled, true)
-  await f.changeTemperature(false)
-  assert.deepEqual(f.writes[2], { temperatureEnabled: false, revision: 3 })
-  assert.equal(f.state.policy.enabled, true); assert.equal(f.state.policy.temperatureEnabled, false)
-})
-test('legacy or malformed temperature capability never grants temperature permission', async () => {
-  const old = fixture(); await old.load(); await old.changeTemperature(true)
-  assert.equal(old.writes.length, 0); assert.equal(old.state.policy.temperatureEnabled, undefined)
-  for (const invalid of [
-    { ...temperaturePolicy, temperatureEnabled: 'true' },
-    { ...temperaturePolicy, temperatureSupported: false, temperatureEnabled: true },
-    { ...temperaturePolicy, temperatureSupported: 1 }
-  ]) {
-    const bad = fixture({ initialPolicy: invalid }); await bad.load(); await bad.changeTemperature(true)
-    assert.equal(bad.state.policy, null); assert.equal(bad.writes.length, 0)
+test('unapplied, legacy, stale or newly expanded write responses cannot report a grant', async () => {
+  for (const response of [{ enabled: true, revision: 2 }, { ...initial(), revision: 2 },
+    { ...initial(), remoteEnabled: true }, { ...initial(), remoteEnabled: true, revision: 2, authorizationVersion: 2 }]) {
+    let successes = 0
+    const f = fixture({ write: async () => response, onSuccess: () => { successes++ } }); await f.load(); await f.change(true)
+    assert.equal(successes, 0); assert.equal(f.state.policy, null); assert.match(f.state.error, /刷新/)
   }
-})
-test('temperature enable confirmation can cancel and concurrent changes cannot bypass it', async () => {
-  const wait = deferred(); let confirms = 0
-  const f = fixture({ initialPolicy: temperaturePolicy, confirm: async (message, title) => { confirms++; assert.match(title, /温度/); assert.match(message, /0°C/); return wait.promise } })
-  await f.load(); const pending = f.changeTemperature(true)
-  await f.change(true); await f.changeTemperature(true)
-  wait.resolve(); await pending
-  assert.equal(confirms, 1); assert.equal(f.writes.length, 1); assert.equal(f.state.policy.enabled, false)
-  const canceled = fixture({ initialPolicy: temperaturePolicy, confirm: async () => { throw 'cancel' } })
-  await canceled.load(); await canceled.changeTemperature(true)
-  assert.equal(canceled.writes.length, 0); assert.equal(canceled.state.policy.temperatureEnabled, false)
-})
-test('temperature readonly, binding changes and CAS conflicts never replay authorization', async () => {
-  const readonly = fixture({ initialPolicy: temperaturePolicy, canChange: () => false })
-  await readonly.load(); await readonly.changeTemperature(true); assert.equal(readonly.writes.length, 0)
-  let scope = 'first'; const wait = deferred()
-  const rebound = fixture({ initialPolicy: temperaturePolicy, scope: () => scope, confirm: () => wait.promise })
-  await rebound.load(); const pending = rebound.changeTemperature(true); scope = 'second'; wait.resolve(); await pending
-  assert.equal(rebound.writes.length, 0)
-  let reads = 0; let attempts = 0
-  const conflict = fixture({ read: async () => ({ ...temperaturePolicy, revision: ++reads }), write: async () => { attempts++; throw { status: 409 } } })
-  await conflict.load(); await conflict.changeTemperature(true)
-  assert.equal(attempts, 1); assert.equal(conflict.state.policy.revision, 2); assert.match(conflict.state.error, /重新确认/)
-})
-test('temperature lost write response and account exit remain fail closed', async () => {
-  let attempts = 0
-  const lost = fixture({ initialPolicy: temperaturePolicy, write: async () => { attempts++; throw new Error('timeout') } })
-  await lost.load(); await lost.changeTemperature(true)
-  assert.equal(attempts, 1); assert.equal(lost.state.policy, null)
-  let active = true; const wait = deferred()
-  const late = fixture({ initialPolicy: temperaturePolicy, current: () => active, write: () => wait.promise })
-  await late.load(); const pending = late.changeTemperature(true); active = false; late.clear()
-  wait.resolve({ ...temperaturePolicy, temperatureEnabled: true, revision: 2 }); await pending
-  assert.equal(late.state.policy, null)
+  let successes = 0
+  const f = fixture({ initialPolicy: { ...initial(), supportedActions: ['PAUSE'] },
+    write: async () => ({ ...initial(), remoteEnabled: true, revision: 2 }), onSuccess: () => { successes++ } })
+  await f.load(); await f.change(true); assert.equal(successes, 0)
 })
 
-test('a legacy or unapplied successful response cannot report a temperature grant', async () => {
-  for (const response of [{ enabled: false, revision: 2 }, { ...temperaturePolicy, revision: 2 }]) {
-    let successes = 0; let writes = 0
-    const f = fixture({ initialPolicy: temperaturePolicy, write: async () => { writes++; return response }, onSuccess: () => { successes++ } })
-    await f.load(); await f.changeTemperature(true)
-    assert.equal(writes, 1); assert.equal(successes, 0); assert.equal(f.state.policy, null)
-    assert.match(f.state.error, /刷新/)
-  }
+test('clearing an old pending request does not release the new operation busy state', async () => {
+  const old = deferred(); const next = deferred(); let calls = 0
+  const f = fixture({ write: () => (++calls === 1 ? old.promise : next.promise) }); await f.load()
+  const first = f.change(false); f.clear(); await f.load(); const second = f.change(true)
+  old.resolve({ ...initial(), revision: 2 }); await first
+  assert.equal(f.state.busy, true)
+  next.resolve({ ...initial(), remoteEnabled: true, revision: 2 }); await second
+  assert.equal(f.state.busy, false); assert.equal(f.state.policy.remoteEnabled, true)
 })

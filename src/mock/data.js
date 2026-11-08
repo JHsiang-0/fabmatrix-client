@@ -1,4 +1,5 @@
 import { isFeatureEnabled } from '../config/features.js'
+import { REMOTE_CONTROL_ACTION_LABELS } from '../utils/cloudRemoteControl.js'
 
 const clone = value => JSON.parse(JSON.stringify(value))
 
@@ -17,7 +18,8 @@ const createSeedData = ({
   batchDispatchEnabled = isFeatureEnabled('batchDispatch')
 } = {}) => ({
   cloudPairing: null,
-  cloudRemoteControl: { enabled: false, temperatureEnabled: false, temperatureSupported: true, revision: 0 },
+  cloudRemoteControl: { remoteEnabled: false, unifiedControlSupported: true, authorizationVersion: 1,
+    requiresReauthorization: false, supportedActions: Object.keys(REMOTE_CONTROL_ACTION_LABELS), revision: 1 },
   cloudConnection: {
     revision: 0, enabled: false, bound: false, state: 'DISABLED', connected: false,
     apiUrl: '', mqttUrl: '', caCertificateConfigured: false,

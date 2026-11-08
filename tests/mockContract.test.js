@@ -171,7 +171,7 @@ test('Mock reconcile、safe assign 和 safe start 成功响应的 data 均为 nu
   }
 })
 
-test('Mock远程授权按单字段更新并在解绑时同时撤销两项授权', async () => {
+test('Mock统一授权必须明确目录版本，关闭及解绑撤销全部控制且不改变上报', async () => {
   resetMockState()
   const sessionKey = 'mock-temperature-policy-session'
   mockState.sessions[sessionKey] = { userId: 1, username: 'admin', role: 'ADMIN' }
@@ -179,19 +179,21 @@ test('Mock远程授权按单字段更新并在解绑时同时撤销两项授权'
   const request = (method, url, data) => mockRequest({ method, url, data, headers })
   try {
     Object.assign(mockState.cloudConnection, { bound: true, enabled: true })
-    Object.assign(mockState.cloudRemoteControl, { enabled: true, temperatureEnabled: true })
     const revision = mockState.cloudRemoteControl.revision
-    const temperature = await request('PUT', '/api/v1/cloud/remote-control', { temperatureEnabled: false, revision })
-    assert.equal(temperature.data.enabled, true)
-    assert.equal(temperature.data.temperatureEnabled, false)
-    const pause = await request('PUT', '/api/v1/cloud/remote-control', { enabled: false, revision: temperature.data.revision })
-    assert.equal(pause.data.temperatureEnabled, false)
-    await request('PUT', '/api/v1/cloud/remote-control', { enabled: true, temperatureEnabled: true, revision: pause.data.revision })
+    await assert.rejects(request('PUT', '/api/v1/cloud/remote-control', { enabled: true, temperatureEnabled: true, revision }))
+    await assert.rejects(request('PUT', '/api/v1/cloud/remote-control', { remoteEnabled: true, authorizationVersion: 2, revision }))
+    const enabled = await request('PUT', '/api/v1/cloud/remote-control', { remoteEnabled: true, authorizationVersion: 1, revision })
+    assert.equal(enabled.data.remoteEnabled, true)
+    assert.equal(enabled.data.supportedActions.length, 8)
+    const disabled = await request('PUT', '/api/v1/cloud/remote-control', { remoteEnabled: false, authorizationVersion: 1, revision: enabled.data.revision })
+    assert.equal(disabled.data.remoteEnabled, false)
+    await request('PUT', '/api/v1/cloud/remote-control', { remoteEnabled: true, authorizationVersion: 1, revision: disabled.data.revision })
     assert.equal(mockState.cloudConnection.enabled, true)
     await request('POST', '/api/v1/cloud/unbind', { revision: mockState.cloudConnection.revision })
-    assert.equal(mockState.cloudRemoteControl.enabled, false)
-    assert.equal(mockState.cloudRemoteControl.temperatureEnabled, false)
-    await assert.rejects(request('PUT', '/api/v1/cloud/remote-control', { temperatureEnabled: true, revision: mockState.cloudRemoteControl.revision }))
+    assert.equal(mockState.cloudRemoteControl.remoteEnabled, false)
+    assert.ok(mockState.auditLogs.some(row => row.action === 'REMOTE_UNIFIED_CONTROL_ENABLE'))
+    assert.ok(mockState.auditLogs.some(row => row.action === 'REMOTE_UNIFIED_CONTROL_DISABLE'))
+    await assert.rejects(request('PUT', '/api/v1/cloud/remote-control', { remoteEnabled: true, authorizationVersion: 1, revision: mockState.cloudRemoteControl.revision }))
   } finally {
     resetMockState()
   }

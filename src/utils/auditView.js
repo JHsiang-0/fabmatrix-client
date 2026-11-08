@@ -31,7 +31,15 @@ const ACTION_LABELS = Object.freeze({
   REMOTE_CONTROL_DISABLE: '关闭远程暂停',
   REMOTE_TEMPERATURE_ENABLE: '允许远程温度设置',
   REMOTE_TEMPERATURE_DISABLE: '关闭远程温度设置',
+  REMOTE_UNIFIED_CONTROL_ENABLE: '允许远程控制',
+  REMOTE_UNIFIED_CONTROL_DISABLE: '关闭远程控制',
   REMOTE_SET_HEATER_TARGET: '设置加热器目标温度',
+  REMOTE_RESUME: '远程恢复打印',
+  REMOTE_CANCEL: '远程取消打印',
+  REMOTE_SET_FAN_SPEED: '远程设置料冷风扇',
+  REMOTE_SET_SPEED_FACTOR: '远程设置打印速度倍率',
+  REMOTE_SET_FLOW_FACTOR: '远程设置挤出倍率',
+  REMOTE_HEATERS_OFF: '远程关闭全部加热',
   REMOTE_PAUSE: '远程暂停打印'
 })
 
