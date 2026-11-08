@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { getAuditActionLabel, getAuditResultView, getAuditTargetLabel } from '../src/utils/auditView.js'
+import { AUDIT_ACTION_OPTIONS, getAuditActionLabel, getAuditResultView, getAuditTargetLabel } from '../src/utils/auditView.js'
 
 test('审计视图将已知动作和目标转换为用户文案', () => {
   assert.equal(getAuditActionLabel('JOB_CANCEL'), '取消打印任务')
@@ -11,4 +11,12 @@ test('审计视图将已知动作和目标转换为用户文案', () => {
 test('未知审计动作不把原始枚举直接当作界面文案', () => {
   assert.equal(getAuditActionLabel('UNRECOGNIZED_ACTION'), '其他操作')
   assert.equal(getAuditActionLabel(), '未记录动作')
+})
+
+test('远程暂停和授权变更显示中文并可在已有动作筛选中选取', () => {
+  for (const [value, label] of Object.entries({ REMOTE_CONTROL_ENABLE: '允许远程暂停', REMOTE_CONTROL_DISABLE: '关闭远程暂停', REMOTE_PAUSE: '远程暂停打印' })) {
+    assert.equal(getAuditActionLabel(value), label)
+    assert.ok(AUDIT_ACTION_OPTIONS.some(option => option.value === value && option.label === label))
+  }
+  assert.equal(getAuditTargetLabel({ targetType: 'REMOTE_COMMAND', targetId: 'command-1' }), '远程操作 #command-1')
 })

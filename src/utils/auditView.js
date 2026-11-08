@@ -26,7 +26,10 @@ const ACTION_LABELS = Object.freeze({
   CLOUD_ENABLE: '开启云端上报',
   CLOUD_DISABLE: '关闭云端上报',
   CLOUD_UNBIND: '解除云网关绑定',
-  CLOUD_CONNECTION_CHANGE: '变更云端连接'
+  CLOUD_CONNECTION_CHANGE: '变更云端连接',
+  REMOTE_CONTROL_ENABLE: '允许远程暂停',
+  REMOTE_CONTROL_DISABLE: '关闭远程暂停',
+  REMOTE_PAUSE: '远程暂停打印'
 })
 
 const TARGET_LABELS = Object.freeze({
@@ -34,7 +37,8 @@ const TARGET_LABELS = Object.freeze({
   PRINTER: '打印机',
   FILE: '文件',
   USER: '用户',
-  CLOUD_GATEWAY: '云网关'
+  CLOUD_GATEWAY: '云网关',
+  REMOTE_COMMAND: '远程操作'
 })
 
 export const AUDIT_ACTION_OPTIONS = Object.freeze(
