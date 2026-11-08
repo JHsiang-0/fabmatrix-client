@@ -245,6 +245,29 @@ test('云端连接：管理员绑定后核对归属、开启关闭和解绑，�
   })
 })
 
+test('云端连接：远程暂停单独授权，取消无写入，关闭不改变上报', async ({ page }) => {
+  await login(page)
+  await page.evaluate(async () => {
+    const { mockState } = await import('/src/mock/data.js')
+    Object.assign(mockState.cloudConnection, { bound: true, gatewayId: 'mock-gateway', enabled: true })
+  })
+  await openSidebarItem(page, 1280, '云端连接')
+  const toggle = page.getByLabel('允许远程暂停', { exact: true })
+  await expect(toggle).toHaveAttribute('aria-checked', 'false')
+  await toggle.click()
+  await expect(page.getByText('允许具有此农场操作权限的云账号暂停当前打印？此授权与数据上报分别管理。', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '取消', exact: true }).click()
+  await expect(page.locator('.t-dialog:visible')).toHaveCount(0)
+  await expect(toggle).toHaveAttribute('aria-checked', 'false')
+  await toggle.focus()
+  await toggle.press('Enter')
+  await page.locator('.t-dialog:visible').getByRole('button', { name: '确定', exact: true }).click()
+  await expect(toggle).toHaveAttribute('aria-checked', 'true')
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-checked', 'false')
+  await expect(page.getByLabel('启用云端数据上报', { exact: true })).toHaveAttribute('aria-checked', 'true')
+})
+
 test('云端连接：操作员入口隐藏且直接路由拒绝，窄屏管理员配置可用', async ({ page }) => {
   await loginAs(page, 'operator', 'Operator123')
   await expect(page.getByText('云端连接', { exact: true })).toHaveCount(0)

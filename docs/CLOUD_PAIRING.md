@@ -6,6 +6,8 @@
 
 页面使用独立的 `GET/PUT /api/v1/cloud/remote-control`，提交当前 `revision`；多人设置冲突后刷新并要求重新确认，不自动覆盖。该界面只授予权限，不直接下发打印命令。验证入口 `node --test tests/cloudRemoteControl.test.js` 覆盖取消、关闭、权限、版本冲突、旧版兼容和迟到响应。真实打印操作未在本轮执行。
 
+Mock 模式同样使用独立授权和版本，重新绑定或解绑时清除旧授权。浏览器验收 `npx playwright test --project=browser --grep '远程暂停单独授权'` 验证键盘确认、取消、独立开启关闭和保持上报设置；未连接现场服务。
+
 2026-11-05 后续部署：获用户授权后覆盖安装正式 Client，退出码 0、已安装 ASAR 与本次新包一致，新版登录页可打开。本机 Cloud V18、Windows Server 和 PJE110 同步升级；通过真实 App 业务层与隔离 Server/新验收农场完成配对和 MQTT ACK，原生产绑定保留。手机要求 PIN，真实相机扫码与桌面登录后路径仍待现场验收。完整版本与边界见 [Cloud 升级记录](../../../Java/fabmatrix-cloud/docs/CLOUD_APP_ROLLOUT_20261105.md)。
 
 本地管理员入口：设置 → 云端连接 → 手机扫码配对。首次填写部署者提供的 Cloud API、MQTT TLS 地址和必要的 CA 公共证书，生成十分钟二维码。手机在「我的 → 扫码连接现场服务器」扫码，核对编号、选择农场并确认。桌面每三秒查询配对结果，成功后展示组织/农场；仍须显式开启数据上报。

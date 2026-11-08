@@ -41,9 +41,11 @@
               <p>由当前本地管理员单独授权。开启后，具有此农场操作权限的云账号可请求暂停当前打印，现场 Server 会再次核验设备、任务和有效期。</p>
             </div>
             <t-switch :value="remoteState.policy?.enabled === true"
-              :disabled="busy || remoteState.loading || remoteState.supported !== true || !connection.bound"
-              aria-label="允许远程暂停" :aria-checked="remoteState.policy?.enabled === true"
-              @change="remotePolicy.change" />
+              :disabled="remoteDisabled" role="switch"
+              aria-label="允许远程暂停" :aria-checked="remoteState.policy?.enabled === true" :aria-disabled="remoteDisabled"
+              :tabindex="remoteDisabled ? -1 : 0" @change="remotePolicy.change"
+              @keydown.enter.prevent="remotePolicy.change(remoteState.policy?.enabled !== true)"
+              @keydown.space.prevent="remotePolicy.change(remoteState.policy?.enabled !== true)" />
           </div>
           <t-alert v-if="remoteState.error" :theme="remoteState.supported === false ? 'info' : 'warning'" :close-btn="false">{{ remoteState.error }}</t-alert>
           <t-typography-text theme="secondary">默认关闭。绑定网关或启用上报不会自动授权；关闭立即阻止新的远程暂停，不改变当前打印状态。当前阶段只支持暂停。</t-typography-text>
@@ -121,6 +123,7 @@ let active = true
 let timer
 const current = () => active && user.isAuthenticated && user.isAdmin && user.getSessionGeneration() === generation
 const remoteState = reactive(initialRemotePausePolicy())
+const remoteDisabled = computed(() => busy.value || remoteState.loading || !remoteState.policy || remoteState.supported !== true || !connection.value?.bound || !user.isAdmin)
 const remotePolicy = createRemotePausePolicy({
   state: remoteState,
   read: async () => (await getCloudRemoteControl()).data,
