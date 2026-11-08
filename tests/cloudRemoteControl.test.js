@@ -118,3 +118,13 @@ test('temperature lost write response and account exit remain fail closed', asyn
   wait.resolve({ ...temperaturePolicy, temperatureEnabled: true, revision: 2 }); await pending
   assert.equal(late.state.policy, null)
 })
+
+test('a legacy or unapplied successful response cannot report a temperature grant', async () => {
+  for (const response of [{ enabled: false, revision: 2 }, { ...temperaturePolicy, revision: 2 }]) {
+    let successes = 0; let writes = 0
+    const f = fixture({ initialPolicy: temperaturePolicy, write: async () => { writes++; return response }, onSuccess: () => { successes++ } })
+    await f.load(); await f.changeTemperature(true)
+    assert.equal(writes, 1); assert.equal(successes, 0); assert.equal(f.state.policy, null)
+    assert.match(f.state.error, /刷新/)
+  }
+})

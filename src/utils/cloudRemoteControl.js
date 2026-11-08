@@ -56,6 +56,7 @@ export function createRemotePausePolicy({ state, read, write, current, scope, co
         temperature ? '允许远程温度设置' : '允许远程暂停')
       if (!current() || scope() !== expectedScope) return
       const result = policy(await write({ [field]: enabled, revision }))
+      if (result[field] !== enabled || (temperature && result.temperatureSupported !== true)) throw new Error('REMOTE_POLICY_NOT_APPLIED')
       if (current() && scope() === expectedScope) {
         state.policy = result
         onSuccess(temperature ? (enabled ? '已允许远程温度设置' : '远程温度设置已关闭') : (enabled ? '已允许远程暂停' : '远程暂停已关闭'))
